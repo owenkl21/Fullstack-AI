@@ -15,16 +15,17 @@ export const chatController = {
    sendMessage: async (req: Request, res: Response) => {
       const parseResult = chatSchema.safeParse(req.body);
       if (!parseResult.success) {
-         res.status(400).json(parseResult.error.format());
+         return res.status(400).json(parseResult.error.format());
       }
 
       try {
-         const { prompt, conversationId } = req.body;
+         const { prompt, conversationId } = parseResult.data;
          const response = await chatService.sendMessage(prompt, conversationId);
 
-         res.json({ message: response.message });
+         return res.json({ message: response.message });
       } catch (error) {
-         res.status(500).json({
+         console.error('Failed to process /api/chat request:', error);
+         return res.status(500).json({
             error: 'An error occurred while processing your request.',
          });
       }
