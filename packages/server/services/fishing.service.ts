@@ -10,7 +10,6 @@ export const fishingService = {
          coordinates.latitude,
          coordinates.longitude
       );
-
       return {
          location: coordinates,
          weather,
