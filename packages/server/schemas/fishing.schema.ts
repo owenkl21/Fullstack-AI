@@ -1,2 +1,6 @@
 // TODO: implement fishing request/response schemas.
-// Suggested responsibility: define runtime validation contracts for fishing endpoints.
+import z from 'zod';
+
+export const fishingRequestSchema = z.object({
+   locationName: z.string().trim().min(1).max(50),
+});

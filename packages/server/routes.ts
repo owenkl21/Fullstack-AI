@@ -1,6 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import { chatController } from './controllers/chat.controller';
+import { fishingController } from './controllers/fishing.controller';
 
 const router = express.Router();
 
@@ -14,4 +15,5 @@ router.get('/api/hello', (req: Request, res: Response) => {
 
 router.post('/api/chat', chatController.sendMessage);
 
+router.post('/api/fishing/conditions', fishingController.getConditions);
 export default router;
