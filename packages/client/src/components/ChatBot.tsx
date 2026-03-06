@@ -7,6 +7,7 @@ import ChatMessages from './ChatMessages';
 import ChatInput, { type ChatFormData } from './ChatInput';
 import popSound from '@/assets/sounds/pop.mp3';
 import notificationSound from '@/assets/sounds/notification.mp3';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type ChatResponse = {
    message: string;
@@ -51,18 +52,24 @@ const ChatBot = () => {
    };
 
    return (
-      <div className="flex flex-col h-full">
-         <div className="flex flex-col flex-1 gap-3 mb-4 overflow-y-auto scroll-bar-hide">
-            <ChatMessages messages={messages} />
-            {isBotTyping && <TypingIndicator />}
-            {error && (
-               <div className="flex items-center gap-2 p-2 bg-red-100 rounded-md border border-red-300 self-start">
-                  <MdErrorOutline className="text-red-500" />
-                  <p className="text-red-500">{error}</p>
+      <div className="flex h-full min-h-0 flex-col">
+         <div className="flex-1 min-h-0">
+            <ScrollArea className="h-full w-full p-4">
+               <div className="flex flex-col gap-3">
+                  <ChatMessages messages={messages} />
+                  {isBotTyping && <TypingIndicator />}
+                  {error && (
+                     <div className="flex items-center gap-2 self-start rounded-md border border-red-300 bg-red-100 p-2">
+                        <MdErrorOutline className="text-red-500" />
+                        <p className="text-red-500">{error}</p>
+                     </div>
+                  )}
                </div>
-            )}
+            </ScrollArea>
          </div>
-         <ChatInput onSubmit={onSubmit} isBotTyping={isBotTyping} />
+         <div className="shrink-0  bg-background p-4">
+            <ChatInput onSubmit={onSubmit} isBotTyping={isBotTyping} />
+         </div>
       </div>
    );
 };
