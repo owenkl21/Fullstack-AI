@@ -28,6 +28,7 @@ type ClerkFallbackMetadata = {
    appProfile?: {
       displayName?: string;
       bio?: string | null;
+      username?: string;
    };
 };
 
@@ -150,6 +151,27 @@ const getFallbackProfileFromClerk = async (
       createdAt: new Date(identity.clerkUser.createdAt),
       updatedAt: new Date(),
    };
+};
+
+const persistFallbackProfileToClerk = async (
+   clerkUserId: string,
+   profile: Pick<ProfileShape, 'displayName' | 'bio' | 'username'>
+) => {
+   const clerkUser = await clerkClient.users.getUser(clerkUserId);
+   const metadata = (clerkUser.unsafeMetadata ?? {}) as ClerkFallbackMetadata;
+   const existingProfile = metadata.appProfile ?? {};
+
+   await clerkClient.users.updateUser(clerkUserId, {
+      unsafeMetadata: {
+         ...metadata,
+         appProfile: {
+            ...existingProfile,
+            displayName: profile.displayName,
+            bio: profile.bio,
+            username: profile.username,
+         },
+      },
+   });
 };
 
 export const userService = {
@@ -304,9 +326,25 @@ export const userService = {
       } catch (error) {
          if (isDatabaseConnectivityError(error)) {
             console.error(
-               '[user:updateProfile] Database unavailable; refusing Clerk-only fallback so profile changes are not lost from primary storage.',
+               '[user:updateProfile] Database unavailable. Persisting profile to Clerk fallback metadata.',
                { clerkUserId, error }
             );
+
+            const fallbackProfile = await getFallbackProfileFromClerk(
+               clerkUserId,
+               input
+            );
+
+            await persistFallbackProfileToClerk(clerkUserId, {
+               displayName: fallbackProfile.displayName,
+               bio: fallbackProfile.bio,
+               username: fallbackProfile.username,
+            });
+
+            return {
+               profile: fallbackProfile,
+               storage: 'clerk_fallback',
+            } satisfies ProfileResult;
          }
 
          throw error;
