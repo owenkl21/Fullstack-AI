@@ -1,7 +1,11 @@
 import { LandingPage } from '@/components/landing/LandingPage';
 
 function App() {
-   return <LandingPage />;
+   return (
+      <div className="scroll-smooth">
+         <LandingPage />
+      </div>
+   );
 }
 
 export default App;
