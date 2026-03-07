@@ -112,27 +112,17 @@ const getFallbackProfileFromClerk = async (
 
 export const userService = {
    async syncAuthenticatedUser(clerkUserId: string) {
-      try {
-         const identity = await getPrimaryEmail(clerkUserId);
+      let identity: Awaited<ReturnType<typeof getPrimaryEmail>>;
 
-         return prisma.user.upsert({
-            where: { clerkId: clerkUserId },
-            create: {
-               clerkId: clerkUserId,
-               email: identity.email,
-               username: identity.username,
-               displayName: identity.displayName,
-               avatarUrl: identity.imageUrl,
-            },
-            update: {
-               email: identity.email,
-               avatarUrl: identity.imageUrl,
-            },
-         });
+      try {
+         identity = await getPrimaryEmail(clerkUserId);
       } catch (error) {
          console.warn(
-            '[user:sync] Falling back to placeholder identity for authenticated Clerk user.',
-            error
+            '[user:sync] Clerk identity incomplete; syncing fallback placeholder identity to database.',
+            {
+               clerkUserId,
+               error,
+            }
          );
 
          return prisma.user.upsert({
@@ -146,6 +136,21 @@ export const userService = {
             update: {},
          });
       }
+
+      return prisma.user.upsert({
+         where: { clerkId: clerkUserId },
+         create: {
+            clerkId: clerkUserId,
+            email: identity.email,
+            username: identity.username,
+            displayName: identity.displayName,
+            avatarUrl: identity.imageUrl,
+         },
+         update: {
+            email: identity.email,
+            avatarUrl: identity.imageUrl,
+         },
+      });
    },
 
    async getProfileByClerkId(clerkUserId: string) {
@@ -225,40 +230,14 @@ export const userService = {
 
          return { profile, storage: 'database' } satisfies ProfileResult;
       } catch (error) {
-         if (!isDatabaseConnectivityError(error)) {
-            throw error;
+         if (isDatabaseConnectivityError(error)) {
+            console.error(
+               '[user:updateProfile] Database unavailable; refusing Clerk-only fallback so profile changes are not lost from primary storage.',
+               { clerkUserId, error }
+            );
          }
 
-         const clerkUser = await clerkClient.users.getUser(clerkUserId);
-         const existingMetadata = (clerkUser.unsafeMetadata ?? {}) as Record<
-            string,
-            unknown
-         >;
-         const existingAppProfile =
-            (existingMetadata.appProfile as ClerkFallbackMetadata['appProfile']) ??
-            {};
-
-         await clerkClient.users.updateUser(clerkUserId, {
-            username: input.username,
-            unsafeMetadata: {
-               ...existingMetadata,
-               appProfile: {
-                  ...existingAppProfile,
-                  displayName: input.displayName,
-                  bio: input.bio,
-               },
-            },
-         });
-
-         console.warn(
-            '[user:updateProfile] Database unavailable, profile saved to Clerk unsafeMetadata.appProfile fallback.',
-            { clerkUserId }
-         );
-
-         return {
-            profile: await getFallbackProfileFromClerk(clerkUserId, input),
-            storage: 'clerk_fallback',
-         } satisfies ProfileResult;
+         throw error;
       }
    },
 };

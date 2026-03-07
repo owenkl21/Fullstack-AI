@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { getAuth } from '@clerk/express';
-import { Prisma } from '../generated/prisma/client';
+import { Prisma } from '@prisma/client';
 import { updateProfileSchema } from '../schemas/user.schema';
 import { userService } from '../services/user.service';
 
