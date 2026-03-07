@@ -16,6 +16,7 @@
       "typescript": "^5"
    },
    "dependencies": {
+      "@clerk/express": "^2.0.1",
       "@prisma/client": "^7.4.2",
       "axios": "^1.13.6",
       "dotenv": "^17.3.1",
