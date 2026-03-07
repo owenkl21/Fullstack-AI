@@ -2,11 +2,13 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import { chatController } from './controllers/chat.controller';
 import { fishingController } from './controllers/fishing.controller';
+import { userController } from './controllers/user.controller';
 import { getAuth } from '@clerk/express';
+import { userService } from './services/user.service';
 
 const router = express.Router();
 
-function requireApiAuth(
+async function requireApiAuth(
    req: Request,
    res: Response,
    next: express.NextFunction
@@ -20,7 +22,12 @@ function requireApiAuth(
       });
    }
 
-   return next();
+   try {
+      await userService.syncAuthenticatedUser(auth.userId);
+      return next();
+   } catch (error) {
+      return next(error);
+   }
 }
 
 router.get('/', (_req: Request, res: Response) => {
@@ -37,6 +44,13 @@ router.post(
    '/api/fishing/conditions',
    requireApiAuth,
    fishingController.getConditions
+);
+
+router.get('/api/users/me', requireApiAuth, userController.getCurrentProfile);
+router.patch(
+   '/api/users/me',
+   requireApiAuth,
+   userController.updateCurrentProfile
 );
 
 export default router;
