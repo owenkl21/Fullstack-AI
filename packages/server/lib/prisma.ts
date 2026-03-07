@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { createRequire } from 'node:module';
-import { PrismaClient } from '../generated/prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 dotenv.config({ override: true });
 
