@@ -5,8 +5,7 @@ dotenv.config({ override: true });
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const databaseUrl = process.env.DATABASE_URL?.trim();
-const useMariaDbAdapter =
-   process.env.PRISMA_USE_MARIADB_ADAPTER?.trim().toLowerCase() === 'true';
+const isBunRuntime = Boolean(globalThis.Bun || process.versions?.bun);
 
 if (!databaseUrl) {
    throw new Error('DATABASE_URL is required to initialize Prisma.');
@@ -20,7 +19,7 @@ let prismaClientOptions: ConstructorParameters<typeof PrismaClient>[0] = {
    log: baseLogs,
 };
 
-if (useMariaDbAdapter) {
+if (isBunRuntime) {
    const { createRequire } = await import('node:module');
 
    type PrismaMariaDbCtor = new (options: {
@@ -53,7 +52,8 @@ if (isDevelopment) {
    })();
 
    console.info('[prisma] Initialized client.', {
-      adapter: useMariaDbAdapter ? 'mariadb-driver-adapter' : 'prisma-engine',
+      adapter: isBunRuntime ? 'mysql-driver-adapter' : 'prisma-engine',
+      runtime: isBunRuntime ? 'bun' : 'node',
       connectionTarget,
    });
 }
