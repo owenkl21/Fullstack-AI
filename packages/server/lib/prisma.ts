@@ -1,5 +1,8 @@
+import dotenv from 'dotenv';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { PrismaClient } from '../generated/prisma/client';
+
+dotenv.config({ override: true });
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const databaseUrl = process.env.DATABASE_URL;
