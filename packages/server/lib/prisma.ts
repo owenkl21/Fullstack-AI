@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { PrismaClient, type Prisma } from '@prisma/client';
+import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 
 dotenv.config({ override: true });
 
@@ -10,28 +11,36 @@ if (!databaseUrl) {
    throw new Error('DATABASE_URL is required to initialize Prisma.');
 }
 
+const parsed = new URL(databaseUrl);
+
+const adapter = new PrismaMariaDb({
+   host: parsed.hostname,
+   port: parsed.port ? Number(parsed.port) : 3306,
+   user: decodeURIComponent(parsed.username),
+   password: decodeURIComponent(parsed.password),
+   database: parsed.pathname.replace(/^\//, ''),
+});
+
 const baseLogs: Prisma.LogLevel[] = isDevelopment
    ? ['query', 'warn', 'error']
    : ['error'];
 
-let prismaClientOptions: ConstructorParameters<typeof PrismaClient>[0] = {
-   log: baseLogs,
+const globalForPrisma = globalThis as typeof globalThis & {
+   prisma?: PrismaClient;
 };
 
-export const prisma = new PrismaClient(prismaClientOptions);
+export const prisma =
+   globalForPrisma.prisma ??
+   new PrismaClient({
+      adapter,
+      log: baseLogs,
+   });
 
 if (isDevelopment) {
-   const connectionTarget = (() => {
-      try {
-         const parsed = new URL(databaseUrl);
-         return `${parsed.protocol}//${parsed.hostname}:${parsed.port || '3306'}/${parsed.pathname.replace(/^\//, '')}`;
-      } catch {
-         return databaseUrl;
-      }
-   })();
+   globalForPrisma.prisma = prisma;
 
    console.info('[prisma] Initialized client.', {
-      adapter: 'prisma-engine',
-      connectionTarget,
+      adapter: '@prisma/adapter-mariadb',
+      connectionTarget: `${parsed.protocol}//${parsed.hostname}:${parsed.port || '3306'}/${parsed.pathname.replace(/^\//, '')}`,
    });
 }
