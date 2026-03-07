@@ -1,26 +1,59 @@
 import dotenv from 'dotenv';
-import { createRequire } from 'node:module';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 
 dotenv.config({ override: true });
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const databaseUrl = process.env.DATABASE_URL?.trim();
+const useMariaDbAdapter =
+   process.env.PRISMA_USE_MARIADB_ADAPTER?.trim().toLowerCase() === 'true';
 
 if (!databaseUrl) {
    throw new Error('DATABASE_URL is required to initialize Prisma.');
 }
 
-type PrismaMariaDbCtor = new (options: { connectionString: string }) => unknown;
+const baseLogs: Prisma.LogLevel[] = isDevelopment
+   ? ['query', 'warn', 'error']
+   : ['error'];
 
-const require = createRequire(import.meta.url);
-const { PrismaMariaDb } = require('@prisma/adapter-mariadb') as {
-   PrismaMariaDb: PrismaMariaDbCtor;
+let prismaClientOptions: ConstructorParameters<typeof PrismaClient>[0] = {
+   log: baseLogs,
 };
 
-const adapter = new PrismaMariaDb({ connectionString: databaseUrl });
+if (useMariaDbAdapter) {
+   const { createRequire } = await import('node:module');
 
-export const prisma = new PrismaClient({
-   adapter: adapter as never,
-   log: isDevelopment ? ['query', 'warn', 'error'] : ['error'],
-});
+   type PrismaMariaDbCtor = new (options: {
+      connectionString: string;
+   }) => unknown;
+
+   const require = createRequire(import.meta.url);
+   const { PrismaMariaDb } = require('@prisma/adapter-mariadb') as {
+      PrismaMariaDb: PrismaMariaDbCtor;
+   };
+
+   const adapter = new PrismaMariaDb({ connectionString: databaseUrl });
+
+   prismaClientOptions = {
+      ...prismaClientOptions,
+      adapter: adapter as never,
+   };
+}
+
+export const prisma = new PrismaClient(prismaClientOptions);
+
+if (isDevelopment) {
+   const connectionTarget = (() => {
+      try {
+         const parsed = new URL(databaseUrl);
+         return `${parsed.protocol}//${parsed.hostname}:${parsed.port || '3306'}/${parsed.pathname.replace(/^\//, '')}`;
+      } catch {
+         return databaseUrl;
+      }
+   })();
+
+   console.info('[prisma] Initialized client.', {
+      adapter: useMariaDbAdapter ? 'mariadb-driver-adapter' : 'prisma-engine',
+      connectionTarget,
+   });
+}

@@ -31,6 +31,23 @@ If you only need to create the database without seeding data:
 bun run prisma:db:create
 ```
 
+### Prisma connection troubleshooting
+
+If requests to `/api/users/me` are slow and logs show `pool timeout: failed to retrieve a connection from pool`, verify these first:
+
+1. Use `127.0.0.1` instead of `localhost` in `DATABASE_URL` to avoid IPv6/local resolver issues on some environments.
+2. Ensure your DB type and Prisma driver mode match:
+   - **MySQL**: keep `PRISMA_USE_MARIADB_ADAPTER=false` (default).
+   - **MariaDB**: set `PRISMA_USE_MARIADB_ADAPTER=true`.
+3. Confirm the same `DATABASE_URL` used by the server process can connect (host, port, user, password, db name).
+
+Example:
+
+```env
+DATABASE_URL="mysql://root:password@127.0.0.1:3306/fishing_app"
+PRISMA_USE_MARIADB_ADAPTER=false
+```
+
 ## Integrating `getFishingConditions` (architecture-first)
 
 This codebase already follows a `route -> controller -> service -> repository` flow for chat features.
