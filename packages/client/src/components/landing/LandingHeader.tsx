@@ -19,6 +19,14 @@ export function LandingHeader() {
             </a>
 
             <nav className="hidden items-center gap-6 md:flex ">
+               <Show when="signed-in">
+                  <a
+                     href="#profile"
+                     className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                     Profile
+                  </a>
+               </Show>
                {navItems.map((item) => (
                   <a
                      key={item}
