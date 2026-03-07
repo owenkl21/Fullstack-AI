@@ -1,11 +1,7 @@
-import ChatBot from './components/ChatBot';
+import { LandingPage } from '@/components/landing/LandingPage';
 
 function App() {
-   return (
-      <div className="p-4 h-screen w-full">
-         <ChatBot />
-      </div>
-   );
+   return <LandingPage />;
 }
 
 export default App;
