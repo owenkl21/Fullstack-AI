@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { PrismaClient } from '../generated/prisma/client';
 
 dotenv.config({ override: true });
@@ -10,7 +11,9 @@ if (!databaseUrl) {
    throw new Error('DATABASE_URL is required to initialize Prisma.');
 }
 
+const adapter = new PrismaMariaDb({ connectionString: databaseUrl });
+
 export const prisma = new PrismaClient({
-   datasourceUrl: databaseUrl,
+   adapter,
    log: isDevelopment ? ['query', 'warn', 'error'] : ['error'],
 });
