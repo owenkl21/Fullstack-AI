@@ -5,8 +5,6 @@ dotenv.config({ override: true });
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 const databaseUrl = process.env.DATABASE_URL?.trim();
-const useMariaDbAdapter =
-   process.env.PRISMA_USE_MARIADB_ADAPTER?.trim().toLowerCase() === 'true';
 
 if (!databaseUrl) {
    throw new Error('DATABASE_URL is required to initialize Prisma.');
@@ -19,26 +17,6 @@ const baseLogs: Prisma.LogLevel[] = isDevelopment
 let prismaClientOptions: ConstructorParameters<typeof PrismaClient>[0] = {
    log: baseLogs,
 };
-
-if (useMariaDbAdapter) {
-   const { createRequire } = await import('node:module');
-
-   type PrismaMariaDbCtor = new (options: {
-      connectionString: string;
-   }) => unknown;
-
-   const require = createRequire(import.meta.url);
-   const { PrismaMariaDb } = require('@prisma/adapter-mariadb') as {
-      PrismaMariaDb: PrismaMariaDbCtor;
-   };
-
-   const adapter = new PrismaMariaDb({ connectionString: databaseUrl });
-
-   prismaClientOptions = {
-      ...prismaClientOptions,
-      adapter: adapter as never,
-   };
-}
 
 export const prisma = new PrismaClient(prismaClientOptions);
 
@@ -53,7 +31,7 @@ if (isDevelopment) {
    })();
 
    console.info('[prisma] Initialized client.', {
-      adapter: useMariaDbAdapter ? 'mariadb-driver-adapter' : 'prisma-engine',
+      adapter: 'prisma-engine',
       connectionTarget,
    });
 }
