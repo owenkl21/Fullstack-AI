@@ -24,10 +24,17 @@ async function requireApiAuth(
 
    try {
       await userService.syncAuthenticatedUser(auth.userId);
-      return next();
    } catch (error) {
-      return next(error);
+      console.warn(
+         '[auth] Failed to sync user from Clerk to database. Continuing with authenticated request.',
+         {
+            userId: auth.userId,
+            error,
+         }
+      );
    }
+
+   return next();
 }
 
 router.get('/', (_req: Request, res: Response) => {
