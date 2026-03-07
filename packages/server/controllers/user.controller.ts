@@ -50,17 +50,29 @@ export const userController = {
 
          return res.json({ profile });
       } catch (error) {
-         if (
-            error instanceof Prisma.PrismaClientKnownRequestError &&
-            error.code === 'P2002'
-         ) {
+         const prismaErrorCode =
+            error instanceof Prisma.PrismaClientKnownRequestError
+               ? error.code
+               : typeof error === 'object' && error !== null && 'code' in error
+                 ? String((error as { code?: unknown }).code)
+                 : null;
+
+         if (prismaErrorCode === 'P2002') {
             return res.status(409).json({
                code: 'username_already_exists',
                message: 'That username is already in use.',
             });
          }
 
-         throw error;
+         console.error('[user:updateCurrentProfile] failed to update profile', {
+            clerkId: auth.userId,
+            error,
+         });
+
+         return res.status(500).json({
+            code: 'internal_server_error',
+            message: 'Unexpected server error',
+         });
       }
    },
 };
