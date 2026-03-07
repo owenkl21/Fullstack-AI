@@ -240,3 +240,20 @@ curl -X POST http://localhost:3000/api/fishing/conditions \
 ```
 
 If successful, the response should include `location`, `weather`, and `tides`.
+
+## Phase 0 foundations checklist
+
+- Domain model baseline is defined in `prisma/schema.prisma`.
+- Auth baseline is Clerk middleware + route-level `requireApiAuth` gate.
+- Dev environment can be seeded via Prisma.
+- Observability includes request lifecycle logs, Prisma query logs (development), and centralized error middleware.
+- Image storage uses object storage keys + signed URL conventions (see `docs/phase-0-foundations.md`).
+
+## Prisma commands
+
+```bash
+bun run --cwd packages/server prisma generate
+bun run --cwd packages/server prisma db seed
+```
+
+`prisma db seed` runs `packages/server/prisma/seed.ts`.

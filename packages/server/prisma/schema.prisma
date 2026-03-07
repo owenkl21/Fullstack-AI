@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -11,4 +5,195 @@ generator client {
 
 datasource db {
   provider = "mysql"
+}
+
+enum WaterType {
+  FRESHWATER
+  SALTWATER
+  BRACKISH
+  OTHER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String   @unique
+  displayName  String
+  bio          String?
+  avatarUrl    String?
+  catches      Catch[]
+  sites        FishingSite[]
+  reviews      Review[]
+  comments     Comment[]
+  uploaded     Image[]  @relation("UploadedImages")
+  following    Follow[] @relation("FollowerRelation")
+  followers    Follow[] @relation("FollowingRelation")
+  catchLikes   CatchLike[]
+  siteLikes    SiteLike[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+}
+
+model FishingSite {
+  id           String   @id @default(cuid())
+  createdById  String
+  createdBy    User     @relation(fields: [createdById], references: [id])
+  name         String
+  description  String?
+  latitude     Float?
+  longitude    Float?
+  waterType    WaterType?
+  accessNotes  String?
+  likeCount    Int      @default(0)
+  reviewCount  Int      @default(0)
+  catchCount   Int      @default(0)
+  catches      Catch[]
+  reviews      Review[]
+  likes        SiteLike[]
+  images       SiteImage[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  @@index([createdById])
+}
+
+model Species {
+  id             String   @id @default(cuid())
+  commonName     String
+  scientificName String?
+  aliases        Json?
+  regionTags     Json?
+  catches        Catch[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Catch {
+  id           String   @id @default(cuid())
+  createdById  String
+  createdBy    User     @relation(fields: [createdById], references: [id])
+  siteId       String?
+  site         FishingSite? @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  speciesId    String?
+  species      Species? @relation(fields: [speciesId], references: [id], onDelete: SetNull)
+  title        String
+  notes        String?
+  caughtAt     DateTime
+  weight       Float?
+  length       Float?
+  count        Int      @default(1)
+  weather      String?
+  waterTemp    Float?
+  depth        Float?
+  likeCount    Int      @default(0)
+  commentCount Int      @default(0)
+  comments     Comment[]
+  likes        CatchLike[]
+  images       CatchImage[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  @@index([createdById, caughtAt(sort: Desc)])
+  @@index([siteId, caughtAt(sort: Desc)])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  siteId    String
+  site      FishingSite @relation(fields: [siteId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  rating    Int
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@unique([siteId, userId])
+  @@index([siteId, createdAt(sort: Desc)])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  catchId   String
+  catch     Catch    @relation(fields: [catchId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([catchId, createdAt(sort: Asc)])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  follower    User     @relation("FollowerRelation", fields: [followerId], references: [id])
+  following   User     @relation("FollowingRelation", fields: [followingId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model CatchLike {
+  id        String   @id @default(cuid())
+  catchId   String
+  catch     Catch    @relation(fields: [catchId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([catchId, userId])
+}
+
+model SiteLike {
+  id        String   @id @default(cuid())
+  siteId    String
+  site      FishingSite @relation(fields: [siteId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([siteId, userId])
+}
+
+model Image {
+  id           String   @id @default(cuid())
+  url          String
+  storageKey   String   @unique
+  uploadedById String
+  uploadedBy   User     @relation("UploadedImages", fields: [uploadedById], references: [id])
+  catchLinks   CatchImage[]
+  siteLinks    SiteImage[]
+  createdAt    DateTime @default(now())
+}
+
+model CatchImage {
+  id        String   @id @default(cuid())
+  catchId   String
+  catch     Catch    @relation(fields: [catchId], references: [id])
+  imageId   String
+  image     Image    @relation(fields: [imageId], references: [id])
+  position  Int      @default(0)
+
+  @@unique([catchId, imageId])
+}
+
+model SiteImage {
+  id        String   @id @default(cuid())
+  siteId    String
+  site      FishingSite @relation(fields: [siteId], references: [id])
+  imageId   String
+  image     Image    @relation(fields: [imageId], references: [id])
+  position  Int      @default(0)
+
+  @@unique([siteId, imageId])
 }
