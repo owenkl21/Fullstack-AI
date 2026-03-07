@@ -7,7 +7,10 @@
       "start": "bun run prisma:generate && bun run index.ts",
       "dev": "bun run prisma:generate && bun run --watch index.ts",
       "prisma:generate": "prisma generate",
-      "prisma:seed": "bun run prisma/seed.ts"
+      "prisma:seed": "bun run prisma/seed.ts",
+      "prisma:db:create": "bun run prisma/create-database.ts",
+      "prisma:db:push": "prisma db push",
+      "prisma:setup": "bun run prisma:db:create && bun run prisma:db:push && bun run prisma:seed"
    },
    "prisma": {
       "seed": "bun run prisma/seed.ts"
