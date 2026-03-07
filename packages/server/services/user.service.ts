@@ -71,6 +71,12 @@ export const userService = {
       });
    },
 
+   async deleteByClerkId(clerkUserId: string) {
+      return prisma.user.deleteMany({
+         where: { clerkId: clerkUserId },
+      });
+   },
+
    async updateProfileByClerkId(clerkUserId: string, input: UserProfileInput) {
       return prisma.user.update({
          where: { clerkId: clerkUserId },

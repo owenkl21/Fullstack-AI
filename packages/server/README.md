@@ -274,3 +274,20 @@ bun run --cwd packages/server prisma db seed
 ```
 
 `prisma db seed` runs `packages/server/prisma/seed.ts`.
+
+
+## Clerk user sync webhook
+
+This backend now exposes a Clerk webhook endpoint at `POST /api/webhooks/clerk` to keep the local `User` table in sync when users are created, updated, or deleted in Clerk.
+
+Add your webhook signing secret in `.env`:
+
+```env
+CLERK_WEBHOOK_SIGNING_SECRET=whsec_...
+```
+
+In the Clerk dashboard, configure a webhook pointing to your server URL plus `/api/webhooks/clerk` and subscribe to at least:
+
+- `user.created`
+- `user.updated`
+- `user.deleted`

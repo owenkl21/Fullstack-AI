@@ -3,11 +3,18 @@ import dotenv from 'dotenv';
 import router from './routes';
 import { clerkMiddleware } from '@clerk/express';
 import { prisma } from './lib/prisma';
+import { webhookController } from './controllers/webhook.controller';
 
 //reads variables from .env file and adds them to process.env
 dotenv.config();
 
 const app = express();
+
+app.post(
+   '/api/webhooks/clerk',
+   express.raw({ type: 'application/json' }),
+   webhookController.handleClerkWebhook
+);
 
 app.use(express.json());
 app.use(clerkMiddleware());
