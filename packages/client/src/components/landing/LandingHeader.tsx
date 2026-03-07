@@ -1,5 +1,5 @@
 import { Fish, Menu } from 'lucide-react';
-
+import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react';
 import { Button } from '@/components/ui/button';
 
 const navItems = ['Features', 'How it works', 'FAQ'];
@@ -30,11 +30,22 @@ export function LandingHeader() {
                ))}
             </nav>
 
-            <div className="hidden items-center gap-3 sm:flex">
-               <Button variant="ghost" size="sm">
-                  Sign in
-               </Button>
-               <Button size="sm">Join waitlist</Button>
+            <div className="flex items-center gap-3">
+               <Show when="signed-out">
+                  <SignInButton mode="modal">
+                     <Button variant="ghost" size="sm">
+                        Sign in
+                     </Button>
+                  </SignInButton>
+
+                  <SignUpButton mode="modal">
+                     <Button size="sm">Join waitlist</Button>
+                  </SignUpButton>
+               </Show>
+
+               <Show when="signed-in">
+                  <UserButton />
+               </Show>
             </div>
 
             <Button
