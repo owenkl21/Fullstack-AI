@@ -4,8 +4,16 @@
    "type": "module",
    "private": true,
    "scripts": {
-      "start": "bun run index.ts",
-      "dev": "bun run --watch index.ts"
+      "start": "bun run prisma:generate && bun run index.ts",
+      "dev": "bun run prisma:generate && bun run --watch index.ts",
+      "prisma:generate": "prisma generate",
+      "prisma:seed": "bun run prisma/seed.ts",
+      "prisma:db:create": "bun run prisma/create-database.ts",
+      "prisma:db:push": "prisma db push",
+      "prisma:setup": "bun run prisma:db:create && bun run prisma:db:push && bun run prisma:seed"
+   },
+   "prisma": {
+      "seed": "bun run prisma/seed.ts"
    },
    "devDependencies": {
       "@types/bun": "latest",
@@ -21,6 +29,7 @@
       "axios": "^1.13.6",
       "dotenv": "^17.3.1",
       "express": "^5.2.1",
+      "mysql2": "^3.19.0",
       "openai": "^6.25.0",
       "zod": "^4.3.6"
    }

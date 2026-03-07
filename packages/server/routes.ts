@@ -19,13 +19,15 @@ function requireApiAuth(
          message: 'Authentication required.',
       });
    }
+
+   return next();
 }
 
-router.get('/', (req: Request, res: Response) => {
+router.get('/', (_req: Request, res: Response) => {
    res.send('Hello World!');
 });
 
-router.get('/api/hello', (req: Request, res: Response) => {
+router.get('/api/hello', (_req: Request, res: Response) => {
    res.json({ message: 'Hello from the API!' });
 });
 
@@ -36,4 +38,5 @@ router.post(
    requireApiAuth,
    fishingController.getConditions
 );
+
 export default router;
