@@ -15,16 +15,19 @@ export const userController = {
          });
       }
 
-      const profile = await userService.getProfileByClerkId(auth.userId);
+      const result = await userService.getProfileByClerkId(auth.userId);
 
-      if (!profile) {
+      if (!result?.profile) {
          return res.status(404).json({
             code: 'profile_not_found',
             message: 'Profile not found for authenticated user.',
          });
       }
 
-      return res.json({ profile });
+      return res.json({
+         profile: result.profile,
+         storage: result.storage,
+      });
    },
 
    updateCurrentProfile: async (req: Request, res: Response) => {
@@ -43,12 +46,15 @@ export const userController = {
       }
 
       try {
-         const profile = await userService.updateProfileByClerkId(
+         const result = await userService.updateProfileByClerkId(
             auth.userId,
             parsed.data
          );
 
-         return res.json({ profile });
+         return res.json({
+            profile: result.profile,
+            storage: result.storage,
+         });
       } catch (error) {
          const prismaErrorCode =
             error instanceof Prisma.PrismaClientKnownRequestError

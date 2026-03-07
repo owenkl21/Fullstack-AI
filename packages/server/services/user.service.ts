@@ -19,6 +19,11 @@ type ProfileShape = {
    updatedAt: Date;
 };
 
+type ProfileResult = {
+   profile: ProfileShape;
+   storage: 'database' | 'clerk_fallback';
+};
+
 type ClerkFallbackMetadata = {
    appProfile?: {
       displayName?: string;
@@ -161,7 +166,7 @@ export const userService = {
          });
 
          if (profile) {
-            return profile;
+            return { profile, storage: 'database' } satisfies ProfileResult;
          }
       } catch (error) {
          if (!isDatabaseConnectivityError(error)) {
@@ -177,7 +182,10 @@ export const userService = {
          );
       }
 
-      return getFallbackProfileFromClerk(clerkUserId);
+      return {
+         profile: await getFallbackProfileFromClerk(clerkUserId),
+         storage: 'clerk_fallback',
+      } satisfies ProfileResult;
    },
 
    async deleteByClerkId(clerkUserId: string) {
@@ -188,7 +196,7 @@ export const userService = {
 
    async updateProfileByClerkId(clerkUserId: string, input: UserProfileInput) {
       try {
-         return await prisma.user.upsert({
+         const profile = await prisma.user.upsert({
             where: { clerkId: clerkUserId },
             create: {
                clerkId: clerkUserId,
@@ -214,6 +222,8 @@ export const userService = {
                updatedAt: true,
             },
          });
+
+         return { profile, storage: 'database' } satisfies ProfileResult;
       } catch (error) {
          if (!isDatabaseConnectivityError(error)) {
             throw error;
@@ -240,7 +250,15 @@ export const userService = {
             },
          });
 
-         return getFallbackProfileFromClerk(clerkUserId, input);
+         console.warn(
+            '[user:updateProfile] Database unavailable, profile saved to Clerk unsafeMetadata.appProfile fallback.',
+            { clerkUserId }
+         );
+
+         return {
+            profile: await getFallbackProfileFromClerk(clerkUserId, input),
+            storage: 'clerk_fallback',
+         } satisfies ProfileResult;
       }
    },
 };

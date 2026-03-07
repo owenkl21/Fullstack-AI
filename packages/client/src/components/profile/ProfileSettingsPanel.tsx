@@ -13,6 +13,7 @@ type UserProfile = {
 
 type ProfileResponse = {
    profile: UserProfile;
+   storage?: 'database' | 'clerk_fallback';
 };
 
 export function ProfileSettingsPanel() {
@@ -74,7 +75,11 @@ export function ProfileSettingsPanel() {
          setDisplayName(data.profile.displayName ?? '');
          setUsername(data.profile.username ?? '');
          setBio(data.profile.bio ?? '');
-         setStatusMessage('Profile saved.');
+         setStatusMessage(
+            data.storage === 'clerk_fallback'
+               ? 'Profile saved to Clerk fallback metadata (database unavailable).'
+               : 'Profile saved to database.'
+         );
       } catch (error) {
          console.error(error);
          setErrorMessage(
