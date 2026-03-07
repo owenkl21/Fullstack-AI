@@ -10,6 +10,11 @@ type UserProfileInput = {
 const buildDefaultUsername = (clerkUserId: string) =>
    `clerk_${clerkUserId.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase()}`;
 
+const buildPlaceholderEmail = (clerkUserId: string) =>
+   `${buildDefaultUsername(clerkUserId)}@placeholder.local`;
+
+const buildPlaceholderDisplayName = () => 'New Angler';
+
 const getPrimaryEmail = async (clerkUserId: string) => {
    const clerkUser = await clerkClient.users.getUser(clerkUserId);
    const primaryEmail = clerkUser.emailAddresses.find(
@@ -36,22 +41,40 @@ const getPrimaryEmail = async (clerkUserId: string) => {
 
 export const userService = {
    async syncAuthenticatedUser(clerkUserId: string) {
-      const identity = await getPrimaryEmail(clerkUserId);
+      try {
+         const identity = await getPrimaryEmail(clerkUserId);
 
-      return prisma.user.upsert({
-         where: { clerkId: clerkUserId },
-         create: {
-            clerkId: clerkUserId,
-            email: identity.email,
-            username: identity.username,
-            displayName: identity.displayName,
-            avatarUrl: identity.imageUrl,
-         },
-         update: {
-            email: identity.email,
-            avatarUrl: identity.imageUrl,
-         },
-      });
+         return prisma.user.upsert({
+            where: { clerkId: clerkUserId },
+            create: {
+               clerkId: clerkUserId,
+               email: identity.email,
+               username: identity.username,
+               displayName: identity.displayName,
+               avatarUrl: identity.imageUrl,
+            },
+            update: {
+               email: identity.email,
+               avatarUrl: identity.imageUrl,
+            },
+         });
+      } catch (error) {
+         console.warn(
+            '[user:sync] Falling back to placeholder identity for authenticated Clerk user.',
+            error
+         );
+
+         return prisma.user.upsert({
+            where: { clerkId: clerkUserId },
+            create: {
+               clerkId: clerkUserId,
+               email: buildPlaceholderEmail(clerkUserId),
+               username: buildDefaultUsername(clerkUserId),
+               displayName: buildPlaceholderDisplayName(),
+            },
+            update: {},
+         });
+      }
    },
 
    async getProfileByClerkId(clerkUserId: string) {
@@ -78,9 +101,16 @@ export const userService = {
    },
 
    async updateProfileByClerkId(clerkUserId: string, input: UserProfileInput) {
-      return prisma.user.update({
+      return prisma.user.upsert({
          where: { clerkId: clerkUserId },
-         data: {
+         create: {
+            clerkId: clerkUserId,
+            email: buildPlaceholderEmail(clerkUserId),
+            username: input.username ?? buildDefaultUsername(clerkUserId),
+            displayName: input.displayName ?? buildPlaceholderDisplayName(),
+            bio: input.bio,
+         },
+         update: {
             displayName: input.displayName,
             bio: input.bio,
             username: input.username,
