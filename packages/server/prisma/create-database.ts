@@ -1,6 +1,6 @@
-import { spawn } from 'node:child_process';
+import mysql from 'mysql2/promise';
 
-function getServerUrl(databaseUrl: string) {
+function getServerConfig(databaseUrl: string) {
    const parsed = new URL(databaseUrl);
    const databaseName = parsed.pathname.replace(/^\//, '');
 
@@ -8,37 +8,13 @@ function getServerUrl(databaseUrl: string) {
       throw new Error('DATABASE_URL must include a database name in the path.');
    }
 
-   parsed.pathname = '/mysql';
-
    return {
-      serverUrl: parsed.toString(),
+      host: parsed.hostname,
+      port: parsed.port ? Number(parsed.port) : 3306,
+      user: decodeURIComponent(parsed.username),
+      password: decodeURIComponent(parsed.password),
       databaseName,
    };
-}
-
-function runPrismaExecute(serverUrl: string, sql: string) {
-   return new Promise<void>((resolve, reject) => {
-      const child = spawn(
-         'bunx',
-         ['prisma', 'db', 'execute', '--url', serverUrl, '--stdin'],
-         {
-            stdio: ['pipe', 'inherit', 'inherit'],
-         }
-      );
-
-      child.on('error', reject);
-      child.stdin.write(sql);
-      child.stdin.end();
-
-      child.on('close', (code) => {
-         if (code === 0) {
-            resolve();
-            return;
-         }
-
-         reject(new Error(`prisma db execute exited with code ${code}`));
-      });
-   });
 }
 
 async function createDatabase() {
@@ -48,13 +24,20 @@ async function createDatabase() {
       throw new Error('DATABASE_URL is required.');
    }
 
-   const { serverUrl, databaseName } = getServerUrl(databaseUrl);
+   const { host, port, user, password, databaseName } =
+      getServerConfig(databaseUrl);
+
+   const connection = await mysql.createConnection({
+      host,
+      port,
+      user,
+      password,
+   });
+
    const escapedName = `\`${databaseName.replace(/`/g, '``')}\``;
 
-   await runPrismaExecute(
-      serverUrl,
-      `CREATE DATABASE IF NOT EXISTS ${escapedName};`
-   );
+   await connection.execute(`CREATE DATABASE IF NOT EXISTS ${escapedName}`);
+   await connection.end();
 
    console.log(`Database "${databaseName}" is ready.`);
 }
