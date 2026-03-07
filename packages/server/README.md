@@ -14,6 +14,23 @@ To run:
 bun run index.ts
 ```
 
+## Database setup (MySQL)
+
+Prisma commands such as `db pull`/`introspect` fail with `Unknown database "fishing_app"` when the database in `DATABASE_URL` does not exist yet.
+
+1. Copy `.env.example` to `.env` and update credentials if needed.
+2. Create the database and apply the schema:
+
+```bash
+bun run prisma:setup
+```
+
+If you only need to create the database without seeding data:
+
+```bash
+bun run prisma:db:create
+```
+
 ## Integrating `getFishingConditions` (architecture-first)
 
 This codebase already follows a `route -> controller -> service -> repository` flow for chat features.
