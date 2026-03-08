@@ -51,6 +51,17 @@ async function main() {
       },
    });
 
+   const gear = await prisma.gear.upsert({
+      where: { id: 'phase0-sample-gear' },
+      update: {},
+      create: {
+         id: 'phase0-sample-gear',
+         name: 'Medium spinning combo',
+         category: 'Rod/Reel',
+         description: '7ft medium power spinning setup with braided line.',
+      },
+   });
+
    await prisma.catch.upsert({
       where: { id: 'phase0-sample-catch' },
       update: {},
@@ -60,6 +71,7 @@ async function main() {
          siteId: site.id,
          speciesId: species.id,
          title: 'Morning halibut near the pier edge',
+         gearId: gear.id,
          notes: 'Caught on cut bait right after the tide changed.',
          caughtAt: new Date(),
          length: 24.5,

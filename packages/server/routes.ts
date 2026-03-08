@@ -53,6 +53,10 @@ router.post(
    fishingController.getConditions
 );
 
+router.post('/api/catches', requireApiAuth, fishingController.createCatch);
+router.get('/api/catches/:catchId', fishingController.getCatchById);
+router.post('/api/sites', requireApiAuth, fishingController.createFishingSite);
+router.get('/api/sites/:siteId', fishingController.getFishingSiteById);
 router.get('/api/users/me', requireApiAuth, userController.getCurrentProfile);
 router.patch(
    '/api/users/me',
