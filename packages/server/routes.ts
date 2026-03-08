@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { chatController } from './controllers/chat.controller';
 import { fishingController } from './controllers/fishing.controller';
 import { userController } from './controllers/user.controller';
+import { uploadsController } from './controllers/uploads.controller';
 import { getAuth } from '@clerk/express';
 import { userService } from './services/user.service';
 
@@ -54,6 +55,8 @@ router.post(
 );
 
 router.post('/api/catches', requireApiAuth, fishingController.createCatch);
+router.post('/api/uploads/sign', requireApiAuth, uploadsController.signUpload);
+router.post('/api/uploads/read-url', uploadsController.getReadUrl);
 router.get('/api/catches/:catchId', fishingController.getCatchById);
 router.post('/api/sites', requireApiAuth, fishingController.createFishingSite);
 router.get('/api/sites/:siteId', fishingController.getFishingSiteById);
