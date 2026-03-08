@@ -70,15 +70,36 @@ export function R2ImagePicker({
                sizeBytes: file.size,
             });
 
-            const uploadResponse = await fetch(signed.uploadUrl, {
+            const directUploadUrl = new URL(
+               '/api/uploads/direct',
+               window.location.origin
+            );
+            directUploadUrl.searchParams.set('scope', scope);
+            directUploadUrl.searchParams.set('storageKey', signed.storageKey);
+
+            const directUploadResponse = await fetch(
+               directUploadUrl.toString(),
+               {
+                  method: 'GET',
+                  credentials: 'include',
+               }
+            );
+
+            if (!directUploadResponse.ok) {
+               throw new Error(
+                  `Failed to prepare direct upload with status ${directUploadResponse.status}`
+               );
+            }
+
+            const directUpload = await directUploadResponse.json();
+
+            const uploadResponse = await fetch(directUpload.uploadUrl, {
                method: 'PUT',
-               headers: {
-                  'Content-Type': file.type,
-               },
+               mode: 'no-cors',
                body: file,
             });
 
-            if (!uploadResponse.ok) {
+            if (uploadResponse.type !== 'opaque' && !uploadResponse.ok) {
                throw new Error(
                   `Upload failed with status ${uploadResponse.status}`
                );

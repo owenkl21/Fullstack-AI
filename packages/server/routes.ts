@@ -57,6 +57,11 @@ router.post(
 router.post('/api/catches', requireApiAuth, fishingController.createCatch);
 router.post('/api/uploads/sign', requireApiAuth, uploadsController.signUpload);
 router.post('/api/uploads/read-url', uploadsController.getReadUrl);
+router.get(
+   '/api/uploads/direct',
+   requireApiAuth,
+   uploadsController.getDirectUploadData
+);
 router.get('/api/catches/:catchId', fishingController.getCatchById);
 router.post('/api/sites', requireApiAuth, fishingController.createFishingSite);
 router.get('/api/sites/:siteId', fishingController.getFishingSiteById);

@@ -205,4 +205,32 @@ export const uploadsService = {
          readUrl: await resolveReadUrl(storageKey),
       };
    },
+
+   async getDirectUploadData(input: {
+      clerkUserId: string;
+      scope: UploadScope;
+      storageKey: string;
+   }) {
+      const expectedPathSegment =
+         input.scope === 'avatar'
+            ? 'avatar'
+            : input.scope === 'catch'
+              ? 'catches/temp'
+              : 'sites/temp';
+      const expectedPrefix = `users/${input.clerkUserId}/${expectedPathSegment}/`;
+
+      if (!input.storageKey.startsWith(expectedPrefix)) {
+         throw new Error(
+            'Storage key does not match authenticated user and scope.'
+         );
+      }
+
+      return {
+         storageKey: input.storageKey,
+         uploadUrl: `https://${getConfig().host}/${input.storageKey
+            .split('/')
+            .map(encodeRfc3986)
+            .join('/')}`,
+      };
+   },
 };

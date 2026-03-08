@@ -1,6 +1,10 @@
 import type { Request, Response } from 'express';
 import { getAuth } from '@clerk/express';
-import { getReadUrlSchema, signUploadSchema } from '../schemas/uploads.schema';
+import {
+   directUploadQuerySchema,
+   getReadUrlSchema,
+   signUploadSchema,
+} from '../schemas/uploads.schema';
 import { uploadsService } from '../services/uploads.service';
 
 const unauthorizedResponse = {
@@ -34,6 +38,35 @@ export const uploadsController = {
          return res.status(500).json({
             code: 'failed_to_sign_upload',
             message: 'Unable to prepare upload URL.',
+         });
+      }
+   },
+
+   async getDirectUploadData(req: Request, res: Response) {
+      const auth = getAuth(req);
+
+      if (!auth.userId) {
+         return res.status(401).json(unauthorizedResponse);
+      }
+
+      const parsed = directUploadQuerySchema.safeParse(req.query);
+
+      if (!parsed.success) {
+         return res.status(400).json(parsed.error.format());
+      }
+
+      try {
+         const directUpload = await uploadsService.getDirectUploadData({
+            clerkUserId: auth.userId,
+            ...parsed.data,
+         });
+
+         return res.json(directUpload);
+      } catch (error) {
+         console.error('[uploads:getDirectUploadData] failed', error);
+         return res.status(500).json({
+            code: 'failed_to_prepare_direct_upload',
+            message: 'Unable to prepare direct upload target.',
          });
       }
    },
