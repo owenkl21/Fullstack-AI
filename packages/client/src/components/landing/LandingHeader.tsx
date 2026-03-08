@@ -1,5 +1,5 @@
 import { Fish, Menu } from 'lucide-react';
-import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react';
+import { Show, SignInButton, UserButton } from '@clerk/react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
@@ -33,13 +33,13 @@ export function LandingHeader() {
                   </Link>
                </Show>
                {navItems.map((item) => (
-                  <Link
+                  <a
                      key={item.label}
-                     to={item.href}
+                     href={item.href}
                      className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                   >
                      {item.label}
-                  </Link>
+                  </a>
                ))}
             </nav>
 
@@ -50,10 +50,6 @@ export function LandingHeader() {
                         Sign in
                      </Button>
                   </SignInButton>
-
-                  <SignUpButton mode="modal">
-                     <Button size="sm">Join waitlist</Button>
-                  </SignUpButton>
                </Show>
 
                <Show when="signed-in">
