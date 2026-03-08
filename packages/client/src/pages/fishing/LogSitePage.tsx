@@ -7,20 +7,14 @@ import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
-
-const parseImages = (value: string) =>
-   value
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-         const [storageKey, url] = line.split('|').map((part) => part.trim());
-         return { storageKey, url };
-      });
+import { R2ImagePicker } from '@/components/r2-image-picker';
 
 export function LogSitePage() {
    const navigate = useNavigate();
    const [isSaving, setIsSaving] = useState(false);
+   const [images, setImages] = useState<{ storageKey: string; url: string }[]>(
+      []
+   );
 
    const submitSite = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -33,7 +27,7 @@ export function LogSitePage() {
          longitude: Number(formData.get('longitude')) || null,
          waterType: String(formData.get('waterType') ?? '') || null,
          accessNotes: String(formData.get('accessNotes') ?? '') || null,
-         images: parseImages(String(formData.get('images') ?? '')),
+         images,
       };
 
       try {
@@ -107,10 +101,12 @@ export function LogSitePage() {
                      placeholder="Access notes"
                      className="rounded border p-2"
                   />
-                  <textarea
-                     name="images"
-                     placeholder="Images (one per line): storage/key.jpg | https://cdn.example.com/key.jpg"
-                     className="min-h-24 rounded border p-2"
+                  <R2ImagePicker
+                     scope="site"
+                     label="Site images"
+                     maxItems={12}
+                     value={images}
+                     onChange={setImages}
                   />
                   <Button type="submit" disabled={isSaving}>
                      {isSaving ? 'Saving...' : 'Save site'}

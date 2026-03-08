@@ -7,20 +7,14 @@ import { LandingHeader } from '@/components/landing/LandingHeader';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
-
-const parseImages = (value: string) =>
-   value
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-         const [storageKey, url] = line.split('|').map((part) => part.trim());
-         return { storageKey, url };
-      });
+import { R2ImagePicker } from '@/components/r2-image-picker';
 
 export function LogCatchPage() {
    const navigate = useNavigate();
    const [isSaving, setIsSaving] = useState(false);
+   const [images, setImages] = useState<{ storageKey: string; url: string }[]>(
+      []
+   );
 
    const submitCatch = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -39,7 +33,7 @@ export function LogCatchPage() {
          count: Number(formData.get('count')) || 1,
          length: Number(formData.get('length')) || null,
          weight: Number(formData.get('weight')) || null,
-         images: parseImages(String(formData.get('images') ?? '')),
+         images,
       };
 
       try {
@@ -147,10 +141,12 @@ export function LogCatchPage() {
                         className="rounded border p-2"
                      />
                   </div>
-                  <textarea
-                     name="images"
-                     placeholder="Images (one per line): storage/key.jpg | https://cdn.example.com/key.jpg"
-                     className="min-h-24 rounded border p-2"
+                  <R2ImagePicker
+                     scope="catch"
+                     label="Catch images"
+                     maxItems={8}
+                     value={images}
+                     onChange={setImages}
                   />
                   <Button type="submit" disabled={isSaving}>
                      {isSaving ? 'Saving...' : 'Save catch'}

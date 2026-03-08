@@ -5,6 +5,7 @@ type UserProfileInput = {
    displayName?: string;
    bio?: string | null;
    username?: string;
+   avatarUrl?: string | null;
 };
 
 type ProfileShape = {
@@ -29,6 +30,7 @@ type ClerkFallbackMetadata = {
       displayName?: string;
       bio?: string | null;
       username?: string;
+      avatarUrl?: string | null;
    };
 };
 
@@ -147,7 +149,7 @@ const getFallbackProfileFromClerk = async (
          identity.displayName ??
          buildPlaceholderDisplayName(),
       bio: overrides?.bio ?? profileMetadata.bio ?? null,
-      avatarUrl: identity.imageUrl,
+      avatarUrl: overrides?.avatarUrl ?? identity.imageUrl,
       createdAt: new Date(identity.clerkUser.createdAt),
       updatedAt: new Date(),
    };
@@ -155,7 +157,7 @@ const getFallbackProfileFromClerk = async (
 
 const persistFallbackProfileToClerk = async (
    clerkUserId: string,
-   profile: Pick<ProfileShape, 'displayName' | 'bio' | 'username'>
+   profile: Pick<ProfileShape, 'displayName' | 'bio' | 'username' | 'avatarUrl'>
 ) => {
    const clerkUser = await clerkClient.users.getUser(clerkUserId);
    const metadata = (clerkUser.unsafeMetadata ?? {}) as ClerkFallbackMetadata;
@@ -169,6 +171,7 @@ const persistFallbackProfileToClerk = async (
             displayName: profile.displayName,
             bio: profile.bio,
             username: profile.username,
+            avatarUrl: profile.avatarUrl,
          },
       },
    });
@@ -303,11 +306,13 @@ export const userService = {
                username: requestedUsername ?? buildDefaultUsername(clerkUserId),
                displayName: input.displayName ?? buildPlaceholderDisplayName(),
                bio: input.bio,
+               avatarUrl: input.avatarUrl,
             },
             update: {
                displayName: input.displayName,
                bio: input.bio,
                username: requestedUsername,
+               avatarUrl: input.avatarUrl,
             },
             select: {
                id: true,
@@ -339,6 +344,7 @@ export const userService = {
                displayName: fallbackProfile.displayName,
                bio: fallbackProfile.bio,
                username: fallbackProfile.username,
+               avatarUrl: fallbackProfile.avatarUrl,
             });
 
             return {

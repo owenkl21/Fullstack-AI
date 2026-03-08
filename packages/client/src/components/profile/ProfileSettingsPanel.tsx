@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useClerk, useUser } from '@clerk/react';
 import { CalendarDays, Database, UserCircle2 } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
+import { R2ImagePicker } from '@/components/r2-image-picker';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
@@ -44,6 +45,9 @@ export function ProfileSettingsPanel() {
    const [displayName, setDisplayName] = useState('');
    const [username, setUsername] = useState('');
    const [bio, setBio] = useState('');
+   const [avatarImages, setAvatarImages] = useState<
+      { storageKey: string; url: string }[]
+   >([]);
    const [isLoading, setIsLoading] = useState(true);
    const [isSaving, setIsSaving] = useState(false);
 
@@ -56,6 +60,16 @@ export function ProfileSettingsPanel() {
             setDisplayName(data.profile.displayName ?? '');
             setUsername(data.profile.username ?? '');
             setBio(data.profile.bio ?? '');
+            setAvatarImages(
+               data.profile.avatarUrl
+                  ? [
+                       {
+                          storageKey: data.profile.avatarUrl,
+                          url: data.profile.avatarUrl,
+                       },
+                    ]
+                  : []
+            );
          } catch (error) {
             console.error(error);
             toast({
@@ -82,6 +96,7 @@ export function ProfileSettingsPanel() {
             displayName: displayName.trim(),
             username: username.trim(),
             bio: bio.trim() ? bio.trim() : null,
+            avatarUrl: avatarImages[0]?.url ?? null,
          };
 
          const { data } = await axios.patch<ProfileResponse>(
@@ -93,6 +108,16 @@ export function ProfileSettingsPanel() {
          setDisplayName(data.profile.displayName ?? '');
          setUsername(data.profile.username ?? '');
          setBio(data.profile.bio ?? '');
+         setAvatarImages(
+            data.profile.avatarUrl
+               ? [
+                    {
+                       storageKey: data.profile.avatarUrl,
+                       url: data.profile.avatarUrl,
+                    },
+                 ]
+               : []
+         );
 
          toast({
             title:
@@ -222,9 +247,18 @@ export function ProfileSettingsPanel() {
                         />
                      </label>
 
+                     <R2ImagePicker
+                        scope="avatar"
+                        label="Avatar image"
+                        multiple={false}
+                        maxItems={1}
+                        value={avatarImages}
+                        onChange={setAvatarImages}
+                     />
+
                      <p className="text-xs text-muted-foreground">
-                        Editable fields: display name, username, and bio.
-                        Account email and avatar are synced from Clerk.
+                        Editable fields: display name, username, bio, and avatar
+                        image.
                      </p>
 
                      <div className="flex flex-wrap items-center gap-3 pt-2">

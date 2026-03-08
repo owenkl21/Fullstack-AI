@@ -24,6 +24,12 @@ export const updateProfileSchema = z
          .max(280, 'Bio must be 280 characters or less.')
          .nullable()
          .optional(),
+      avatarUrl: z
+         .string()
+         .trim()
+         .url('Avatar URL must be a valid URL.')
+         .nullable()
+         .optional(),
    })
    .refine((data) => Object.keys(data).length > 0, {
       message: 'At least one profile field must be provided.',
