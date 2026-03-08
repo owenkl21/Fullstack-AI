@@ -2,11 +2,13 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import { chatController } from './controllers/chat.controller';
 import { fishingController } from './controllers/fishing.controller';
+import { userController } from './controllers/user.controller';
 import { getAuth } from '@clerk/express';
+import { userService } from './services/user.service';
 
 const router = express.Router();
 
-function requireApiAuth(
+async function requireApiAuth(
    req: Request,
    res: Response,
    next: express.NextFunction
@@ -18,6 +20,18 @@ function requireApiAuth(
          code: 'unauthorized',
          message: 'Authentication required.',
       });
+   }
+
+   try {
+      await userService.syncAuthenticatedUser(auth.userId);
+   } catch (error) {
+      console.warn(
+         '[auth] Failed to sync user from Clerk to database. Continuing with authenticated request.',
+         {
+            userId: auth.userId,
+            error,
+         }
+      );
    }
 
    return next();
@@ -37,6 +51,13 @@ router.post(
    '/api/fishing/conditions',
    requireApiAuth,
    fishingController.getConditions
+);
+
+router.get('/api/users/me', requireApiAuth, userController.getCurrentProfile);
+router.patch(
+   '/api/users/me',
+   requireApiAuth,
+   userController.updateCurrentProfile
 );
 
 export default router;

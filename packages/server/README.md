@@ -31,6 +31,20 @@ If you only need to create the database without seeding data:
 bun run prisma:db:create
 ```
 
+### Prisma connection troubleshooting
+
+If requests to `/api/users/me` are slow and logs show `pool timeout: failed to retrieve a connection from pool`, verify these first:
+
+1. Use `127.0.0.1` instead of `localhost` in `DATABASE_URL` to avoid IPv6/local resolver issues on some environments.
+2. Confirm the same `DATABASE_URL` used by the server process can connect (host, port, user, password, db name).
+3. Ensure your MySQL server is running and accepts TCP connections on the configured host/port.
+
+Example:
+
+```env
+DATABASE_URL="mysql://root:password@127.0.0.1:3306/fishing_app"
+```
+
 ## Integrating `getFishingConditions` (architecture-first)
 
 This codebase already follows a `route -> controller -> service -> repository` flow for chat features.
@@ -274,3 +288,20 @@ bun run --cwd packages/server prisma db seed
 ```
 
 `prisma db seed` runs `packages/server/prisma/seed.ts`.
+
+
+## Clerk user sync webhook
+
+This backend now exposes a Clerk webhook endpoint at `POST /api/webhooks/clerk` to keep the local `User` table in sync when users are created, updated, or deleted in Clerk.
+
+Add your webhook signing secret in `.env`:
+
+```env
+CLERK_WEBHOOK_SIGNING_SECRET=whsec_...
+```
+
+In the Clerk dashboard, configure a webhook pointing to your server URL plus `/api/webhooks/clerk` and subscribe to at least:
+
+- `user.created`
+- `user.updated`
+- `user.deleted`
