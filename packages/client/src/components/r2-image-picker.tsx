@@ -95,11 +95,13 @@ export function R2ImagePicker({
 
             const uploadResponse = await fetch(directUpload.uploadUrl, {
                method: 'PUT',
-               mode: 'no-cors',
+               headers: {
+                  'Content-Type': file.type,
+               },
                body: file,
             });
 
-            if (uploadResponse.type !== 'opaque' && !uploadResponse.ok) {
+            if (!uploadResponse.ok) {
                throw new Error(
                   `Upload failed with status ${uploadResponse.status}`
                );
