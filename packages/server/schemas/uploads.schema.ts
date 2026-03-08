@@ -17,3 +17,8 @@ export const signUploadSchema = z.object({
 export const getReadUrlSchema = z.object({
    storageKey: z.string().trim().min(1).max(512),
 });
+
+export const directUploadQuerySchema = z.object({
+   scope: z.enum(allowedScopes),
+   storageKey: z.string().trim().min(1).max(512),
+});
