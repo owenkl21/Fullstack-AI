@@ -1,4 +1,10 @@
-import { createHash, createHmac, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
+import {
+   S3Client,
+   GetObjectCommand,
+   PutObjectCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 type UploadScope = 'catch' | 'site' | 'avatar';
 
@@ -7,6 +13,7 @@ type SignUploadInput = {
    scope: UploadScope;
    fileName: string;
    contentType: 'image/jpeg' | 'image/png' | 'image/webp';
+   sizeBytes: number;
 };
 
 const requiredEnv = [
@@ -30,104 +37,31 @@ const getConfig = () => {
       bucket: process.env.CLOUDFLARE_R2_BUCKET!,
       publicBaseUrl: process.env.CLOUDFLARE_R2_PUBLIC_BASE_URL,
       region: 'auto',
-      service: 's3',
       host: `${process.env.CLOUDFLARE_R2_BUCKET}.${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      maxUploadSizeBytes: 10 * 1024 * 1024,
    };
 };
 
-const encodeRfc3986 = (value: string) =>
-   encodeURIComponent(value).replace(
-      /[!'()*]/g,
-      (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
-   );
+let s3Client: S3Client | null = null;
 
-const sha256Hex = (value: string) =>
-   createHash('sha256').update(value, 'utf8').digest('hex');
+const getS3Client = () => {
+   if (s3Client) {
+      return s3Client;
+   }
 
-const hmac = (key: Buffer | string, value: string) =>
-   createHmac('sha256', key).update(value, 'utf8').digest();
-
-const getSigningKey = (
-   secretAccessKey: string,
-   dateStamp: string,
-   region: string,
-   service: string
-) => {
-   const kDate = hmac(`AWS4${secretAccessKey}`, dateStamp);
-   const kRegion = hmac(kDate, region);
-   const kService = hmac(kRegion, service);
-   return hmac(kService, 'aws4_request');
-};
-
-const buildPresignedUrl = ({
-   method,
-   key,
-   contentType,
-   expiresIn,
-}: {
-   method: 'GET' | 'PUT';
-   key: string;
-   contentType?: string;
-   expiresIn: number;
-}) => {
    const config = getConfig();
-   const now = new Date();
-   const iso = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
-   const amzDate = `${iso.slice(0, 8)}T${iso.slice(9, 15)}Z`;
-   const dateStamp = amzDate.slice(0, 8);
-   const credentialScope = `${dateStamp}/${config.region}/${config.service}/aws4_request`;
-   const canonicalUri = `/${key.split('/').map(encodeRfc3986).join('/')}`;
 
-   const signedHeaders = contentType ? 'content-type;host' : 'host';
-
-   const queryParams = new URLSearchParams({
-      'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
-      'X-Amz-Credential': `${config.accessKeyId}/${credentialScope}`,
-      'X-Amz-Date': amzDate,
-      'X-Amz-Expires': String(expiresIn),
-      'X-Amz-SignedHeaders': signedHeaders,
+   s3Client = new S3Client({
+      region: config.region,
+      endpoint: `https://${config.host}`,
+      forcePathStyle: false,
+      credentials: {
+         accessKeyId: config.accessKeyId,
+         secretAccessKey: config.secretAccessKey,
+      },
    });
 
-   const canonicalQueryString = Array.from(queryParams.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([name, value]) => `${encodeRfc3986(name)}=${encodeRfc3986(value)}`)
-      .join('&');
-
-   const canonicalHeaders = contentType
-      ? `content-type:${contentType}\nhost:${config.host}\n`
-      : `host:${config.host}\n`;
-
-   const canonicalRequest = [
-      method,
-      canonicalUri,
-      canonicalQueryString,
-      canonicalHeaders,
-      signedHeaders,
-      'UNSIGNED-PAYLOAD',
-   ].join('\n');
-
-   const stringToSign = [
-      'AWS4-HMAC-SHA256',
-      amzDate,
-      credentialScope,
-      sha256Hex(canonicalRequest),
-   ].join('\n');
-
-   const signature = createHmac(
-      'sha256',
-      getSigningKey(
-         config.secretAccessKey,
-         dateStamp,
-         config.region,
-         config.service
-      )
-   )
-      .update(stringToSign, 'utf8')
-      .digest('hex');
-
-   queryParams.set('X-Amz-Signature', signature);
-
-   return `https://${config.host}${canonicalUri}?${queryParams.toString()}`;
+   return s3Client;
 };
 
 const slugify = (value: string) =>
@@ -149,7 +83,10 @@ const buildStorageKey = ({
    scope,
    fileName,
    contentType,
-}: SignUploadInput) => {
+}: Pick<
+   SignUploadInput,
+   'clerkUserId' | 'scope' | 'fileName' | 'contentType'
+>) => {
    const timestamp = Date.now();
    const safeSlug = slugify(fileName) || 'image';
    const extension = extensionByMime[contentType];
@@ -164,33 +101,76 @@ const buildStorageKey = ({
    return `users/${clerkUserId}/${pathSegment}/temp/${timestamp}-${randomSuffix}-${safeSlug}.${extension}`;
 };
 
+const buildUnsignedObjectUrl = (storageKey: string) => {
+   const { host } = getConfig();
+
+   return `https://${host}/${storageKey
+      .split('/')
+      .map(encodeURIComponent)
+      .join('/')}`;
+};
+
 const resolveReadUrl = async (storageKey: string) => {
-   const { publicBaseUrl } = getConfig();
+   const { publicBaseUrl, bucket } = getConfig();
 
    if (publicBaseUrl) {
       const base = publicBaseUrl.replace(/\/+$/, '');
       return `${base}/${storageKey}`;
    }
 
-   return buildPresignedUrl({
-      method: 'GET',
-      key: storageKey,
+   const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: storageKey,
+   });
+
+   return getSignedUrl(getS3Client(), command, {
       expiresIn: 60 * 10,
    });
 };
 
+const buildSignedUploadUrl = async ({
+   storageKey,
+   contentType,
+}: {
+   storageKey: string;
+   contentType: SignUploadInput['contentType'];
+}) => {
+   const { bucket } = getConfig();
+
+   const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: storageKey,
+      ContentType: contentType,
+   });
+
+   return getSignedUrl(getS3Client(), command, {
+      expiresIn: 60 * 5,
+   });
+};
+
+const assertUploadSize = (sizeBytes: number) => {
+   const { maxUploadSizeBytes } = getConfig();
+
+   if (sizeBytes > maxUploadSizeBytes) {
+      throw new Error(
+         `File exceeds maximum upload size of ${maxUploadSizeBytes} bytes.`
+      );
+   }
+};
+
 export const uploadsService = {
    async signUpload(input: SignUploadInput) {
+      assertUploadSize(input.sizeBytes);
+
       const storageKey = buildStorageKey(input);
 
-      const uploadUrl = buildPresignedUrl({
-         method: 'PUT',
-         key: storageKey,
-         contentType: input.contentType,
-         expiresIn: 60 * 5,
-      });
-
-      const readUrl = await resolveReadUrl(storageKey);
+      const [uploadUrl, readUrl] = await Promise.all([
+         buildSignedUploadUrl({
+            storageKey,
+            contentType: input.contentType,
+         }),
+         resolveReadUrl(storageKey),
+      ]);
 
       return {
          storageKey,
@@ -210,6 +190,7 @@ export const uploadsService = {
       clerkUserId: string;
       scope: UploadScope;
       storageKey: string;
+      contentType: SignUploadInput['contentType'];
    }) {
       const expectedPathSegment =
          input.scope === 'avatar'
@@ -227,10 +208,12 @@ export const uploadsService = {
 
       return {
          storageKey: input.storageKey,
-         uploadUrl: `https://${getConfig().host}/${input.storageKey
-            .split('/')
-            .map(encodeRfc3986)
-            .join('/')}`,
+         uploadUrl: await buildSignedUploadUrl({
+            storageKey: input.storageKey,
+            contentType: input.contentType,
+         }),
+         readUrl: await resolveReadUrl(input.storageKey),
+         objectUrl: buildUnsignedObjectUrl(input.storageKey),
       };
    },
 };
