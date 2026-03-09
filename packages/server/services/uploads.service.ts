@@ -240,4 +240,42 @@ export const uploadsService = {
          objectUrl: buildUnsignedObjectUrl(input.storageKey),
       };
    },
+
+   async proxyUpload(input: {
+      clerkUserId: string;
+      scope: UploadScope;
+      storageKey: string;
+      contentType: SignUploadInput['contentType'];
+      body: Buffer;
+   }) {
+      const expectedPathSegment =
+         input.scope === 'avatar'
+            ? 'avatar'
+            : input.scope === 'catch'
+              ? 'catches/temp'
+              : 'sites/temp';
+      const expectedPrefix = `users/${input.clerkUserId}/${expectedPathSegment}/`;
+
+      if (!input.storageKey.startsWith(expectedPrefix)) {
+         throw new Error(
+            'Storage key does not match authenticated user and scope.'
+         );
+      }
+
+      const { bucket } = getConfig();
+
+      await getS3Client().send(
+         new PutObjectCommand({
+            Bucket: bucket,
+            Key: input.storageKey,
+            Body: input.body,
+            ContentType: input.contentType,
+         })
+      );
+
+      return {
+         storageKey: input.storageKey,
+         readUrl: await resolveReadUrl(input.storageKey),
+      };
+   },
 };
