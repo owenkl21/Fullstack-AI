@@ -133,15 +133,29 @@ const withResolvedImageUrls = async <
 ): Promise<T> => {
    const images = await Promise.all(
       record.images.map(async (entry) => {
-         const signed = await uploadsService.getReadUrl(entry.image.storageKey);
+         try {
+            const signed = await uploadsService.getReadUrl(
+               entry.image.storageKey
+            );
 
-         return {
-            ...entry,
-            image: {
-               ...entry.image,
-               url: signed.readUrl,
-            },
-         };
+            return {
+               ...entry,
+               image: {
+                  ...entry.image,
+                  url: signed.readUrl,
+               },
+            };
+         } catch (error) {
+            console.warn(
+               '[fishing:create] Falling back to persisted image URL because generating read URL failed.',
+               {
+                  storageKey: entry.image.storageKey,
+                  error,
+               }
+            );
+
+            return entry;
+         }
       })
    );
 
