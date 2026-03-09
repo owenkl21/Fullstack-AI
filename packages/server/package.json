@@ -4,8 +4,8 @@
    "type": "module",
    "private": true,
    "scripts": {
-      "start": "bun run prisma:generate && bun run index.ts",
-      "dev": "bun run prisma:generate && bun run --watch index.ts",
+      "start": "bun run prisma:db:push && bun run prisma:generate && bun run index.ts",
+      "dev": "bun run prisma:db:push && bun run prisma:generate && bun run --watch index.ts",
       "prisma:generate": "prisma generate",
       "prisma:seed": "bun run prisma/seed.ts",
       "prisma:db:create": "bun run prisma/create-database.ts",
