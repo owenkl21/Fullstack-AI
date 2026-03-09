@@ -46,34 +46,16 @@ type CreateFishingSiteInput = {
 
 const resolveOptionalRelationIds = async (input: {
    siteId?: string | null;
-   speciesId?: string | null;
-   gearId?: string | null;
 }) => {
-   const [site, species, gear] = await Promise.all([
-      input.siteId
-         ? prisma.fishingSite.findUnique({
-              where: { id: input.siteId },
-              select: { id: true },
-           })
-         : null,
-      input.speciesId
-         ? prisma.species.findUnique({
-              where: { id: input.speciesId },
-              select: { id: true },
-           })
-         : null,
-      input.gearId
-         ? prisma.gear.findUnique({
-              where: { id: input.gearId },
-              select: { id: true },
-           })
-         : null,
-   ]);
+   const site = input.siteId
+      ? await prisma.fishingSite.findUnique({
+           where: { id: input.siteId },
+           select: { id: true },
+        })
+      : null;
 
    return {
       siteId: site?.id ?? null,
-      speciesId: species?.id ?? null,
-      gearId: gear?.id ?? null,
    };
 };
 
@@ -197,8 +179,6 @@ export const fishingService = {
       const user = await getUserByClerkId(clerkId);
       const relations = await resolveOptionalRelationIds({
          siteId: input.siteId,
-         speciesId: input.speciesId,
-         gearId: input.gearId,
       });
 
       const created = await prisma.$transaction(async (tx) => {
@@ -206,8 +186,6 @@ export const fishingService = {
             data: {
                createdById: user.id,
                siteId: relations.siteId,
-               speciesId: relations.speciesId,
-               gearId: relations.gearId,
                title: input.title,
                notes: input.notes,
                caughtAt: input.caughtAt,
