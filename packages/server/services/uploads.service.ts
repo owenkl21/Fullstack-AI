@@ -148,6 +148,29 @@ const buildSignedUploadUrl = async ({
    });
 };
 
+const inferScopeFromStorageKey = (
+   clerkUserId: string,
+   storageKey: string
+): UploadScope => {
+   const catchPrefix = `users/${clerkUserId}/catches/temp/`;
+   const sitePrefix = `users/${clerkUserId}/sites/temp/`;
+   const avatarPrefix = `users/${clerkUserId}/avatar/`;
+
+   if (storageKey.startsWith(catchPrefix)) {
+      return 'catch';
+   }
+
+   if (storageKey.startsWith(sitePrefix)) {
+      return 'site';
+   }
+
+   if (storageKey.startsWith(avatarPrefix)) {
+      return 'avatar';
+   }
+
+   throw new Error('Storage key does not match authenticated user and scope.');
+};
+
 const assertUploadSize = (sizeBytes: number) => {
    const { maxUploadSizeBytes } = getConfig();
 
@@ -159,6 +182,7 @@ const assertUploadSize = (sizeBytes: number) => {
 };
 
 export const uploadsService = {
+   inferScopeFromStorageKey,
    async signUpload(input: SignUploadInput) {
       assertUploadSize(input.sizeBytes);
 

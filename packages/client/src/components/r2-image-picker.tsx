@@ -73,23 +73,23 @@ export function R2ImagePicker({
                   sizeBytes: file.size,
                });
 
-               const uploadResponse = await fetch(signed.uploadUrl, {
-                  method: 'PUT',
-                  headers: {
-                     'Content-Type': file.type,
-                  },
-                  body: file,
-               });
-
-               if (!uploadResponse.ok) {
-                  throw new Error(
-                     `Upload failed with status ${uploadResponse.status}`
-                  );
-               }
+               const uploadResponse = await axios.put(
+                  '/api/uploads/proxy',
+                  file,
+                  {
+                     params: {
+                        storageKey: signed.storageKey,
+                        contentType: file.type,
+                     },
+                     headers: {
+                        'Content-Type': file.type,
+                     },
+                  }
+               );
 
                uploaded.push({
-                  storageKey: signed.storageKey,
-                  url: signed.readUrl,
+                  storageKey: uploadResponse.data.storageKey,
+                  url: uploadResponse.data.readUrl,
                });
             } catch (error) {
                console.error(error);

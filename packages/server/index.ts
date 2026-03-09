@@ -16,6 +16,14 @@ app.post(
    webhookController.handleClerkWebhook
 );
 
+app.use(
+   '/api/uploads/proxy',
+   express.raw({
+      type: ['image/jpeg', 'image/png', 'image/webp'],
+      limit: '10mb',
+   })
+);
+
 app.use(express.json());
 app.use(clerkMiddleware());
 app.use((req, res, next) => {
