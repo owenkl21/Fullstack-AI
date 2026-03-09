@@ -1,8 +1,10 @@
 import type { Request, Response } from 'express';
 import { getAuth } from '@clerk/express';
+import axios from 'axios';
 import {
    directUploadQuerySchema,
    getReadUrlSchema,
+   proxyUploadQuerySchema,
    signUploadSchema,
 } from '../schemas/uploads.schema';
 import { uploadsService } from '../services/uploads.service';
@@ -11,6 +13,12 @@ const unauthorizedResponse = {
    code: 'unauthorized',
    message: 'Authentication required.',
 };
+
+const uploadHeadersByContentType = {
+   'image/jpeg': 'image/jpeg',
+   'image/png': 'image/png',
+   'image/webp': 'image/webp',
+} as const;
 
 export const uploadsController = {
    async signUpload(req: Request, res: Response) {
@@ -67,6 +75,60 @@ export const uploadsController = {
          return res.status(500).json({
             code: 'failed_to_prepare_direct_upload',
             message: 'Unable to prepare direct upload target.',
+         });
+      }
+   },
+
+   async proxyUpload(req: Request, res: Response) {
+      const auth = getAuth(req);
+
+      if (!auth.userId) {
+         return res.status(401).json(unauthorizedResponse);
+      }
+
+      const query = proxyUploadQuerySchema.safeParse(req.query);
+
+      if (!query.success) {
+         return res.status(400).json(query.error.format());
+      }
+
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+         return res.status(400).json({
+            code: 'invalid_upload_payload',
+            message: 'Expected a binary image payload.',
+         });
+      }
+
+      try {
+         const directUpload = await uploadsService.getDirectUploadData({
+            clerkUserId: auth.userId,
+            scope: uploadsService.inferScopeFromStorageKey(
+               auth.userId,
+               query.data.storageKey
+            ),
+            storageKey: query.data.storageKey,
+            contentType: query.data.contentType,
+         });
+
+         await axios.put(directUpload.uploadUrl, req.body, {
+            headers: {
+               'Content-Type':
+                  uploadHeadersByContentType[query.data.contentType],
+               'Content-Length': req.body.length,
+            },
+            maxBodyLength: Infinity,
+            maxContentLength: Infinity,
+         });
+
+         return res.json({
+            storageKey: directUpload.storageKey,
+            readUrl: directUpload.readUrl,
+         });
+      } catch (error) {
+         console.error('[uploads:proxyUpload] failed to proxy upload', error);
+         return res.status(500).json({
+            code: 'failed_to_proxy_upload',
+            message: 'Unable to upload image.',
          });
       }
    },

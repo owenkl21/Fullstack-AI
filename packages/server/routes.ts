@@ -56,6 +56,7 @@ router.post(
 
 router.post('/api/catches', requireApiAuth, fishingController.createCatch);
 router.post('/api/uploads/sign', requireApiAuth, uploadsController.signUpload);
+router.put('/api/uploads/proxy', requireApiAuth, uploadsController.proxyUpload);
 router.post('/api/uploads/read-url', uploadsController.getReadUrl);
 router.get(
    '/api/uploads/direct',

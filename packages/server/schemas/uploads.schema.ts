@@ -23,3 +23,8 @@ export const directUploadQuerySchema = z.object({
    storageKey: z.string().trim().min(1).max(512),
    contentType: z.enum(allowedMimeTypes),
 });
+
+export const proxyUploadQuerySchema = z.object({
+   storageKey: z.string().trim().min(1).max(512),
+   contentType: z.enum(allowedMimeTypes),
+});
