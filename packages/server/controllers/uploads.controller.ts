@@ -19,6 +19,27 @@ const uploadHeadersByContentType = {
    'image/webp': 'image/webp',
 } as const;
 
+const isNoSuchBucketError = (error: unknown) => {
+   if (typeof error !== 'object' || error === null) {
+      return false;
+   }
+
+   const maybeError = error as { name?: string; Code?: string; code?: string };
+   return (
+      maybeError.name === 'NoSuchBucket' ||
+      maybeError.Code === 'NoSuchBucket' ||
+      maybeError.code === 'NoSuchBucket'
+   );
+};
+
+const resolveBucketName = () =>
+   process.env.CLOUDFLARE_R2_BUCKET || process.env.CLOUDFLARE_R2_BUCKET_NAME;
+
+const bucketNotFoundResponse = {
+   code: 'r2_bucket_not_found',
+   message: `Upload bucket \"${resolveBucketName() || '(not set)'}\" was not found. Verify CLOUDFLARE_R2_BUCKET (or CLOUDFLARE_R2_BUCKET_NAME).`,
+};
+
 export const uploadsController = {
    async signUpload(req: Request, res: Response) {
       const auth = getAuth(req);
@@ -41,6 +62,13 @@ export const uploadsController = {
 
          return res.json(signed);
       } catch (error) {
+         if (isNoSuchBucketError(error)) {
+            console.warn('[uploads:signUpload] bucket not found', {
+               bucket: resolveBucketName() || null,
+            });
+            return res.status(500).json(bucketNotFoundResponse);
+         }
+
          console.error('[uploads:signUpload] failed to sign upload URL', error);
          return res.status(500).json({
             code: 'failed_to_sign_upload',
@@ -70,6 +98,13 @@ export const uploadsController = {
 
          return res.json(directUpload);
       } catch (error) {
+         if (isNoSuchBucketError(error)) {
+            console.warn('[uploads:getDirectUploadData] bucket not found', {
+               bucket: resolveBucketName() || null,
+            });
+            return res.status(500).json(bucketNotFoundResponse);
+         }
+
          console.error('[uploads:getDirectUploadData] failed', error);
          return res.status(500).json({
             code: 'failed_to_prepare_direct_upload',
@@ -112,20 +147,14 @@ export const uploadsController = {
 
          return res.json(proxiedUpload);
       } catch (error) {
-         console.error('[uploads:proxyUpload] failed to proxy upload', error);
-
-         if (
-            typeof error === 'object' &&
-            error !== null &&
-            'name' in error &&
-            error.name === 'NoSuchBucket'
-         ) {
-            return res.status(500).json({
-               code: 'r2_bucket_not_found',
-               message:
-                  'Upload bucket was not found. Verify CLOUDFLARE_R2_BUCKET (or CLOUDFLARE_R2_BUCKET_NAME).',
+         if (isNoSuchBucketError(error)) {
+            console.warn('[uploads:proxyUpload] bucket not found', {
+               bucket: resolveBucketName() || null,
             });
+            return res.status(500).json(bucketNotFoundResponse);
          }
+
+         console.error('[uploads:proxyUpload] failed to proxy upload', error);
 
          return res.status(500).json({
             code: 'failed_to_proxy_upload',
@@ -145,6 +174,13 @@ export const uploadsController = {
          const signed = await uploadsService.getReadUrl(parsed.data.storageKey);
          return res.json(signed);
       } catch (error) {
+         if (isNoSuchBucketError(error)) {
+            console.warn('[uploads:getReadUrl] bucket not found', {
+               bucket: resolveBucketName() || null,
+            });
+            return res.status(500).json(bucketNotFoundResponse);
+         }
+
          console.error('[uploads:getReadUrl] failed to sign read URL', error);
          return res.status(500).json({
             code: 'failed_to_sign_read_url',
