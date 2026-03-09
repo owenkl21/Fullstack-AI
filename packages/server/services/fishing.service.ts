@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { getCoordinates } from '../clients/geocoding.client';
 import { getCurrentWeather } from '../clients/weather.client';
 import { uploadsService } from './uploads.service';
+import { userService } from './user.service';
 
 type CreateImageInput = {
    storageKey: string;
@@ -113,6 +114,17 @@ const siteDetailInclude = {
 };
 
 async function getUserByClerkId(clerkId: string) {
+   const existing = await prisma.user.findUnique({
+      where: { clerkId },
+      select: { id: true },
+   });
+
+   if (existing) {
+      return existing;
+   }
+
+   await userService.syncAuthenticatedUser(clerkId);
+
    return prisma.user.findUniqueOrThrow({
       where: { clerkId },
       select: { id: true },
