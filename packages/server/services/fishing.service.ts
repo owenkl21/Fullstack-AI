@@ -113,6 +113,17 @@ const siteDetailInclude = {
    },
 };
 
+const buildPlaceholderIdentity = (clerkId: string) => {
+   const normalized = clerkId.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+   const username = `clerk_${normalized}`;
+
+   return {
+      email: `${username}@placeholder.local`,
+      username,
+      displayName: 'New Angler',
+   };
+};
+
 async function getUserByClerkId(clerkId: string) {
    const existing = await prisma.user.findUnique({
       where: { clerkId },
