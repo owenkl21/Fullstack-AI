@@ -8,6 +8,17 @@ type CreateImageInput = {
    url: string;
 };
 
+const stripSignedUrlParams = (url: string) => {
+   try {
+      const parsed = new URL(url);
+      parsed.search = '';
+      parsed.hash = '';
+      return parsed.toString();
+   } catch {
+      return url;
+   }
+};
+
 type CreateCatchInput = {
    title: string;
    notes?: string | null;
@@ -151,7 +162,7 @@ export const fishingService = {
                data: {
                   uploadedById: user.id,
                   storageKey: image.storageKey,
-                  url: image.url,
+                  url: stripSignedUrlParams(image.url),
                },
             });
 
@@ -207,7 +218,7 @@ export const fishingService = {
                data: {
                   uploadedById: user.id,
                   storageKey: image.storageKey,
-                  url: image.url,
+                  url: stripSignedUrlParams(image.url),
                },
             });
 
