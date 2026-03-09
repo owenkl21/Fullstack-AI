@@ -116,6 +116,17 @@ const withResolvedImageUrls = async <
 };
 
 export const fishingService = {
+   async listFishingSites() {
+      return prisma.fishingSite.findMany({
+         where: { deletedAt: null },
+         orderBy: { name: 'asc' },
+         select: {
+            id: true,
+            name: true,
+         },
+      });
+   },
+
    async getFishingConditions(locationName: string) {
       const coordinates = await getCoordinates(locationName);
       const weather = await getCurrentWeather(
@@ -158,18 +169,32 @@ export const fishingService = {
          }
 
          for (const [position, image] of input.images.entries()) {
-            const createdImage = await tx.image.create({
-               data: {
+            const normalizedUrl = stripSignedUrlParams(image.url);
+            const createdImage = await tx.image.upsert({
+               where: { storageKey: image.storageKey },
+               create: {
                   uploadedById: user.id,
                   storageKey: image.storageKey,
-                  url: stripSignedUrlParams(image.url),
+                  url: normalizedUrl,
+               },
+               update: {
+                  url: normalizedUrl,
                },
             });
 
-            await tx.catchImage.create({
-               data: {
+            await tx.catchImage.upsert({
+               where: {
+                  catchId_imageId: {
+                     catchId: catchRecord.id,
+                     imageId: createdImage.id,
+                  },
+               },
+               create: {
                   catchId: catchRecord.id,
                   imageId: createdImage.id,
+                  position,
+               },
+               update: {
                   position,
                },
             });

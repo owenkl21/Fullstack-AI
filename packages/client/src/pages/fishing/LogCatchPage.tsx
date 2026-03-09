@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Show, SignInButton } from '@clerk/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LandingHeader } from '@/components/landing/LandingHeader';
@@ -9,28 +9,56 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 
+type SiteOption = { id: string; name: string };
+
+const WEATHER_OPTIONS = [
+   'Clear skies',
+   'Partly cloudy',
+   'Cloudy',
+   'Raining',
+   'Stormy',
+   'Windy',
+   'Foggy',
+];
+
 export function LogCatchPage() {
    const navigate = useNavigate();
    const [isSaving, setIsSaving] = useState(false);
    const [images, setImages] = useState<{ storageKey: string; url: string }[]>(
       []
    );
+   const [sites, setSites] = useState<SiteOption[]>([]);
+   const [siteChoice, setSiteChoice] = useState('');
+
+   useEffect(() => {
+      const loadSites = async () => {
+         const { data } = await axios.get('/api/sites');
+         setSites(data.sites ?? []);
+      };
+
+      void loadSites();
+   }, []);
 
    const submitCatch = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
+      const weatherValues = formData.getAll('weather').map(String);
+      const isOtherSpot = siteChoice === '__other';
+      const customSpot = String(formData.get('customSpot') ?? '').trim();
+      const notes = String(formData.get('notes') ?? '').trim();
 
       const payload = {
          title: String(formData.get('title') ?? ''),
          caughtAt: String(formData.get('caughtAt') ?? ''),
-         notes: String(formData.get('notes') ?? '') || null,
-         siteId: String(formData.get('siteId') ?? '') || null,
-         speciesId: String(formData.get('speciesId') ?? '') || null,
-         gearId: String(formData.get('gearId') ?? '') || null,
-         weather: String(formData.get('weather') ?? '') || null,
+         notes:
+            (isOtherSpot && customSpot
+               ? `${notes ? `${notes}\n\n` : ''}Spot: ${customSpot}`
+               : notes) || null,
+         siteId: isOtherSpot ? null : siteChoice || null,
+         speciesId: null,
+         gearId: null,
+         weather: weatherValues.length > 0 ? weatherValues.join(', ') : null,
          waterTemp: Number(formData.get('waterTemp')) || null,
-         depth: Number(formData.get('depth')) || null,
-         count: Number(formData.get('count')) || 1,
          length: Number(formData.get('length')) || null,
          weight: Number(formData.get('weight')) || null,
          images,
@@ -81,26 +109,48 @@ export function LogCatchPage() {
                      placeholder="Notes"
                      className="rounded border p-2"
                   />
-                  <input
+                  <select
                      name="siteId"
-                     placeholder="Optional siteId"
+                     value={siteChoice}
+                     onChange={(event) => setSiteChoice(event.target.value)}
                      className="rounded border p-2"
-                  />
-                  <input
-                     name="gearId"
-                     placeholder="Optional gearId"
-                     className="rounded border p-2"
-                  />
-                  <input
-                     name="speciesId"
-                     placeholder="Optional speciesId"
-                     className="rounded border p-2"
-                  />
-                  <input
-                     name="weather"
-                     placeholder="Optional weather"
-                     className="rounded border p-2"
-                  />
+                  >
+                     <option value="">No fishing spot selected</option>
+                     {sites.map((site) => (
+                        <option key={site.id} value={site.id}>
+                           {site.name}
+                        </option>
+                     ))}
+                     <option value="__other">Other (add new spot name)</option>
+                  </select>
+                  {siteChoice === '__other' && (
+                     <input
+                        name="customSpot"
+                        placeholder="Enter fishing spot name"
+                        className="rounded border p-2"
+                        required
+                     />
+                  )}
+                  <fieldset className="grid gap-2 rounded border p-3">
+                     <legend className="px-1 text-sm font-medium">
+                        Weather
+                     </legend>
+                     <div className="grid gap-2 sm:grid-cols-2">
+                        {WEATHER_OPTIONS.map((weather) => (
+                           <label
+                              key={weather}
+                              className="flex items-center gap-2 text-sm"
+                           >
+                              <input
+                                 type="checkbox"
+                                 name="weather"
+                                 value={weather}
+                              />
+                              {weather}
+                           </label>
+                        ))}
+                     </div>
+                  </fieldset>
                   <div className="grid gap-3 sm:grid-cols-3">
                      <input
                         name="waterTemp"
@@ -109,23 +159,6 @@ export function LogCatchPage() {
                         step="0.1"
                         className="rounded border p-2"
                      />
-                     <input
-                        name="depth"
-                        placeholder="Depth"
-                        type="number"
-                        step="0.1"
-                        className="rounded border p-2"
-                     />
-                     <input
-                        name="count"
-                        placeholder="Count"
-                        type="number"
-                        min={1}
-                        defaultValue={1}
-                        className="rounded border p-2"
-                     />
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
                      <input
                         name="length"
                         placeholder="Length"

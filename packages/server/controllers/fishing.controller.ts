@@ -117,6 +117,11 @@ export const fishingController = {
       }
    },
 
+   async listFishingSites(_req: Request, res: Response) {
+      const sites = await fishingService.listFishingSites();
+      return res.json({ sites });
+   },
+
    async getFishingSiteById(req: Request, res: Response) {
       const siteIdParam = req.params.siteId;
       const siteId = Array.isArray(siteIdParam) ? siteIdParam[0] : siteIdParam;
