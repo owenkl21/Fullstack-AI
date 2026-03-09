@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { getCoordinates } from '../clients/geocoding.client';
 import { getCurrentWeather } from '../clients/weather.client';
+import { uploadsService } from './uploads.service';
 
 type CreateImageInput = {
    storageKey: string;
@@ -74,6 +75,35 @@ async function getUserByClerkId(clerkId: string) {
    });
 }
 
+const withResolvedImageUrls = async <
+   T extends {
+      images: Array<{
+         image: { id: string; storageKey: string; url: string };
+      }>;
+   },
+>(
+   record: T
+): Promise<T> => {
+   const images = await Promise.all(
+      record.images.map(async (entry) => {
+         const signed = await uploadsService.getReadUrl(entry.image.storageKey);
+
+         return {
+            ...entry,
+            image: {
+               ...entry.image,
+               url: signed.readUrl,
+            },
+         };
+      })
+   );
+
+   return {
+      ...record,
+      images,
+   };
+};
+
 export const fishingService = {
    async getFishingConditions(locationName: string) {
       const coordinates = await getCoordinates(locationName);
@@ -140,14 +170,20 @@ export const fishingService = {
          });
       });
 
-      return created;
+      return withResolvedImageUrls(created);
    },
 
    async getCatchById(catchId: string) {
-      return prisma.catch.findUnique({
+      const catchRecord = await prisma.catch.findUnique({
          where: { id: catchId },
          include: catchDetailInclude,
       });
+
+      if (!catchRecord) {
+         return null;
+      }
+
+      return withResolvedImageUrls(catchRecord);
    },
 
    async createFishingSite(clerkId: string, input: CreateFishingSiteInput) {
@@ -190,13 +226,19 @@ export const fishingService = {
          });
       });
 
-      return created;
+      return withResolvedImageUrls(created);
    },
 
    async getFishingSiteById(siteId: string) {
-      return prisma.fishingSite.findUnique({
+      const site = await prisma.fishingSite.findUnique({
          where: { id: siteId },
          include: siteDetailInclude,
       });
+
+      if (!site) {
+         return null;
+      }
+
+      return withResolvedImageUrls(site);
    },
 };
