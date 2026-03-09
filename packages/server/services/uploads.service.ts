@@ -20,8 +20,11 @@ const requiredEnv = [
    'CLOUDFLARE_ACCOUNT_ID',
    'CLOUDFLARE_R2_ACCESS_KEY_ID',
    'CLOUDFLARE_R2_SECRET_ACCESS_KEY',
-   'CLOUDFLARE_R2_BUCKET',
 ] as const;
+
+const resolveBucket = () =>
+   process.env.CLOUDFLARE_R2_BUCKET?.trim() ||
+   process.env.CLOUDFLARE_R2_BUCKET_NAME?.trim();
 
 const getConfig = () => {
    for (const key of requiredEnv) {
@@ -30,11 +33,19 @@ const getConfig = () => {
       }
    }
 
+   const bucket = resolveBucket();
+
+   if (!bucket) {
+      throw new Error(
+         'Missing required environment variable: CLOUDFLARE_R2_BUCKET (or CLOUDFLARE_R2_BUCKET_NAME).'
+      );
+   }
+
    return {
       accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
       accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID!,
       secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY!,
-      bucket: process.env.CLOUDFLARE_R2_BUCKET!,
+      bucket,
       publicBaseUrl: process.env.CLOUDFLARE_R2_PUBLIC_BASE_URL,
       region: 'auto',
       endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,

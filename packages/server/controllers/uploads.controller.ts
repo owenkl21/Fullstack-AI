@@ -113,6 +113,20 @@ export const uploadsController = {
          return res.json(proxiedUpload);
       } catch (error) {
          console.error('[uploads:proxyUpload] failed to proxy upload', error);
+
+         if (
+            typeof error === 'object' &&
+            error !== null &&
+            'name' in error &&
+            error.name === 'NoSuchBucket'
+         ) {
+            return res.status(500).json({
+               code: 'r2_bucket_not_found',
+               message:
+                  'Upload bucket was not found. Verify CLOUDFLARE_R2_BUCKET (or CLOUDFLARE_R2_BUCKET_NAME).',
+            });
+         }
+
          return res.status(500).json({
             code: 'failed_to_proxy_upload',
             message: 'Unable to upload image.',
