@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { getCoordinates } from '../clients/geocoding.client';
 import { getCurrentWeather } from '../clients/weather.client';
 import { uploadsService } from './uploads.service';
+import { userService } from './user.service';
 
 type CreateImageInput = {
    storageKey: string;
@@ -133,18 +134,7 @@ async function getUserByClerkId(clerkId: string) {
       return existing;
    }
 
-   const placeholderIdentity = buildPlaceholderIdentity(clerkId);
-
-   await prisma.user.upsert({
-      where: { clerkId },
-      create: {
-         clerkId,
-         email: placeholderIdentity.email,
-         username: placeholderIdentity.username,
-         displayName: placeholderIdentity.displayName,
-      },
-      update: {},
-   });
+   await userService.syncAuthenticatedUser(clerkId);
 
    return prisma.user.findUniqueOrThrow({
       where: { clerkId },
