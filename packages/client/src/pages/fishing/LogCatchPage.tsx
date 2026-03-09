@@ -66,8 +66,6 @@ export function LogCatchPage() {
                ? `${notes ? `${notes}\n\n` : ''}Spot: ${customSpot}`
                : notes) || null,
          siteId: isOtherSpot ? null : siteChoice || null,
-         speciesId: null,
-         gearId: null,
          weather: weatherValues.length > 0 ? weatherValues.join(', ') : null,
          waterTemp: Number(formData.get('waterTemp')) || null,
          length: Number(formData.get('length')) || null,

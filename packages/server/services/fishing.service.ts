@@ -25,8 +25,6 @@ type CreateCatchInput = {
    notes?: string | null;
    caughtAt: Date;
    siteId?: string | null;
-   speciesId?: string | null;
-   gearId?: string | null;
    weight?: number | null;
    length?: number | null;
    count?: number;
