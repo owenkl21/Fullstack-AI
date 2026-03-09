@@ -45,6 +45,39 @@ type CreateFishingSiteInput = {
    images: CreateImageInput[];
 };
 
+const resolveOptionalRelationIds = async (input: {
+   siteId?: string | null;
+   speciesId?: string | null;
+   gearId?: string | null;
+}) => {
+   const [site, species, gear] = await Promise.all([
+      input.siteId
+         ? prisma.fishingSite.findUnique({
+              where: { id: input.siteId },
+              select: { id: true },
+           })
+         : null,
+      input.speciesId
+         ? prisma.species.findUnique({
+              where: { id: input.speciesId },
+              select: { id: true },
+           })
+         : null,
+      input.gearId
+         ? prisma.gear.findUnique({
+              where: { id: input.gearId },
+              select: { id: true },
+           })
+         : null,
+   ]);
+
+   return {
+      siteId: site?.id ?? null,
+      speciesId: species?.id ?? null,
+      gearId: gear?.id ?? null,
+   };
+};
+
 const catchDetailInclude = {
    createdBy: { select: { id: true, displayName: true, username: true } },
    site: { select: { id: true, name: true, latitude: true, longitude: true } },
@@ -79,7 +112,40 @@ const siteDetailInclude = {
    },
 };
 
+const buildPlaceholderIdentity = (clerkId: string) => {
+   const normalized = clerkId.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+   const username = `clerk_${normalized}`;
+
+   return {
+      email: `${username}@placeholder.local`,
+      username,
+      displayName: 'New Angler',
+   };
+};
+
 async function getUserByClerkId(clerkId: string) {
+   const existing = await prisma.user.findUnique({
+      where: { clerkId },
+      select: { id: true },
+   });
+
+   if (existing) {
+      return existing;
+   }
+
+   const placeholderIdentity = buildPlaceholderIdentity(clerkId);
+
+   await prisma.user.upsert({
+      where: { clerkId },
+      create: {
+         clerkId,
+         email: placeholderIdentity.email,
+         username: placeholderIdentity.username,
+         displayName: placeholderIdentity.displayName,
+      },
+      update: {},
+   });
+
    return prisma.user.findUniqueOrThrow({
       where: { clerkId },
       select: { id: true },
@@ -141,14 +207,19 @@ export const fishingService = {
 
    async createCatch(clerkId: string, input: CreateCatchInput) {
       const user = await getUserByClerkId(clerkId);
+      const relations = await resolveOptionalRelationIds({
+         siteId: input.siteId,
+         speciesId: input.speciesId,
+         gearId: input.gearId,
+      });
 
       const created = await prisma.$transaction(async (tx) => {
          const catchRecord = await tx.catch.create({
             data: {
                createdById: user.id,
-               siteId: input.siteId,
-               speciesId: input.speciesId,
-               gearId: input.gearId,
+               siteId: relations.siteId,
+               speciesId: relations.speciesId,
+               gearId: relations.gearId,
                title: input.title,
                notes: input.notes,
                caughtAt: input.caughtAt,
@@ -161,9 +232,9 @@ export const fishingService = {
             },
          });
 
-         if (input.siteId) {
+         if (relations.siteId) {
             await tx.fishingSite.update({
-               where: { id: input.siteId },
+               where: { id: relations.siteId },
                data: { catchCount: { increment: 1 } },
             });
          }

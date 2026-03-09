@@ -32,8 +32,19 @@ export function LogCatchPage() {
 
    useEffect(() => {
       const loadSites = async () => {
-         const { data } = await axios.get('/api/sites');
-         setSites(data.sites ?? []);
+         try {
+            const { data } = await axios.get('/api/sites');
+            setSites(data.sites ?? []);
+         } catch (error) {
+            console.error('Unable to load fishing sites', error);
+            setSites([]);
+            toast({
+               title: 'Unable to load fishing spots',
+               description:
+                  'You can still save a catch without selecting a spot.',
+               variant: 'error',
+            });
+         }
       };
 
       void loadSites();
