@@ -55,6 +55,18 @@ router.post(
 );
 
 router.post('/api/catches', requireApiAuth, fishingController.createCatch);
+
+router.get('/api/catches/me', requireApiAuth, fishingController.listMyCatches);
+router.put(
+   '/api/catches/:catchId',
+   requireApiAuth,
+   fishingController.updateCatch
+);
+router.delete(
+   '/api/catches/:catchId',
+   requireApiAuth,
+   fishingController.deleteCatch
+);
 router.post('/api/uploads/sign', requireApiAuth, uploadsController.signUpload);
 router.put('/api/uploads/proxy', requireApiAuth, uploadsController.proxyUpload);
 router.post('/api/uploads/read-url', uploadsController.getReadUrl);
@@ -65,6 +77,22 @@ router.get(
 );
 router.get('/api/catches/:catchId', fishingController.getCatchById);
 router.get('/api/sites', fishingController.listFishingSites);
+
+router.get(
+   '/api/sites/me',
+   requireApiAuth,
+   fishingController.listMyFishingSites
+);
+router.put(
+   '/api/sites/:siteId',
+   requireApiAuth,
+   fishingController.updateFishingSite
+);
+router.delete(
+   '/api/sites/:siteId',
+   requireApiAuth,
+   fishingController.deleteFishingSite
+);
 router.post('/api/sites', requireApiAuth, fishingController.createFishingSite);
 router.get('/api/sites/:siteId', fishingController.getFishingSiteById);
 router.get('/api/users/me', requireApiAuth, userController.getCurrentProfile);

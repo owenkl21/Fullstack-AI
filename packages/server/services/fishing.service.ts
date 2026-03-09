@@ -44,6 +44,9 @@ type CreateFishingSiteInput = {
    images: CreateImageInput[];
 };
 
+type UpdateCatchInput = Omit<CreateCatchInput, 'images'>;
+type UpdateFishingSiteInput = Omit<CreateFishingSiteInput, 'images'>;
+
 const resolveOptionalRelationIds = async (input: {
    siteId?: string | null;
 }) => {
@@ -261,8 +264,8 @@ export const fishingService = {
    },
 
    async getCatchById(catchId: string) {
-      const catchRecord = await prisma.catch.findUnique({
-         where: { id: catchId },
+      const catchRecord = await prisma.catch.findFirst({
+         where: { id: catchId, deletedAt: null },
          include: catchDetailInclude,
       });
 
@@ -271,6 +274,105 @@ export const fishingService = {
       }
 
       return withResolvedImageUrls(catchRecord);
+   },
+
+   async listMyCatches(clerkId: string) {
+      const user = await getUserByClerkId(clerkId);
+
+      return prisma.catch.findMany({
+         where: { createdById: user.id, deletedAt: null },
+         orderBy: { caughtAt: 'desc' },
+         select: {
+            id: true,
+            title: true,
+            caughtAt: true,
+            site: { select: { id: true, name: true } },
+         },
+      });
+   },
+
+   async updateCatch(
+      clerkId: string,
+      catchId: string,
+      input: UpdateCatchInput
+   ) {
+      const user = await getUserByClerkId(clerkId);
+      const relations = await resolveOptionalRelationIds({
+         siteId: input.siteId,
+      });
+
+      return prisma.$transaction(async (tx) => {
+         const existing = await tx.catch.findFirst({
+            where: { id: catchId, createdById: user.id, deletedAt: null },
+            select: { id: true, siteId: true },
+         });
+
+         if (!existing) {
+            return null;
+         }
+
+         if (existing.siteId && existing.siteId !== relations.siteId) {
+            await tx.fishingSite.update({
+               where: { id: existing.siteId },
+               data: { catchCount: { decrement: 1 } },
+            });
+         }
+
+         if (relations.siteId && existing.siteId !== relations.siteId) {
+            await tx.fishingSite.update({
+               where: { id: relations.siteId },
+               data: { catchCount: { increment: 1 } },
+            });
+         }
+
+         const updated = await tx.catch.update({
+            where: { id: catchId },
+            data: {
+               title: input.title,
+               notes: input.notes,
+               caughtAt: input.caughtAt,
+               siteId: relations.siteId,
+               weight: input.weight,
+               length: input.length,
+               count: input.count ?? 1,
+               weather: input.weather,
+               waterTemp: input.waterTemp,
+               depth: input.depth,
+            },
+            include: catchDetailInclude,
+         });
+
+         return withResolvedImageUrls(updated);
+      });
+   },
+
+   async deleteCatch(clerkId: string, catchId: string) {
+      const user = await getUserByClerkId(clerkId);
+
+      return prisma.$transaction(async (tx) => {
+         const existing = await tx.catch.findFirst({
+            where: { id: catchId, createdById: user.id, deletedAt: null },
+            select: { id: true, siteId: true },
+         });
+
+         if (!existing) {
+            return null;
+         }
+
+         await tx.catch.update({
+            where: { id: catchId },
+            data: { deletedAt: new Date() },
+         });
+
+         if (existing.siteId) {
+            await tx.fishingSite.update({
+               where: { id: existing.siteId },
+               data: { catchCount: { decrement: 1 } },
+            });
+         }
+
+         return { id: catchId };
+      });
    },
 
    async createFishingSite(clerkId: string, input: CreateFishingSiteInput) {
@@ -317,8 +419,8 @@ export const fishingService = {
    },
 
    async getFishingSiteById(siteId: string) {
-      const site = await prisma.fishingSite.findUnique({
-         where: { id: siteId },
+      const site = await prisma.fishingSite.findFirst({
+         where: { id: siteId, deletedAt: null },
          include: siteDetailInclude,
       });
 
@@ -327,5 +429,70 @@ export const fishingService = {
       }
 
       return withResolvedImageUrls(site);
+   },
+
+   async listMyFishingSites(clerkId: string) {
+      const user = await getUserByClerkId(clerkId);
+
+      return prisma.fishingSite.findMany({
+         where: { createdById: user.id, deletedAt: null },
+         orderBy: { createdAt: 'desc' },
+         select: {
+            id: true,
+            name: true,
+            createdAt: true,
+            catchCount: true,
+         },
+      });
+   },
+
+   async updateFishingSite(
+      clerkId: string,
+      siteId: string,
+      input: UpdateFishingSiteInput
+   ) {
+      const user = await getUserByClerkId(clerkId);
+      const existing = await prisma.fishingSite.findFirst({
+         where: { id: siteId, createdById: user.id, deletedAt: null },
+         select: { id: true },
+      });
+
+      if (!existing) {
+         return null;
+      }
+
+      const updated = await prisma.fishingSite.update({
+         where: { id: siteId },
+         data: {
+            name: input.name,
+            description: input.description,
+            latitude: input.latitude,
+            longitude: input.longitude,
+            waterType: input.waterType,
+            accessNotes: input.accessNotes,
+         },
+         include: siteDetailInclude,
+      });
+
+      return withResolvedImageUrls(updated);
+   },
+
+   async deleteFishingSite(clerkId: string, siteId: string) {
+      const user = await getUserByClerkId(clerkId);
+      const existing = await prisma.fishingSite.findFirst({
+         where: { id: siteId, createdById: user.id, deletedAt: null },
+         select: { id: true },
+      });
+
+      if (!existing) {
+         return null;
+      }
+
+      await prisma.fishingSite.update({
+         where: { id: siteId },
+         data: { deletedAt: new Date() },
+      });
+
+      return { id: siteId };
    },
 };

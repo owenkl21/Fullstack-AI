@@ -17,7 +17,7 @@ const imageInputSchema = z.object({
    url: z.string().trim().url(),
 });
 
-export const createCatchSchema = z.object({
+const catchPayloadSchema = z.object({
    title: z.string().trim().min(2).max(120),
    notes: z.string().trim().min(1).max(2000).optional().nullable(),
    caughtAt: z.coerce.date(),
@@ -28,10 +28,15 @@ export const createCatchSchema = z.object({
    weather: optionalTrimmedString,
    waterTemp: z.coerce.number().optional().nullable(),
    depth: z.coerce.number().nonnegative().optional().nullable(),
+});
+
+export const createCatchSchema = catchPayloadSchema.extend({
    images: z.array(imageInputSchema).max(8).optional().default([]),
 });
 
-export const createFishingSiteSchema = z.object({
+export const updateCatchSchema = catchPayloadSchema;
+
+const fishingSitePayloadSchema = z.object({
    name: z.string().trim().min(2).max(120),
    description: z.string().trim().min(1).max(2000).optional().nullable(),
    latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
@@ -41,5 +46,10 @@ export const createFishingSiteSchema = z.object({
       .optional()
       .nullable(),
    accessNotes: z.string().trim().min(1).max(500).optional().nullable(),
+});
+
+export const createFishingSiteSchema = fishingSitePayloadSchema.extend({
    images: z.array(imageInputSchema).max(12).optional().default([]),
 });
+
+export const updateFishingSiteSchema = fishingSitePayloadSchema;
