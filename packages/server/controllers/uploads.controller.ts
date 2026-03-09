@@ -1,6 +1,5 @@
 import type { Request, Response } from 'express';
 import { getAuth } from '@clerk/express';
-import axios from 'axios';
 import {
    directUploadQuerySchema,
    getReadUrlSchema,
@@ -100,32 +99,34 @@ export const uploadsController = {
       }
 
       try {
-         const directUpload = await uploadsService.getDirectUploadData({
+         const proxiedUpload = await uploadsService.proxyUpload({
             clerkUserId: auth.userId,
             scope: uploadsService.inferScopeFromStorageKey(
                auth.userId,
                query.data.storageKey
             ),
             storageKey: query.data.storageKey,
-            contentType: query.data.contentType,
+            contentType: uploadHeadersByContentType[query.data.contentType],
+            body: req.body,
          });
 
-         await axios.put(directUpload.uploadUrl, req.body, {
-            headers: {
-               'Content-Type':
-                  uploadHeadersByContentType[query.data.contentType],
-               'Content-Length': req.body.length,
-            },
-            maxBodyLength: Infinity,
-            maxContentLength: Infinity,
-         });
-
-         return res.json({
-            storageKey: directUpload.storageKey,
-            readUrl: directUpload.readUrl,
-         });
+         return res.json(proxiedUpload);
       } catch (error) {
          console.error('[uploads:proxyUpload] failed to proxy upload', error);
+
+         if (
+            typeof error === 'object' &&
+            error !== null &&
+            'name' in error &&
+            error.name === 'NoSuchBucket'
+         ) {
+            return res.status(500).json({
+               code: 'r2_bucket_not_found',
+               message:
+                  'Upload bucket was not found. Verify CLOUDFLARE_R2_BUCKET (or CLOUDFLARE_R2_BUCKET_NAME).',
+            });
+         }
+
          return res.status(500).json({
             code: 'failed_to_proxy_upload',
             message: 'Unable to upload image.',
