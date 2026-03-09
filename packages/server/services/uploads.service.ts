@@ -55,6 +55,7 @@ const getS3Client = () => {
       region: config.region,
       endpoint: config.endpoint,
       forcePathStyle: false,
+      requestChecksumCalculation: 'WHEN_REQUIRED',
       credentials: {
          accessKeyId: config.accessKeyId,
          secretAccessKey: config.secretAccessKey,
