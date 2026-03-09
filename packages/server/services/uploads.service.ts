@@ -37,7 +37,7 @@ const getConfig = () => {
       bucket: process.env.CLOUDFLARE_R2_BUCKET!,
       publicBaseUrl: process.env.CLOUDFLARE_R2_PUBLIC_BASE_URL,
       region: 'auto',
-      host: `${process.env.CLOUDFLARE_R2_BUCKET}.${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
       maxUploadSizeBytes: 10 * 1024 * 1024,
    };
 };
@@ -53,7 +53,7 @@ const getS3Client = () => {
 
    s3Client = new S3Client({
       region: config.region,
-      endpoint: `https://${config.host}`,
+      endpoint: config.endpoint,
       forcePathStyle: false,
       credentials: {
          accessKeyId: config.accessKeyId,
@@ -102,9 +102,9 @@ const buildStorageKey = ({
 };
 
 const buildUnsignedObjectUrl = (storageKey: string) => {
-   const { host } = getConfig();
+   const { endpoint, bucket } = getConfig();
 
-   return `https://${host}/${storageKey
+   return `${endpoint}/${bucket}/${storageKey
       .split('/')
       .map(encodeURIComponent)
       .join('/')}`;
