@@ -22,8 +22,6 @@ export const createCatchSchema = z.object({
    notes: z.string().trim().min(1).max(2000).optional().nullable(),
    caughtAt: z.coerce.date(),
    siteId: z.string().trim().min(1).optional().nullable(),
-   speciesId: z.string().trim().min(1).optional().nullable(),
-   gearId: z.string().trim().min(1).optional().nullable(),
    weight: z.coerce.number().positive().optional().nullable(),
    length: z.coerce.number().positive().optional().nullable(),
    count: z.coerce.number().int().positive().max(999).optional(),

@@ -32,8 +32,19 @@ export function LogCatchPage() {
 
    useEffect(() => {
       const loadSites = async () => {
-         const { data } = await axios.get('/api/sites');
-         setSites(data.sites ?? []);
+         try {
+            const { data } = await axios.get('/api/sites');
+            setSites(data.sites ?? []);
+         } catch (error) {
+            console.error('Unable to load fishing sites', error);
+            setSites([]);
+            toast({
+               title: 'Unable to load fishing spots',
+               description:
+                  'You can still save a catch without selecting a spot.',
+               variant: 'error',
+            });
+         }
       };
 
       void loadSites();
@@ -55,8 +66,6 @@ export function LogCatchPage() {
                ? `${notes ? `${notes}\n\n` : ''}Spot: ${customSpot}`
                : notes) || null,
          siteId: isOtherSpot ? null : siteChoice || null,
-         speciesId: null,
-         gearId: null,
          weather: weatherValues.length > 0 ? weatherValues.join(', ') : null,
          waterTemp: Number(formData.get('waterTemp')) || null,
          length: Number(formData.get('length')) || null,

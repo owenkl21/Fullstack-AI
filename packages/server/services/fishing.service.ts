@@ -24,8 +24,6 @@ type CreateCatchInput = {
    notes?: string | null;
    caughtAt: Date;
    siteId?: string | null;
-   speciesId?: string | null;
-   gearId?: string | null;
    weight?: number | null;
    length?: number | null;
    count?: number;
@@ -43,6 +41,21 @@ type CreateFishingSiteInput = {
    waterType?: 'FRESHWATER' | 'SALTWATER' | 'BRACKISH' | 'OTHER' | null;
    accessNotes?: string | null;
    images: CreateImageInput[];
+};
+
+const resolveOptionalRelationIds = async (input: {
+   siteId?: string | null;
+}) => {
+   const site = input.siteId
+      ? await prisma.fishingSite.findUnique({
+           where: { id: input.siteId },
+           select: { id: true },
+        })
+      : null;
+
+   return {
+      siteId: site?.id ?? null,
+   };
 };
 
 const catchDetailInclude = {
@@ -79,7 +92,75 @@ const siteDetailInclude = {
    },
 };
 
+const getErrorCode = (error: unknown) => {
+   if (typeof error !== 'object' || error === null || !('code' in error)) {
+      return null;
+   }
+
+   return String((error as { code?: unknown }).code);
+};
+
+const isDuplicateConstraintError = (error: unknown) => {
+   const code = getErrorCode(error);
+
+   return code === 'P2002' || code === 'ER_DUP_ENTRY' || code === '1062';
+};
+
+const buildPlaceholderIdentity = (clerkId: string) => {
+   const normalized = clerkId.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+   const username = `clerk_${normalized}`;
+
+   return {
+      email: `${username}@placeholder.local`,
+      username,
+      displayName: 'New Angler',
+   };
+};
+
 async function getUserByClerkId(clerkId: string) {
+   const existing = await prisma.user.findUnique({
+      where: { clerkId },
+      select: { id: true },
+   });
+
+   if (existing) {
+      return existing;
+   }
+
+   const placeholderIdentity = buildPlaceholderIdentity(clerkId);
+
+   try {
+      await prisma.user.upsert({
+         where: { clerkId },
+         create: {
+            clerkId,
+            email: placeholderIdentity.email,
+            username: placeholderIdentity.username,
+            displayName: placeholderIdentity.displayName,
+         },
+         update: {},
+      });
+   } catch (error) {
+      if (!isDuplicateConstraintError(error)) {
+         throw error;
+      }
+
+      try {
+         await prisma.user.create({
+            data: {
+               clerkId,
+               email: `${placeholderIdentity.username}-${Date.now()}@placeholder.local`,
+               username: `${placeholderIdentity.username}_${Date.now().toString(36)}`,
+               displayName: placeholderIdentity.displayName,
+            },
+         });
+      } catch (createError) {
+         if (!isDuplicateConstraintError(createError)) {
+            throw createError;
+         }
+      }
+   }
+
    return prisma.user.findUniqueOrThrow({
       where: { clerkId },
       select: { id: true },
@@ -141,14 +222,15 @@ export const fishingService = {
 
    async createCatch(clerkId: string, input: CreateCatchInput) {
       const user = await getUserByClerkId(clerkId);
+      const relations = await resolveOptionalRelationIds({
+         siteId: input.siteId,
+      });
 
       const created = await prisma.$transaction(async (tx) => {
          const catchRecord = await tx.catch.create({
             data: {
                createdById: user.id,
-               siteId: input.siteId,
-               speciesId: input.speciesId,
-               gearId: input.gearId,
+               siteId: relations.siteId,
                title: input.title,
                notes: input.notes,
                caughtAt: input.caughtAt,
@@ -161,9 +243,9 @@ export const fishingService = {
             },
          });
 
-         if (input.siteId) {
+         if (relations.siteId) {
             await tx.fishingSite.update({
-               where: { id: input.siteId },
+               where: { id: relations.siteId },
                data: { catchCount: { increment: 1 } },
             });
          }
