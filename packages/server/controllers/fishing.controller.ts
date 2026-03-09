@@ -4,6 +4,8 @@ import {
    createCatchSchema,
    createFishingSiteSchema,
    fishingRequestSchema,
+   updateCatchSchema,
+   updateFishingSiteSchema,
 } from '../schemas/fishing.schema';
 import { fishingService } from '../services/fishing.service';
 
@@ -11,6 +13,9 @@ const unauthorizedResponse = {
    code: 'unauthorized',
    message: 'Authentication required.',
 };
+
+const asSingleParam = (value: string | string[] | undefined) =>
+   Array.isArray(value) ? value[0] : value;
 
 export const fishingController = {
    async getConditions(req: Request, res: Response) {
@@ -69,6 +74,76 @@ export const fishingController = {
       }
    },
 
+   async listMyCatches(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) {
+         return res.status(401).json(unauthorizedResponse);
+      }
+
+      const catches = await fishingService.listMyCatches(auth.userId);
+      return res.json({ catches });
+   },
+
+   async updateCatch(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) {
+         return res.status(401).json(unauthorizedResponse);
+      }
+
+      const catchId = asSingleParam(req.params.catchId);
+      if (!catchId) {
+         return res.status(400).json({
+            code: 'missing_catch_id',
+            message: 'Catch id is required.',
+         });
+      }
+
+      const parseResult = updateCatchSchema.safeParse(req.body);
+      if (!parseResult.success) {
+         return res.status(400).json(parseResult.error.format());
+      }
+
+      const updated = await fishingService.updateCatch(
+         auth.userId,
+         catchId,
+         parseResult.data
+      );
+
+      if (!updated) {
+         return res.status(404).json({
+            code: 'catch_not_found',
+            message: 'Catch not found.',
+         });
+      }
+
+      return res.json({ catch: updated });
+   },
+
+   async deleteCatch(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) {
+         return res.status(401).json(unauthorizedResponse);
+      }
+
+      const catchId = asSingleParam(req.params.catchId);
+      if (!catchId) {
+         return res.status(400).json({
+            code: 'missing_catch_id',
+            message: 'Catch id is required.',
+         });
+      }
+
+      const deleted = await fishingService.deleteCatch(auth.userId, catchId);
+      if (!deleted) {
+         return res.status(404).json({
+            code: 'catch_not_found',
+            message: 'Catch not found.',
+         });
+      }
+
+      return res.status(204).send();
+   },
+
    async getCatchById(req: Request, res: Response) {
       const catchIdParam = req.params.catchId;
       const catchId = Array.isArray(catchIdParam)
@@ -120,6 +195,78 @@ export const fishingController = {
             message: 'Unable to save your fishing site right now.',
          });
       }
+   },
+
+   async listMyFishingSites(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) {
+         return res.status(401).json(unauthorizedResponse);
+      }
+
+      const sites = await fishingService.listMyFishingSites(auth.userId);
+      return res.json({ sites });
+   },
+
+   async updateFishingSite(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) {
+         return res.status(401).json(unauthorizedResponse);
+      }
+
+      const siteId = asSingleParam(req.params.siteId);
+      if (!siteId) {
+         return res.status(400).json({
+            code: 'missing_site_id',
+            message: 'Site id is required.',
+         });
+      }
+
+      const parseResult = updateFishingSiteSchema.safeParse(req.body);
+      if (!parseResult.success) {
+         return res.status(400).json(parseResult.error.format());
+      }
+
+      const updated = await fishingService.updateFishingSite(
+         auth.userId,
+         siteId,
+         parseResult.data
+      );
+      if (!updated) {
+         return res.status(404).json({
+            code: 'site_not_found',
+            message: 'Fishing site not found.',
+         });
+      }
+
+      return res.json({ site: updated });
+   },
+
+   async deleteFishingSite(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) {
+         return res.status(401).json(unauthorizedResponse);
+      }
+
+      const siteId = asSingleParam(req.params.siteId);
+      if (!siteId) {
+         return res.status(400).json({
+            code: 'missing_site_id',
+            message: 'Site id is required.',
+         });
+      }
+
+      const deleted = await fishingService.deleteFishingSite(
+         auth.userId,
+         siteId
+      );
+      if (!deleted) {
+         return res.status(404).json({
+            code: 'site_not_found',
+            message: 'Fishing site not found.',
+         });
+      }
+
+      return res.status(204).send();
    },
 
    async listFishingSites(_req: Request, res: Response) {
