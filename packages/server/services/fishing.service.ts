@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { getCoordinates } from '../clients/geocoding.client';
 import { getCurrentWeather } from '../clients/weather.client';
 import { uploadsService } from './uploads.service';
+import { userService } from './user.service';
 
 type CreateImageInput = {
    storageKey: string;
@@ -45,16 +46,34 @@ type CreateFishingSiteInput = {
 
 const resolveOptionalRelationIds = async (input: {
    siteId?: string | null;
+   speciesId?: string | null;
+   gearId?: string | null;
 }) => {
-   const site = input.siteId
-      ? await prisma.fishingSite.findUnique({
-           where: { id: input.siteId },
-           select: { id: true },
-        })
-      : null;
+   const [site, species, gear] = await Promise.all([
+      input.siteId
+         ? prisma.fishingSite.findUnique({
+              where: { id: input.siteId },
+              select: { id: true },
+           })
+         : null,
+      input.speciesId
+         ? prisma.species.findUnique({
+              where: { id: input.speciesId },
+              select: { id: true },
+           })
+         : null,
+      input.gearId
+         ? prisma.gear.findUnique({
+              where: { id: input.gearId },
+              select: { id: true },
+           })
+         : null,
+   ]);
 
    return {
       siteId: site?.id ?? null,
+      speciesId: species?.id ?? null,
+      gearId: gear?.id ?? null,
    };
 };
 
@@ -113,18 +132,7 @@ async function getUserByClerkId(clerkId: string) {
       return existing;
    }
 
-   const placeholderIdentity = buildPlaceholderIdentity(clerkId);
-
-   await prisma.user.upsert({
-      where: { clerkId },
-      create: {
-         clerkId,
-         email: placeholderIdentity.email,
-         username: placeholderIdentity.username,
-         displayName: placeholderIdentity.displayName,
-      },
-      update: {},
-   });
+   await userService.syncAuthenticatedUser(clerkId);
 
    return prisma.user.findUniqueOrThrow({
       where: { clerkId },
@@ -189,6 +197,8 @@ export const fishingService = {
       const user = await getUserByClerkId(clerkId);
       const relations = await resolveOptionalRelationIds({
          siteId: input.siteId,
+         speciesId: input.speciesId,
+         gearId: input.gearId,
       });
 
       const created = await prisma.$transaction(async (tx) => {
@@ -196,6 +206,8 @@ export const fishingService = {
             data: {
                createdById: user.id,
                siteId: relations.siteId,
+               speciesId: relations.speciesId,
+               gearId: relations.gearId,
                title: input.title,
                notes: input.notes,
                caughtAt: input.caughtAt,
