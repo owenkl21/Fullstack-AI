@@ -56,10 +56,15 @@ export const fishingController = {
          );
          return res.status(201).json({ catch: created });
       } catch (error) {
-         console.error('Failed to create catch', error);
+         console.error('Failed to create catch', {
+            error,
+            payload: parseResult.data,
+            userId: auth.userId,
+         });
          return res.status(500).json({
             code: 'failed_to_create_catch',
-            message: 'Unable to save your catch right now.',
+            message:
+               'Unable to save your catch right now. Please try again without images first.',
          });
       }
    },

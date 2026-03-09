@@ -57,10 +57,22 @@ export function LogCatchPage() {
       const isOtherSpot = siteChoice === '__other';
       const customSpot = String(formData.get('customSpot') ?? '').trim();
       const notes = String(formData.get('notes') ?? '').trim();
+      const rawCaughtAt = String(formData.get('caughtAt') ?? '').trim();
 
-      const payload = {
+      const parsedCaughtAt = rawCaughtAt ? new Date(rawCaughtAt) : null;
+
+      if (!parsedCaughtAt || Number.isNaN(parsedCaughtAt.getTime())) {
+         toast({
+            title: 'Invalid catch date/time',
+            description: 'Please choose a valid date and time.',
+            variant: 'error',
+         });
+         return;
+      }
+
+      const basePayload = {
          title: String(formData.get('title') ?? ''),
-         caughtAt: String(formData.get('caughtAt') ?? ''),
+         caughtAt: parsedCaughtAt.toISOString(),
          notes:
             (isOtherSpot && customSpot
                ? `${notes ? `${notes}\n\n` : ''}Spot: ${customSpot}`
@@ -75,14 +87,44 @@ export function LogCatchPage() {
 
       try {
          setIsSaving(true);
-         const { data } = await axios.post('/api/catches', payload);
+         const { data } = await axios.post('/api/catches', basePayload);
          toast({ title: 'Catch logged!', variant: 'success' });
          navigate(`/catches/${data.catch.id}`);
       } catch (error) {
+         const shouldRetryWithoutImages =
+            axios.isAxiosError(error) &&
+            error.response?.status === 500 &&
+            images.length > 0;
+
+         if (shouldRetryWithoutImages) {
+            try {
+               const { data } = await axios.post('/api/catches', {
+                  ...basePayload,
+                  images: [],
+               });
+
+               toast({
+                  title: 'Catch logged without images',
+                  description:
+                     'Your catch was saved. You can add images later while we improve upload reliability.',
+               });
+               navigate(`/catches/${data.catch.id}`);
+               return;
+            } catch (retryError) {
+               console.error('Catch save retry failed', retryError);
+            }
+         }
+
          console.error(error);
+         const message =
+            axios.isAxiosError(error) &&
+            typeof error.response?.data?.message === 'string'
+               ? error.response.data.message
+               : 'Check your values and try again.';
+
          toast({
             title: 'Unable to log catch',
-            description: 'Check your values and try again.',
+            description: message,
             variant: 'error',
          });
       } finally {
