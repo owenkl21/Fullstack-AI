@@ -52,9 +52,11 @@ export function R2ImagePicker({
       try {
          setIsUploading(true);
          const uploaded: UploadedImage[] = [];
+         const failedFiles: string[] = [];
 
          for (const file of toUpload) {
             if (!isSupportedImage(file)) {
+               failedFiles.push(file.name);
                toast({
                   title: `${file.name} skipped`,
                   description: 'Only JPG, PNG, and WebP are allowed.',
@@ -63,44 +65,57 @@ export function R2ImagePicker({
                continue;
             }
 
-            const { data: signed } = await axios.post('/api/uploads/sign', {
-               scope,
-               fileName: file.name,
-               contentType: file.type,
-               sizeBytes: file.size,
-            });
+            try {
+               const { data: signed } = await axios.post('/api/uploads/sign', {
+                  scope,
+                  fileName: file.name,
+                  contentType: file.type,
+                  sizeBytes: file.size,
+               });
 
-            const uploadResponse = await fetch(signed.uploadUrl, {
-               method: 'PUT',
-               headers: {
-                  'Content-Type': file.type,
-               },
-               body: file,
-            });
+               const uploadResponse = await fetch(signed.uploadUrl, {
+                  method: 'PUT',
+                  headers: {
+                     'Content-Type': file.type,
+                  },
+                  body: file,
+               });
 
-            if (!uploadResponse.ok) {
-               throw new Error(
-                  `Upload failed with status ${uploadResponse.status}`
-               );
+               if (!uploadResponse.ok) {
+                  throw new Error(
+                     `Upload failed with status ${uploadResponse.status}`
+                  );
+               }
+
+               uploaded.push({
+                  storageKey: signed.storageKey,
+                  url: signed.readUrl,
+               });
+            } catch (error) {
+               console.error(error);
+               failedFiles.push(file.name);
             }
-
-            uploaded.push({
-               storageKey: signed.storageKey,
-               url: signed.readUrl,
-            });
          }
 
          if (uploaded.length > 0) {
             onChange(multiple ? [...value, ...uploaded] : [uploaded[0]]);
-            toast({ title: 'Image upload complete.', variant: 'success' });
          }
-      } catch (error) {
-         console.error(error);
-         toast({
-            title: 'Upload failed',
-            description: 'Could not upload image to Cloudflare R2.',
-            variant: 'error',
-         });
+
+         if (failedFiles.length === 0) {
+            toast({ title: 'Image upload complete.', variant: 'success' });
+         } else if (uploaded.length > 0) {
+            toast({
+               title: 'Partial upload complete',
+               description: `${uploaded.length} uploaded, ${failedFiles.length} failed.`,
+               variant: 'default',
+            });
+         } else {
+            toast({
+               title: 'Upload failed',
+               description: 'Could not upload image to Cloudflare R2.',
+               variant: 'error',
+            });
+         }
       } finally {
          setIsUploading(false);
       }
