@@ -21,6 +21,12 @@ const WEATHER_OPTIONS = [
    'Foggy',
 ];
 
+const formatForDateTimeLocal = (date: Date) => {
+   const pad = (value: number) => String(value).padStart(2, '0');
+
+   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 export function LogCatchPage() {
    const navigate = useNavigate();
    const [isSaving, setIsSaving] = useState(false);
@@ -29,6 +35,9 @@ export function LogCatchPage() {
    );
    const [sites, setSites] = useState<SiteOption[]>([]);
    const [siteChoice, setSiteChoice] = useState('');
+   const [caughtAt, setCaughtAt] = useState(() =>
+      formatForDateTimeLocal(new Date())
+   );
 
    useEffect(() => {
       const loadSites = async () => {
@@ -57,7 +66,7 @@ export function LogCatchPage() {
       const isOtherSpot = siteChoice === '__other';
       const customSpot = String(formData.get('customSpot') ?? '').trim();
       const notes = String(formData.get('notes') ?? '').trim();
-      const rawCaughtAt = String(formData.get('caughtAt') ?? '').trim();
+      const rawCaughtAt = caughtAt.trim();
 
       const parsedCaughtAt = rawCaughtAt ? new Date(rawCaughtAt) : null;
 
@@ -152,6 +161,8 @@ export function LogCatchPage() {
                   <input
                      name="caughtAt"
                      type="datetime-local"
+                     value={caughtAt}
+                     onChange={(event) => setCaughtAt(event.target.value)}
                      className="rounded border p-2"
                      required
                   />
