@@ -163,7 +163,7 @@ export function EditCatchPage() {
                                        <img
                                           src={entry.imageUrl}
                                           alt={entry.name}
-                                          className="h-10 w-10 rounded border bg-muted object-contain"
+                                          className="h-10 w-10 rounded border object-cover"
                                        />
                                     ) : null}
                                     <span className="text-sm">
