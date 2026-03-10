@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { uploadsService } from './uploads.service';
 import { userService } from './user.service';
 
 type FeedScope = 'GLOBAL' | 'NEARBY';
@@ -12,7 +13,9 @@ const feedInclude = {
          title: true,
          images: {
             orderBy: { position: 'asc' as const },
-            select: { image: { select: { id: true, url: true } } },
+            select: {
+               image: { select: { id: true, url: true, storageKey: true } },
+            },
          },
       },
    },
@@ -22,7 +25,9 @@ const feedInclude = {
          name: true,
          images: {
             orderBy: { position: 'asc' as const },
-            select: { image: { select: { id: true, url: true } } },
+            select: {
+               image: { select: { id: true, url: true, storageKey: true } },
+            },
          },
       },
    },
@@ -34,6 +39,66 @@ const feedInclude = {
          user: { select: { id: true, username: true, displayName: true } },
       },
    },
+};
+
+const withResolvedFeedImageUrls = async <
+   T extends {
+      catch: {
+         images: Array<{
+            image: { id: string; url: string; storageKey: string };
+         }>;
+      } | null;
+      site: {
+         images: Array<{
+            image: { id: string; url: string; storageKey: string };
+         }>;
+      } | null;
+   },
+>(
+   post: T
+): Promise<T> => {
+   const resolvePostImages = async (
+      images: Array<{ image: { id: string; url: string; storageKey: string } }>
+   ) => {
+      return Promise.all(
+         images.map(async (entry) => {
+            try {
+               const signed = await uploadsService.getReadUrl(
+                  entry.image.storageKey
+               );
+
+               return {
+                  ...entry,
+                  image: {
+                     ...entry.image,
+                     url: signed.readUrl,
+                  },
+               };
+            } catch (error) {
+               console.warn(
+                  '[feed:list] Falling back to persisted image URL because generating read URL failed.',
+                  {
+                     storageKey: entry.image.storageKey,
+                     error,
+                  }
+               );
+
+               return entry;
+            }
+         })
+      );
+   };
+
+   const [catchImages, siteImages] = await Promise.all([
+      post.catch ? resolvePostImages(post.catch.images) : null,
+      post.site ? resolvePostImages(post.site.images) : null,
+   ]);
+
+   return {
+      ...post,
+      catch: post.catch ? { ...post.catch, images: catchImages ?? [] } : null,
+      site: post.site ? { ...post.site, images: siteImages ?? [] } : null,
+   };
 };
 
 async function getUserId(clerkId: string) {
@@ -89,20 +154,27 @@ export const feedService = {
          take: 50,
       });
 
+      const postsWithResolvedImageUrls = await Promise.all(
+         posts.map((post: any) => withResolvedFeedImageUrls(post))
+      );
+
       if (!input.userId) {
-         return posts.map((post: any) => ({ ...post, likedByMe: false }));
+         return postsWithResolvedImageUrls.map((post: any) => ({
+            ...post,
+            likedByMe: false,
+         }));
       }
 
       const likes = await prisma.feedLike.findMany({
          where: {
             userId: input.userId,
-            postId: { in: posts.map((p: any) => p.id) },
+            postId: { in: postsWithResolvedImageUrls.map((p: any) => p.id) },
          },
          select: { postId: true },
       });
       const likedSet = new Set(likes.map((l: any) => l.postId));
 
-      return posts.map((post: any) => ({
+      return postsWithResolvedImageUrls.map((post: any) => ({
          ...post,
          likedByMe: likedSet.has(post.id),
       }));
