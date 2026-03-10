@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useClerk, useUser } from '@clerk/react';
 import { CalendarDays, Database, UserCircle2 } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -65,6 +66,7 @@ const formatDate = (value: string) => {
 export function ProfileSettingsPanel() {
    const { user } = useUser();
    const clerk = useClerk();
+   const navigate = useNavigate();
 
    const [profile, setProfile] = useState<UserProfile | null>(null);
    const [displayName, setDisplayName] = useState('');
@@ -160,6 +162,8 @@ export function ProfileSettingsPanel() {
                   : 'Your profile details were updated successfully.',
             variant: 'success',
          });
+
+         navigate('/', { replace: true });
       } catch (error) {
          console.error(error);
          toast({
