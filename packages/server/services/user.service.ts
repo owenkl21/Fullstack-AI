@@ -87,11 +87,43 @@ const syncAvatarToClerk = async (
    const contentType =
       response.headers.get('content-type') ?? 'application/octet-stream';
    const bytes = await response.arrayBuffer();
-   const blob = new Blob([bytes], { type: contentType });
-
-   await clerkClient.users.updateUserProfileImage(clerkUserId, {
-      file: blob,
+   const extension =
+      contentType === 'image/png'
+         ? 'png'
+         : contentType === 'image/webp'
+           ? 'webp'
+           : 'jpg';
+   const file = new File([bytes], `avatar.${extension}`, {
+      type: contentType,
    });
+
+   await clerkClient.users.updateUserProfileImage(clerkUserId, { file });
+};
+
+const syncAvatarToClerkWithRetry = async (
+   clerkUserId: string,
+   avatarValue: string | null | undefined
+) => {
+   let lastError: unknown;
+
+   for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+         await syncAvatarToClerk(clerkUserId, avatarValue);
+         return;
+      } catch (error) {
+         lastError = error;
+         console.warn(
+            '[user:updateProfile] Avatar sync to Clerk attempt failed.',
+            {
+               clerkUserId,
+               attempt,
+               error,
+            }
+         );
+      }
+   }
+
+   throw lastError;
 };
 
 type ClerkFallbackMetadata = {
@@ -401,14 +433,7 @@ export const userService = {
             },
          });
 
-         try {
-            await syncAvatarToClerk(clerkUserId, input.avatarUrl);
-         } catch (error) {
-            console.warn(
-               '[user:updateProfile] Failed to sync avatar image to Clerk.',
-               { clerkUserId, error }
-            );
-         }
+         await syncAvatarToClerkWithRetry(clerkUserId, input.avatarUrl);
 
          return {
             profile: await withResolvedAvatar(profile),
@@ -432,6 +457,11 @@ export const userService = {
                username: fallbackProfile.username,
                avatarUrl: fallbackProfile.avatarUrl,
             });
+
+            await syncAvatarToClerkWithRetry(
+               clerkUserId,
+               fallbackProfile.avatarUrl
+            );
 
             return {
                profile: await withResolvedAvatar(fallbackProfile),
