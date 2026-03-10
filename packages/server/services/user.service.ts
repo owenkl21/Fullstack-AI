@@ -1,5 +1,6 @@
 import { clerkClient } from '@clerk/express';
 import { prisma } from '../lib/prisma';
+import { uploadsService } from './uploads.service';
 
 type UserProfileInput = {
    displayName?: string;
@@ -25,6 +26,36 @@ type ProfileResult = {
    storage: 'database' | 'clerk_fallback';
 };
 
+const maybeResolveAvatarReadUrl = async (avatarValue: string | null) => {
+   if (!avatarValue) {
+      return null;
+   }
+
+   if (!avatarValue.startsWith('users/')) {
+      return avatarValue;
+   }
+
+   try {
+      const signed = await uploadsService.getReadUrl(avatarValue);
+      return signed.readUrl;
+   } catch (error) {
+      console.warn(
+         '[user:avatar] Failed to resolve avatar storage key to read URL.',
+         {
+            avatarValue,
+            error,
+         }
+      );
+      return avatarValue;
+   }
+};
+
+const withResolvedAvatar = async (
+   profile: ProfileShape
+): Promise<ProfileShape> => ({
+   ...profile,
+   avatarUrl: await maybeResolveAvatarReadUrl(profile.avatarUrl),
+});
 type ClerkFallbackMetadata = {
    appProfile?: {
       displayName?: string;
@@ -264,7 +295,10 @@ export const userService = {
          });
 
          if (profile) {
-            return { profile, storage: 'database' } satisfies ProfileResult;
+            return {
+               profile: await withResolvedAvatar(profile),
+               storage: 'database',
+            } satisfies ProfileResult;
          }
       } catch (error) {
          if (!isDatabaseConnectivityError(error)) {
@@ -281,7 +315,9 @@ export const userService = {
       }
 
       return {
-         profile: await getFallbackProfileFromClerk(clerkUserId),
+         profile: await withResolvedAvatar(
+            await getFallbackProfileFromClerk(clerkUserId)
+         ),
          storage: 'clerk_fallback',
       } satisfies ProfileResult;
    },
@@ -327,7 +363,10 @@ export const userService = {
             },
          });
 
-         return { profile, storage: 'database' } satisfies ProfileResult;
+         return {
+            profile: await withResolvedAvatar(profile),
+            storage: 'database',
+         } satisfies ProfileResult;
       } catch (error) {
          if (isDatabaseConnectivityError(error)) {
             console.error(
@@ -348,7 +387,7 @@ export const userService = {
             });
 
             return {
-               profile: fallbackProfile,
+               profile: await withResolvedAvatar(fallbackProfile),
                storage: 'clerk_fallback',
             } satisfies ProfileResult;
          }
