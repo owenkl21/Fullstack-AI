@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useClerk, useUser } from '@clerk/react';
 import { CalendarDays, Database, UserCircle2 } from 'lucide-react';
 import { type FormEvent, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -24,6 +25,30 @@ type ProfileResponse = {
    storage?: 'database' | 'clerk_fallback';
 };
 
+const extractStorageKey = (value: string | null | undefined) => {
+   if (!value) {
+      return null;
+   }
+
+   if (value.startsWith('users/')) {
+      return value;
+   }
+
+   try {
+      const parsed = new URL(value);
+      const normalizedPath = parsed.pathname.replace(/^\/+/, '');
+      const userSegmentIndex = normalizedPath.indexOf('users/');
+
+      if (userSegmentIndex >= 0) {
+         return normalizedPath.slice(userSegmentIndex);
+      }
+   } catch {
+      return null;
+   }
+
+   return null;
+};
+
 const formatDate = (value: string) => {
    const date = new Date(value);
 
@@ -41,6 +66,7 @@ const formatDate = (value: string) => {
 export function ProfileSettingsPanel() {
    const { user } = useUser();
    const clerk = useClerk();
+   const navigate = useNavigate();
 
    const [profile, setProfile] = useState<UserProfile | null>(null);
    const [displayName, setDisplayName] = useState('');
@@ -65,7 +91,9 @@ export function ProfileSettingsPanel() {
                data.profile.avatarUrl
                   ? [
                        {
-                          storageKey: data.profile.avatarUrl,
+                          storageKey:
+                             extractStorageKey(data.profile.avatarUrl) ??
+                             data.profile.avatarUrl,
                           url: data.profile.avatarUrl,
                        },
                     ]
@@ -97,7 +125,7 @@ export function ProfileSettingsPanel() {
             displayName: displayName.trim(),
             username: username.trim(),
             bio: bio.trim() ? bio.trim() : null,
-            avatarUrl: avatarImages[0]?.url ?? null,
+            avatarUrl: avatarImages[0]?.storageKey ?? null,
          };
 
          const { data } = await axios.patch<ProfileResponse>(
@@ -113,7 +141,10 @@ export function ProfileSettingsPanel() {
             data.profile.avatarUrl
                ? [
                     {
-                       storageKey: data.profile.avatarUrl,
+                       storageKey:
+                          payload.avatarUrl ??
+                          extractStorageKey(data.profile.avatarUrl) ??
+                          data.profile.avatarUrl,
                        url: data.profile.avatarUrl,
                     },
                  ]
@@ -131,6 +162,8 @@ export function ProfileSettingsPanel() {
                   : 'Your profile details were updated successfully.',
             variant: 'success',
          });
+
+         navigate('/', { replace: true });
       } catch (error) {
          console.error(error);
          toast({

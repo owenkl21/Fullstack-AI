@@ -1,5 +1,6 @@
 import { clerkClient } from '@clerk/express';
 import { prisma } from '../lib/prisma';
+import { uploadsService } from './uploads.service';
 
 type UserProfileInput = {
    displayName?: string;
@@ -23,6 +24,106 @@ type ProfileShape = {
 type ProfileResult = {
    profile: ProfileShape;
    storage: 'database' | 'clerk_fallback';
+};
+
+const maybeResolveAvatarReadUrl = async (avatarValue: string | null) => {
+   if (!avatarValue) {
+      return null;
+   }
+
+   if (!avatarValue.startsWith('users/')) {
+      return avatarValue;
+   }
+
+   try {
+      const signed = await uploadsService.getReadUrl(avatarValue);
+      return signed.readUrl;
+   } catch (error) {
+      console.warn(
+         '[user:avatar] Failed to resolve avatar storage key to read URL.',
+         {
+            avatarValue,
+            error,
+         }
+      );
+      return avatarValue;
+   }
+};
+
+const withResolvedAvatar = async (
+   profile: ProfileShape
+): Promise<ProfileShape> => ({
+   ...profile,
+   avatarUrl: await maybeResolveAvatarReadUrl(profile.avatarUrl),
+});
+
+const syncAvatarToClerk = async (
+   clerkUserId: string,
+   avatarValue: string | null | undefined
+) => {
+   if (avatarValue === undefined) {
+      return;
+   }
+
+   if (avatarValue === null) {
+      await clerkClient.users.deleteUserProfileImage(clerkUserId);
+      return;
+   }
+
+   const avatarUrl = await maybeResolveAvatarReadUrl(avatarValue);
+
+   if (!avatarUrl) {
+      await clerkClient.users.deleteUserProfileImage(clerkUserId);
+      return;
+   }
+
+   const response = await fetch(avatarUrl);
+   if (!response.ok) {
+      throw new Error(
+         `Failed to fetch avatar image for Clerk sync: ${response.status} ${response.statusText}`
+      );
+   }
+
+   const contentType =
+      response.headers.get('content-type') ?? 'application/octet-stream';
+   const bytes = await response.arrayBuffer();
+   const extension =
+      contentType === 'image/png'
+         ? 'png'
+         : contentType === 'image/webp'
+           ? 'webp'
+           : 'jpg';
+   const file = new File([bytes], `avatar.${extension}`, {
+      type: contentType,
+   });
+
+   await clerkClient.users.updateUserProfileImage(clerkUserId, { file });
+};
+
+const syncAvatarToClerkWithRetry = async (
+   clerkUserId: string,
+   avatarValue: string | null | undefined
+) => {
+   let lastError: unknown;
+
+   for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+         await syncAvatarToClerk(clerkUserId, avatarValue);
+         return;
+      } catch (error) {
+         lastError = error;
+         console.warn(
+            '[user:updateProfile] Avatar sync to Clerk attempt failed.',
+            {
+               clerkUserId,
+               attempt,
+               error,
+            }
+         );
+      }
+   }
+
+   throw lastError;
 };
 
 type ClerkFallbackMetadata = {
@@ -264,7 +365,10 @@ export const userService = {
          });
 
          if (profile) {
-            return { profile, storage: 'database' } satisfies ProfileResult;
+            return {
+               profile: await withResolvedAvatar(profile),
+               storage: 'database',
+            } satisfies ProfileResult;
          }
       } catch (error) {
          if (!isDatabaseConnectivityError(error)) {
@@ -281,7 +385,9 @@ export const userService = {
       }
 
       return {
-         profile: await getFallbackProfileFromClerk(clerkUserId),
+         profile: await withResolvedAvatar(
+            await getFallbackProfileFromClerk(clerkUserId)
+         ),
          storage: 'clerk_fallback',
       } satisfies ProfileResult;
    },
@@ -327,7 +433,12 @@ export const userService = {
             },
          });
 
-         return { profile, storage: 'database' } satisfies ProfileResult;
+         await syncAvatarToClerkWithRetry(clerkUserId, input.avatarUrl);
+
+         return {
+            profile: await withResolvedAvatar(profile),
+            storage: 'database',
+         } satisfies ProfileResult;
       } catch (error) {
          if (isDatabaseConnectivityError(error)) {
             console.error(
@@ -347,8 +458,13 @@ export const userService = {
                avatarUrl: fallbackProfile.avatarUrl,
             });
 
+            await syncAvatarToClerkWithRetry(
+               clerkUserId,
+               fallbackProfile.avatarUrl
+            );
+
             return {
-               profile: fallbackProfile,
+               profile: await withResolvedAvatar(fallbackProfile),
                storage: 'clerk_fallback',
             } satisfies ProfileResult;
          }
