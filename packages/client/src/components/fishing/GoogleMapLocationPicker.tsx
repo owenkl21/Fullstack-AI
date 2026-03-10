@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadGoogleMapsScript } from '@/lib/maps';
 
 type GoogleMapLocationPickerProps = {
@@ -15,6 +15,7 @@ type MapInstance = {
       }) => void
    ) => void;
    panTo: (position: { lat: number; lng: number }) => void;
+   setZoom: (zoom: number) => void;
 };
 
 type MarkerInstance = {
@@ -25,6 +26,8 @@ type MarkerInstance = {
 };
 
 const DEFAULT_CENTER = { lat: 39.8283, lng: -98.5795 };
+const DEFAULT_ZOOM = 4;
+const FOCUSED_ZOOM = 14;
 
 export function GoogleMapLocationPicker({
    latitude,
@@ -35,6 +38,36 @@ export function GoogleMapLocationPicker({
    const mapRef = useRef<MapInstance | null>(null);
    const markerRef = useRef<MarkerInstance | null>(null);
    const [mapError, setMapError] = useState<string | null>(null);
+   const [locationStatus, setLocationStatus] = useState<
+      'idle' | 'loading' | 'error'
+   >('idle');
+
+   const centerOnCurrentLocation = useCallback(() => {
+      if (!navigator.geolocation || !mapRef.current || !markerRef.current) {
+         setLocationStatus('error');
+         return;
+      }
+
+      setLocationStatus('loading');
+
+      navigator.geolocation.getCurrentPosition(
+         (position) => {
+            const nextPosition = {
+               lat: position.coords.latitude,
+               lng: position.coords.longitude,
+            };
+
+            markerRef.current?.setPosition(nextPosition);
+            mapRef.current?.panTo(nextPosition);
+            mapRef.current?.setZoom(FOCUSED_ZOOM);
+            onChange(nextPosition.lat, nextPosition.lng);
+            setLocationStatus('idle');
+         },
+         () => {
+            setLocationStatus('error');
+         }
+      );
+   }, [onChange]);
 
    useEffect(() => {
       const initializeMap = async () => {
@@ -58,7 +91,7 @@ export function GoogleMapLocationPicker({
 
             const map = new mapsLibrary.Map(mapContainerRef.current, {
                center: DEFAULT_CENTER,
-               zoom: 4,
+               zoom: DEFAULT_ZOOM,
             });
 
             const marker = new googleSdk.maps.Marker({
@@ -88,12 +121,14 @@ export function GoogleMapLocationPicker({
 
                marker.setPosition({ lat: nextLatitude, lng: nextLongitude });
                map.panTo({ lat: nextLatitude, lng: nextLongitude });
+               map.setZoom(FOCUSED_ZOOM);
                onChange(nextLatitude, nextLongitude);
             });
 
             mapRef.current = map;
             markerRef.current = marker;
             setMapError(null);
+            centerOnCurrentLocation();
          } catch (error) {
             console.error(error);
             setMapError(
@@ -103,7 +138,7 @@ export function GoogleMapLocationPicker({
       };
 
       void initializeMap();
-   }, [onChange]);
+   }, [centerOnCurrentLocation, onChange]);
 
    useEffect(() => {
       if (!mapRef.current || !markerRef.current) {
@@ -123,6 +158,7 @@ export function GoogleMapLocationPicker({
       const nextPosition = { lat: parsedLatitude, lng: parsedLongitude };
       markerRef.current.setPosition(nextPosition);
       mapRef.current.panTo(nextPosition);
+      mapRef.current.setZoom(FOCUSED_ZOOM);
    }, [latitude, longitude]);
 
    if (mapError) {
@@ -134,6 +170,24 @@ export function GoogleMapLocationPicker({
          <p className="text-sm text-muted-foreground">
             Drag the pin (or click the map) to set your exact fishing site.
          </p>
+         <div>
+            <button
+               type="button"
+               onClick={centerOnCurrentLocation}
+               disabled={locationStatus === 'loading'}
+               className="rounded border px-3 py-1 text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+            >
+               {locationStatus === 'loading'
+                  ? 'Getting current location...'
+                  : 'Use current location'}
+            </button>
+            {locationStatus === 'error' ? (
+               <p className="mt-1 text-xs text-muted-foreground">
+                  We couldn&apos;t access your location. You can still place the
+                  pin manually.
+               </p>
+            ) : null}
+         </div>
          <div ref={mapContainerRef} className="h-80 w-full rounded border" />
       </div>
    );
