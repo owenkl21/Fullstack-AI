@@ -20,6 +20,7 @@ type MapInstance = {
 type MarkerInstance = {
    position: { lat: number; lng: number };
    getPosition: () => { lat: () => number; lng: () => number } | null;
+   setPosition: (position: { lat: number; lng: number }) => void;
    addListener: (eventName: 'dragend', handler: () => void) => void;
 };
 
@@ -55,25 +56,13 @@ export function GoogleMapLocationPicker({
                ) => MapInstance;
             };
 
-            const parsedLatitude = Number(latitude);
-            const parsedLongitude = Number(longitude);
-            const startPosition =
-               Number.isFinite(parsedLatitude) &&
-               Number.isFinite(parsedLongitude)
-                  ? { lat: parsedLatitude, lng: parsedLongitude }
-                  : DEFAULT_CENTER;
-
             const map = new mapsLibrary.Map(mapContainerRef.current, {
-               center: startPosition,
-               zoom:
-                  startPosition.lat === DEFAULT_CENTER.lat &&
-                  startPosition.lng === DEFAULT_CENTER.lng
-                     ? 4
-                     : 14,
+               center: DEFAULT_CENTER,
+               zoom: 4,
             });
 
             const marker = new googleSdk.maps.Marker({
-               position: startPosition,
+               position: DEFAULT_CENTER,
                map,
                draggable: true,
                title: 'Fishing site pin',
@@ -97,7 +86,8 @@ export function GoogleMapLocationPicker({
                const nextLatitude = event.latLng.lat();
                const nextLongitude = event.latLng.lng();
 
-               marker.position = { lat: nextLatitude, lng: nextLongitude };
+               marker.setPosition({ lat: nextLatitude, lng: nextLongitude });
+               map.panTo({ lat: nextLatitude, lng: nextLongitude });
                onChange(nextLatitude, nextLongitude);
             });
 
@@ -131,7 +121,7 @@ export function GoogleMapLocationPicker({
       }
 
       const nextPosition = { lat: parsedLatitude, lng: parsedLongitude };
-      markerRef.current.position = nextPosition;
+      markerRef.current.setPosition(nextPosition);
       mapRef.current.panTo(nextPosition);
    }, [latitude, longitude]);
 

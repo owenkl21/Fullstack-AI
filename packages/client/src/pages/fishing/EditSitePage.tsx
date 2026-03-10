@@ -8,7 +8,6 @@ import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { GoogleMapLocationPicker } from '@/components/fishing/GoogleMapLocationPicker';
-import { parseGoogleMapsCoordinates } from '@/lib/maps';
 
 type SiteEdit = {
    name: string;
@@ -25,7 +24,6 @@ export function EditSitePage() {
    const [item, setItem] = useState<SiteEdit | null>(null);
    const [isSaving, setIsSaving] = useState(false);
    const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-   const [googleMapsLink, setGoogleMapsLink] = useState('');
    const [latitude, setLatitude] = useState('');
    const [longitude, setLongitude] = useState('');
 
@@ -63,7 +61,7 @@ export function EditSitePage() {
             toast({
                title: 'Could not get your location',
                description:
-                  'Please allow location access, or pin your site using a Google Maps link.',
+                  'Please allow location access, or click the map to drop a pin.',
                variant: 'error',
             });
             setIsDetectingLocation(false);
@@ -73,37 +71,6 @@ export function EditSitePage() {
             timeout: 10000,
          }
       );
-   };
-
-   const extractCoordinatesFromMapsLink = () => {
-      if (!googleMapsLink.trim()) {
-         toast({
-            title: 'Add a Google Maps link first',
-            description: 'Paste the link, then extract coordinates.',
-            variant: 'error',
-         });
-         return;
-      }
-
-      const coordinates = parseGoogleMapsCoordinates(googleMapsLink);
-
-      if (!coordinates) {
-         toast({
-            title: 'Could not read coordinates from that link',
-            description:
-               'Use a Google Maps share link that includes latitude and longitude.',
-            variant: 'error',
-         });
-         return;
-      }
-
-      setCoordinates(coordinates.parsedLatitude, coordinates.parsedLongitude);
-      toast({
-         title: 'Pin coordinates added',
-         description:
-            'Latitude and longitude were pulled from your Google Maps pin.',
-         variant: 'success',
-      });
    };
 
    useEffect(() => {
@@ -189,32 +156,6 @@ export function EditSitePage() {
                            {isDetectingLocation
                               ? 'Detecting location...'
                               : 'Use my current location'}
-                        </Button>
-                        <a
-                           href="https://www.google.com/maps"
-                           target="_blank"
-                           rel="noreferrer"
-                        >
-                           <Button type="button" variant="outline">
-                              Open Google Maps (free)
-                           </Button>
-                        </a>
-                     </div>
-                     <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                        <input
-                           value={googleMapsLink}
-                           onChange={(event) =>
-                              setGoogleMapsLink(event.target.value)
-                           }
-                           placeholder="Paste Google Maps pin/share link"
-                           className="rounded border p-2"
-                        />
-                        <Button
-                           type="button"
-                           variant="outline"
-                           onClick={extractCoordinatesFromMapsLink}
-                        >
-                           Extract pin
                         </Button>
                      </div>
                   </div>
