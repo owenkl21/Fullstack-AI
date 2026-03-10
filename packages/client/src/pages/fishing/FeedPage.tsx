@@ -14,8 +14,16 @@ type FeedPost = {
    likeCount: number;
    commentCount: number;
    likedByMe: boolean;
-   catch: { id: string; title: string } | null;
-   site: { id: string; name: string } | null;
+   catch: {
+      id: string;
+      title: string;
+      images: Array<{ image: { id: string; url: string } }>;
+   } | null;
+   site: {
+      id: string;
+      name: string;
+      images: Array<{ image: { id: string; url: string } }>;
+   } | null;
    author: { displayName: string; username: string };
    comments: Array<{
       id: string;
@@ -31,6 +39,9 @@ export function FeedPage() {
    const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>(
       {}
    );
+   const [expandedComments, setExpandedComments] = useState<
+      Record<string, boolean>
+   >({});
 
    const load = async () => {
       try {
@@ -75,7 +86,15 @@ export function FeedPage() {
       if (!body) return;
       await axios.post(`/api/feed/${postId}/comments`, { body });
       setCommentDrafts((prev) => ({ ...prev, [postId]: '' }));
+      setExpandedComments((prev) => ({ ...prev, [postId]: true }));
       await load();
+   };
+
+   const toggleComments = (postId: string) => {
+      setExpandedComments((prev) => ({
+         ...prev,
+         [postId]: !prev[postId],
+      }));
    };
 
    return (
@@ -126,61 +145,105 @@ export function FeedPage() {
                </Show>
 
                <div className="space-y-3">
-                  {posts.map((post) => (
-                     <article
-                        key={post.id}
-                        className="space-y-2 rounded border p-3"
-                     >
-                        <p className="text-sm text-muted-foreground">
-                           {post.author.displayName} @{post.author.username} •{' '}
-                           {post.type} • {post.scope}
-                        </p>
-                        <p>{post.content ?? 'No text'}</p>
-                        {post.catch ? (
-                           <p className="text-sm">Catch: {post.catch.title}</p>
-                        ) : null}
-                        {post.site ? (
-                           <p className="text-sm">Site: {post.site.name}</p>
-                        ) : null}
-                        <div className="flex gap-2">
-                           <Button
-                              size="sm"
-                              variant={post.likedByMe ? 'default' : 'outline'}
-                              onClick={() => void like(post.id)}
-                           >
-                              Like ({post.likeCount})
-                           </Button>
-                        </div>
-                        <div className="space-y-1">
-                           {post.comments.map((entry) => (
-                              <p key={entry.id} className="text-sm">
-                                 {entry.user.displayName}: {entry.body}
+                  {posts.map((post) => {
+                     const postImages = [
+                        ...(post.catch?.images ?? []),
+                        ...(post.site?.images ?? []),
+                     ];
+                     const commentsOpen = Boolean(expandedComments[post.id]);
+
+                     return (
+                        <article
+                           key={post.id}
+                           className="space-y-2 rounded border p-3"
+                        >
+                           <p className="text-sm text-muted-foreground">
+                              {post.author.displayName} @{post.author.username}{' '}
+                              • {post.type} • {post.scope}
+                           </p>
+                           <p>{post.content ?? 'No text'}</p>
+                           {post.catch ? (
+                              <p className="text-sm">
+                                 Catch: {post.catch.title}
                               </p>
-                           ))}
-                        </div>
-                        <Show when="signed-in">
+                           ) : null}
+                           {post.site ? (
+                              <p className="text-sm">Site: {post.site.name}</p>
+                           ) : null}
+
+                           {postImages.length > 0 ? (
+                              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                 {postImages.map((entry) => (
+                                    <img
+                                       key={entry.image.id}
+                                       src={entry.image.url}
+                                       alt="Post"
+                                       className="h-32 w-full rounded object-cover"
+                                       loading="lazy"
+                                    />
+                                 ))}
+                              </div>
+                           ) : null}
+
                            <div className="flex gap-2">
-                              <input
-                                 className="flex-1 rounded border px-2 py-1"
-                                 value={commentDrafts[post.id] ?? ''}
-                                 onChange={(event) =>
-                                    setCommentDrafts((prev) => ({
-                                       ...prev,
-                                       [post.id]: event.target.value,
-                                    }))
-                                 }
-                                 placeholder="Add comment"
-                              />
                               <Button
                                  size="sm"
-                                 onClick={() => void comment(post.id)}
+                                 variant={
+                                    post.likedByMe ? 'default' : 'outline'
+                                 }
+                                 onClick={() => void like(post.id)}
                               >
-                                 Send
+                                 Like ({post.likeCount})
+                              </Button>
+                              <Button
+                                 size="sm"
+                                 variant={commentsOpen ? 'default' : 'outline'}
+                                 onClick={() => toggleComments(post.id)}
+                              >
+                                 Comments ({post.commentCount})
                               </Button>
                            </div>
-                        </Show>
-                     </article>
-                  ))}
+
+                           {commentsOpen ? (
+                              <>
+                                 <div className="space-y-1">
+                                    {post.comments.map((entry) => (
+                                       <p key={entry.id} className="text-sm">
+                                          {entry.user.displayName}: {entry.body}
+                                       </p>
+                                    ))}
+                                    {post.comments.length === 0 ? (
+                                       <p className="text-sm text-muted-foreground">
+                                          No comments yet.
+                                       </p>
+                                    ) : null}
+                                 </div>
+                                 <Show when="signed-in">
+                                    <div className="flex gap-2">
+                                       <input
+                                          className="flex-1 rounded border px-2 py-1"
+                                          value={commentDrafts[post.id] ?? ''}
+                                          onChange={(event) =>
+                                             setCommentDrafts((prev) => ({
+                                                ...prev,
+                                                [post.id]: event.target.value,
+                                             }))
+                                          }
+                                          placeholder="Add comment"
+                                       />
+                                       <Button
+                                          size="sm"
+                                          onClick={() => void comment(post.id)}
+                                       >
+                                          Send
+                                       </Button>
+                                    </div>
+                                 </Show>
+                              </>
+                           ) : null}
+                        </article>
+                     );
+                  })}
                </div>
             </section>
          </main>

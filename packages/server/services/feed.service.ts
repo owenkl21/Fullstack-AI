@@ -6,8 +6,26 @@ type FeedType = 'CATCH' | 'SITE';
 
 const feedInclude = {
    author: { select: { id: true, username: true, displayName: true } },
-   catch: { select: { id: true, title: true } },
-   site: { select: { id: true, name: true } },
+   catch: {
+      select: {
+         id: true,
+         title: true,
+         images: {
+            orderBy: { position: 'asc' as const },
+            select: { image: { select: { id: true, url: true } } },
+         },
+      },
+   },
+   site: {
+      select: {
+         id: true,
+         name: true,
+         images: {
+            orderBy: { position: 'asc' as const },
+            select: { image: { select: { id: true, url: true } } },
+         },
+      },
+   },
    comments: {
       where: { deletedAt: null },
       orderBy: { createdAt: 'desc' as const },
