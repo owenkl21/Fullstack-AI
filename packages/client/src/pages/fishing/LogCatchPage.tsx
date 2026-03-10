@@ -302,7 +302,7 @@ export function LogCatchPage() {
                                              <img
                                                 src={entry.imageUrl}
                                                 alt={entry.name}
-                                                className="h-10 w-10 rounded border object-cover"
+                                                className="h-10 w-10 rounded border bg-muted object-contain"
                                              />
                                           ) : null}
                                           <span className="text-sm">
