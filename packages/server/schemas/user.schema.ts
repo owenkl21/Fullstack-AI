@@ -27,7 +27,13 @@ export const updateProfileSchema = z
       avatarUrl: z
          .string()
          .trim()
-         .url('Avatar URL must be a valid URL.')
+         .min(1, 'Avatar value must not be empty.')
+         .max(512, 'Avatar value must be 512 characters or fewer.')
+         .refine(
+            (value) =>
+               /^https?:\/\//i.test(value) || value.startsWith('users/'),
+            'Avatar value must be a valid URL or storage key.'
+         )
          .nullable()
          .optional(),
    })

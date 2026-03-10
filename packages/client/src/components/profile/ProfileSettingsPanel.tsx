@@ -24,6 +24,30 @@ type ProfileResponse = {
    storage?: 'database' | 'clerk_fallback';
 };
 
+const extractStorageKey = (value: string | null | undefined) => {
+   if (!value) {
+      return null;
+   }
+
+   if (value.startsWith('users/')) {
+      return value;
+   }
+
+   try {
+      const parsed = new URL(value);
+      const normalizedPath = parsed.pathname.replace(/^\/+/, '');
+      const userSegmentIndex = normalizedPath.indexOf('users/');
+
+      if (userSegmentIndex >= 0) {
+         return normalizedPath.slice(userSegmentIndex);
+      }
+   } catch {
+      return null;
+   }
+
+   return null;
+};
+
 const formatDate = (value: string) => {
    const date = new Date(value);
 
@@ -65,7 +89,9 @@ export function ProfileSettingsPanel() {
                data.profile.avatarUrl
                   ? [
                        {
-                          storageKey: data.profile.avatarUrl,
+                          storageKey:
+                             extractStorageKey(data.profile.avatarUrl) ??
+                             data.profile.avatarUrl,
                           url: data.profile.avatarUrl,
                        },
                     ]
@@ -97,7 +123,7 @@ export function ProfileSettingsPanel() {
             displayName: displayName.trim(),
             username: username.trim(),
             bio: bio.trim() ? bio.trim() : null,
-            avatarUrl: avatarImages[0]?.url ?? null,
+            avatarUrl: avatarImages[0]?.storageKey ?? null,
          };
 
          const { data } = await axios.patch<ProfileResponse>(
@@ -113,7 +139,10 @@ export function ProfileSettingsPanel() {
             data.profile.avatarUrl
                ? [
                     {
-                       storageKey: data.profile.avatarUrl,
+                       storageKey:
+                          payload.avatarUrl ??
+                          extractStorageKey(data.profile.avatarUrl) ??
+                          data.profile.avatarUrl,
                        url: data.profile.avatarUrl,
                     },
                  ]
