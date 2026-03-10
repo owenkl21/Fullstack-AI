@@ -28,9 +28,6 @@ export function FeedPage() {
    const [posts, setPosts] = useState<FeedPost[]>([]);
    const [scope, setScope] = useState<'GLOBAL' | 'NEARBY'>('GLOBAL');
    const [type, setType] = useState<'ALL' | 'CATCH' | 'SITE'>('ALL');
-   const [content, setContent] = useState('');
-   const [postType, setPostType] = useState<'CATCH' | 'SITE'>('CATCH');
-   const [targetId, setTargetId] = useState('');
    const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>(
       {}
    );
@@ -67,31 +64,6 @@ export function FeedPage() {
    useEffect(() => {
       void load();
    }, [scope, type]);
-
-   const createPost = async () => {
-      if (!targetId.trim()) {
-         toast({ title: 'Enter catch or site id', variant: 'error' });
-         return;
-      }
-
-      const payload: Record<string, string> = {
-         type: postType,
-         scope,
-         content,
-      };
-
-      if (postType === 'CATCH') {
-         payload.catchId = targetId;
-      } else {
-         payload.siteId = targetId;
-      }
-
-      await axios.post('/api/feed', payload);
-      setContent('');
-      setTargetId('');
-      toast({ title: 'Post published', variant: 'success' });
-      await load();
-   };
 
    const like = async (postId: string) => {
       await axios.post(`/api/feed/${postId}/likes`);
@@ -147,40 +119,10 @@ export function FeedPage() {
                </div>
 
                <Show when="signed-in">
-                  <div className="space-y-2 rounded border p-3">
-                     <h2 className="font-medium">Create post</h2>
-                     <div className="flex gap-2">
-                        <Button
-                           variant={
-                              postType === 'CATCH' ? 'default' : 'outline'
-                           }
-                           onClick={() => setPostType('CATCH')}
-                        >
-                           Catch
-                        </Button>
-                        <Button
-                           variant={postType === 'SITE' ? 'default' : 'outline'}
-                           onClick={() => setPostType('SITE')}
-                        >
-                           Site
-                        </Button>
-                     </div>
-                     <input
-                        className="w-full rounded border px-2 py-1"
-                        placeholder={
-                           postType === 'CATCH' ? 'Catch id' : 'Site id'
-                        }
-                        value={targetId}
-                        onChange={(event) => setTargetId(event.target.value)}
-                     />
-                     <textarea
-                        className="w-full rounded border px-2 py-1"
-                        placeholder="Write something..."
-                        value={content}
-                        onChange={(event) => setContent(event.target.value)}
-                     />
-                     <Button onClick={() => void createPost()}>Publish</Button>
-                  </div>
+                  <p className="rounded border p-3 text-sm text-muted-foreground">
+                     Your feed posts are created when you log a catch or log a
+                     fishing site.
+                  </p>
                </Show>
 
                <div className="space-y-3">

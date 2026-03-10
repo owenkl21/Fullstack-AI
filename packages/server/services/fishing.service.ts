@@ -334,6 +334,16 @@ export const fishingService = {
             });
          }
 
+         await tx.feedPost.create({
+            data: {
+               authorId: user.id,
+               type: 'CATCH',
+               scope: 'GLOBAL',
+               content: input.notes || null,
+               catchId: catchRecord.id,
+            },
+         });
+
          return tx.catch.findUniqueOrThrow({
             where: { id: catchRecord.id },
             include: catchDetailInclude,
@@ -501,6 +511,18 @@ export const fishingService = {
                },
             });
          }
+
+         await tx.feedPost.create({
+            data: {
+               authorId: user.id,
+               type: 'SITE',
+               scope: 'GLOBAL',
+               content: input.description || null,
+               siteId: site.id,
+               latitude: input.latitude,
+               longitude: input.longitude,
+            },
+         });
 
          return tx.fishingSite.findUniqueOrThrow({
             where: { id: site.id },
