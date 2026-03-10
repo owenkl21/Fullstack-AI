@@ -129,6 +129,67 @@ async function getUserByClerkId(clerkId: string) {
    });
 }
 
+const withResolvedGearImageUrls = async <
+   T extends {
+      gears: Array<{ imageUrl: string | null }>;
+   },
+>(
+   record: T
+): Promise<T> => {
+   const imageUrls = record.gears
+      .map((gear) => gear.imageUrl)
+      .filter((url): url is string => Boolean(url));
+
+   if (imageUrls.length === 0) {
+      return record;
+   }
+
+   const images: Array<{ url: string; storageKey: string }> =
+      await prisma.image.findMany({
+         where: { url: { in: imageUrls } },
+         select: { url: true, storageKey: true },
+      });
+
+   const storageKeyByUrl = new Map<string, string>(
+      images.map((image: { url: string; storageKey: string }) => [
+         image.url,
+         image.storageKey,
+      ])
+   );
+
+   const gears = await Promise.all(
+      record.gears.map(async (gear) => {
+         if (!gear.imageUrl) {
+            return gear;
+         }
+
+         const storageKey = storageKeyByUrl.get(gear.imageUrl);
+         if (!storageKey) {
+            return gear;
+         }
+
+         try {
+            const signed = await uploadsService.getReadUrl(storageKey);
+            return { ...gear, imageUrl: signed.readUrl };
+         } catch (error) {
+            console.warn(
+               '[fishing:gear] Falling back to persisted gear image URL because generating read URL failed.',
+               {
+                  storageKey,
+                  error,
+               }
+            );
+
+            return gear;
+         }
+      })
+   );
+
+   return {
+      ...record,
+      gears,
+   };
+};
 const withResolvedImageUrls = async <
    T extends {
       images: Array<{
@@ -274,7 +335,8 @@ export const fishingService = {
          });
       });
 
-      return withResolvedImageUrls(created);
+      const withResolvedImages = await withResolvedImageUrls(created);
+      return withResolvedGearImageUrls(withResolvedImages);
    },
 
    async getCatchById(catchId: string) {
@@ -287,7 +349,8 @@ export const fishingService = {
          return null;
       }
 
-      return withResolvedImageUrls(catchRecord);
+      const withResolvedImages = await withResolvedImageUrls(catchRecord);
+      return withResolvedGearImageUrls(withResolvedImages);
    },
 
    async listMyCatches(clerkId: string) {
@@ -366,7 +429,8 @@ export const fishingService = {
             include: catchDetailInclude,
          });
 
-         return withResolvedImageUrls(updated);
+         const withResolvedImages = await withResolvedImageUrls(updated);
+         return withResolvedGearImageUrls(withResolvedImages);
       });
    },
 
