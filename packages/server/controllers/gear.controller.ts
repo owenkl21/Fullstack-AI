@@ -27,6 +27,16 @@ export const gearController = {
       return res.status(201).json({ gear });
    },
 
+   async listGear(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) {
+         return res.status(401).json(unauthorizedResponse);
+      }
+
+      const gear = await gearService.listGear();
+      return res.json({ gear });
+   },
+
    async listMyGear(req: Request, res: Response) {
       const auth = getAuth(req);
       if (!auth.userId) {

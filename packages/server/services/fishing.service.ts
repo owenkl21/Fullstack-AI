@@ -31,6 +31,7 @@ type CreateCatchInput = {
    weather?: string | null;
    waterTemp?: number | null;
    depth?: number | null;
+   gearIds: string[];
    images: CreateImageInput[];
 };
 
@@ -66,8 +67,9 @@ const catchDetailInclude = {
    createdBy: { select: { id: true, displayName: true, username: true } },
    site: { select: { id: true, name: true, latitude: true, longitude: true } },
    species: { select: { id: true, commonName: true, scientificName: true } },
-   gear: {
+   gears: {
       select: { id: true, name: true, brand: true, type: true, imageUrl: true },
+      orderBy: { createdAt: 'desc' as const },
    },
    images: {
       include: {
@@ -200,6 +202,13 @@ export const fishingService = {
          siteId: input.siteId,
       });
 
+      const validGears = input.gearIds.length
+         ? await prisma.gear.findMany({
+              where: { id: { in: input.gearIds } },
+              select: { id: true },
+           })
+         : [];
+
       const created = await prisma.$transaction(async (tx) => {
          const catchRecord = await tx.catch.create({
             data: {
@@ -214,6 +223,9 @@ export const fishingService = {
                weather: input.weather,
                waterTemp: input.waterTemp,
                depth: input.depth,
+               gears: {
+                  connect: validGears.map((gear) => ({ id: gear.id })),
+               },
             },
          });
 
@@ -303,6 +315,13 @@ export const fishingService = {
          siteId: input.siteId,
       });
 
+      const validGears = input.gearIds.length
+         ? await prisma.gear.findMany({
+              where: { id: { in: input.gearIds } },
+              select: { id: true },
+           })
+         : [];
+
       return prisma.$transaction(async (tx) => {
          const existing = await tx.catch.findFirst({
             where: { id: catchId, createdById: user.id, deletedAt: null },
@@ -340,6 +359,9 @@ export const fishingService = {
                weather: input.weather,
                waterTemp: input.waterTemp,
                depth: input.depth,
+               gears: {
+                  set: validGears.map((gear) => ({ id: gear.id })),
+               },
             },
             include: catchDetailInclude,
          });

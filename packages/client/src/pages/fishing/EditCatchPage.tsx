@@ -13,27 +13,45 @@ type CatchEdit = {
    caughtAt: string;
    site: { id: string } | null;
    weather: string | null;
+   gears: { id: string }[];
    waterTemp: number | null;
    length: number | null;
    weight: number | null;
 };
 
 type SiteOption = { id: string; name: string };
+type GearOption = {
+   id: string;
+   name: string;
+   brand: string;
+   type: string;
+   imageUrl: string | null;
+};
 
 export function EditCatchPage() {
    const { catchId } = useParams();
    const navigate = useNavigate();
    const [item, setItem] = useState<CatchEdit | null>(null);
    const [sites, setSites] = useState<SiteOption[]>([]);
+   const [gear, setGear] = useState<GearOption[]>([]);
+   const [selectedGearIds, setSelectedGearIds] = useState<string[]>([]);
 
    useEffect(() => {
       const load = async () => {
-         const [{ data: catchData }, { data: siteData }] = await Promise.all([
-            axios.get(`/api/catches/${catchId}`),
-            axios.get('/api/sites'),
-         ]);
+         const [{ data: catchData }, { data: siteData }, { data: gearData }] =
+            await Promise.all([
+               axios.get(`/api/catches/${catchId}`),
+               axios.get('/api/sites'),
+               axios.get('/api/gear'),
+            ]);
          setItem(catchData.catch);
          setSites(siteData.sites ?? []);
+         setGear(gearData.gear ?? []);
+         setSelectedGearIds(
+            (catchData.catch.gears ?? []).map(
+               (entry: { id: string }) => entry.id
+            )
+         );
       };
 
       void load();
@@ -55,10 +73,19 @@ export function EditCatchPage() {
          waterTemp: Number(formData.get('waterTemp')) || null,
          length: Number(formData.get('length')) || null,
          weight: Number(formData.get('weight')) || null,
+         gearIds: selectedGearIds,
       });
 
       toast({ title: 'Catch updated', variant: 'success' });
       navigate(`/catches/${catchId}`);
+   };
+
+   const toggleGearSelection = (gearId: string) => {
+      setSelectedGearIds((previous) =>
+         previous.includes(gearId)
+            ? previous.filter((id) => id !== gearId)
+            : [...previous, gearId]
+      );
    };
 
    return (
@@ -104,6 +131,55 @@ export function EditCatchPage() {
                         </option>
                      ))}
                   </select>
+                  <fieldset className="grid gap-2 rounded border p-3">
+                     <legend className="px-1 text-sm font-medium">
+                        Gear used
+                     </legend>
+                     {gear.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                           No gear found in the database yet.
+                        </p>
+                     ) : (
+                        <div className="grid gap-2">
+                           {gear.map((entry) => {
+                              const selected = selectedGearIds.includes(
+                                 entry.id
+                              );
+
+                              return (
+                                 <label
+                                    key={entry.id}
+                                    className="flex cursor-pointer items-center gap-3 rounded border p-2"
+                                 >
+                                    <input
+                                       type="checkbox"
+                                       checked={selected}
+                                       onChange={() =>
+                                          toggleGearSelection(entry.id)
+                                       }
+                                    />
+                                    {entry.imageUrl ? (
+                                       <img
+                                          src={entry.imageUrl}
+                                          alt={entry.name}
+                                          className="h-10 w-10 rounded border object-cover"
+                                       />
+                                    ) : null}
+                                    <span className="text-sm">
+                                       <span className="font-medium">
+                                          {entry.name}
+                                       </span>{' '}
+                                       <span className="text-muted-foreground">
+                                          • {entry.brand} •{' '}
+                                          {entry.type.toLowerCase()}
+                                       </span>
+                                    </span>
+                                 </label>
+                              );
+                           })}
+                        </div>
+                     )}
+                  </fieldset>
                   <input
                      name="weather"
                      defaultValue={item.weather ?? ''}

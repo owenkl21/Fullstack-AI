@@ -108,8 +108,7 @@ model Catch {
   site         FishingSite? @relation(fields: [siteId], references: [id], onDelete: SetNull)
   speciesId    String?
   species      Species?     @relation(fields: [speciesId], references: [id], onDelete: SetNull)
-  gearId       String?
-  gear         Gear?        @relation(fields: [gearId], references: [id], onDelete: SetNull)
+  gears        Gear[]
   title        String
   notes        String?
   caughtAt     DateTime

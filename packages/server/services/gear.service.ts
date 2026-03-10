@@ -45,6 +45,55 @@ async function getUserByClerkId(clerkId: string) {
    });
 }
 
+const withSignedImageUrls = async <T extends { imageUrl: string | null }>(
+   gear: T[]
+) => {
+   const imageUrls = gear
+      .map((entry) => entry.imageUrl)
+      .filter((url): url is string => Boolean(url));
+
+   if (imageUrls.length === 0) {
+      return gear;
+   }
+
+   const images = await prisma.image.findMany({
+      where: { url: { in: imageUrls } },
+      select: { url: true, storageKey: true },
+   });
+
+   const storageKeyByUrl = new Map(
+      images.map((image) => [image.url, image.storageKey])
+   );
+
+   return Promise.all(
+      gear.map(async (entry) => {
+         if (!entry.imageUrl) {
+            return entry;
+         }
+
+         const storageKey = storageKeyByUrl.get(entry.imageUrl);
+         if (!storageKey) {
+            return entry;
+         }
+
+         try {
+            const signed = await uploadsService.getReadUrl(storageKey);
+            return { ...entry, imageUrl: signed.readUrl };
+         } catch (error) {
+            console.warn(
+               '[gear:list] Falling back to persisted image URL because generating read URL failed.',
+               {
+                  storageKey,
+                  error,
+               }
+            );
+
+            return entry;
+         }
+      })
+   );
+};
+
 export const gearService = {
    async createGear(clerkId: string, input: GearInput) {
       const user = await getUserByClerkId(clerkId);
@@ -80,6 +129,14 @@ export const gearService = {
       });
    },
 
+   async listGear() {
+      const gear = await prisma.gear.findMany({
+         orderBy: { createdAt: 'desc' },
+      });
+
+      return withSignedImageUrls(gear);
+   },
+
    async listMyGear(clerkId: string) {
       const user = await getUserByClerkId(clerkId);
 
@@ -88,50 +145,7 @@ export const gearService = {
          orderBy: { createdAt: 'desc' },
       });
 
-      const imageUrls = gear
-         .map((entry) => entry.imageUrl)
-         .filter((url): url is string => Boolean(url));
-
-      if (imageUrls.length === 0) {
-         return gear;
-      }
-
-      const images = await prisma.image.findMany({
-         where: { url: { in: imageUrls } },
-         select: { url: true, storageKey: true },
-      });
-
-      const storageKeyByUrl = new Map(
-         images.map((image) => [image.url, image.storageKey])
-      );
-
-      return Promise.all(
-         gear.map(async (entry) => {
-            if (!entry.imageUrl) {
-               return entry;
-            }
-
-            const storageKey = storageKeyByUrl.get(entry.imageUrl);
-            if (!storageKey) {
-               return entry;
-            }
-
-            try {
-               const signed = await uploadsService.getReadUrl(storageKey);
-               return { ...entry, imageUrl: signed.readUrl };
-            } catch (error) {
-               console.warn(
-                  '[gear:list] Falling back to persisted image URL because generating read URL failed.',
-                  {
-                     storageKey,
-                     error,
-                  }
-               );
-
-               return entry;
-            }
-         })
-      );
+      return withSignedImageUrls(gear);
    },
 
    async updateGear(clerkId: string, gearId: string, input: GearInput) {

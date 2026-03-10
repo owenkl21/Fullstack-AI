@@ -18,7 +18,13 @@ type CatchDetail = {
    weight: number | null;
    site: { id: string; name: string } | null;
    species: { commonName: string } | null;
-   gear: { name: string; category: string | null } | null;
+   gears: {
+      id: string;
+      name: string;
+      brand: string;
+      type: string;
+      imageUrl: string | null;
+   }[];
    images: { image: { id: string; url: string } }[];
 };
 
@@ -97,7 +103,38 @@ export function CatchDetailPage() {
                      <p>
                         Species: {data.species?.commonName ?? 'Not specified'}
                      </p>
-                     <p>Gear: {data.gear?.name ?? 'Not specified'}</p>
+                     <div className="space-y-2">
+                        <p className="font-medium">Gear</p>
+                        {data.gears.length === 0 ? (
+                           <p>Not specified</p>
+                        ) : (
+                           <div className="grid gap-2">
+                              {data.gears.map((gear) => (
+                                 <div
+                                    key={gear.id}
+                                    className="flex items-center gap-3 rounded border p-2"
+                                 >
+                                    {gear.imageUrl ? (
+                                       <img
+                                          src={gear.imageUrl}
+                                          alt={gear.name}
+                                          className="h-10 w-10 rounded border object-cover"
+                                       />
+                                    ) : null}
+                                    <p className="text-sm">
+                                       <span className="font-medium">
+                                          {gear.name}
+                                       </span>{' '}
+                                       <span className="text-muted-foreground">
+                                          • {gear.brand} •{' '}
+                                          {gear.type.toLowerCase()}
+                                       </span>
+                                    </p>
+                                 </div>
+                              ))}
+                           </div>
+                        )}
+                     </div>
                      <p>
                         Conditions: {data.weather ?? 'Not specified'} | Water
                         temp: {data.waterTemp ?? '—'}

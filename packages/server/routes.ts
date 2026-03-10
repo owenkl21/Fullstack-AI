@@ -98,6 +98,7 @@ router.post('/api/sites', requireApiAuth, fishingController.createFishingSite);
 router.get('/api/sites/:siteId', fishingController.getFishingSiteById);
 
 router.post('/api/gear', requireApiAuth, gearController.createGear);
+router.get('/api/gear', requireApiAuth, gearController.listGear);
 router.get('/api/gear/me', requireApiAuth, gearController.listMyGear);
 router.put('/api/gear/:gearId', requireApiAuth, gearController.updateGear);
 router.delete('/api/gear/:gearId', requireApiAuth, gearController.deleteGear);
