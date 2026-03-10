@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 
-type Scope = 'catch' | 'site' | 'avatar';
+type Scope = 'catch' | 'site' | 'avatar' | 'gear';
 
 type UploadedImage = {
    storageKey: string;
@@ -107,7 +107,6 @@ export function R2ImagePicker({
             toast({
                title: 'Partial upload complete',
                description: `${uploaded.length} uploaded, ${failedFiles.length} failed.`,
-               variant: 'default',
             });
          } else {
             toast({

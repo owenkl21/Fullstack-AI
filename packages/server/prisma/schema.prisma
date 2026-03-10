@@ -14,6 +14,16 @@ enum WaterType {
   OTHER
 }
 
+enum GearType {
+  ROD
+  REEL
+  BAIT
+  LURE
+  LINE
+  HOOK
+  WEIGHTS
+}
+
 model User {
   id          String        @id @default(cuid())
   clerkId     String        @unique
@@ -31,6 +41,7 @@ model User {
   followers   Follow[]      @relation("FollowingRelation")
   catchLikes  CatchLike[]
   siteLikes   SiteLike[]
+  gear        Gear[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   deletedAt   DateTime?
@@ -64,12 +75,18 @@ model FishingSite {
 
 model Gear {
   id          String   @id @default(cuid())
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
   name        String
-  category    String?
-  description String?
+  brand       String
+  type        GearType
+  imageUrl    String?
   catches     Catch[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([createdById])
+  @@map("gear")
 }
 
 model Species {

@@ -1,6 +1,6 @@
 import z from 'zod';
 
-const allowedScopes = ['catch', 'site', 'avatar'] as const;
+const allowedScopes = ['catch', 'site', 'avatar', 'gear'] as const;
 const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 export const signUploadSchema = z.object({

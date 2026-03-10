@@ -4,6 +4,7 @@ import { chatController } from './controllers/chat.controller';
 import { fishingController } from './controllers/fishing.controller';
 import { userController } from './controllers/user.controller';
 import { uploadsController } from './controllers/uploads.controller';
+import { gearController } from './controllers/gear.controller';
 import { getAuth } from '@clerk/express';
 import { userService } from './services/user.service';
 
@@ -95,6 +96,12 @@ router.delete(
 );
 router.post('/api/sites', requireApiAuth, fishingController.createFishingSite);
 router.get('/api/sites/:siteId', fishingController.getFishingSiteById);
+
+router.post('/api/gear', requireApiAuth, gearController.createGear);
+router.get('/api/gear/me', requireApiAuth, gearController.listMyGear);
+router.put('/api/gear/:gearId', requireApiAuth, gearController.updateGear);
+router.delete('/api/gear/:gearId', requireApiAuth, gearController.deleteGear);
+
 router.get('/api/users/me', requireApiAuth, userController.getCurrentProfile);
 router.patch(
    '/api/users/me',

@@ -9,6 +9,9 @@ import { LogSitePage } from '@/pages/fishing/LogSitePage';
 import { MyCatchesPage } from '@/pages/fishing/MyCatchesPage';
 import { MySitesPage } from '@/pages/fishing/MySitesPage';
 import { SiteDetailPage } from '@/pages/fishing/SiteDetailPage';
+import { LogGearPage } from '@/pages/fishing/LogGearPage';
+import { MyGearPage } from '@/pages/fishing/MyGearPage';
+import { EditGearPage } from '@/pages/fishing/EditGearPage';
 
 function App() {
    return (
@@ -23,6 +26,9 @@ function App() {
          <Route path="/sites/me" element={<MySitesPage />} />
          <Route path="/sites/:siteId" element={<SiteDetailPage />} />
          <Route path="/sites/:siteId/edit" element={<EditSitePage />} />
+         <Route path="/gear/new" element={<LogGearPage />} />
+         <Route path="/gear/me" element={<MyGearPage />} />
+         <Route path="/gear/:gearId/edit" element={<EditGearPage />} />
          <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
    );
