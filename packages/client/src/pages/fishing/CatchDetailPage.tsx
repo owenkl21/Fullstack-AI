@@ -60,7 +60,7 @@ export function CatchDetailPage() {
                         <img
                            src={images[activeImage]?.image.url}
                            alt="Catch"
-                           className="h-96 w-full object-cover"
+                           className="h-96 w-full bg-muted object-contain"
                         />
                      ) : (
                         <div className="flex h-96 items-center justify-center text-sm text-slate-300">
@@ -119,7 +119,7 @@ export function CatchDetailPage() {
                                        <img
                                           src={gear.imageUrl}
                                           alt={gear.name}
-                                          className="h-10 w-10 rounded border object-cover"
+                                          className="h-10 w-10 rounded border bg-muted object-contain"
                                        />
                                     ) : null}
                                     <p className="text-sm">

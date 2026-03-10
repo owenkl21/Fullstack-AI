@@ -178,7 +178,7 @@ export function FeedPage() {
                                        key={entry.image.id}
                                        src={entry.image.url}
                                        alt="Post"
-                                       className="h-32 w-full rounded object-cover"
+                                       className="h-32 w-full rounded bg-muted object-contain"
                                        loading="lazy"
                                     />
                                  ))}
