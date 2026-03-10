@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { toast } from '@/components/ui/use-toast';
+import { ImageUploader } from '@/components/ImageUploader';
 
 type Scope = 'catch' | 'site' | 'avatar' | 'gear';
 
@@ -28,19 +29,18 @@ export function R2ImagePicker({
    label,
    value,
    onChange,
-   multiple = true,
+   multiple = scope === 'catch',
    maxItems = 8,
 }: Props) {
    const [isUploading, setIsUploading] = useState(false);
 
-   const uploadFiles = async (files: FileList | null) => {
-      if (!files || files.length === 0) {
+   const uploadFiles = async (files: File[]) => {
+      if (!files.length) {
          return;
       }
 
-      const selected = Array.from(files);
       const availableSlots = Math.max(0, maxItems - value.length);
-      const toUpload = selected.slice(0, availableSlots);
+      const toUpload = files.slice(0, availableSlots);
 
       if (toUpload.length === 0) {
          toast({
@@ -121,46 +121,73 @@ export function R2ImagePicker({
       }
    };
 
+   const onImageCropped = async (blob: Blob) => {
+      if (!multiple && value.length >= 1) {
+         toast({
+            title: 'Only one image is allowed here.',
+            description: 'Remove the current image to upload a new one.',
+            variant: 'error',
+         });
+         return;
+      }
+
+      const file = new File([blob], `cropped-${Date.now()}.jpg`, {
+         type: blob.type || 'image/jpeg',
+      });
+      await uploadFiles([file]);
+   };
+
    return (
-      <div className="space-y-2">
-         <label className="text-sm font-medium">{label}</label>
-         <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple={multiple}
-            disabled={isUploading}
-            onChange={(event) => {
-               void uploadFiles(event.target.files);
-               event.currentTarget.value = '';
+      <div className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+         <div className="space-y-1">
+            <label className="text-sm font-semibold">{label}</label>
+            <p className="text-xs text-muted-foreground">
+               {multiple
+                  ? `You can upload up to ${maxItems} images.`
+                  : 'Upload one image.'}
+            </p>
+         </div>
+         <ImageUploader
+            maxSize={10 * 1024 * 1024}
+            acceptedFileTypes={['image/jpeg', 'image/png', 'image/webp']}
+            onImageCropped={(blob) => {
+               void onImageCropped(blob);
             }}
+            className="max-w-lg"
          />
          {isUploading && (
             <FishingBobberLoader label="Uploading to R2..." compact />
          )}
          {value.length > 0 && (
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
                {value.map((image, index) => (
-                  <div key={image.storageKey} className="space-y-1">
+                  <div
+                     key={image.storageKey}
+                     className="overflow-hidden rounded-lg border bg-background"
+                  >
                      <img
                         src={image.url}
                         alt={`${label} ${index + 1}`}
-                        className="h-36 w-full rounded border object-cover"
+                        className="h-40 w-full object-cover"
                      />
-                     <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                           onChange(
-                              value.filter(
-                                 (entry) =>
-                                    entry.storageKey !== image.storageKey
+                     <div className="p-2">
+                        <Button
+                           type="button"
+                           variant="outline"
+                           size="sm"
+                           className="w-full"
+                           onClick={() =>
+                              onChange(
+                                 value.filter(
+                                    (entry) =>
+                                       entry.storageKey !== image.storageKey
+                                 )
                               )
-                           )
-                        }
-                     >
-                        Remove
-                     </Button>
+                           }
+                        >
+                           Remove image
+                        </Button>
+                     </div>
                   </div>
                ))}
             </div>
