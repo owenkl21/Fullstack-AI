@@ -6,7 +6,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-type UploadScope = 'catch' | 'site' | 'avatar';
+type UploadScope = 'catch' | 'site' | 'avatar' | 'gear';
 
 type SignUploadInput = {
    clerkUserId: string;
@@ -107,7 +107,8 @@ const buildStorageKey = ({
       return `users/${clerkUserId}/avatar/${timestamp}-${randomSuffix}-${safeSlug}.${extension}`;
    }
 
-   const pathSegment = scope === 'catch' ? 'catches' : 'sites';
+   const pathSegment =
+      scope === 'catch' ? 'catches' : scope === 'site' ? 'sites' : 'gear';
 
    return `users/${clerkUserId}/${pathSegment}/temp/${timestamp}-${randomSuffix}-${safeSlug}.${extension}`;
 };
@@ -166,6 +167,7 @@ const inferScopeFromStorageKey = (
    const catchPrefix = `users/${clerkUserId}/catches/temp/`;
    const sitePrefix = `users/${clerkUserId}/sites/temp/`;
    const avatarPrefix = `users/${clerkUserId}/avatar/`;
+   const gearPrefix = `users/${clerkUserId}/gear/temp/`;
 
    if (storageKey.startsWith(catchPrefix)) {
       return 'catch';
@@ -177,6 +179,10 @@ const inferScopeFromStorageKey = (
 
    if (storageKey.startsWith(avatarPrefix)) {
       return 'avatar';
+   }
+
+   if (storageKey.startsWith(gearPrefix)) {
+      return 'gear';
    }
 
    throw new Error('Storage key does not match authenticated user and scope.');
@@ -232,7 +238,9 @@ export const uploadsService = {
             ? 'avatar'
             : input.scope === 'catch'
               ? 'catches/temp'
-              : 'sites/temp';
+              : input.scope === 'site'
+                ? 'sites/temp'
+                : 'gear/temp';
       const expectedPrefix = `users/${input.clerkUserId}/${expectedPathSegment}/`;
 
       if (!input.storageKey.startsWith(expectedPrefix)) {
@@ -264,7 +272,9 @@ export const uploadsService = {
             ? 'avatar'
             : input.scope === 'catch'
               ? 'catches/temp'
-              : 'sites/temp';
+              : input.scope === 'site'
+                ? 'sites/temp'
+                : 'gear/temp';
       const expectedPrefix = `users/${input.clerkUserId}/${expectedPathSegment}/`;
 
       if (!input.storageKey.startsWith(expectedPrefix)) {
