@@ -168,7 +168,7 @@ export function R2ImagePicker({
                      <img
                         src={image.url}
                         alt={`${label} ${index + 1}`}
-                        className="h-40 w-full object-cover"
+                        className="aspect-[4/3] w-full object-cover"
                      />
                      <div className="p-2">
                         <Button

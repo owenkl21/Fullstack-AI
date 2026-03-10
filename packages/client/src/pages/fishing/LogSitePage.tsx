@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Show, SignInButton } from '@clerk/react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
@@ -8,13 +8,74 @@ import { LandingHeader } from '@/components/landing/LandingHeader';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { R2ImagePicker } from '@/components/r2-image-picker';
+import { GoogleMapLocationPicker } from '@/components/fishing/GoogleMapLocationPicker';
 
 export function LogSitePage() {
    const navigate = useNavigate();
    const [isSaving, setIsSaving] = useState(false);
+   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+   const [latitude, setLatitude] = useState('');
+   const [longitude, setLongitude] = useState('');
    const [images, setImages] = useState<{ storageKey: string; url: string }[]>(
       []
    );
+
+   const setCoordinates = useCallback(
+      (nextLatitude: number, nextLongitude: number) => {
+         setLatitude(nextLatitude.toFixed(6));
+         setLongitude(nextLongitude.toFixed(6));
+      },
+      []
+   );
+
+   const detectCurrentLocation = useCallback(
+      (showToast = true) => {
+         if (!navigator.geolocation) {
+            toast({
+               title: 'Location is unavailable',
+               description: 'Your browser does not support geolocation.',
+               variant: 'error',
+            });
+            return;
+         }
+
+         setIsDetectingLocation(true);
+         navigator.geolocation.getCurrentPosition(
+            ({ coords }) => {
+               setCoordinates(coords.latitude, coords.longitude);
+               if (showToast) {
+                  toast({
+                     title: 'Location added',
+                     description:
+                        'Latitude and longitude were filled from your device.',
+                     variant: 'success',
+                  });
+               }
+               setIsDetectingLocation(false);
+            },
+            () => {
+               if (showToast) {
+                  toast({
+                     title: 'Could not get your location',
+                     description:
+                        'Please allow location access, or click the map to drop a pin.',
+                     variant: 'error',
+                  });
+               }
+               setIsDetectingLocation(false);
+            },
+            {
+               enableHighAccuracy: true,
+               timeout: 10000,
+            }
+         );
+      },
+      [setCoordinates]
+   );
+
+   useEffect(() => {
+      detectCurrentLocation(false);
+   }, [detectCurrentLocation]);
 
    const submitSite = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -23,8 +84,8 @@ export function LogSitePage() {
       const payload = {
          name: String(formData.get('name') ?? ''),
          description: String(formData.get('description') ?? '') || null,
-         latitude: Number(formData.get('latitude')) || null,
-         longitude: Number(formData.get('longitude')) || null,
+         latitude: Number(latitude) || null,
+         longitude: Number(longitude) || null,
          waterType: String(formData.get('waterType') ?? '') || null,
          accessNotes: String(formData.get('accessNotes') ?? '') || null,
          images,
@@ -69,12 +130,34 @@ export function LogSitePage() {
                      placeholder="Description"
                      className="rounded border p-2"
                   />
+                  <div className="grid gap-2 rounded border p-3">
+                     <p className="text-sm font-medium">Location options</p>
+                     <div className="flex flex-wrap gap-2">
+                        <Button
+                           type="button"
+                           variant="outline"
+                           onClick={() => detectCurrentLocation()}
+                           disabled={isDetectingLocation}
+                        >
+                           {isDetectingLocation
+                              ? 'Detecting location...'
+                              : 'Use my current location'}
+                        </Button>
+                     </div>
+                  </div>
+                  <GoogleMapLocationPicker
+                     latitude={latitude}
+                     longitude={longitude}
+                     onChange={setCoordinates}
+                  />
                   <div className="grid gap-3 sm:grid-cols-2">
                      <input
                         name="latitude"
                         placeholder="Latitude"
                         type="number"
                         step="0.000001"
+                        value={latitude}
+                        onChange={(event) => setLatitude(event.target.value)}
                         className="rounded border p-2"
                      />
                      <input
@@ -82,6 +165,8 @@ export function LogSitePage() {
                         placeholder="Longitude"
                         type="number"
                         step="0.000001"
+                        value={longitude}
+                        onChange={(event) => setLongitude(event.target.value)}
                         className="rounded border p-2"
                      />
                   </div>

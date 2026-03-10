@@ -22,6 +22,9 @@ export function FishingActionBar() {
          <Button asChild variant="outline">
             <Link to="/gear/me">My gear</Link>
          </Button>
+         <Button asChild variant="outline">
+            <Link to="/feed">Feed</Link>
+         </Button>
       </div>
    );
 }

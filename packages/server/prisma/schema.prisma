@@ -24,27 +24,40 @@ enum GearType {
   WEIGHTS
 }
 
+enum FeedPostType {
+  CATCH
+  SITE
+}
+
+enum FeedScope {
+  GLOBAL
+  NEARBY
+}
+
 model User {
-  id          String        @id @default(cuid())
-  clerkId     String        @unique
-  email       String        @unique
-  username    String        @unique
-  displayName String
-  bio         String?
-  avatarUrl   String?
-  catches     Catch[]
-  sites       FishingSite[]
-  reviews     Review[]
-  comments    Comment[]
-  uploaded    Image[]       @relation("UploadedImages")
-  following   Follow[]      @relation("FollowerRelation")
-  followers   Follow[]      @relation("FollowingRelation")
-  catchLikes  CatchLike[]
-  siteLikes   SiteLike[]
-  gear        Gear[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  deletedAt   DateTime?
+  id           String        @id @default(cuid())
+  clerkId      String        @unique
+  email        String        @unique
+  username     String        @unique
+  displayName  String
+  bio          String?
+  avatarUrl    String?
+  catches      Catch[]
+  sites        FishingSite[]
+  reviews      Review[]
+  comments     Comment[]
+  uploaded     Image[]       @relation("UploadedImages")
+  following    Follow[]      @relation("FollowerRelation")
+  followers    Follow[]      @relation("FollowingRelation")
+  catchLikes   CatchLike[]
+  siteLikes    SiteLike[]
+  gear         Gear[]
+  feedPosts    FeedPost[]
+  feedLikes    FeedLike[]
+  feedComments FeedComment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
 
   @@map("users")
 }
@@ -66,6 +79,7 @@ model FishingSite {
   reviews     Review[]
   likes       SiteLike[]
   images      SiteImage[]
+  feedPosts   FeedPost[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   deletedAt   DateTime?
@@ -123,6 +137,7 @@ model Catch {
   comments     Comment[]
   likes        CatchLike[]
   images       CatchImage[]
+  feedPosts    FeedPost[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   deletedAt    DateTime?
@@ -227,4 +242,55 @@ model SiteImage {
   position Int         @default(0)
 
   @@unique([siteId, imageId])
+}
+
+model FeedPost {
+  id           String        @id @default(cuid())
+  authorId     String
+  author       User          @relation(fields: [authorId], references: [id])
+  type         FeedPostType
+  scope        FeedScope     @default(GLOBAL)
+  content      String?
+  catchId      String?
+  catch        Catch?        @relation(fields: [catchId], references: [id], onDelete: SetNull)
+  siteId       String?
+  site         FishingSite?  @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  latitude     Float?
+  longitude    Float?
+  likeCount    Int           @default(0)
+  commentCount Int           @default(0)
+  likes        FeedLike[]
+  comments     FeedComment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+
+  @@index([createdAt(sort: Desc)])
+  @@index([scope, createdAt(sort: Desc)])
+  @@index([authorId, createdAt(sort: Desc)])
+}
+
+model FeedLike {
+  id        String   @id @default(cuid())
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+}
+
+model FeedComment {
+  id        String    @id @default(cuid())
+  postId    String
+  post      FeedPost  @relation(fields: [postId], references: [id])
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  body      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([postId, createdAt(sort: Desc)])
 }

@@ -69,7 +69,7 @@ export function SiteDetailPage() {
                            key={entry.image.id}
                            src={entry.image.url}
                            alt="Site"
-                           className="h-48 w-full rounded-md object-cover"
+                           className="aspect-[4/3] w-full rounded-md object-cover"
                         />
                      ))}
                   </div>
