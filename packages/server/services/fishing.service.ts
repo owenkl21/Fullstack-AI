@@ -392,35 +392,46 @@ export const fishingService = {
          }
 
          for (const [position, image] of input.images.entries()) {
-            const normalizedUrl = stripSignedUrlParams(image.url);
-            const createdImage = await tx.image.upsert({
-               where: { storageKey: image.storageKey },
-               create: {
-                  uploadedById: user.id,
-                  storageKey: image.storageKey,
-                  url: normalizedUrl,
-               },
-               update: {
-                  url: normalizedUrl,
-               },
-            });
+            try {
+               const normalizedUrl = stripSignedUrlParams(image.url);
+               const createdImage = await tx.image.upsert({
+                  where: { storageKey: image.storageKey },
+                  create: {
+                     uploadedById: user.id,
+                     storageKey: image.storageKey,
+                     url: normalizedUrl,
+                  },
+                  update: {
+                     url: normalizedUrl,
+                  },
+               });
 
-            await tx.catchImage.upsert({
-               where: {
-                  catchId_imageId: {
+               await tx.catchImage.upsert({
+                  where: {
+                     catchId_imageId: {
+                        catchId: catchRecord.id,
+                        imageId: createdImage.id,
+                     },
+                  },
+                  create: {
                      catchId: catchRecord.id,
                      imageId: createdImage.id,
+                     position,
                   },
-               },
-               create: {
-                  catchId: catchRecord.id,
-                  imageId: createdImage.id,
-                  position,
-               },
-               update: {
-                  position,
-               },
-            });
+                  update: {
+                     position,
+                  },
+               });
+            } catch (error) {
+               console.warn(
+                  '[fishing:create] Failed to persist one catch image; continuing without it.',
+                  {
+                     catchId: catchRecord.id,
+                     storageKey: image.storageKey,
+                     error,
+                  }
+               );
+            }
          }
 
          await tx.feedPost.create({
