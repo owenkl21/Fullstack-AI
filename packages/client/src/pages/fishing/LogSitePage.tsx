@@ -12,9 +12,120 @@ import { R2ImagePicker } from '@/components/r2-image-picker';
 export function LogSitePage() {
    const navigate = useNavigate();
    const [isSaving, setIsSaving] = useState(false);
+   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+   const [googleMapsLink, setGoogleMapsLink] = useState('');
+   const [latitude, setLatitude] = useState('');
+   const [longitude, setLongitude] = useState('');
    const [images, setImages] = useState<{ storageKey: string; url: string }[]>(
       []
    );
+
+   const setCoordinates = (nextLatitude: number, nextLongitude: number) => {
+      setLatitude(nextLatitude.toFixed(6));
+      setLongitude(nextLongitude.toFixed(6));
+   };
+
+   const detectCurrentLocation = () => {
+      if (!navigator.geolocation) {
+         toast({
+            title: 'Location is unavailable',
+            description: 'Your browser does not support geolocation.',
+            variant: 'error',
+         });
+         return;
+      }
+
+      setIsDetectingLocation(true);
+      navigator.geolocation.getCurrentPosition(
+         ({ coords }) => {
+            setCoordinates(coords.latitude, coords.longitude);
+            toast({
+               title: 'Location added',
+               description:
+                  'Latitude and longitude were filled from your device.',
+               variant: 'success',
+            });
+            setIsDetectingLocation(false);
+         },
+         () => {
+            toast({
+               title: 'Could not get your location',
+               description:
+                  'Please allow location access, or pin your site using a Google Maps link.',
+               variant: 'error',
+            });
+            setIsDetectingLocation(false);
+         },
+         {
+            enableHighAccuracy: true,
+            timeout: 10000,
+         }
+      );
+   };
+
+   const parseGoogleMapsCoordinates = (mapsLink: string) => {
+      const decodedLink = decodeURIComponent(mapsLink);
+      const patterns = [
+         /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+         /[?&](?:q|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+         /(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
+      ];
+
+      for (const pattern of patterns) {
+         const match = decodedLink.match(pattern);
+
+         if (!match) {
+            continue;
+         }
+
+         const parsedLatitude = Number(match[1]);
+         const parsedLongitude = Number(match[2]);
+
+         if (
+            Number.isFinite(parsedLatitude) &&
+            Number.isFinite(parsedLongitude) &&
+            parsedLatitude >= -90 &&
+            parsedLatitude <= 90 &&
+            parsedLongitude >= -180 &&
+            parsedLongitude <= 180
+         ) {
+            return { parsedLatitude, parsedLongitude };
+         }
+      }
+
+      return null;
+   };
+
+   const extractCoordinatesFromMapsLink = () => {
+      if (!googleMapsLink.trim()) {
+         toast({
+            title: 'Add a Google Maps link first',
+            description: 'Paste the link, then extract coordinates.',
+            variant: 'error',
+         });
+         return;
+      }
+
+      const coordinates = parseGoogleMapsCoordinates(googleMapsLink);
+
+      if (!coordinates) {
+         toast({
+            title: 'Could not read coordinates from that link',
+            description:
+               'Use a Google Maps share link that includes latitude and longitude.',
+            variant: 'error',
+         });
+         return;
+      }
+
+      setCoordinates(coordinates.parsedLatitude, coordinates.parsedLongitude);
+      toast({
+         title: 'Pin coordinates added',
+         description:
+            'Latitude and longitude were pulled from your Google Maps pin.',
+         variant: 'success',
+      });
+   };
 
    const submitSite = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -23,8 +134,8 @@ export function LogSitePage() {
       const payload = {
          name: String(formData.get('name') ?? ''),
          description: String(formData.get('description') ?? '') || null,
-         latitude: Number(formData.get('latitude')) || null,
-         longitude: Number(formData.get('longitude')) || null,
+         latitude: Number(latitude) || null,
+         longitude: Number(longitude) || null,
          waterType: String(formData.get('waterType') ?? '') || null,
          accessNotes: String(formData.get('accessNotes') ?? '') || null,
          images,
@@ -69,12 +180,55 @@ export function LogSitePage() {
                      placeholder="Description"
                      className="rounded border p-2"
                   />
+                  <div className="grid gap-2 rounded border p-3">
+                     <p className="text-sm font-medium">Location options</p>
+                     <div className="flex flex-wrap gap-2">
+                        <Button
+                           type="button"
+                           variant="outline"
+                           onClick={detectCurrentLocation}
+                           disabled={isDetectingLocation}
+                        >
+                           {isDetectingLocation
+                              ? 'Detecting location...'
+                              : 'Use my current location'}
+                        </Button>
+                        <a
+                           href="https://www.google.com/maps"
+                           target="_blank"
+                           rel="noreferrer"
+                        >
+                           <Button type="button" variant="outline">
+                              Open Google Maps (free)
+                           </Button>
+                        </a>
+                     </div>
+                     <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                        <input
+                           value={googleMapsLink}
+                           onChange={(event) =>
+                              setGoogleMapsLink(event.target.value)
+                           }
+                           placeholder="Paste Google Maps pin/share link"
+                           className="rounded border p-2"
+                        />
+                        <Button
+                           type="button"
+                           variant="outline"
+                           onClick={extractCoordinatesFromMapsLink}
+                        >
+                           Extract pin
+                        </Button>
+                     </div>
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                      <input
                         name="latitude"
                         placeholder="Latitude"
                         type="number"
                         step="0.000001"
+                        value={latitude}
+                        onChange={(event) => setLatitude(event.target.value)}
                         className="rounded border p-2"
                      />
                      <input
@@ -82,6 +236,8 @@ export function LogSitePage() {
                         placeholder="Longitude"
                         type="number"
                         step="0.000001"
+                        value={longitude}
+                        onChange={(event) => setLongitude(event.target.value)}
                         className="rounded border p-2"
                      />
                   </div>
