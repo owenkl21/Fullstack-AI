@@ -56,6 +56,44 @@ const withResolvedAvatar = async (
    ...profile,
    avatarUrl: await maybeResolveAvatarReadUrl(profile.avatarUrl),
 });
+
+const syncAvatarToClerk = async (
+   clerkUserId: string,
+   avatarValue: string | null | undefined
+) => {
+   if (avatarValue === undefined) {
+      return;
+   }
+
+   if (avatarValue === null) {
+      await clerkClient.users.deleteUserProfileImage(clerkUserId);
+      return;
+   }
+
+   const avatarUrl = await maybeResolveAvatarReadUrl(avatarValue);
+
+   if (!avatarUrl) {
+      await clerkClient.users.deleteUserProfileImage(clerkUserId);
+      return;
+   }
+
+   const response = await fetch(avatarUrl);
+   if (!response.ok) {
+      throw new Error(
+         `Failed to fetch avatar image for Clerk sync: ${response.status} ${response.statusText}`
+      );
+   }
+
+   const contentType =
+      response.headers.get('content-type') ?? 'application/octet-stream';
+   const bytes = await response.arrayBuffer();
+   const blob = new Blob([bytes], { type: contentType });
+
+   await clerkClient.users.updateUserProfileImage(clerkUserId, {
+      file: blob,
+   });
+};
+
 type ClerkFallbackMetadata = {
    appProfile?: {
       displayName?: string;
@@ -362,6 +400,15 @@ export const userService = {
                updatedAt: true,
             },
          });
+
+         try {
+            await syncAvatarToClerk(clerkUserId, input.avatarUrl);
+         } catch (error) {
+            console.warn(
+               '[user:updateProfile] Failed to sync avatar image to Clerk.',
+               { clerkUserId, error }
+            );
+         }
 
          return {
             profile: await withResolvedAvatar(profile),
