@@ -28,6 +28,7 @@ const catchPayloadSchema = z.object({
    weather: optionalTrimmedString,
    waterTemp: z.coerce.number().optional().nullable(),
    depth: z.coerce.number().nonnegative().optional().nullable(),
+   gearIds: z.array(z.string().trim().min(1)).max(20).optional().default([]),
 });
 
 export const createCatchSchema = catchPayloadSchema.extend({

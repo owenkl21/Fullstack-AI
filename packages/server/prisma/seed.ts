@@ -56,27 +56,30 @@ async function main() {
       update: {},
       create: {
          id: 'phase0-sample-gear',
+         createdById: anglerOne.id,
          name: 'Medium spinning combo',
-         category: 'Rod/Reel',
-         description: '7ft medium power spinning setup with braided line.',
+         brand: 'Penn',
+         type: 'ROD',
       },
    });
 
    await prisma.catch.upsert({
       where: { id: 'phase0-sample-catch' },
-      update: {},
+      update: {
+         gears: { set: [{ id: gear.id }] },
+      },
       create: {
          id: 'phase0-sample-catch',
          createdById: anglerTwo.id,
          siteId: site.id,
          speciesId: species.id,
          title: 'Morning halibut near the pier edge',
-         gearId: gear.id,
          notes: 'Caught on cut bait right after the tide changed.',
          caughtAt: new Date(),
          length: 24.5,
          weight: 6.2,
          weather: 'Clear',
+         gears: { connect: [{ id: gear.id }] },
       },
    });
 

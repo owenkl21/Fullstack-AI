@@ -10,6 +10,13 @@ import { toast } from '@/components/ui/use-toast';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 
 type SiteOption = { id: string; name: string };
+type GearOption = {
+   id: string;
+   name: string;
+   brand: string;
+   type: string;
+   imageUrl: string | null;
+};
 
 const WEATHER_OPTIONS = [
    'Clear skies',
@@ -35,18 +42,25 @@ export function LogCatchPage() {
    );
    const [sites, setSites] = useState<SiteOption[]>([]);
    const [siteChoice, setSiteChoice] = useState('');
+   const [gear, setGear] = useState<GearOption[]>([]);
+   const [selectedGearIds, setSelectedGearIds] = useState<string[]>([]);
    const [caughtAt, setCaughtAt] = useState(() =>
       formatForDateTimeLocal(new Date())
    );
 
    useEffect(() => {
-      const loadSites = async () => {
+      const loadData = async () => {
          try {
-            const { data } = await axios.get('/api/sites');
-            setSites(data.sites ?? []);
+            const [{ data: siteData }, { data: gearData }] = await Promise.all([
+               axios.get('/api/sites'),
+               axios.get('/api/gear'),
+            ]);
+            setSites(siteData.sites ?? []);
+            setGear(gearData.gear ?? []);
          } catch (error) {
-            console.error('Unable to load fishing sites', error);
+            console.error('Unable to load fishing sites/gear', error);
             setSites([]);
+            setGear([]);
             toast({
                title: 'Unable to load fishing spots',
                description:
@@ -56,7 +70,7 @@ export function LogCatchPage() {
          }
       };
 
-      void loadSites();
+      void loadData();
    }, []);
 
    const submitCatch = async (event: FormEvent<HTMLFormElement>) => {
@@ -92,6 +106,7 @@ export function LogCatchPage() {
          length: Number(formData.get('length')) || null,
          weight: Number(formData.get('weight')) || null,
          images,
+         gearIds: selectedGearIds,
       };
 
       try {
@@ -139,6 +154,14 @@ export function LogCatchPage() {
       } finally {
          setIsSaving(false);
       }
+   };
+
+   const toggleGearSelection = (gearId: string) => {
+      setSelectedGearIds((previous) =>
+         previous.includes(gearId)
+            ? previous.filter((id) => id !== gearId)
+            : [...previous, gearId]
+      );
    };
 
    return (
@@ -193,6 +216,55 @@ export function LogCatchPage() {
                         required
                      />
                   )}
+                  <fieldset className="grid gap-2 rounded border p-3">
+                     <legend className="px-1 text-sm font-medium">
+                        Gear used
+                     </legend>
+                     {gear.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                           No gear found in the database yet.
+                        </p>
+                     ) : (
+                        <div className="grid gap-2">
+                           {gear.map((entry) => {
+                              const selected = selectedGearIds.includes(
+                                 entry.id
+                              );
+
+                              return (
+                                 <label
+                                    key={entry.id}
+                                    className="flex cursor-pointer items-center gap-3 rounded border p-2"
+                                 >
+                                    <input
+                                       type="checkbox"
+                                       checked={selected}
+                                       onChange={() =>
+                                          toggleGearSelection(entry.id)
+                                       }
+                                    />
+                                    {entry.imageUrl ? (
+                                       <img
+                                          src={entry.imageUrl}
+                                          alt={entry.name}
+                                          className="h-10 w-10 rounded border object-cover"
+                                       />
+                                    ) : null}
+                                    <span className="text-sm">
+                                       <span className="font-medium">
+                                          {entry.name}
+                                       </span>{' '}
+                                       <span className="text-muted-foreground">
+                                          • {entry.brand} •{' '}
+                                          {entry.type.toLowerCase()}
+                                       </span>
+                                    </span>
+                                 </label>
+                              );
+                           })}
+                        </div>
+                     )}
+                  </fieldset>
                   <fieldset className="grid gap-2 rounded border p-3">
                      <legend className="px-1 text-sm font-medium">
                         Weather
