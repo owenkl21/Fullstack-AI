@@ -5,6 +5,7 @@ import { fishingController } from './controllers/fishing.controller';
 import { userController } from './controllers/user.controller';
 import { uploadsController } from './controllers/uploads.controller';
 import { gearController } from './controllers/gear.controller';
+import { feedController } from './controllers/feed.controller';
 import { getAuth } from '@clerk/express';
 import { userService } from './services/user.service';
 
@@ -96,6 +97,31 @@ router.delete(
 );
 router.post('/api/sites', requireApiAuth, fishingController.createFishingSite);
 router.get('/api/sites/:siteId', fishingController.getFishingSiteById);
+
+router.get('/api/feed', feedController.listFeed);
+router.post('/api/feed', requireApiAuth, feedController.createFeedPost);
+router.put('/api/feed/:postId', requireApiAuth, feedController.updateFeedPost);
+router.delete(
+   '/api/feed/:postId',
+   requireApiAuth,
+   feedController.deleteFeedPost
+);
+router.post(
+   '/api/feed/:postId/likes',
+   requireApiAuth,
+   feedController.toggleLike
+);
+router.get('/api/feed/:postId/comments', feedController.listComments);
+router.post(
+   '/api/feed/:postId/comments',
+   requireApiAuth,
+   feedController.createComment
+);
+router.delete(
+   '/api/feed/comments/:commentId',
+   requireApiAuth,
+   feedController.deleteComment
+);
 
 router.post('/api/gear', requireApiAuth, gearController.createGear);
 router.get('/api/gear', requireApiAuth, gearController.listGear);

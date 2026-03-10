@@ -12,6 +12,7 @@ import { SiteDetailPage } from '@/pages/fishing/SiteDetailPage';
 import { LogGearPage } from '@/pages/fishing/LogGearPage';
 import { MyGearPage } from '@/pages/fishing/MyGearPage';
 import { EditGearPage } from '@/pages/fishing/EditGearPage';
+import { FeedPage } from '@/pages/fishing/FeedPage';
 
 function App() {
    return (
@@ -29,6 +30,7 @@ function App() {
          <Route path="/gear/new" element={<LogGearPage />} />
          <Route path="/gear/me" element={<MyGearPage />} />
          <Route path="/gear/:gearId/edit" element={<EditGearPage />} />
+         <Route path="/feed" element={<FeedPage />} />
          <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
    );
