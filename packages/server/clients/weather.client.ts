@@ -1,8 +1,13 @@
 export async function getCurrentWeather(latitude: number, longitude: number) {
-   const apiKey = process.env.GOOGLE_WEATHER_API_KEY?.trim();
+   const apiKey =
+      process.env.GOOGLE_WEATHER_API_KEY?.trim() ||
+      process.env.GOOGLE_MAPS_API_KEY?.trim() ||
+      process.env.GOOGLE_API_KEY?.trim();
 
    if (!apiKey) {
-      throw new Error('GOOGLE_WEATHER_API_KEY is required.');
+      throw new Error(
+         'A Google API key is required (GOOGLE_WEATHER_API_KEY, GOOGLE_MAPS_API_KEY, or GOOGLE_API_KEY).'
+      );
    }
 
    const params = new URLSearchParams({
@@ -15,7 +20,11 @@ export async function getCurrentWeather(latitude: number, longitude: number) {
 
    const weatherUrl = `https://weather.googleapis.com/v1/currentConditions:lookup?${params.toString()}`;
 
-   const response = await fetch(weatherUrl);
+   const response = await fetch(weatherUrl, {
+      headers: {
+         'X-Goog-Api-Key': apiKey,
+      },
+   });
 
    if (!response.ok) {
       const details = await response.text();
