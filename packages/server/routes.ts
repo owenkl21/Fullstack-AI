@@ -56,6 +56,12 @@ router.post(
    fishingController.getConditions
 );
 
+router.get(
+   '/api/weather/current',
+   requireApiAuth,
+   fishingController.getCurrentWeatherByCoordinates
+);
+
 router.post('/api/catches', requireApiAuth, fishingController.createCatch);
 
 router.get('/api/catches/me', requireApiAuth, fishingController.listMyCatches);

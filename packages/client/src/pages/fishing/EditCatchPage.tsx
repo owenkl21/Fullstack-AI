@@ -15,7 +15,6 @@ type CatchEdit = {
    site: { id: string } | null;
    weather: string | null;
    gears: { id: string }[];
-   waterTemp: number | null;
    length: number | null;
    weight: number | null;
 };
@@ -71,7 +70,6 @@ export function EditCatchPage() {
          ).toISOString(),
          siteId: String(formData.get('siteId') ?? '') || null,
          weather: String(formData.get('weather') ?? '') || null,
-         waterTemp: Number(formData.get('waterTemp')) || null,
          length: Number(formData.get('length')) || null,
          weight: Number(formData.get('weight')) || null,
          gearIds: selectedGearIds,
@@ -186,14 +184,7 @@ export function EditCatchPage() {
                      defaultValue={item.weather ?? ''}
                      className="rounded border p-2"
                   />
-                  <div className="grid gap-3 sm:grid-cols-3">
-                     <input
-                        name="waterTemp"
-                        defaultValue={item.waterTemp ?? ''}
-                        type="number"
-                        step="0.1"
-                        className="rounded border p-2"
-                     />
+                  <div className="grid gap-3 sm:grid-cols-2">
                      <input
                         name="length"
                         defaultValue={item.length ?? ''}

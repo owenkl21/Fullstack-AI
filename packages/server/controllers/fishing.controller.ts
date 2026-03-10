@@ -4,6 +4,7 @@ import {
    createCatchSchema,
    createFishingSiteSchema,
    fishingRequestSchema,
+   weatherLookupSchema,
    updateCatchSchema,
    updateFishingSiteSchema,
 } from '../schemas/fishing.schema';
@@ -18,6 +19,29 @@ const asSingleParam = (value: string | string[] | undefined) =>
    Array.isArray(value) ? value[0] : value;
 
 export const fishingController = {
+   async getCurrentWeatherByCoordinates(req: Request, res: Response) {
+      const parseResult = weatherLookupSchema.safeParse(req.query);
+
+      if (!parseResult.success) {
+         return res.status(400).json(parseResult.error.format());
+      }
+
+      try {
+         const weather = await fishingService.getCurrentWeatherByCoordinates(
+            parseResult.data.latitude,
+            parseResult.data.longitude
+         );
+
+         return res.json({ weather });
+      } catch (error) {
+         console.error('Failed to get weather by coordinates', error);
+         return res.status(500).json({
+            code: 'failed_to_fetch_weather',
+            message: 'Unable to fetch weather for this location right now.',
+         });
+      }
+   },
+
    async getConditions(req: Request, res: Response) {
       const parseResult = fishingRequestSchema.safeParse(req.body);
 

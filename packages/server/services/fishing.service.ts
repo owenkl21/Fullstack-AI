@@ -20,6 +20,27 @@ const stripSignedUrlParams = (url: string) => {
    }
 };
 
+type WeatherSnapshotInput = {
+   currentTime?: string | null;
+   timeZone: { id: string };
+   weatherCondition: { type: string };
+   temperature: { degrees: number; unit: string };
+   feelsLikeTemperature: { degrees: number; unit: string };
+   dewPoint: { degrees: number; unit: string };
+   precipitation: { probability: number };
+   airPressure: { meanSeaLevelMillibars: number };
+   wind: {
+      direction: { degrees: number };
+      speed: { value: number; unit: string };
+   };
+   visibility: { distance: { value: number; unit: string } };
+   isDaytime: boolean;
+   relativeHumidity: number;
+   uvIndex: number;
+   thunderstormProbability: number;
+   cloudCover: number;
+};
+
 type CreateCatchInput = {
    title: string;
    notes?: string | null;
@@ -30,6 +51,7 @@ type CreateCatchInput = {
    count?: number;
    weather?: string | null;
    waterTemp?: number | null;
+   weatherSnapshot?: WeatherSnapshotInput | null;
    depth?: number | null;
    gearIds: string[];
    images: CreateImageInput[];
@@ -98,6 +120,72 @@ const siteDetailInclude = {
          createdBy: { select: { displayName: true, username: true } },
       },
    },
+};
+
+const mapWeatherSnapshotToCatchData = (
+   weatherSnapshot?: WeatherSnapshotInput | null
+) => {
+   if (!weatherSnapshot) {
+      return {
+         weatherCurrentTime: null,
+         weatherTimeZoneId: null,
+         weatherConditionType: null,
+         weatherTemperatureDegrees: null,
+         weatherTemperatureUnit: null,
+         weatherFeelsLikeTemperatureDegrees: null,
+         weatherFeelsLikeTemperatureUnit: null,
+         weatherDewPointDegrees: null,
+         weatherDewPointUnit: null,
+         weatherPrecipitationProbability: null,
+         weatherAirPressureMeanSeaLevelMillibars: null,
+         weatherWindDirectionDegrees: null,
+         weatherWindSpeedValue: null,
+         weatherWindSpeedUnit: null,
+         weatherVisibilityDistanceValue: null,
+         weatherVisibilityDistanceUnit: null,
+         weatherIsDaytime: null,
+         weatherRelativeHumidity: null,
+         weatherUvIndex: null,
+         weatherThunderstormProbability: null,
+         weatherCloudCover: null,
+      };
+   }
+
+   return {
+      weatherCurrentTime: weatherSnapshot.currentTime
+         ? new Date(weatherSnapshot.currentTime)
+         : null,
+      weatherTimeZoneId: weatherSnapshot.timeZone.id,
+      weatherConditionType: weatherSnapshot.weatherCondition.type,
+      weatherTemperatureDegrees: weatherSnapshot.temperature.degrees,
+      weatherTemperatureUnit: weatherSnapshot.temperature.unit,
+      weatherFeelsLikeTemperatureDegrees:
+         weatherSnapshot.feelsLikeTemperature.degrees,
+      weatherFeelsLikeTemperatureUnit:
+         weatherSnapshot.feelsLikeTemperature.unit,
+      weatherDewPointDegrees: weatherSnapshot.dewPoint.degrees,
+      weatherDewPointUnit: weatherSnapshot.dewPoint.unit,
+      weatherPrecipitationProbability: Math.round(
+         weatherSnapshot.precipitation.probability
+      ),
+      weatherAirPressureMeanSeaLevelMillibars: Math.round(
+         weatherSnapshot.airPressure.meanSeaLevelMillibars
+      ),
+      weatherWindDirectionDegrees: Math.round(
+         weatherSnapshot.wind.direction.degrees
+      ),
+      weatherWindSpeedValue: weatherSnapshot.wind.speed.value,
+      weatherWindSpeedUnit: weatherSnapshot.wind.speed.unit,
+      weatherVisibilityDistanceValue: weatherSnapshot.visibility.distance.value,
+      weatherVisibilityDistanceUnit: weatherSnapshot.visibility.distance.unit,
+      weatherIsDaytime: weatherSnapshot.isDaytime,
+      weatherRelativeHumidity: Math.round(weatherSnapshot.relativeHumidity),
+      weatherUvIndex: Math.round(weatherSnapshot.uvIndex),
+      weatherThunderstormProbability: Math.round(
+         weatherSnapshot.thunderstormProbability
+      ),
+      weatherCloudCover: Math.round(weatherSnapshot.cloudCover),
+   };
 };
 
 const buildPlaceholderIdentity = (clerkId: string) => {
@@ -246,6 +334,8 @@ export const fishingService = {
          select: {
             id: true,
             name: true,
+            latitude: true,
+            longitude: true,
          },
       });
    },
@@ -260,6 +350,10 @@ export const fishingService = {
          location: coordinates,
          weather,
       };
+   },
+
+   async getCurrentWeatherByCoordinates(latitude: number, longitude: number) {
+      return getCurrentWeather(latitude, longitude);
    },
 
    async createCatch(clerkId: string, input: CreateCatchInput) {
@@ -287,7 +381,8 @@ export const fishingService = {
                length: input.length,
                count: input.count ?? 1,
                weather: input.weather,
-               waterTemp: input.waterTemp,
+               waterTemp: null,
+               ...mapWeatherSnapshotToCatchData(input.weatherSnapshot),
                depth: input.depth,
                gears: {
                   connect: validGears.map((gear) => ({ id: gear.id })),
@@ -435,7 +530,8 @@ export const fishingService = {
                length: input.length,
                count: input.count ?? 1,
                weather: input.weather,
-               waterTemp: input.waterTemp,
+               waterTemp: null,
+               ...mapWeatherSnapshotToCatchData(input.weatherSnapshot),
                depth: input.depth,
                gears: {
                   set: validGears.map((gear) => ({ id: gear.id })),
