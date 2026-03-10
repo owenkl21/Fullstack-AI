@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Show, SignInButton } from '@clerk/react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
@@ -8,6 +8,8 @@ import { LandingHeader } from '@/components/landing/LandingHeader';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { R2ImagePicker } from '@/components/r2-image-picker';
+import { GoogleMapLocationPicker } from '@/components/fishing/GoogleMapLocationPicker';
+import { parseGoogleMapsCoordinates } from '@/lib/maps';
 
 export function LogSitePage() {
    const navigate = useNavigate();
@@ -20,81 +22,62 @@ export function LogSitePage() {
       []
    );
 
-   const setCoordinates = (nextLatitude: number, nextLongitude: number) => {
-      setLatitude(nextLatitude.toFixed(6));
-      setLongitude(nextLongitude.toFixed(6));
-   };
+   const setCoordinates = useCallback(
+      (nextLatitude: number, nextLongitude: number) => {
+         setLatitude(nextLatitude.toFixed(6));
+         setLongitude(nextLongitude.toFixed(6));
+      },
+      []
+   );
 
-   const detectCurrentLocation = () => {
-      if (!navigator.geolocation) {
-         toast({
-            title: 'Location is unavailable',
-            description: 'Your browser does not support geolocation.',
-            variant: 'error',
-         });
-         return;
-      }
-
-      setIsDetectingLocation(true);
-      navigator.geolocation.getCurrentPosition(
-         ({ coords }) => {
-            setCoordinates(coords.latitude, coords.longitude);
+   const detectCurrentLocation = useCallback(
+      (showToast = true) => {
+         if (!navigator.geolocation) {
             toast({
-               title: 'Location added',
-               description:
-                  'Latitude and longitude were filled from your device.',
-               variant: 'success',
-            });
-            setIsDetectingLocation(false);
-         },
-         () => {
-            toast({
-               title: 'Could not get your location',
-               description:
-                  'Please allow location access, or pin your site using a Google Maps link.',
+               title: 'Location is unavailable',
+               description: 'Your browser does not support geolocation.',
                variant: 'error',
             });
-            setIsDetectingLocation(false);
-         },
-         {
-            enableHighAccuracy: true,
-            timeout: 10000,
-         }
-      );
-   };
-
-   const parseGoogleMapsCoordinates = (mapsLink: string) => {
-      const decodedLink = decodeURIComponent(mapsLink);
-      const patterns = [
-         /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
-         /[?&](?:q|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
-         /(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
-      ];
-
-      for (const pattern of patterns) {
-         const match = decodedLink.match(pattern);
-
-         if (!match) {
-            continue;
+            return;
          }
 
-         const parsedLatitude = Number(match[1]);
-         const parsedLongitude = Number(match[2]);
+         setIsDetectingLocation(true);
+         navigator.geolocation.getCurrentPosition(
+            ({ coords }) => {
+               setCoordinates(coords.latitude, coords.longitude);
+               if (showToast) {
+                  toast({
+                     title: 'Location added',
+                     description:
+                        'Latitude and longitude were filled from your device.',
+                     variant: 'success',
+                  });
+               }
+               setIsDetectingLocation(false);
+            },
+            () => {
+               if (showToast) {
+                  toast({
+                     title: 'Could not get your location',
+                     description:
+                        'Please allow location access, or pin your site using a Google Maps link.',
+                     variant: 'error',
+                  });
+               }
+               setIsDetectingLocation(false);
+            },
+            {
+               enableHighAccuracy: true,
+               timeout: 10000,
+            }
+         );
+      },
+      [setCoordinates]
+   );
 
-         if (
-            Number.isFinite(parsedLatitude) &&
-            Number.isFinite(parsedLongitude) &&
-            parsedLatitude >= -90 &&
-            parsedLatitude <= 90 &&
-            parsedLongitude >= -180 &&
-            parsedLongitude <= 180
-         ) {
-            return { parsedLatitude, parsedLongitude };
-         }
-      }
-
-      return null;
-   };
+   useEffect(() => {
+      detectCurrentLocation(false);
+   }, [detectCurrentLocation]);
 
    const extractCoordinatesFromMapsLink = () => {
       if (!googleMapsLink.trim()) {
@@ -186,7 +169,7 @@ export function LogSitePage() {
                         <Button
                            type="button"
                            variant="outline"
-                           onClick={detectCurrentLocation}
+                           onClick={() => detectCurrentLocation()}
                            disabled={isDetectingLocation}
                         >
                            {isDetectingLocation
@@ -221,6 +204,11 @@ export function LogSitePage() {
                         </Button>
                      </div>
                   </div>
+                  <GoogleMapLocationPicker
+                     latitude={latitude}
+                     longitude={longitude}
+                     onChange={setCoordinates}
+                  />
                   <div className="grid gap-3 sm:grid-cols-2">
                      <input
                         name="latitude"

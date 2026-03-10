@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
@@ -7,6 +7,8 @@ import { LandingHeader } from '@/components/landing/LandingHeader';
 import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
+import { GoogleMapLocationPicker } from '@/components/fishing/GoogleMapLocationPicker';
+import { parseGoogleMapsCoordinates } from '@/lib/maps';
 
 type SiteEdit = {
    name: string;
@@ -27,10 +29,13 @@ export function EditSitePage() {
    const [latitude, setLatitude] = useState('');
    const [longitude, setLongitude] = useState('');
 
-   const setCoordinates = (nextLatitude: number, nextLongitude: number) => {
-      setLatitude(nextLatitude.toFixed(6));
-      setLongitude(nextLongitude.toFixed(6));
-   };
+   const setCoordinates = useCallback(
+      (nextLatitude: number, nextLongitude: number) => {
+         setLatitude(nextLatitude.toFixed(6));
+         setLongitude(nextLongitude.toFixed(6));
+      },
+      []
+   );
 
    const detectCurrentLocation = () => {
       if (!navigator.geolocation) {
@@ -68,39 +73,6 @@ export function EditSitePage() {
             timeout: 10000,
          }
       );
-   };
-
-   const parseGoogleMapsCoordinates = (mapsLink: string) => {
-      const decodedLink = decodeURIComponent(mapsLink);
-      const patterns = [
-         /@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
-         /[?&](?:q|ll)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
-         /(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/,
-      ];
-
-      for (const pattern of patterns) {
-         const match = decodedLink.match(pattern);
-
-         if (!match) {
-            continue;
-         }
-
-         const parsedLatitude = Number(match[1]);
-         const parsedLongitude = Number(match[2]);
-
-         if (
-            Number.isFinite(parsedLatitude) &&
-            Number.isFinite(parsedLongitude) &&
-            parsedLatitude >= -90 &&
-            parsedLatitude <= 90 &&
-            parsedLongitude >= -180 &&
-            parsedLongitude <= 180
-         ) {
-            return { parsedLatitude, parsedLongitude };
-         }
-      }
-
-      return null;
    };
 
    const extractCoordinatesFromMapsLink = () => {
@@ -246,6 +218,11 @@ export function EditSitePage() {
                         </Button>
                      </div>
                   </div>
+                  <GoogleMapLocationPicker
+                     latitude={latitude}
+                     longitude={longitude}
+                     onChange={setCoordinates}
+                  />
                   <div className="grid gap-3 sm:grid-cols-2">
                      <input
                         name="latitude"
