@@ -29,7 +29,7 @@ export function R2ImagePicker({
    label,
    value,
    onChange,
-   multiple = true,
+   multiple = scope === 'catch',
    maxItems = 8,
 }: Props) {
    const [isUploading, setIsUploading] = useState(false);
@@ -138,8 +138,15 @@ export function R2ImagePicker({
    };
 
    return (
-      <div className="space-y-2">
-         <label className="text-sm font-medium">{label}</label>
+      <div className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+         <div className="space-y-1">
+            <label className="text-sm font-semibold">{label}</label>
+            <p className="text-xs text-muted-foreground">
+               {multiple
+                  ? `You can upload up to ${maxItems} images.`
+                  : 'Upload one image.'}
+            </p>
+         </div>
          <ImageUploader
             maxSize={10 * 1024 * 1024}
             acceptedFileTypes={['image/jpeg', 'image/png', 'image/webp']}
@@ -152,29 +159,35 @@ export function R2ImagePicker({
             <FishingBobberLoader label="Uploading to R2..." compact />
          )}
          {value.length > 0 && (
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
                {value.map((image, index) => (
-                  <div key={image.storageKey} className="space-y-1">
+                  <div
+                     key={image.storageKey}
+                     className="overflow-hidden rounded-lg border bg-background"
+                  >
                      <img
                         src={image.url}
                         alt={`${label} ${index + 1}`}
-                        className="h-36 w-full rounded border object-cover"
+                        className="h-40 w-full object-cover"
                      />
-                     <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                           onChange(
-                              value.filter(
-                                 (entry) =>
-                                    entry.storageKey !== image.storageKey
+                     <div className="p-2">
+                        <Button
+                           type="button"
+                           variant="outline"
+                           size="sm"
+                           className="w-full"
+                           onClick={() =>
+                              onChange(
+                                 value.filter(
+                                    (entry) =>
+                                       entry.storageKey !== image.storageKey
+                                 )
                               )
-                           )
-                        }
-                     >
-                        Remove
-                     </Button>
+                           }
+                        >
+                           Remove image
+                        </Button>
+                     </div>
                   </div>
                ))}
             </div>

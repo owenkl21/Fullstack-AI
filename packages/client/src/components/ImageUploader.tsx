@@ -1,4 +1,5 @@
 import { type ChangeEvent, useMemo, useRef, useState } from 'react';
+import { ImagePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -74,7 +75,6 @@ export function ImageUploader({
 }: ImageUploaderProps) {
    const fileInputRef = useRef<HTMLInputElement>(null);
    const [error, setError] = useState<string | null>(null);
-   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
    const helperText = useMemo(() => {
       const maxMb = (maxSize / (1024 * 1024)).toFixed(0);
@@ -108,11 +108,6 @@ export function ImageUploader({
          );
          setError(null);
          onImageCropped?.(croppedBlob);
-
-         if (previewImage) {
-            URL.revokeObjectURL(previewImage);
-         }
-         setPreviewImage(URL.createObjectURL(croppedBlob));
       } catch {
          setError('Could not process image. Please try another file.');
       } finally {
@@ -122,7 +117,7 @@ export function ImageUploader({
    };
 
    return (
-      <div className={cn('space-y-3 rounded-md border p-3', className)}>
+      <div className={cn('space-y-2', className)}>
          <input
             ref={fileInputRef}
             type="file"
@@ -135,21 +130,18 @@ export function ImageUploader({
          <Button
             type="button"
             variant="outline"
+            className="h-auto w-full flex-col items-center justify-center gap-2 rounded-xl border-dashed border-border/80 bg-muted/40 px-4 py-6 text-sm hover:bg-muted"
             onClick={() => fileInputRef.current?.click()}
          >
+            <ImagePlus className="h-5 w-5" />
             Select image
+            <span className="text-xs font-normal text-muted-foreground">
+               Crop is applied automatically.
+            </span>
          </Button>
          <p className="text-xs text-muted-foreground">{helperText}</p>
 
          {error && <p className="text-sm text-red-500">{error}</p>}
-
-         {previewImage && (
-            <img
-               src={previewImage}
-               alt="Cropped preview"
-               className="h-44 w-full rounded-md border object-cover"
-            />
-         )}
       </div>
    );
 }
