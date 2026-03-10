@@ -25,23 +25,17 @@ type GearOption = {
 };
 
 type WeatherSnapshot = {
-   currentTime?: string;
-   timeZone: { id: string };
-   weatherCondition: { type: string };
-   temperature: { degrees: number; unit: string };
-   feelsLikeTemperature: { degrees: number; unit: string };
-   dewPoint: { degrees: number; unit: string };
-   precipitation: { probability: number };
-   airPressure: { meanSeaLevelMillibars: number };
-   wind: {
-      direction: { degrees: number };
-      speed: { value: number; unit: string };
+   weatherCondition: {
+      iconBaseUri: string;
+      description: { text: string };
    };
-   visibility: { distance: { value: number; unit: string } };
-   isDaytime: boolean;
-   relativeHumidity: number;
-   uvIndex: number;
-   thunderstormProbability: number;
+   temperature: { degrees: number; unit: string };
+   precipitation: { probability: { percent: number } };
+   wind: {
+      direction: { cardinal: string };
+      speed: { value: number; unit: string };
+      gust: { value: number; unit: string };
+   };
    cloudCover: number;
 };
 
@@ -53,6 +47,57 @@ const formatForDateTimeLocal = (date: Date) => {
 
 const toDisplay = (value: string | number | boolean | null | undefined) =>
    value === null || value === undefined ? '' : String(value);
+
+const formatUnit = (unit: string | undefined) => {
+   if (!unit) {
+      return '';
+   }
+
+   const map: Record<string, string> = {
+      CELSIUS: '°C',
+      FAHRENHEIT: '°F',
+      KILOMETERS_PER_HOUR: 'km/h',
+      MILES_PER_HOUR: 'mph',
+   };
+
+   return map[unit] ?? unit;
+};
+
+const formatCardinal = (cardinal: string | undefined) => {
+   if (!cardinal) {
+      return '';
+   }
+
+   const map: Record<string, string> = {
+      NORTH: 'N',
+      NORTH_NORTHEAST: 'NNE',
+      NORTHEAST: 'NE',
+      EAST_NORTHEAST: 'ENE',
+      EAST: 'E',
+      EAST_SOUTHEAST: 'ESE',
+      SOUTHEAST: 'SE',
+      SOUTH_SOUTHEAST: 'SSE',
+      SOUTH: 'S',
+      SOUTH_SOUTHWEST: 'SSW',
+      SOUTHWEST: 'SW',
+      WEST_SOUTHWEST: 'WSW',
+      WEST: 'W',
+      WEST_NORTHWEST: 'WNW',
+      NORTHWEST: 'NW',
+      NORTH_NORTHWEST: 'NNW',
+   };
+
+   return map[cardinal] ?? cardinal;
+};
+
+const formatWeatherMetric = (value: number | undefined, unit?: string) => {
+   if (value === null || value === undefined) {
+      return '';
+   }
+
+   const resolvedUnit = formatUnit(unit);
+   return resolvedUnit ? `${value} ${resolvedUnit}` : String(value);
+};
 
 export function LogCatchPage() {
    const navigate = useNavigate();
@@ -184,7 +229,7 @@ export function LogCatchPage() {
                ? `${notes ? `${notes}\n\n` : ''}Spot: ${customSpot}`
                : notes) || null,
          siteId: isOtherSpot ? null : siteChoice || null,
-         weather: weatherSnapshot?.weatherCondition?.type ?? null,
+         weather: weatherSnapshot?.weatherCondition?.description?.text ?? null,
          weatherSnapshot,
          length: Number(formData.get('length')) || null,
          weight: Number(formData.get('weight')) || null,
@@ -406,151 +451,93 @@ export function LogCatchPage() {
                      <div className="grid gap-2 sm:grid-cols-2">
                         <input
                            readOnly
-                           value={toDisplay(weatherSnapshot?.currentTime)}
-                           placeholder="currentTime"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(weatherSnapshot?.timeZone?.id)}
-                           placeholder="timeZone.id"
+                           value={toDisplay(
+                              formatWeatherMetric(
+                                 weatherSnapshot?.temperature?.degrees,
+                                 weatherSnapshot?.temperature?.unit
+                              )
+                           )}
+                           placeholder="Temp"
                            className="rounded border p-2"
                         />
                         <input
                            readOnly
                            value={toDisplay(
-                              weatherSnapshot?.weatherCondition?.type
+                              weatherSnapshot?.weatherCondition?.description
+                                 ?.text
                            )}
-                           placeholder="weatherCondition.type"
+                           placeholder="Weather"
+                           className="rounded border p-2"
+                        />
+                        <div className="flex items-center gap-2 rounded border p-2 text-sm text-muted-foreground">
+                           {weatherSnapshot?.weatherCondition?.iconBaseUri ? (
+                              <img
+                                 src={`${weatherSnapshot.weatherCondition.iconBaseUri}.svg`}
+                                 alt={
+                                    weatherSnapshot.weatherCondition.description
+                                       ?.text ?? 'Weather icon'
+                                 }
+                                 className="h-6 w-6"
+                              />
+                           ) : null}
+                           <span>
+                              {toDisplay(
+                                 weatherSnapshot?.weatherCondition?.description
+                                    ?.text || 'Weather icon'
+                              )}
+                           </span>
+                        </div>
+                        <input
+                           readOnly
+                           value={toDisplay(
+                              weatherSnapshot?.cloudCover !== undefined
+                                 ? `${weatherSnapshot.cloudCover}%`
+                                 : ''
+                           )}
+                           placeholder="Cloud cover"
                            className="rounded border p-2"
                         />
                         <input
                            readOnly
                            value={toDisplay(
-                              weatherSnapshot?.temperature?.degrees
+                              formatCardinal(
+                                 weatherSnapshot?.wind?.direction?.cardinal
+                              )
                            )}
-                           placeholder="temperature.degrees"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(weatherSnapshot?.temperature?.unit)}
-                           placeholder="temperature.unit"
+                           placeholder="Wind direction"
                            className="rounded border p-2"
                         />
                         <input
                            readOnly
                            value={toDisplay(
-                              weatherSnapshot?.feelsLikeTemperature?.degrees
+                              formatWeatherMetric(
+                                 weatherSnapshot?.wind?.speed?.value,
+                                 weatherSnapshot?.wind?.speed?.unit
+                              )
                            )}
-                           placeholder="feelsLikeTemperature.degrees"
+                           placeholder="Wind speed"
                            className="rounded border p-2"
                         />
                         <input
                            readOnly
                            value={toDisplay(
-                              weatherSnapshot?.feelsLikeTemperature?.unit
+                              formatWeatherMetric(
+                                 weatherSnapshot?.wind?.gust?.value,
+                                 weatherSnapshot?.wind?.gust?.unit
+                              )
                            )}
-                           placeholder="feelsLikeTemperature.unit"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(weatherSnapshot?.dewPoint?.degrees)}
-                           placeholder="dewPoint.degrees"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(weatherSnapshot?.dewPoint?.unit)}
-                           placeholder="dewPoint.unit"
+                           placeholder="Wind gust"
                            className="rounded border p-2"
                         />
                         <input
                            readOnly
                            value={toDisplay(
                               weatherSnapshot?.precipitation?.probability
+                                 ?.percent !== undefined
+                                 ? `${weatherSnapshot.precipitation.probability.percent}%`
+                                 : ''
                            )}
-                           placeholder="precipitation.probability"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              weatherSnapshot?.airPressure
-                                 ?.meanSeaLevelMillibars
-                           )}
-                           placeholder="airPressure.meanSeaLevelMillibars"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              weatherSnapshot?.wind?.direction?.degrees
-                           )}
-                           placeholder="wind.direction.degrees"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              weatherSnapshot?.wind?.speed?.value
-                           )}
-                           placeholder="wind.speed.value"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(weatherSnapshot?.wind?.speed?.unit)}
-                           placeholder="wind.speed.unit"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              weatherSnapshot?.visibility?.distance?.value
-                           )}
-                           placeholder="visibility.distance.value"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              weatherSnapshot?.visibility?.distance?.unit
-                           )}
-                           placeholder="visibility.distance.unit"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(weatherSnapshot?.isDaytime)}
-                           placeholder="isDaytime"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(weatherSnapshot?.relativeHumidity)}
-                           placeholder="relativeHumidity"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(weatherSnapshot?.uvIndex)}
-                           placeholder="uvIndex"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              weatherSnapshot?.thunderstormProbability
-                           )}
-                           placeholder="thunderstormProbability"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(weatherSnapshot?.cloudCover)}
-                           placeholder="cloudCover"
+                           placeholder="Precipitation"
                            className="rounded border p-2"
                         />
                      </div>

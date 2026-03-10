@@ -21,23 +21,17 @@ const stripSignedUrlParams = (url: string) => {
 };
 
 type WeatherSnapshotInput = {
-   currentTime?: string | null;
-   timeZone: { id: string };
-   weatherCondition: { type: string };
-   temperature: { degrees: number; unit: string };
-   feelsLikeTemperature: { degrees: number; unit: string };
-   dewPoint: { degrees: number; unit: string };
-   precipitation: { probability: number };
-   airPressure: { meanSeaLevelMillibars: number };
-   wind: {
-      direction: { degrees: number };
-      speed: { value: number; unit: string };
+   weatherCondition: {
+      iconBaseUri: string;
+      description: { text: string };
    };
-   visibility: { distance: { value: number; unit: string } };
-   isDaytime: boolean;
-   relativeHumidity: number;
-   uvIndex: number;
-   thunderstormProbability: number;
+   temperature: { degrees: number; unit: string };
+   precipitation: { probability: { percent: number } };
+   wind: {
+      direction: { cardinal: string };
+      speed: { value: number; unit: string };
+      gust: { value: number; unit: string };
+   };
    cloudCover: number;
 };
 
@@ -130,6 +124,8 @@ const mapWeatherSnapshotToCatchData = (
          weatherCurrentTime: null,
          weatherTimeZoneId: null,
          weatherConditionType: null,
+         weatherConditionText: null,
+         weatherConditionIconBaseUri: null,
          weatherTemperatureDegrees: null,
          weatherTemperatureUnit: null,
          weatherFeelsLikeTemperatureDegrees: null,
@@ -139,8 +135,11 @@ const mapWeatherSnapshotToCatchData = (
          weatherPrecipitationProbability: null,
          weatherAirPressureMeanSeaLevelMillibars: null,
          weatherWindDirectionDegrees: null,
+         weatherWindDirectionCardinal: null,
          weatherWindSpeedValue: null,
          weatherWindSpeedUnit: null,
+         weatherWindGustValue: null,
+         weatherWindGustUnit: null,
          weatherVisibilityDistanceValue: null,
          weatherVisibilityDistanceUnit: null,
          weatherIsDaytime: null,
@@ -152,38 +151,33 @@ const mapWeatherSnapshotToCatchData = (
    }
 
    return {
-      weatherCurrentTime: weatherSnapshot.currentTime
-         ? new Date(weatherSnapshot.currentTime)
-         : null,
-      weatherTimeZoneId: weatherSnapshot.timeZone.id,
-      weatherConditionType: weatherSnapshot.weatherCondition.type,
+      weatherCurrentTime: null,
+      weatherTimeZoneId: null,
+      weatherConditionType: weatherSnapshot.weatherCondition.description.text,
+      weatherConditionText: weatherSnapshot.weatherCondition.description.text,
+      weatherConditionIconBaseUri: weatherSnapshot.weatherCondition.iconBaseUri,
       weatherTemperatureDegrees: weatherSnapshot.temperature.degrees,
       weatherTemperatureUnit: weatherSnapshot.temperature.unit,
-      weatherFeelsLikeTemperatureDegrees:
-         weatherSnapshot.feelsLikeTemperature.degrees,
-      weatherFeelsLikeTemperatureUnit:
-         weatherSnapshot.feelsLikeTemperature.unit,
-      weatherDewPointDegrees: weatherSnapshot.dewPoint.degrees,
-      weatherDewPointUnit: weatherSnapshot.dewPoint.unit,
+      weatherFeelsLikeTemperatureDegrees: null,
+      weatherFeelsLikeTemperatureUnit: null,
+      weatherDewPointDegrees: null,
+      weatherDewPointUnit: null,
       weatherPrecipitationProbability: Math.round(
-         weatherSnapshot.precipitation.probability
+         weatherSnapshot.precipitation.probability.percent
       ),
-      weatherAirPressureMeanSeaLevelMillibars: Math.round(
-         weatherSnapshot.airPressure.meanSeaLevelMillibars
-      ),
-      weatherWindDirectionDegrees: Math.round(
-         weatherSnapshot.wind.direction.degrees
-      ),
+      weatherAirPressureMeanSeaLevelMillibars: null,
+      weatherWindDirectionDegrees: null,
+      weatherWindDirectionCardinal: weatherSnapshot.wind.direction.cardinal,
       weatherWindSpeedValue: weatherSnapshot.wind.speed.value,
       weatherWindSpeedUnit: weatherSnapshot.wind.speed.unit,
-      weatherVisibilityDistanceValue: weatherSnapshot.visibility.distance.value,
-      weatherVisibilityDistanceUnit: weatherSnapshot.visibility.distance.unit,
-      weatherIsDaytime: weatherSnapshot.isDaytime,
-      weatherRelativeHumidity: Math.round(weatherSnapshot.relativeHumidity),
-      weatherUvIndex: Math.round(weatherSnapshot.uvIndex),
-      weatherThunderstormProbability: Math.round(
-         weatherSnapshot.thunderstormProbability
-      ),
+      weatherWindGustValue: weatherSnapshot.wind.gust.value,
+      weatherWindGustUnit: weatherSnapshot.wind.gust.unit,
+      weatherVisibilityDistanceValue: null,
+      weatherVisibilityDistanceUnit: null,
+      weatherIsDaytime: null,
+      weatherRelativeHumidity: null,
+      weatherUvIndex: null,
+      weatherThunderstormProbability: null,
       weatherCloudCover: Math.round(weatherSnapshot.cloudCover),
    };
 };
