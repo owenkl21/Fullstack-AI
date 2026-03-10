@@ -45,6 +45,7 @@ export function LogCatchPage() {
    const [gear, setGear] = useState<GearOption[]>([]);
    const [gearSearch, setGearSearch] = useState('');
    const [selectedGearIds, setSelectedGearIds] = useState<string[]>([]);
+   const [isGearDropdownOpen, setIsGearDropdownOpen] = useState(false);
    const [caughtAt, setCaughtAt] = useState(() =>
       formatForDateTimeLocal(new Date())
    );
@@ -236,61 +237,82 @@ export function LogCatchPage() {
                      <legend className="px-1 text-sm font-medium">
                         Gear used
                      </legend>
-                     <input
-                        type="search"
-                        value={gearSearch}
-                        onChange={(event) => setGearSearch(event.target.value)}
-                        placeholder="Search gear by name, brand, or type"
-                        className="rounded border p-2 text-sm"
-                     />
-                     {gear.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                           No gear found in the database yet.
-                        </p>
-                     ) : filteredGear.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                           No gear matches your search.
-                        </p>
-                     ) : (
-                        <div className="grid gap-2">
-                           {filteredGear.map((entry) => {
-                              const selected = selectedGearIds.includes(
-                                 entry.id
-                              );
+                     <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-between"
+                        onClick={() =>
+                           setIsGearDropdownOpen((previous) => !previous)
+                        }
+                     >
+                        <span>
+                           {selectedGearIds.length > 0
+                              ? `${selectedGearIds.length} gear selected`
+                              : 'Select gear'}
+                        </span>
+                        <span>{isGearDropdownOpen ? '▲' : '▼'}</span>
+                     </Button>
+                     {isGearDropdownOpen ? (
+                        <div className="grid gap-2 rounded border p-2">
+                           <input
+                              type="search"
+                              value={gearSearch}
+                              onChange={(event) =>
+                                 setGearSearch(event.target.value)
+                              }
+                              placeholder="Search gear by name, brand, or type"
+                              className="rounded border p-2 text-sm"
+                           />
+                           {gear.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">
+                                 No gear found in the database yet.
+                              </p>
+                           ) : filteredGear.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">
+                                 No gear matches your search.
+                              </p>
+                           ) : (
+                              <div className="grid max-h-64 gap-2 overflow-y-auto pr-1">
+                                 {filteredGear.map((entry) => {
+                                    const selected = selectedGearIds.includes(
+                                       entry.id
+                                    );
 
-                              return (
-                                 <label
-                                    key={entry.id}
-                                    className="flex cursor-pointer items-center gap-3 rounded border p-2"
-                                 >
-                                    <input
-                                       type="checkbox"
-                                       checked={selected}
-                                       onChange={() =>
-                                          toggleGearSelection(entry.id)
-                                       }
-                                    />
-                                    {entry.imageUrl ? (
-                                       <img
-                                          src={entry.imageUrl}
-                                          alt={entry.name}
-                                          className="h-10 w-10 rounded border object-cover"
-                                       />
-                                    ) : null}
-                                    <span className="text-sm">
-                                       <span className="font-medium">
-                                          {entry.name}
-                                       </span>{' '}
-                                       <span className="text-muted-foreground">
-                                          • {entry.brand} •{' '}
-                                          {entry.type.toLowerCase()}
-                                       </span>
-                                    </span>
-                                 </label>
-                              );
-                           })}
+                                    return (
+                                       <label
+                                          key={entry.id}
+                                          className="flex cursor-pointer items-center gap-3 rounded border p-2"
+                                       >
+                                          <input
+                                             type="checkbox"
+                                             checked={selected}
+                                             onChange={() =>
+                                                toggleGearSelection(entry.id)
+                                             }
+                                          />
+                                          {entry.imageUrl ? (
+                                             <img
+                                                src={entry.imageUrl}
+                                                alt={entry.name}
+                                                className="h-10 w-10 rounded border object-cover"
+                                             />
+                                          ) : null}
+                                          <span className="text-sm">
+                                             <span className="font-medium">
+                                                {entry.name}
+                                             </span>{' '}
+                                             <span className="text-muted-foreground">
+                                                • {entry.brand} •{' '}
+                                                {entry.type.toLowerCase()}
+                                             </span>
+                                          </span>
+                                       </label>
+                                    );
+                                 })}
+                              </div>
+                           )}
                         </div>
-                     )}
+                     ) : null}
                   </fieldset>
                   <fieldset className="grid gap-2 rounded border p-3">
                      <legend className="px-1 text-sm font-medium">

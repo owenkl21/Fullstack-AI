@@ -144,9 +144,13 @@ const withResolvedGearImageUrls = async <
       return record;
    }
 
+   const normalizedImageUrls = Array.from(
+      new Set(imageUrls.map((url) => stripSignedUrlParams(url)))
+   );
+
    const images: Array<{ url: string; storageKey: string }> =
       await prisma.image.findMany({
-         where: { url: { in: imageUrls } },
+         where: { url: { in: normalizedImageUrls } },
          select: { url: true, storageKey: true },
       });
 
@@ -163,7 +167,8 @@ const withResolvedGearImageUrls = async <
             return gear;
          }
 
-         const storageKey = storageKeyByUrl.get(gear.imageUrl);
+         const normalizedUrl = stripSignedUrlParams(gear.imageUrl);
+         const storageKey = storageKeyByUrl.get(normalizedUrl);
          if (!storageKey) {
             return gear;
          }
