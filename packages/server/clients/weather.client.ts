@@ -10,6 +10,10 @@ export async function getCurrentWeather(latitude: number, longitude: number) {
       );
    }
 
+   const referer =
+      process.env.GOOGLE_WEATHER_API_REFERER?.trim() ||
+      process.env.GOOGLE_API_HTTP_REFERER?.trim();
+
    const params = new URLSearchParams({
       key: apiKey,
       unitsSystem: 'METRIC',
@@ -23,6 +27,7 @@ export async function getCurrentWeather(latitude: number, longitude: number) {
    const response = await fetch(weatherUrl, {
       headers: {
          'X-Goog-Api-Key': apiKey,
+         ...(referer ? { Referer: referer } : {}),
       },
    });
 
@@ -48,6 +53,15 @@ export async function getCurrentWeather(latitude: number, longitude: number) {
             return details;
          }
       })();
+
+      if (
+         response.status === 403 &&
+         details.includes('API_KEY_HTTP_REFERRER_BLOCKED')
+      ) {
+         throw new Error(
+            'Failed to fetch weather data (403): API key is restricted by HTTP referrer. Either use a server key with IP restrictions, or set GOOGLE_WEATHER_API_REFERER / GOOGLE_API_HTTP_REFERER to an allowed referrer in Google Cloud.'
+         );
+      }
 
       throw new Error(
          `Failed to fetch weather data (${response.status}): ${parsedDetails || response.statusText}`
