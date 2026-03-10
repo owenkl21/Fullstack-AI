@@ -28,8 +28,29 @@ export async function getCurrentWeather(latitude: number, longitude: number) {
 
    if (!response.ok) {
       const details = await response.text();
+      const parsedDetails = (() => {
+         try {
+            const payload = JSON.parse(details) as {
+               error?: {
+                  message?: string;
+                  status?: string;
+               };
+            };
+
+            if (!payload?.error) {
+               return details;
+            }
+
+            return `${payload.error.status || 'UNKNOWN'}: ${
+               payload.error.message || details
+            }`;
+         } catch {
+            return details;
+         }
+      })();
+
       throw new Error(
-         `Failed to fetch weather data (${response.status}): ${details || response.statusText}`
+         `Failed to fetch weather data (${response.status}): ${parsedDetails || response.statusText}`
       );
    }
 

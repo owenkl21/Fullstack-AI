@@ -34,12 +34,24 @@ export const fishingController = {
 
          return res.json({ weather });
       } catch (error) {
+         const message = error instanceof Error ? error.message : String(error);
+
          console.warn(
             'Failed to get weather by coordinates; returning null snapshot.',
-            error
+            {
+               latitude: parseResult.data.latitude,
+               longitude: parseResult.data.longitude,
+               message,
+            }
          );
 
-         return res.json({ weather: null });
+         return res.json({
+            weather: null,
+            weatherError:
+               process.env.NODE_ENV === 'production'
+                  ? 'Weather lookup failed.'
+                  : message,
+         });
       }
    },
 
