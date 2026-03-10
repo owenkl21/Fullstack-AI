@@ -126,3 +126,35 @@
 html {
    scroll-behavior: smooth;
 }
+
+@keyframes bobber-float {
+   0%,
+   100% {
+      transform: translate(-50%, 0px) rotate(-4deg);
+   }
+   50% {
+      transform: translate(-50%, -4px) rotate(4deg);
+   }
+}
+
+@keyframes bobber-ripple {
+   0%,
+   100% {
+      transform: translateX(-50%) scaleX(0.9);
+      opacity: 0.5;
+   }
+   50% {
+      transform: translateX(-50%) scaleX(1.1);
+      opacity: 0.9;
+   }
+}
+
+@layer utilities {
+   .bobber-float {
+      animation: bobber-float 1.3s ease-in-out infinite;
+   }
+
+   .bobber-ripple {
+      animation: bobber-ripple 1.3s ease-in-out infinite;
+   }
+}

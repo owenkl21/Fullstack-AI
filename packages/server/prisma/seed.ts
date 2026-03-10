@@ -51,9 +51,23 @@ async function main() {
       },
    });
 
+   const gear = await prisma.gear.upsert({
+      where: { id: 'phase0-sample-gear' },
+      update: {},
+      create: {
+         id: 'phase0-sample-gear',
+         createdById: anglerOne.id,
+         name: 'Medium spinning combo',
+         brand: 'Penn',
+         type: 'ROD',
+      },
+   });
+
    await prisma.catch.upsert({
       where: { id: 'phase0-sample-catch' },
-      update: {},
+      update: {
+         gears: { set: [{ id: gear.id }] },
+      },
       create: {
          id: 'phase0-sample-catch',
          createdById: anglerTwo.id,
@@ -65,6 +79,7 @@ async function main() {
          length: 24.5,
          weight: 6.2,
          weather: 'Clear',
+         gears: { connect: [{ id: gear.id }] },
       },
    });
 

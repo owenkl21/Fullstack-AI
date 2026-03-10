@@ -3,6 +3,8 @@ import type { Request, Response } from 'express';
 import { chatController } from './controllers/chat.controller';
 import { fishingController } from './controllers/fishing.controller';
 import { userController } from './controllers/user.controller';
+import { uploadsController } from './controllers/uploads.controller';
+import { gearController } from './controllers/gear.controller';
 import { getAuth } from '@clerk/express';
 import { userService } from './services/user.service';
 
@@ -52,6 +54,54 @@ router.post(
    requireApiAuth,
    fishingController.getConditions
 );
+
+router.post('/api/catches', requireApiAuth, fishingController.createCatch);
+
+router.get('/api/catches/me', requireApiAuth, fishingController.listMyCatches);
+router.put(
+   '/api/catches/:catchId',
+   requireApiAuth,
+   fishingController.updateCatch
+);
+router.delete(
+   '/api/catches/:catchId',
+   requireApiAuth,
+   fishingController.deleteCatch
+);
+router.post('/api/uploads/sign', requireApiAuth, uploadsController.signUpload);
+router.put('/api/uploads/proxy', requireApiAuth, uploadsController.proxyUpload);
+router.post('/api/uploads/read-url', uploadsController.getReadUrl);
+router.get(
+   '/api/uploads/direct',
+   requireApiAuth,
+   uploadsController.getDirectUploadData
+);
+router.get('/api/catches/:catchId', fishingController.getCatchById);
+router.get('/api/sites', fishingController.listFishingSites);
+
+router.get(
+   '/api/sites/me',
+   requireApiAuth,
+   fishingController.listMyFishingSites
+);
+router.put(
+   '/api/sites/:siteId',
+   requireApiAuth,
+   fishingController.updateFishingSite
+);
+router.delete(
+   '/api/sites/:siteId',
+   requireApiAuth,
+   fishingController.deleteFishingSite
+);
+router.post('/api/sites', requireApiAuth, fishingController.createFishingSite);
+router.get('/api/sites/:siteId', fishingController.getFishingSiteById);
+
+router.post('/api/gear', requireApiAuth, gearController.createGear);
+router.get('/api/gear', requireApiAuth, gearController.listGear);
+router.get('/api/gear/me', requireApiAuth, gearController.listMyGear);
+router.put('/api/gear/:gearId', requireApiAuth, gearController.updateGear);
+router.delete('/api/gear/:gearId', requireApiAuth, gearController.deleteGear);
 
 router.get('/api/users/me', requireApiAuth, userController.getCurrentProfile);
 router.patch(
