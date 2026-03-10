@@ -24,40 +24,28 @@ const imageInputSchema = z.object({
 
 const weatherSnapshotSchema = z
    .object({
-      currentTime: z.string().datetime().optional().nullable(),
-      timeZone: z.object({ id: z.string().trim().min(1).max(120) }),
-      weatherCondition: z.object({ type: z.string().trim().min(1).max(120) }),
+      weatherCondition: z.object({
+         iconBaseUri: z.string().trim().url(),
+         description: z.object({ text: z.string().trim().min(1).max(120) }),
+      }),
       temperature: z.object({
          degrees: z.coerce.number(),
          unit: z.string().trim().min(1).max(60),
       }),
-      feelsLikeTemperature: z.object({
-         degrees: z.coerce.number(),
-         unit: z.string().trim().min(1).max(60),
+      precipitation: z.object({
+         probability: z.object({ percent: z.coerce.number().min(0).max(100) }),
       }),
-      dewPoint: z.object({
-         degrees: z.coerce.number(),
-         unit: z.string().trim().min(1).max(60),
-      }),
-      precipitation: z.object({ probability: z.coerce.number() }),
-      airPressure: z.object({ meanSeaLevelMillibars: z.coerce.number() }),
       wind: z.object({
-         direction: z.object({ degrees: z.coerce.number() }),
+         direction: z.object({ cardinal: z.string().trim().min(1).max(40) }),
          speed: z.object({
             value: z.coerce.number(),
             unit: z.string().trim().min(1).max(60),
          }),
-      }),
-      visibility: z.object({
-         distance: z.object({
+         gust: z.object({
             value: z.coerce.number(),
             unit: z.string().trim().min(1).max(60),
          }),
       }),
-      isDaytime: z.boolean(),
-      relativeHumidity: z.coerce.number(),
-      uvIndex: z.coerce.number(),
-      thunderstormProbability: z.coerce.number(),
       cloudCover: z.coerce.number(),
    })
    .optional()

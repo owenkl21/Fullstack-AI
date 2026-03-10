@@ -134,6 +134,8 @@ model Catch {
   weatherCurrentTime                      DateTime?
   weatherTimeZoneId                       String?
   weatherConditionType                    String?
+  weatherConditionText                    String?
+  weatherConditionIconBaseUri             String?
   weatherTemperatureDegrees               Float?
   weatherTemperatureUnit                  String?
   weatherFeelsLikeTemperatureDegrees      Float?
@@ -143,8 +145,11 @@ model Catch {
   weatherPrecipitationProbability         Int?
   weatherAirPressureMeanSeaLevelMillibars Int?
   weatherWindDirectionDegrees             Int?
+  weatherWindDirectionCardinal            String?
   weatherWindSpeedValue                   Float?
   weatherWindSpeedUnit                    String?
+  weatherWindGustValue                    Float?
+  weatherWindGustUnit                     String?
   weatherVisibilityDistanceValue          Float?
   weatherVisibilityDistanceUnit           String?
   weatherIsDaytime                        Boolean?
