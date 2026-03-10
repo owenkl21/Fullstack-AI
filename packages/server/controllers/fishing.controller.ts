@@ -34,11 +34,12 @@ export const fishingController = {
 
          return res.json({ weather });
       } catch (error) {
-         console.error('Failed to get weather by coordinates', error);
-         return res.status(500).json({
-            code: 'failed_to_fetch_weather',
-            message: 'Unable to fetch weather for this location right now.',
-         });
+         console.warn(
+            'Failed to get weather by coordinates; returning null snapshot.',
+            error
+         );
+
+         return res.json({ weather: null });
       }
    },
 
