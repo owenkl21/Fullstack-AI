@@ -72,7 +72,7 @@ export function MyGearPage() {
                                  <img
                                     src={entry.imageUrl}
                                     alt={entry.name}
-                                    className="h-12 w-12 rounded border bg-muted object-contain"
+                                    className="h-12 w-12 rounded border object-cover"
                                  />
                               ) : null}
                               <div>

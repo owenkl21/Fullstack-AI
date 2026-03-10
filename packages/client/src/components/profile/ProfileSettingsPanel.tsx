@@ -198,7 +198,7 @@ export function ProfileSettingsPanel() {
                            <img
                               src={profile.avatarUrl}
                               alt="Profile avatar"
-                              className="size-16 rounded-full border border-border bg-muted object-contain"
+                              className="size-16 rounded-full border border-border object-cover"
                            />
                         ) : (
                            <span className="inline-flex size-16 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">

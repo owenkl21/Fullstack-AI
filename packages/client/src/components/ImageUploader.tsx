@@ -67,7 +67,7 @@ async function createCenteredCropBlob(imageSrc: string, aspectRatio: number) {
 }
 
 export function ImageUploader({
-   aspectRatio = 1,
+   aspectRatio,
    maxSize = 5 * 1024 * 1024,
    acceptedFileTypes = ['image/jpeg', 'image/png', 'image/webp'],
    className,
@@ -102,12 +102,11 @@ export function ImageUploader({
       const imageUrl = URL.createObjectURL(file);
 
       try {
-         const croppedBlob = await createCenteredCropBlob(
-            imageUrl,
-            aspectRatio
-         );
+         const processedBlob = aspectRatio
+            ? await createCenteredCropBlob(imageUrl, aspectRatio)
+            : file;
          setError(null);
-         onImageCropped?.(croppedBlob);
+         onImageCropped?.(processedBlob);
       } catch {
          setError('Could not process image. Please try another file.');
       } finally {
@@ -136,7 +135,9 @@ export function ImageUploader({
             <ImagePlus className="h-5 w-5" />
             Select image
             <span className="text-xs font-normal text-muted-foreground">
-               Crop is applied automatically.
+               {aspectRatio
+                  ? 'Image is center-cropped automatically.'
+                  : 'Image keeps its original framing.'}
             </span>
          </Button>
          <p className="text-xs text-muted-foreground">{helperText}</p>

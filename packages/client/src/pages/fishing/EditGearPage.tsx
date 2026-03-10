@@ -125,7 +125,7 @@ export function EditGearPage() {
                         <img
                            src={gear.imageUrl}
                            alt={gear.name}
-                           className="h-40 w-40 rounded border bg-muted object-contain"
+                           className="h-40 w-40 rounded border object-cover"
                         />
                      ) : null}
                      <R2ImagePicker
