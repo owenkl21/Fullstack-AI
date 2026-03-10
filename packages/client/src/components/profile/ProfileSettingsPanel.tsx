@@ -5,6 +5,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { toast } from '@/components/ui/use-toast';
 
 type UserProfile = {
@@ -155,9 +156,7 @@ export function ProfileSettingsPanel() {
             </div>
 
             {isLoading ? (
-               <p className="text-sm text-muted-foreground">
-                  Loading your profile...
-               </p>
+               <FishingBobberLoader label="Loading your profile..." />
             ) : (
                <div className="space-y-6">
                   <div className="grid gap-4 rounded-lg border border-border bg-muted/20 p-4 sm:grid-cols-3">
