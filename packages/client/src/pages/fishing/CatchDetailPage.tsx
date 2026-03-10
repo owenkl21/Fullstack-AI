@@ -12,7 +12,6 @@ type CatchDetail = {
    notes: string | null;
    caughtAt: string;
    weather: string | null;
-   waterTemp: number | null;
    depth: number | null;
    count: number;
    length: number | null;
@@ -136,10 +135,7 @@ export function CatchDetailPage() {
                            </div>
                         )}
                      </div>
-                     <p>
-                        Conditions: {data.weather ?? 'Not specified'} | Water
-                        temp: {data.waterTemp ?? '—'}
-                     </p>
+                     <p>Conditions: {data.weather ?? 'Not specified'}</p>
                      <p>
                         Size: {data.length ?? '—'} length / {data.weight ?? '—'}{' '}
                         weight

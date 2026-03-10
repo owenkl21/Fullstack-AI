@@ -10,7 +10,12 @@ import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { toast } from '@/components/ui/use-toast';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 
-type SiteOption = { id: string; name: string };
+type SiteOption = {
+   id: string;
+   name: string;
+   latitude: number | null;
+   longitude: number | null;
+};
 type GearOption = {
    id: string;
    name: string;
@@ -19,21 +24,35 @@ type GearOption = {
    imageUrl: string | null;
 };
 
-const WEATHER_OPTIONS = [
-   'Clear skies',
-   'Partly cloudy',
-   'Cloudy',
-   'Raining',
-   'Stormy',
-   'Windy',
-   'Foggy',
-];
+type WeatherSnapshot = {
+   currentTime?: string;
+   timeZone: { id: string };
+   weatherCondition: { type: string };
+   temperature: { degrees: number; unit: string };
+   feelsLikeTemperature: { degrees: number; unit: string };
+   dewPoint: { degrees: number; unit: string };
+   precipitation: { probability: number };
+   airPressure: { meanSeaLevelMillibars: number };
+   wind: {
+      direction: { degrees: number };
+      speed: { value: number; unit: string };
+   };
+   visibility: { distance: { value: number; unit: string } };
+   isDaytime: boolean;
+   relativeHumidity: number;
+   uvIndex: number;
+   thunderstormProbability: number;
+   cloudCover: number;
+};
 
 const formatForDateTimeLocal = (date: Date) => {
    const pad = (value: number) => String(value).padStart(2, '0');
 
    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
+
+const toDisplay = (value: string | number | boolean | null | undefined) =>
+   value === null || value === undefined ? '' : String(value);
 
 export function LogCatchPage() {
    const navigate = useNavigate();
@@ -51,6 +70,13 @@ export function LogCatchPage() {
       formatForDateTimeLocal(new Date())
    );
    const [isLoadingOptions, setIsLoadingOptions] = useState(true);
+   const [weatherSnapshot, setWeatherSnapshot] =
+      useState<WeatherSnapshot | null>(null);
+   const [isWeatherLoading, setIsWeatherLoading] = useState(false);
+   const [currentCoords, setCurrentCoords] = useState<{
+      latitude: number;
+      longitude: number;
+   } | null>(null);
 
    useEffect(() => {
       const loadData = async () => {
@@ -80,10 +106,60 @@ export function LogCatchPage() {
       void loadData();
    }, []);
 
+   useEffect(() => {
+      if (!navigator.geolocation) {
+         return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+         (position) => {
+            setCurrentCoords({
+               latitude: position.coords.latitude,
+               longitude: position.coords.longitude,
+            });
+         },
+         () => {
+            setCurrentCoords(null);
+         }
+      );
+   }, []);
+
+   useEffect(() => {
+      const loadWeather = async () => {
+         if (siteChoice === '__other') {
+            setWeatherSnapshot(null);
+            return;
+         }
+
+         const selectedSite = sites.find((site) => site.id === siteChoice);
+         const latitude = selectedSite?.latitude ?? currentCoords?.latitude;
+         const longitude = selectedSite?.longitude ?? currentCoords?.longitude;
+
+         if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            setWeatherSnapshot(null);
+            return;
+         }
+
+         try {
+            setIsWeatherLoading(true);
+            const { data } = await axios.get('/api/weather/current', {
+               params: { latitude, longitude },
+            });
+            setWeatherSnapshot(data.weather ?? null);
+         } catch (error) {
+            console.error('Unable to fetch weather snapshot', error);
+            setWeatherSnapshot(null);
+         } finally {
+            setIsWeatherLoading(false);
+         }
+      };
+
+      void loadWeather();
+   }, [siteChoice, sites, currentCoords]);
+
    const submitCatch = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
-      const weatherValues = formData.getAll('weather').map(String);
       const isOtherSpot = siteChoice === '__other';
       const customSpot = String(formData.get('customSpot') ?? '').trim();
       const notes = String(formData.get('notes') ?? '').trim();
@@ -108,8 +184,8 @@ export function LogCatchPage() {
                ? `${notes ? `${notes}\n\n` : ''}Spot: ${customSpot}`
                : notes) || null,
          siteId: isOtherSpot ? null : siteChoice || null,
-         weather: weatherValues.length > 0 ? weatherValues.join(', ') : null,
-         waterTemp: Number(formData.get('waterTemp')) || null,
+         weather: weatherSnapshot?.weatherCondition?.type ?? null,
+         weatherSnapshot,
          length: Number(formData.get('length')) || null,
          weight: Number(formData.get('weight')) || null,
          images,
@@ -225,7 +301,7 @@ export function LogCatchPage() {
                      onChange={(event) => setSiteChoice(event.target.value)}
                      className="rounded border p-2"
                   >
-                     <option value="">No fishing spot selected</option>
+                     <option value="">Use current location</option>
                      {sites.map((site) => (
                         <option key={site.id} value={site.id}>
                            {site.name}
@@ -324,32 +400,168 @@ export function LogCatchPage() {
                   </fieldset>
                   <fieldset className="grid gap-2 rounded border p-3">
                      <legend className="px-1 text-sm font-medium">
-                        Weather
+                        Weather snapshot{' '}
+                        {isWeatherLoading ? '(loading...)' : ''}
                      </legend>
                      <div className="grid gap-2 sm:grid-cols-2">
-                        {WEATHER_OPTIONS.map((weather) => (
-                           <label
-                              key={weather}
-                              className="flex items-center gap-2 text-sm"
-                           >
-                              <input
-                                 type="checkbox"
-                                 name="weather"
-                                 value={weather}
-                              />
-                              {weather}
-                           </label>
-                        ))}
+                        <input
+                           readOnly
+                           value={toDisplay(weatherSnapshot?.currentTime)}
+                           placeholder="currentTime"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(weatherSnapshot?.timeZone?.id)}
+                           placeholder="timeZone.id"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(
+                              weatherSnapshot?.weatherCondition?.type
+                           )}
+                           placeholder="weatherCondition.type"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(
+                              weatherSnapshot?.temperature?.degrees
+                           )}
+                           placeholder="temperature.degrees"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(weatherSnapshot?.temperature?.unit)}
+                           placeholder="temperature.unit"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(
+                              weatherSnapshot?.feelsLikeTemperature?.degrees
+                           )}
+                           placeholder="feelsLikeTemperature.degrees"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(
+                              weatherSnapshot?.feelsLikeTemperature?.unit
+                           )}
+                           placeholder="feelsLikeTemperature.unit"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(weatherSnapshot?.dewPoint?.degrees)}
+                           placeholder="dewPoint.degrees"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(weatherSnapshot?.dewPoint?.unit)}
+                           placeholder="dewPoint.unit"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(
+                              weatherSnapshot?.precipitation?.probability
+                           )}
+                           placeholder="precipitation.probability"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(
+                              weatherSnapshot?.airPressure
+                                 ?.meanSeaLevelMillibars
+                           )}
+                           placeholder="airPressure.meanSeaLevelMillibars"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(
+                              weatherSnapshot?.wind?.direction?.degrees
+                           )}
+                           placeholder="wind.direction.degrees"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(
+                              weatherSnapshot?.wind?.speed?.value
+                           )}
+                           placeholder="wind.speed.value"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(weatherSnapshot?.wind?.speed?.unit)}
+                           placeholder="wind.speed.unit"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(
+                              weatherSnapshot?.visibility?.distance?.value
+                           )}
+                           placeholder="visibility.distance.value"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(
+                              weatherSnapshot?.visibility?.distance?.unit
+                           )}
+                           placeholder="visibility.distance.unit"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(weatherSnapshot?.isDaytime)}
+                           placeholder="isDaytime"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(weatherSnapshot?.relativeHumidity)}
+                           placeholder="relativeHumidity"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(weatherSnapshot?.uvIndex)}
+                           placeholder="uvIndex"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(
+                              weatherSnapshot?.thunderstormProbability
+                           )}
+                           placeholder="thunderstormProbability"
+                           className="rounded border p-2"
+                        />
+                        <input
+                           readOnly
+                           value={toDisplay(weatherSnapshot?.cloudCover)}
+                           placeholder="cloudCover"
+                           className="rounded border p-2"
+                        />
                      </div>
+                     {siteChoice === '__other' ? (
+                        <p className="text-xs text-muted-foreground">
+                           Weather fields are cleared for custom locations
+                           without coordinates.
+                        </p>
+                     ) : null}
                   </fieldset>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                     <input
-                        name="waterTemp"
-                        placeholder="Water temp"
-                        type="number"
-                        step="0.1"
-                        className="rounded border p-2"
-                     />
+                  <div className="grid gap-3 sm:grid-cols-2">
                      <input
                         name="length"
                         placeholder="Length"

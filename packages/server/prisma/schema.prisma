@@ -115,32 +115,53 @@ model Species {
 }
 
 model Catch {
-  id           String       @id @default(cuid())
-  createdById  String
-  createdBy    User         @relation(fields: [createdById], references: [id])
-  siteId       String?
-  site         FishingSite? @relation(fields: [siteId], references: [id], onDelete: SetNull)
-  speciesId    String?
-  species      Species?     @relation(fields: [speciesId], references: [id], onDelete: SetNull)
-  gears        Gear[]
-  title        String
-  notes        String?
-  caughtAt     DateTime
-  weight       Float?
-  length       Float?
-  count        Int          @default(1)
-  weather      String?
-  waterTemp    Float?
-  depth        Float?
-  likeCount    Int          @default(0)
-  commentCount Int          @default(0)
-  comments     Comment[]
-  likes        CatchLike[]
-  images       CatchImage[]
-  feedPosts    FeedPost[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  deletedAt    DateTime?
+  id                                      String       @id @default(cuid())
+  createdById                             String
+  createdBy                               User         @relation(fields: [createdById], references: [id])
+  siteId                                  String?
+  site                                    FishingSite? @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  speciesId                               String?
+  species                                 Species?     @relation(fields: [speciesId], references: [id], onDelete: SetNull)
+  gears                                   Gear[]
+  title                                   String
+  notes                                   String?
+  caughtAt                                DateTime
+  weight                                  Float?
+  length                                  Float?
+  count                                   Int          @default(1)
+  weather                                 String?
+  waterTemp                               Float?
+  weatherCurrentTime                      DateTime?
+  weatherTimeZoneId                       String?
+  weatherConditionType                    String?
+  weatherTemperatureDegrees               Float?
+  weatherTemperatureUnit                  String?
+  weatherFeelsLikeTemperatureDegrees      Float?
+  weatherFeelsLikeTemperatureUnit         String?
+  weatherDewPointDegrees                  Float?
+  weatherDewPointUnit                     String?
+  weatherPrecipitationProbability         Int?
+  weatherAirPressureMeanSeaLevelMillibars Int?
+  weatherWindDirectionDegrees             Int?
+  weatherWindSpeedValue                   Float?
+  weatherWindSpeedUnit                    String?
+  weatherVisibilityDistanceValue          Float?
+  weatherVisibilityDistanceUnit           String?
+  weatherIsDaytime                        Boolean?
+  weatherRelativeHumidity                 Int?
+  weatherUvIndex                          Int?
+  weatherThunderstormProbability          Int?
+  weatherCloudCover                       Int?
+  depth                                   Float?
+  likeCount                               Int          @default(0)
+  commentCount                            Int          @default(0)
+  comments                                Comment[]
+  likes                                   CatchLike[]
+  images                                  CatchImage[]
+  feedPosts                               FeedPost[]
+  createdAt                               DateTime     @default(now())
+  updatedAt                               DateTime     @updatedAt
+  deletedAt                               DateTime?
 
   @@index([createdById, caughtAt(sort: Desc)])
   @@index([siteId, caughtAt(sort: Desc)])
