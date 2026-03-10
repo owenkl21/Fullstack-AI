@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Show, SignInButton } from '@clerk/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LandingHeader } from '@/components/landing/LandingHeader';
@@ -43,6 +43,7 @@ export function LogCatchPage() {
    const [sites, setSites] = useState<SiteOption[]>([]);
    const [siteChoice, setSiteChoice] = useState('');
    const [gear, setGear] = useState<GearOption[]>([]);
+   const [gearSearch, setGearSearch] = useState('');
    const [selectedGearIds, setSelectedGearIds] = useState<string[]>([]);
    const [caughtAt, setCaughtAt] = useState(() =>
       formatForDateTimeLocal(new Date())
@@ -164,6 +165,21 @@ export function LogCatchPage() {
       );
    };
 
+   const filteredGear = useMemo(() => {
+      const normalizedSearch = gearSearch.trim().toLowerCase();
+
+      if (!normalizedSearch) {
+         return gear;
+      }
+
+      return gear.filter((entry) =>
+         [entry.name, entry.brand, entry.type]
+            .join(' ')
+            .toLowerCase()
+            .includes(normalizedSearch)
+      );
+   }, [gear, gearSearch]);
+
    return (
       <div className="min-h-screen">
          <LandingHeader />
@@ -220,13 +236,24 @@ export function LogCatchPage() {
                      <legend className="px-1 text-sm font-medium">
                         Gear used
                      </legend>
+                     <input
+                        type="search"
+                        value={gearSearch}
+                        onChange={(event) => setGearSearch(event.target.value)}
+                        placeholder="Search gear by name, brand, or type"
+                        className="rounded border p-2 text-sm"
+                     />
                      {gear.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                            No gear found in the database yet.
                         </p>
+                     ) : filteredGear.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                           No gear matches your search.
+                        </p>
                      ) : (
                         <div className="grid gap-2">
-                           {gear.map((entry) => {
+                           {filteredGear.map((entry) => {
                               const selected = selectedGearIds.includes(
                                  entry.id
                               );
