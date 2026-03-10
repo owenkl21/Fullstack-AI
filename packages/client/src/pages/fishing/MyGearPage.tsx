@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingHeader } from '@/components/landing/LandingHeader';
+import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 
@@ -17,15 +18,19 @@ type GearItem = {
 
 export function MyGearPage() {
    const [items, setItems] = useState<GearItem[]>([]);
+   const [isLoading, setIsLoading] = useState(true);
 
    useEffect(() => {
       const load = async () => {
          try {
+            setIsLoading(true);
             const { data } = await axios.get('/api/gear/me');
             setItems(data.gear ?? []);
          } catch (error) {
             console.error(error);
             toast({ title: 'Unable to load your gear', variant: 'error' });
+         } finally {
+            setIsLoading(false);
          }
       };
 
@@ -50,7 +55,9 @@ export function MyGearPage() {
             <Show when="signed-in">
                <section className="space-y-3 rounded-lg border p-4">
                   <h1 className="text-2xl font-semibold">My gear</h1>
-                  {items.length === 0 ? (
+                  {isLoading ? (
+                     <FishingBobberLoader label="Loading your gear..." />
+                  ) : items.length === 0 ? (
                      <p className="text-sm text-muted-foreground">
                         No gear yet.
                      </p>

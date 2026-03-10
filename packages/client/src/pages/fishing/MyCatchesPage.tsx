@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingHeader } from '@/components/landing/LandingHeader';
+import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 
@@ -16,15 +17,19 @@ type CatchSummary = {
 
 export function MyCatchesPage() {
    const [items, setItems] = useState<CatchSummary[]>([]);
+   const [isLoading, setIsLoading] = useState(true);
 
    useEffect(() => {
       const load = async () => {
          try {
+            setIsLoading(true);
             const { data } = await axios.get('/api/catches/me');
             setItems(data.catches ?? []);
          } catch (error) {
             console.error(error);
             toast({ title: 'Unable to load your catches', variant: 'error' });
+         } finally {
+            setIsLoading(false);
          }
       };
 
@@ -49,7 +54,9 @@ export function MyCatchesPage() {
             <Show when="signed-in">
                <section className="space-y-3 rounded-lg border p-4">
                   <h1 className="text-2xl font-semibold">My catches</h1>
-                  {items.length === 0 ? (
+                  {isLoading ? (
+                     <FishingBobberLoader label="Loading your catches..." />
+                  ) : items.length === 0 ? (
                      <p className="text-sm text-muted-foreground">
                         No catches yet.
                      </p>

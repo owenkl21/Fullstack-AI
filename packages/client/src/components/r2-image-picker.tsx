@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { toast } from '@/components/ui/use-toast';
 
 type Scope = 'catch' | 'site' | 'avatar' | 'gear';
@@ -134,7 +135,7 @@ export function R2ImagePicker({
             }}
          />
          {isUploading && (
-            <p className="text-xs text-muted-foreground">Uploading to R2...</p>
+            <FishingBobberLoader label="Uploading to R2..." compact />
          )}
          {value.length > 0 && (
             <div className="grid gap-2 sm:grid-cols-2">

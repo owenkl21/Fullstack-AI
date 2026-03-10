@@ -4,6 +4,7 @@ import type { FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingHeader } from '@/components/landing/LandingHeader';
+import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 
@@ -94,7 +95,7 @@ export function EditCatchPage() {
          <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
             <FishingActionBar />
             {!item ? (
-               <p>Loading...</p>
+               <FishingBobberLoader label="Loading catch editor..." />
             ) : (
                <form
                   onSubmit={onSubmit}

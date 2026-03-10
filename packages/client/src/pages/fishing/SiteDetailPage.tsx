@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingHeader } from '@/components/landing/LandingHeader';
+import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 
 type SiteDetail = {
    id: string;
@@ -41,7 +42,7 @@ export function SiteDetailPage() {
          <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
             <FishingActionBar />
             {!data ? (
-               <p>Loading site...</p>
+               <FishingBobberLoader label="Loading site details..." />
             ) : (
                <article className="space-y-4 rounded-lg border p-4">
                   <h1 className="text-2xl font-semibold">{data.name}</h1>

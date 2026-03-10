@@ -6,6 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { R2ImagePicker } from '@/components/r2-image-picker';
+import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 
@@ -137,7 +138,9 @@ export function EditGearPage() {
                      />
                      <Button type="submit">Save changes</Button>
                   </form>
-               ) : null}
+               ) : (
+                  <FishingBobberLoader label="Loading gear..." />
+               )}
             </Show>
          </main>
       </div>

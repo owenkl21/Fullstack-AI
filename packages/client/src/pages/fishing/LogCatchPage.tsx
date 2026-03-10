@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { Button } from '@/components/ui/button';
+import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { toast } from '@/components/ui/use-toast';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 
@@ -49,10 +50,12 @@ export function LogCatchPage() {
    const [caughtAt, setCaughtAt] = useState(() =>
       formatForDateTimeLocal(new Date())
    );
+   const [isLoadingOptions, setIsLoadingOptions] = useState(true);
 
    useEffect(() => {
       const loadData = async () => {
          try {
+            setIsLoadingOptions(true);
             const [{ data: siteData }, { data: gearData }] = await Promise.all([
                axios.get('/api/sites'),
                axios.get('/api/gear'),
@@ -69,6 +72,8 @@ export function LogCatchPage() {
                   'You can still save a catch without selecting a spot.',
                variant: 'error',
             });
+         } finally {
+            setIsLoadingOptions(false);
          }
       };
 
@@ -192,6 +197,9 @@ export function LogCatchPage() {
                   className="grid gap-3 rounded-lg border p-4"
                >
                   <h1 className="text-2xl font-semibold">Log a catch</h1>
+                  {isLoadingOptions && (
+                     <FishingBobberLoader label="Loading your fishing spots and gear..." />
+                  )}
                   <input
                      name="title"
                      placeholder="Catch title"
