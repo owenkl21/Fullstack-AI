@@ -66,7 +66,9 @@ const catchDetailInclude = {
    createdBy: { select: { id: true, displayName: true, username: true } },
    site: { select: { id: true, name: true, latitude: true, longitude: true } },
    species: { select: { id: true, commonName: true, scientificName: true } },
-   gear: { select: { id: true, name: true, category: true } },
+   gear: {
+      select: { id: true, name: true, brand: true, type: true, imageUrl: true },
+   },
    images: {
       include: {
          image: { select: { id: true, url: true, storageKey: true } },
