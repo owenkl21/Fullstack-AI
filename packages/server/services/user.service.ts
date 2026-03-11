@@ -21,8 +21,22 @@ type ProfileShape = {
    updatedAt: Date;
 };
 
+type ProfileImage = {
+   id: string;
+   url: string;
+   sourceType: 'CATCH' | 'SITE';
+   sourceId: string;
+   sourceTitle: string;
+};
+
+type ProfileView = ProfileShape & {
+   followersCount: number;
+   followingCount: number;
+   galleryImages: ProfileImage[];
+};
+
 type ProfileResult = {
-   profile: ProfileShape;
+   profile: ProfileView;
    storage: 'database' | 'clerk_fallback';
 };
 
@@ -47,6 +61,26 @@ const maybeResolveAvatarReadUrl = async (avatarValue: string | null) => {
          }
       );
       return avatarValue;
+   }
+};
+
+const maybeResolveImageReadUrl = async (
+   image: { id: string; url: string; storageKey: string },
+   context: string
+) => {
+   try {
+      const signed = await uploadsService.getReadUrl(image.storageKey);
+      return signed.readUrl;
+   } catch (error) {
+      console.warn(
+         `[${context}] Failed to resolve image read URL, falling back to persisted URL.`,
+         {
+            imageId: image.id,
+            storageKey: image.storageKey,
+            error,
+         }
+      );
+      return image.url;
    }
 };
 
@@ -206,6 +240,118 @@ const findAvailableUsername = async (
    throw new Error('Unable to allocate unique username.');
 };
 
+const buildProfileView = async (clerkUserId: string) => {
+   const profile = await prisma.user.findUnique({
+      where: { clerkId: clerkUserId },
+      select: {
+         id: true,
+         clerkId: true,
+         email: true,
+         username: true,
+         displayName: true,
+         bio: true,
+         avatarUrl: true,
+         createdAt: true,
+         updatedAt: true,
+         _count: {
+            select: {
+               followers: true,
+               following: true,
+            },
+         },
+         catches: {
+            where: { deletedAt: null },
+            orderBy: { caughtAt: 'desc' },
+            take: 8,
+            select: {
+               id: true,
+               title: true,
+               images: {
+                  orderBy: { position: 'asc' },
+                  take: 1,
+                  select: {
+                     image: {
+                        select: { id: true, url: true, storageKey: true },
+                     },
+                  },
+               },
+            },
+         },
+         sites: {
+            where: { deletedAt: null },
+            orderBy: { createdAt: 'desc' },
+            take: 8,
+            select: {
+               id: true,
+               name: true,
+               images: {
+                  orderBy: { position: 'asc' },
+                  take: 1,
+                  select: {
+                     image: {
+                        select: { id: true, url: true, storageKey: true },
+                     },
+                  },
+               },
+            },
+         },
+      },
+   });
+
+   if (!profile) {
+      return null;
+   }
+
+   const catchImages = await Promise.all(
+      profile.catches
+         .filter((entry) => entry.images[0]?.image)
+         .map(async (entry) => ({
+            id: entry.images[0]!.image.id,
+            url: await maybeResolveImageReadUrl(
+               entry.images[0]!.image,
+               'user:profileCatchImage'
+            ),
+            sourceType: 'CATCH' as const,
+            sourceId: entry.id,
+            sourceTitle: entry.title,
+         }))
+   );
+
+   const siteImages = await Promise.all(
+      profile.sites
+         .filter((entry) => entry.images[0]?.image)
+         .map(async (entry) => ({
+            id: entry.images[0]!.image.id,
+            url: await maybeResolveImageReadUrl(
+               entry.images[0]!.image,
+               'user:profileSiteImage'
+            ),
+            sourceType: 'SITE' as const,
+            sourceId: entry.id,
+            sourceTitle: entry.name,
+         }))
+   );
+
+   const resolvedProfile = await withResolvedAvatar({
+      id: profile.id,
+      clerkId: profile.clerkId,
+      email: profile.email,
+      username: profile.username,
+      displayName: profile.displayName,
+      bio: profile.bio,
+      avatarUrl: profile.avatarUrl,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+   });
+
+   return {
+      ...resolvedProfile,
+      followersCount: profile._count.followers,
+      followingCount: profile._count.following,
+      galleryImages: [...catchImages, ...siteImages].slice(0, 12),
+   } satisfies ProfileView;
+};
+
 const getPrimaryEmail = async (clerkUserId: string) => {
    const clerkUser = await clerkClient.users.getUser(clerkUserId);
    const primaryEmail = clerkUser.emailAddresses.find(
@@ -349,24 +495,11 @@ export const userService = {
 
    async getProfileByClerkId(clerkUserId: string) {
       try {
-         const profile = await prisma.user.findUnique({
-            where: { clerkId: clerkUserId },
-            select: {
-               id: true,
-               clerkId: true,
-               email: true,
-               username: true,
-               displayName: true,
-               bio: true,
-               avatarUrl: true,
-               createdAt: true,
-               updatedAt: true,
-            },
-         });
+         const profile = await buildProfileView(clerkUserId);
 
          if (profile) {
             return {
-               profile: await withResolvedAvatar(profile),
+               profile,
                storage: 'database',
             } satisfies ProfileResult;
          }
@@ -384,10 +517,17 @@ export const userService = {
          );
       }
 
+      const fallback = await withResolvedAvatar(
+         await getFallbackProfileFromClerk(clerkUserId)
+      );
+
       return {
-         profile: await withResolvedAvatar(
-            await getFallbackProfileFromClerk(clerkUserId)
-         ),
+         profile: {
+            ...fallback,
+            followersCount: 0,
+            followingCount: 0,
+            galleryImages: [],
+         },
          storage: 'clerk_fallback',
       } satisfies ProfileResult;
    },
@@ -404,7 +544,7 @@ export const userService = {
             ? await findAvailableUsername(input.username, clerkUserId)
             : undefined;
 
-         const profile = await prisma.user.upsert({
+         await prisma.user.upsert({
             where: { clerkId: clerkUserId },
             create: {
                clerkId: clerkUserId,
@@ -435,8 +575,14 @@ export const userService = {
 
          await syncAvatarToClerkWithRetry(clerkUserId, input.avatarUrl);
 
+         const profile = await buildProfileView(clerkUserId);
+
+         if (!profile) {
+            throw new Error('Failed to load profile after update.');
+         }
+
          return {
-            profile: await withResolvedAvatar(profile),
+            profile,
             storage: 'database',
          } satisfies ProfileResult;
       } catch (error) {
@@ -463,13 +609,79 @@ export const userService = {
                fallbackProfile.avatarUrl
             );
 
+            const resolvedFallback = await withResolvedAvatar(fallbackProfile);
+
             return {
-               profile: await withResolvedAvatar(fallbackProfile),
+               profile: {
+                  ...resolvedFallback,
+                  followersCount: 0,
+                  followingCount: 0,
+                  galleryImages: [],
+               },
                storage: 'clerk_fallback',
             } satisfies ProfileResult;
          }
 
          throw error;
       }
+   },
+
+   async followByClerkId(clerkUserId: string, targetUserId: string) {
+      const actor = await this.syncAuthenticatedUser(clerkUserId);
+
+      if (actor.id === targetUserId) {
+         return { code: 'cannot_follow_self' as const };
+      }
+
+      const target = await prisma.user.findFirst({
+         where: { id: targetUserId, deletedAt: null },
+         select: { id: true },
+      });
+
+      if (!target) {
+         return null;
+      }
+
+      await prisma.follow.upsert({
+         where: {
+            followerId_followingId: {
+               followerId: actor.id,
+               followingId: targetUserId,
+            },
+         },
+         create: {
+            followerId: actor.id,
+            followingId: targetUserId,
+         },
+         update: {},
+      });
+
+      return { following: true } as const;
+   },
+
+   async unfollowByClerkId(clerkUserId: string, targetUserId: string) {
+      const actor = await this.syncAuthenticatedUser(clerkUserId);
+
+      if (actor.id === targetUserId) {
+         return { code: 'cannot_follow_self' as const };
+      }
+
+      const target = await prisma.user.findFirst({
+         where: { id: targetUserId, deletedAt: null },
+         select: { id: true },
+      });
+
+      if (!target) {
+         return null;
+      }
+
+      await prisma.follow.deleteMany({
+         where: {
+            followerId: actor.id,
+            followingId: targetUserId,
+         },
+      });
+
+      return { following: false } as const;
    },
 };
