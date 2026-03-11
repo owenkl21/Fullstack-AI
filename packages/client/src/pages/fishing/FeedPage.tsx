@@ -351,11 +351,11 @@ export function FeedPage() {
                                                 key={entry.image.id}
                                                 className="pl-0"
                                              >
-                                                <div className="relative h-[28rem] w-full overflow-hidden bg-muted sm:h-[32rem]">
+                                                <div className="relative h-64 w-full overflow-hidden bg-muted sm:h-[32rem]">
                                                    <img
                                                       src={entry.image.url}
                                                       alt="Post"
-                                                      className="h-full w-full object-contain sm:object-cover"
+                                                      className="h-full w-full object-cover"
                                                       loading="lazy"
                                                    />
                                                 </div>
