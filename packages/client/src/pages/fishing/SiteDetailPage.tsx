@@ -18,6 +18,7 @@ type SiteDetail = {
       id: string;
       title: string;
       caughtAt: string;
+      images: { image: { id: string; url: string } }[];
       species: { commonName: string } | null;
       createdBy: { displayName: string; username: string };
    }[];
@@ -115,15 +116,32 @@ export function SiteDetailPage() {
                            <Link
                               key={catchItem.id}
                               to={`/catches/${catchItem.id}`}
-                              className="block rounded border p-3 hover:bg-muted/50"
+                              className="flex items-start gap-3 rounded border p-3 hover:bg-muted/50"
                            >
-                              <p className="font-medium">{catchItem.title}</p>
-                              <p className="text-sm text-muted-foreground">
-                                 {new Date(catchItem.caughtAt).toLocaleString()}{' '}
-                                 •{' '}
-                                 {catchItem.species?.commonName ??
-                                    'Unknown species'}
-                              </p>
+                              {catchItem.images[0]?.image.url ? (
+                                 <img
+                                    src={catchItem.images[0].image.url}
+                                    alt={catchItem.title}
+                                    className="h-16 w-20 shrink-0 rounded-md object-cover"
+                                 />
+                              ) : (
+                                 <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-md border text-xs text-muted-foreground">
+                                    No image
+                                 </div>
+                              )}
+                              <div>
+                                 <p className="font-medium">
+                                    {catchItem.title}
+                                 </p>
+                                 <p className="text-sm text-muted-foreground">
+                                    {new Date(
+                                       catchItem.caughtAt
+                                    ).toLocaleString()}{' '}
+                                    •{' '}
+                                    {catchItem.species?.commonName ??
+                                       'Unknown species'}
+                                 </p>
+                              </div>
                            </Link>
                         ))
                      )}

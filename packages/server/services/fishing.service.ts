@@ -109,6 +109,13 @@ const siteDetailInclude = {
          id: true,
          title: true,
          caughtAt: true,
+         images: {
+            take: 1,
+            orderBy: { position: 'asc' as const },
+            include: {
+               image: { select: { id: true, url: true, storageKey: true } },
+            },
+         },
          species: { select: { commonName: true } },
          createdBy: { select: { displayName: true, username: true } },
       },
@@ -655,7 +662,17 @@ export const fishingService = {
          return null;
       }
 
-      return withResolvedImageUrls(site);
+      const siteWithResolvedImages = await withResolvedImageUrls(site);
+      const catchesWithResolvedImages = await Promise.all(
+         siteWithResolvedImages.catches.map((entry) =>
+            withResolvedImageUrls(entry)
+         )
+      );
+
+      return {
+         ...siteWithResolvedImages,
+         catches: catchesWithResolvedImages,
+      };
    },
 
    async listMyFishingSites(clerkId: string) {
