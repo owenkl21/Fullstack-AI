@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { toast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 
 type FeedPost = {
    id: string;
@@ -336,13 +337,25 @@ export function FeedPage() {
                               </div>
 
                               {postImages.length > 0 ? (
-                                 <div className="grid grid-cols-1 gap-1 bg-muted/30 sm:grid-cols-2">
+                                 <div
+                                    className={cn(
+                                       'grid gap-1 bg-muted/30',
+                                       postImages.length === 1
+                                          ? 'grid-cols-1'
+                                          : 'grid-cols-1 sm:grid-cols-2'
+                                    )}
+                                 >
                                     {postImages.map((entry) => (
                                        <img
                                           key={entry.image.id}
                                           src={entry.image.url}
                                           alt="Post"
-                                          className="h-64 w-full object-cover sm:h-72"
+                                          className={cn(
+                                             'w-full',
+                                             postImages.length === 1
+                                                ? 'h-auto max-h-[32rem] object-contain'
+                                                : 'h-64 object-cover sm:h-72'
+                                          )}
                                           loading="lazy"
                                        />
                                     ))}
