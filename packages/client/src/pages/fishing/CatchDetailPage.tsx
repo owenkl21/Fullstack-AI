@@ -6,6 +6,11 @@ import { LandingHeader } from '@/components/landing/LandingHeader';
 import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+   formatCardinal,
+   toMetricTemperature,
+   toMetricWindSpeed,
+} from '@/lib/weather';
 
 type CatchDetail = {
    id: string;
@@ -72,7 +77,10 @@ export function CatchDetailPage() {
             label: 'Temperature',
             value:
                data.weatherTemperatureDegrees !== null
-                  ? `${data.weatherTemperatureDegrees} ${data.weatherTemperatureUnit ?? ''}`.trim()
+                  ? toMetricTemperature(
+                       data.weatherTemperatureDegrees,
+                       data.weatherTemperatureUnit
+                    )
                   : null,
          },
          {
@@ -86,14 +94,17 @@ export function CatchDetailPage() {
             label: 'Wind',
             value:
                data.weatherWindSpeedValue !== null
-                  ? `${data.weatherWindDirectionCardinal ?? ''} ${data.weatherWindSpeedValue} ${data.weatherWindSpeedUnit ?? ''}`.trim()
+                  ? `${formatCardinal(data.weatherWindDirectionCardinal)} ${toMetricWindSpeed(data.weatherWindSpeedValue, data.weatherWindSpeedUnit) ?? ''}`.trim()
                   : null,
          },
          {
             label: 'Wind gusts',
             value:
                data.weatherWindGustValue !== null
-                  ? `${data.weatherWindGustValue} ${data.weatherWindGustUnit ?? ''}`.trim()
+                  ? toMetricWindSpeed(
+                       data.weatherWindGustValue,
+                       data.weatherWindGustUnit
+                    )
                   : null,
          },
          {

@@ -10,6 +10,11 @@ import { Button } from '@/components/ui/button';
 import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { toast } from '@/components/ui/use-toast';
 import { R2ImagePicker } from '@/components/r2-image-picker';
+import {
+   formatCardinal,
+   toMetricTemperature,
+   toMetricWindSpeed,
+} from '@/lib/weather';
 
 type SiteOption = {
    id: string;
@@ -49,55 +54,16 @@ const formatForDateTimeLocal = (date: Date) => {
 const toDisplay = (value: string | number | boolean | null | undefined) =>
    value === null || value === undefined ? '' : String(value);
 
-const formatUnit = (unit: string | undefined) => {
-   if (!unit) {
-      return '';
+const formatWeatherMetric = (
+   value: number | undefined,
+   unit?: string,
+   kind: 'temperature' | 'wind' = 'wind'
+) => {
+   if (kind === 'temperature') {
+      return toMetricTemperature(value, unit) ?? '';
    }
 
-   const map: Record<string, string> = {
-      CELSIUS: '°C',
-      FAHRENHEIT: '°F',
-      KILOMETERS_PER_HOUR: 'km/h',
-      MILES_PER_HOUR: 'mph',
-   };
-
-   return map[unit] ?? unit;
-};
-
-const formatCardinal = (cardinal: string | undefined) => {
-   if (!cardinal) {
-      return '';
-   }
-
-   const map: Record<string, string> = {
-      NORTH: 'N',
-      NORTH_NORTHEAST: 'NNE',
-      NORTHEAST: 'NE',
-      EAST_NORTHEAST: 'ENE',
-      EAST: 'E',
-      EAST_SOUTHEAST: 'ESE',
-      SOUTHEAST: 'SE',
-      SOUTH_SOUTHEAST: 'SSE',
-      SOUTH: 'S',
-      SOUTH_SOUTHWEST: 'SSW',
-      SOUTHWEST: 'SW',
-      WEST_SOUTHWEST: 'WSW',
-      WEST: 'W',
-      WEST_NORTHWEST: 'WNW',
-      NORTHWEST: 'NW',
-      NORTH_NORTHWEST: 'NNW',
-   };
-
-   return map[cardinal] ?? cardinal;
-};
-
-const formatWeatherMetric = (value: number | undefined, unit?: string) => {
-   if (value === null || value === undefined) {
-      return '';
-   }
-
-   const resolvedUnit = formatUnit(unit);
-   return resolvedUnit ? `${value} ${resolvedUnit}` : String(value);
+   return toMetricWindSpeed(value, unit) ?? '';
 };
 
 export function LogCatchPage() {
@@ -609,7 +575,8 @@ export function LogCatchPage() {
                               value={toDisplay(
                                  formatWeatherMetric(
                                     weatherSnapshot?.temperature?.degrees,
-                                    weatherSnapshot?.temperature?.unit
+                                    weatherSnapshot?.temperature?.unit,
+                                    'temperature'
                                  )
                               )}
                               className="rounded border p-2"
