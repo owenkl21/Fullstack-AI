@@ -33,6 +33,7 @@ type FeedPost = {
 };
 
 export function FeedPage() {
+   const pageSize = 25;
    const [posts, setPosts] = useState<FeedPost[]>([]);
    const [scope, setScope] = useState<'GLOBAL' | 'NEARBY'>('GLOBAL');
    const [type, setType] = useState<'ALL' | 'CATCH' | 'SITE'>('ALL');
@@ -42,10 +43,27 @@ export function FeedPage() {
    const [expandedComments, setExpandedComments] = useState<
       Record<string, boolean>
    >({});
+   const [offset, setOffset] = useState(0);
+   const [hasMore, setHasMore] = useState(true);
+   const [isLoading, setIsLoading] = useState(false);
+   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-   const load = async () => {
+   const load = async (input?: { reset?: boolean }) => {
+      const reset = Boolean(input?.reset);
+      const targetOffset = reset ? 0 : offset;
+
       try {
-         const params: Record<string, string | number> = { scope };
+         if (reset) {
+            setIsLoading(true);
+         } else {
+            setIsLoadingMore(true);
+         }
+
+         const params: Record<string, string | number> = {
+            scope,
+            limit: pageSize,
+            offset: targetOffset,
+         };
          if (type !== 'ALL') {
             params.type = type;
          }
@@ -65,20 +83,60 @@ export function FeedPage() {
          }
 
          const { data } = await axios.get('/api/feed', { params });
-         setPosts(data.posts ?? []);
+         const nextPosts = data.posts ?? [];
+
+         if (reset) {
+            setPosts(nextPosts);
+         } else {
+            setPosts((prev) => [...prev, ...nextPosts]);
+         }
+
+         setOffset(data.nextOffset ?? targetOffset + nextPosts.length);
+         setHasMore(Boolean(data.hasMore));
       } catch (error) {
          console.error(error);
          toast({ title: 'Unable to load feed', variant: 'error' });
+      } finally {
+         if (reset) {
+            setIsLoading(false);
+         } else {
+            setIsLoadingMore(false);
+         }
       }
    };
 
    useEffect(() => {
-      void load();
+      setOffset(0);
+      setHasMore(true);
+      void load({ reset: true });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [scope, type]);
+
+   useEffect(() => {
+      if (!hasMore || isLoading || isLoadingMore) {
+         return;
+      }
+
+      const onScroll = () => {
+         const scrollBottom =
+            window.innerHeight + window.scrollY >=
+            document.body.offsetHeight - 500;
+
+         if (scrollBottom) {
+            void load();
+         }
+      };
+
+      window.addEventListener('scroll', onScroll);
+      return () => window.removeEventListener('scroll', onScroll);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [hasMore, isLoading, isLoadingMore, offset, scope, type]);
 
    const like = async (postId: string) => {
       await axios.post(`/api/feed/${postId}/likes`);
-      await load();
+      setOffset(0);
+      setHasMore(true);
+      await load({ reset: true });
    };
 
    const comment = async (postId: string) => {
@@ -87,7 +145,9 @@ export function FeedPage() {
       await axios.post(`/api/feed/${postId}/comments`, { body });
       setCommentDrafts((prev) => ({ ...prev, [postId]: '' }));
       setExpandedComments((prev) => ({ ...prev, [postId]: true }));
-      await load();
+      setOffset(0);
+      setHasMore(true);
+      await load({ reset: true });
    };
 
    const toggleComments = (postId: string) => {
@@ -245,6 +305,22 @@ export function FeedPage() {
                      );
                   })}
                </div>
+
+               {isLoading ? (
+                  <p className="text-sm text-muted-foreground">
+                     Loading feed...
+                  </p>
+               ) : null}
+               {isLoadingMore ? (
+                  <p className="text-sm text-muted-foreground">
+                     Loading more posts...
+                  </p>
+               ) : null}
+               {!hasMore && posts.length > 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                     You reached the end of the feed.
+                  </p>
+               ) : null}
             </section>
          </main>
       </div>

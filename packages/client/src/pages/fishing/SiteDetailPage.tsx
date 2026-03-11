@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingHeader } from '@/components/landing/LandingHeader';
@@ -24,8 +24,10 @@ type SiteDetail = {
 };
 
 export function SiteDetailPage() {
+   const catchesPageSize = 10;
    const { siteId } = useParams();
    const [data, setData] = useState<SiteDetail | null>(null);
+   const [catchesPage, setCatchesPage] = useState(1);
 
    useEffect(() => {
       const load = async () => {
@@ -35,6 +37,29 @@ export function SiteDetailPage() {
 
       void load();
    }, [siteId]);
+
+   const totalCatchPages = Math.max(
+      1,
+      Math.ceil((data?.catches.length ?? 0) / catchesPageSize)
+   );
+   const pagedCatches = useMemo(
+      () =>
+         data?.catches.slice(
+            (catchesPage - 1) * catchesPageSize,
+            catchesPage * catchesPageSize
+         ) ?? [],
+      [catchesPage, data?.catches]
+   );
+
+   useEffect(() => {
+      setCatchesPage(1);
+   }, [siteId]);
+
+   useEffect(() => {
+      if (catchesPage > totalCatchPages) {
+         setCatchesPage(totalCatchPages);
+      }
+   }, [catchesPage, totalCatchPages]);
 
    const hasCoordinates = data?.latitude != null && data?.longitude != null;
    const mapUrl = hasCoordinates
@@ -86,7 +111,7 @@ export function SiteDetailPage() {
                            No catches logged for this site yet.
                         </p>
                      ) : (
-                        data.catches.map((catchItem) => (
+                        pagedCatches.map((catchItem) => (
                            <Link
                               key={catchItem.id}
                               to={`/catches/${catchItem.id}`}
@@ -102,6 +127,33 @@ export function SiteDetailPage() {
                            </Link>
                         ))
                      )}
+                     {data.catches.length > catchesPageSize ? (
+                        <div className="flex items-center justify-between">
+                           <p className="text-sm text-muted-foreground">
+                              Page {catchesPage} of {totalCatchPages}
+                           </p>
+                           <div className="flex gap-2">
+                              <button
+                                 className="rounded border px-2 py-1 text-sm disabled:opacity-50"
+                                 disabled={catchesPage === 1}
+                                 onClick={() =>
+                                    setCatchesPage((current) => current - 1)
+                                 }
+                              >
+                                 Previous
+                              </button>
+                              <button
+                                 className="rounded border px-2 py-1 text-sm disabled:opacity-50"
+                                 disabled={catchesPage === totalCatchPages}
+                                 onClick={() =>
+                                    setCatchesPage((current) => current + 1)
+                                 }
+                              >
+                                 Next
+                              </button>
+                           </div>
+                        </div>
+                     ) : null}
                   </section>
 
                   {hasCoordinates ? (

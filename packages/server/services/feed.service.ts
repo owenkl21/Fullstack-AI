@@ -128,6 +128,8 @@ export const feedService = {
       type?: FeedType;
       latitude?: number;
       longitude?: number;
+      limit: number;
+      offset: number;
    }) {
       const nearbyWhere =
          input.scope === 'NEARBY' &&
@@ -151,7 +153,8 @@ export const feedService = {
          },
          include: feedInclude,
          orderBy: { createdAt: 'desc' },
-         take: 50,
+         skip: input.offset,
+         take: input.limit,
       });
 
       const postsWithResolvedImageUrls = await Promise.all(
