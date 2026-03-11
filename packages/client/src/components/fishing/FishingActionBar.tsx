@@ -24,22 +24,23 @@ export function FishingActionBar() {
    return (
       <>
          <nav className="pointer-events-none fixed inset-x-0 top-[5.25rem] z-40 hidden justify-center px-4 md:flex">
-            <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-border/70 bg-background/95 p-2 shadow-lg backdrop-blur">
+            <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border/70 bg-background/95 px-2 py-2 shadow-[0_8px_30px_rgb(0_0_0_/_0.12)] backdrop-blur">
                {desktopDockItems.map(({ to, label, icon: Icon }) => (
                   <NavLink
                      key={to}
                      to={to}
                      className={({ isActive }) =>
                         cn(
-                           'flex min-w-20 flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs font-medium transition-colors',
+                           'flex h-12 w-12 items-center justify-center rounded-full transition-all duration-200',
                            isActive
-                              ? 'bg-primary/10 text-primary'
-                              : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                              ? 'bg-primary/15 text-primary shadow-sm'
+                              : 'text-muted-foreground hover:-translate-y-0.5 hover:bg-accent hover:text-foreground'
                         )
                      }
+                     aria-label={label}
+                     title={label}
                   >
-                     <Icon className="h-4 w-4" />
-                     <span>{label}</span>
+                     <Icon className="h-5 w-5" />
                   </NavLink>
                ))}
             </div>
