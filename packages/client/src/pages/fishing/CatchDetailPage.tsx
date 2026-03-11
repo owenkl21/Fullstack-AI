@@ -244,10 +244,31 @@ export function CatchDetailPage() {
                            </ul>
                         )}
                      </div>
-                     <p>
-                        Size: {data.length ?? '—'} length / {data.weight ?? '—'}{' '}
-                        weight
-                     </p>
+                     <div className="space-y-2">
+                        <p className="font-medium">Size</p>
+                        <ul className="grid gap-2 sm:grid-cols-2">
+                           <li className="rounded-lg border bg-slate-50 p-3">
+                              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                 Length
+                              </p>
+                              <p className="text-sm font-semibold text-slate-900">
+                                 {data.length !== null
+                                    ? `${data.length} cm`
+                                    : '—'}
+                              </p>
+                           </li>
+                           <li className="rounded-lg border bg-slate-50 p-3">
+                              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                 Weight
+                              </p>
+                              <p className="text-sm font-semibold text-slate-900">
+                                 {data.weight !== null
+                                    ? `${data.weight} kg`
+                                    : '—'}
+                              </p>
+                           </li>
+                        </ul>
+                     </div>
                      {data.site && (
                         <p>
                            Site:{' '}
