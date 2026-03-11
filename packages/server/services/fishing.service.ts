@@ -104,7 +104,6 @@ const siteDetailInclude = {
       orderBy: { position: 'asc' as const },
    },
    catches: {
-      take: 10,
       orderBy: { caughtAt: 'desc' as const },
       select: {
          id: true,

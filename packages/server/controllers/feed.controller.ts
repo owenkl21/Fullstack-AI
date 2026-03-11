@@ -28,7 +28,14 @@ export const feedController = {
          userId: auth.userId ?? undefined,
          ...parseResult.data,
       });
-      return res.json({ posts });
+
+      return res.json({
+         posts,
+         offset: parseResult.data.offset,
+         limit: parseResult.data.limit,
+         hasMore: posts.length === parseResult.data.limit,
+         nextOffset: parseResult.data.offset + posts.length,
+      });
    },
 
    async createFeedPost(req: Request, res: Response) {
