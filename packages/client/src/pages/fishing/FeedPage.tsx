@@ -355,7 +355,7 @@ export function FeedPage() {
                                                    <img
                                                       src={entry.image.url}
                                                       alt="Post"
-                                                      className="h-full w-full object-cover"
+                                                      className="h-full w-full object-contain sm:object-cover"
                                                       loading="lazy"
                                                    />
                                                 </div>
