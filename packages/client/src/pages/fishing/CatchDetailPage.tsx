@@ -33,7 +33,12 @@ type CatchDetail = {
    count: number;
    length: number | null;
    weight: number | null;
-   site: { id: string; name: string } | null;
+   site: {
+      id: string;
+      name: string;
+      latitude: number | null;
+      longitude: number | null;
+   } | null;
    species: { commonName: string } | null;
    gears: {
       id: string;
@@ -270,15 +275,30 @@ export function CatchDetailPage() {
                         </ul>
                      </div>
                      {data.site && (
-                        <p>
-                           Site:{' '}
-                           <Link
-                              className="underline"
-                              to={`/sites/${data.site.id}`}
-                           >
-                              {data.site.name}
-                           </Link>
-                        </p>
+                        <section className="space-y-2">
+                           <p className="font-medium">Site</p>
+                           <p>
+                              <Link
+                                 className="underline"
+                                 to={`/sites/${data.site.id}`}
+                              >
+                                 {data.site.name}
+                              </Link>
+                           </p>
+                           {data.site.latitude !== null &&
+                           data.site.longitude !== null ? (
+                              <iframe
+                                 title={`Map for ${data.site.name}`}
+                                 src={`https://maps.google.com/maps?q=${data.site.latitude},${data.site.longitude}&z=14&output=embed`}
+                                 loading="lazy"
+                                 className="h-64 w-full rounded-lg border"
+                              />
+                           ) : (
+                              <p className="text-sm text-muted-foreground">
+                                 No coordinates recorded for this site.
+                              </p>
+                           )}
+                        </section>
                      )}
                      {data.notes && (
                         <p className="whitespace-pre-line">{data.notes}</p>
