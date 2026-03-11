@@ -1,9 +1,17 @@
 import axios from 'axios';
 import { Show } from '@clerk/react';
-import { useEffect, useState } from 'react';
+import {
+   MessageCircle,
+   SendHorizontal,
+   SlidersHorizontal,
+   ThumbsUp,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Slider } from '@/components/ui/slider';
 import { toast } from '@/components/ui/use-toast';
 
 type FeedPost = {
@@ -14,6 +22,8 @@ type FeedPost = {
    likeCount: number;
    commentCount: number;
    likedByMe: boolean;
+   latitude?: number | null;
+   longitude?: number | null;
    catch: {
       id: string;
       title: string;
@@ -32,11 +42,34 @@ type FeedPost = {
    }>;
 };
 
+function distanceInKm(
+   origin: { latitude: number; longitude: number },
+   target: { latitude: number; longitude: number }
+) {
+   const toRad = (value: number) => (value * Math.PI) / 180;
+   const radius = 6371;
+   const dLat = toRad(target.latitude - origin.latitude);
+   const dLon = toRad(target.longitude - origin.longitude);
+   const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(origin.latitude)) *
+         Math.cos(toRad(target.latitude)) *
+         Math.sin(dLon / 2) *
+         Math.sin(dLon / 2);
+
+   return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export function FeedPage() {
    const pageSize = 25;
    const [posts, setPosts] = useState<FeedPost[]>([]);
    const [scope, setScope] = useState<'GLOBAL' | 'NEARBY'>('GLOBAL');
    const [type, setType] = useState<'ALL' | 'CATCH' | 'SITE'>('ALL');
+   const [radiusKm, setRadiusKm] = useState(50);
+   const [currentPosition, setCurrentPosition] = useState<{
+      latitude: number;
+      longitude: number;
+   } | null>(null);
    const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>(
       {}
    );
@@ -72,11 +105,19 @@ export function FeedPage() {
             await new Promise<void>((resolve) => {
                navigator.geolocation.getCurrentPosition(
                   (position) => {
-                     params.latitude = position.coords.latitude;
-                     params.longitude = position.coords.longitude;
+                     const coords = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                     };
+                     params.latitude = coords.latitude;
+                     params.longitude = coords.longitude;
+                     setCurrentPosition(coords);
                      resolve();
                   },
-                  () => resolve(),
+                  () => {
+                     setCurrentPosition(null);
+                     resolve();
+                  },
                   { enableHighAccuracy: false, timeout: 1500 }
                );
             });
@@ -132,6 +173,28 @@ export function FeedPage() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [hasMore, isLoading, isLoadingMore, offset, scope, type]);
 
+   const visiblePosts = useMemo(() => {
+      if (scope !== 'NEARBY' || !currentPosition) {
+         return posts;
+      }
+
+      return posts.filter((post) => {
+         if (
+            typeof post.latitude !== 'number' ||
+            typeof post.longitude !== 'number'
+         ) {
+            return false;
+         }
+
+         return (
+            distanceInKm(currentPosition, {
+               latitude: post.latitude,
+               longitude: post.longitude,
+            }) <= radiusKm
+         );
+      });
+   }, [currentPosition, posts, radiusKm, scope]);
+
    const like = async (postId: string) => {
       await axios.post(`/api/feed/${postId}/likes`);
       setOffset(0);
@@ -162,7 +225,7 @@ export function FeedPage() {
          <LandingHeader />
          <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
             <FishingActionBar />
-            <section className="space-y-3 rounded-lg border p-4">
+            <section className="space-y-4 rounded-2xl border bg-card/70 p-4 shadow-sm backdrop-blur-sm">
                <h1 className="text-2xl font-semibold">Feed</h1>
                <div className="flex flex-wrap gap-2">
                   <Button
@@ -175,13 +238,13 @@ export function FeedPage() {
                      variant={scope === 'NEARBY' ? 'default' : 'outline'}
                      onClick={() => setScope('NEARBY')}
                   >
-                     Near me
+                     Local
                   </Button>
                   <Button
                      variant={type === 'ALL' ? 'default' : 'outline'}
                      onClick={() => setType('ALL')}
                   >
-                     All
+                     All feed
                   </Button>
                   <Button
                      variant={type === 'CATCH' ? 'default' : 'outline'}
@@ -197,6 +260,25 @@ export function FeedPage() {
                   </Button>
                </div>
 
+               {scope === 'NEARBY' ? (
+                  <div className="rounded-lg border bg-background p-4">
+                     <div className="mb-2 flex items-center justify-between text-sm text-muted-foreground">
+                        <span className="inline-flex items-center gap-2">
+                           <SlidersHorizontal className="size-4" />
+                           Local radius
+                        </span>
+                        <span>{radiusKm} km</span>
+                     </div>
+                     <Slider
+                        min={0}
+                        max={250}
+                        step={1}
+                        value={[radiusKm]}
+                        onValueChange={(value) => setRadiusKm(value[0] ?? 0)}
+                     />
+                  </div>
+               ) : null}
+
                <Show when="signed-in">
                   <p className="rounded border p-3 text-sm text-muted-foreground">
                      Your feed posts are created when you log a catch or log a
@@ -204,8 +286,8 @@ export function FeedPage() {
                   </p>
                </Show>
 
-               <div className="space-y-3">
-                  {posts.map((post) => {
+               <div className="space-y-5">
+                  {visiblePosts.map((post) => {
                      const postImages = [
                         ...(post.catch?.images ?? []),
                         ...(post.site?.images ?? []),
@@ -213,95 +295,134 @@ export function FeedPage() {
                      const commentsOpen = Boolean(expandedComments[post.id]);
 
                      return (
-                        <article
+                        <Card
                            key={post.id}
-                           className="space-y-2 rounded border p-3"
+                           className="overflow-hidden gap-0 py-0"
                         >
-                           <p className="text-sm text-muted-foreground">
-                              {post.author.displayName} @{post.author.username}{' '}
-                              • {post.type} • {post.scope}
-                           </p>
-                           <p>{post.content ?? 'No text'}</p>
-                           {post.catch ? (
-                              <p className="text-sm">
-                                 Catch: {post.catch.title}
-                              </p>
-                           ) : null}
-                           {post.site ? (
-                              <p className="text-sm">Site: {post.site.name}</p>
-                           ) : null}
-
-                           {postImages.length > 0 ? (
-                              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                 {postImages.map((entry) => (
-                                    <img
-                                       key={entry.image.id}
-                                       src={entry.image.url}
-                                       alt="Post"
-                                       className="aspect-[4/3] w-full rounded object-cover"
-                                       loading="lazy"
-                                    />
-                                 ))}
+                           <CardContent className="space-y-3 p-0">
+                              <div className="flex items-center justify-between px-4 pt-4">
+                                 <p className="text-sm font-medium">
+                                    {post.author.displayName}
+                                    <span className="ml-1 text-muted-foreground">
+                                       @{post.author.username}
+                                    </span>
+                                 </p>
+                                 <p className="text-xs text-muted-foreground">
+                                    {post.type} • {post.scope}
+                                 </p>
                               </div>
-                           ) : null}
 
-                           <div className="flex gap-2">
-                              <Button
-                                 size="sm"
-                                 variant={
-                                    post.likedByMe ? 'default' : 'outline'
-                                 }
-                                 onClick={() => void like(post.id)}
-                              >
-                                 Like ({post.likeCount})
-                              </Button>
-                              <Button
-                                 size="sm"
-                                 variant={commentsOpen ? 'default' : 'outline'}
-                                 onClick={() => toggleComments(post.id)}
-                              >
-                                 Comments ({post.commentCount})
-                              </Button>
-                           </div>
-
-                           {commentsOpen ? (
-                              <>
-                                 <div className="space-y-1">
-                                    {post.comments.map((entry) => (
-                                       <p key={entry.id} className="text-sm">
-                                          {entry.user.displayName}: {entry.body}
-                                       </p>
-                                    ))}
-                                    {post.comments.length === 0 ? (
-                                       <p className="text-sm text-muted-foreground">
-                                          No comments yet.
-                                       </p>
-                                    ) : null}
-                                 </div>
-                                 <Show when="signed-in">
-                                    <div className="flex gap-2">
-                                       <input
-                                          className="flex-1 rounded border px-2 py-1"
-                                          value={commentDrafts[post.id] ?? ''}
-                                          onChange={(event) =>
-                                             setCommentDrafts((prev) => ({
-                                                ...prev,
-                                                [post.id]: event.target.value,
-                                             }))
-                                          }
-                                          placeholder="Add comment"
+                              {postImages.length > 0 ? (
+                                 <div className="grid grid-cols-1 gap-1 bg-muted/50 sm:grid-cols-2">
+                                    {postImages.map((entry) => (
+                                       <img
+                                          key={entry.image.id}
+                                          src={entry.image.url}
+                                          alt="Post"
+                                          className="aspect-square w-full object-cover"
+                                          loading="lazy"
                                        />
-                                       <Button
-                                          size="sm"
-                                          onClick={() => void comment(post.id)}
-                                       >
-                                          Send
-                                       </Button>
-                                    </div>
-                                 </Show>
-                              </>
-                           ) : null}
-                        </article>
+                                    ))}
+                                 </div>
+                              ) : null}
+
+                              <div className="space-y-2 px-4 pb-4">
+                                 <p className="text-sm leading-relaxed">
+                                    {post.content ?? 'No text'}
+                                 </p>
+                                 {post.catch ? (
+                                    <p className="text-sm text-muted-foreground">
+                                       Catch: {post.catch.title}
+                                    </p>
+                                 ) : null}
+                                 {post.site ? (
+                                    <p className="text-sm text-muted-foreground">
+                                       Site: {post.site.name}
+                                    </p>
+                                 ) : null}
+
+                                 <div className="flex items-center gap-4 border-y py-2">
+                                    <Button
+                                       size="sm"
+                                       variant="ghost"
+                                       className={
+                                          post.likedByMe ? 'text-primary' : ''
+                                       }
+                                       onClick={() => void like(post.id)}
+                                    >
+                                       <ThumbsUp className="size-4" />
+                                       Like
+                                    </Button>
+                                    <Button
+                                       size="sm"
+                                       variant="ghost"
+                                       className={
+                                          commentsOpen ? 'text-primary' : ''
+                                       }
+                                       onClick={() => toggleComments(post.id)}
+                                    >
+                                       <MessageCircle className="size-4" />
+                                       Comment
+                                    </Button>
+                                 </div>
+
+                                 <p className="text-xs text-muted-foreground">
+                                    {post.commentCount} comments •{' '}
+                                    {post.likeCount} likes
+                                 </p>
+
+                                 {commentsOpen ? (
+                                    <>
+                                       <div className="space-y-2">
+                                          {post.comments.map((entry) => (
+                                             <p
+                                                key={entry.id}
+                                                className="text-sm"
+                                             >
+                                                <span className="font-medium">
+                                                   {entry.user.displayName}:
+                                                </span>{' '}
+                                                {entry.body}
+                                             </p>
+                                          ))}
+                                          {post.comments.length === 0 ? (
+                                             <p className="text-sm text-muted-foreground">
+                                                No comments yet.
+                                             </p>
+                                          ) : null}
+                                       </div>
+                                       <Show when="signed-in">
+                                          <div className="flex gap-2">
+                                             <input
+                                                className="flex-1 rounded-full border px-3 py-2 text-sm"
+                                                value={
+                                                   commentDrafts[post.id] ?? ''
+                                                }
+                                                onChange={(event) =>
+                                                   setCommentDrafts((prev) => ({
+                                                      ...prev,
+                                                      [post.id]:
+                                                         event.target.value,
+                                                   }))
+                                                }
+                                                placeholder="Add comment"
+                                             />
+                                             <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                onClick={() =>
+                                                   void comment(post.id)
+                                                }
+                                             >
+                                                <SendHorizontal className="size-4" />
+                                             </Button>
+                                          </div>
+                                       </Show>
+                                    </>
+                                 ) : null}
+                              </div>
+                           </CardContent>
+                        </Card>
                      );
                   })}
                </div>
