@@ -20,6 +20,21 @@ const stripSignedUrlParams = (url: string) => {
    }
 };
 
+type WeatherSnapshotInput = {
+   weatherCondition: {
+      iconBaseUri: string;
+      description: { text: string };
+   };
+   temperature: { degrees: number; unit: string };
+   precipitation: { probability: { percent: number } };
+   wind: {
+      direction: { cardinal: string };
+      speed: { value: number; unit: string };
+      gust: { value: number; unit: string };
+   };
+   cloudCover: number;
+};
+
 type CreateCatchInput = {
    title: string;
    notes?: string | null;
@@ -30,6 +45,7 @@ type CreateCatchInput = {
    count?: number;
    weather?: string | null;
    waterTemp?: number | null;
+   weatherSnapshot?: WeatherSnapshotInput | null;
    depth?: number | null;
    gearIds: string[];
    images: CreateImageInput[];
@@ -88,16 +104,88 @@ const siteDetailInclude = {
       orderBy: { position: 'asc' as const },
    },
    catches: {
-      take: 10,
       orderBy: { caughtAt: 'desc' as const },
       select: {
          id: true,
          title: true,
          caughtAt: true,
+         images: {
+            take: 1,
+            orderBy: { position: 'asc' as const },
+            include: {
+               image: { select: { id: true, url: true, storageKey: true } },
+            },
+         },
          species: { select: { commonName: true } },
          createdBy: { select: { displayName: true, username: true } },
       },
    },
+};
+
+const mapWeatherSnapshotToCatchData = (
+   weatherSnapshot?: WeatherSnapshotInput | null
+) => {
+   if (!weatherSnapshot) {
+      return {
+         weatherCurrentTime: null,
+         weatherTimeZoneId: null,
+         weatherConditionType: null,
+         weatherConditionText: null,
+         weatherConditionIconBaseUri: null,
+         weatherTemperatureDegrees: null,
+         weatherTemperatureUnit: null,
+         weatherFeelsLikeTemperatureDegrees: null,
+         weatherFeelsLikeTemperatureUnit: null,
+         weatherDewPointDegrees: null,
+         weatherDewPointUnit: null,
+         weatherPrecipitationProbability: null,
+         weatherAirPressureMeanSeaLevelMillibars: null,
+         weatherWindDirectionDegrees: null,
+         weatherWindDirectionCardinal: null,
+         weatherWindSpeedValue: null,
+         weatherWindSpeedUnit: null,
+         weatherWindGustValue: null,
+         weatherWindGustUnit: null,
+         weatherVisibilityDistanceValue: null,
+         weatherVisibilityDistanceUnit: null,
+         weatherIsDaytime: null,
+         weatherRelativeHumidity: null,
+         weatherUvIndex: null,
+         weatherThunderstormProbability: null,
+         weatherCloudCover: null,
+      };
+   }
+
+   return {
+      weatherCurrentTime: null,
+      weatherTimeZoneId: null,
+      weatherConditionType: weatherSnapshot.weatherCondition.description.text,
+      weatherConditionText: weatherSnapshot.weatherCondition.description.text,
+      weatherConditionIconBaseUri: weatherSnapshot.weatherCondition.iconBaseUri,
+      weatherTemperatureDegrees: weatherSnapshot.temperature.degrees,
+      weatherTemperatureUnit: weatherSnapshot.temperature.unit,
+      weatherFeelsLikeTemperatureDegrees: null,
+      weatherFeelsLikeTemperatureUnit: null,
+      weatherDewPointDegrees: null,
+      weatherDewPointUnit: null,
+      weatherPrecipitationProbability: Math.round(
+         weatherSnapshot.precipitation.probability.percent
+      ),
+      weatherAirPressureMeanSeaLevelMillibars: null,
+      weatherWindDirectionDegrees: null,
+      weatherWindDirectionCardinal: weatherSnapshot.wind.direction.cardinal,
+      weatherWindSpeedValue: weatherSnapshot.wind.speed.value,
+      weatherWindSpeedUnit: weatherSnapshot.wind.speed.unit,
+      weatherWindGustValue: weatherSnapshot.wind.gust.value,
+      weatherWindGustUnit: weatherSnapshot.wind.gust.unit,
+      weatherVisibilityDistanceValue: null,
+      weatherVisibilityDistanceUnit: null,
+      weatherIsDaytime: null,
+      weatherRelativeHumidity: null,
+      weatherUvIndex: null,
+      weatherThunderstormProbability: null,
+      weatherCloudCover: Math.round(weatherSnapshot.cloudCover),
+   };
 };
 
 const buildPlaceholderIdentity = (clerkId: string) => {
@@ -246,6 +334,8 @@ export const fishingService = {
          select: {
             id: true,
             name: true,
+            latitude: true,
+            longitude: true,
          },
       });
    },
@@ -260,6 +350,10 @@ export const fishingService = {
          location: coordinates,
          weather,
       };
+   },
+
+   async getCurrentWeatherByCoordinates(latitude: number, longitude: number) {
+      return getCurrentWeather(latitude, longitude);
    },
 
    async createCatch(clerkId: string, input: CreateCatchInput) {
@@ -287,7 +381,8 @@ export const fishingService = {
                length: input.length,
                count: input.count ?? 1,
                weather: input.weather,
-               waterTemp: input.waterTemp,
+               waterTemp: null,
+               ...mapWeatherSnapshotToCatchData(input.weatherSnapshot),
                depth: input.depth,
                gears: {
                   connect: validGears.map((gear) => ({ id: gear.id })),
@@ -303,35 +398,46 @@ export const fishingService = {
          }
 
          for (const [position, image] of input.images.entries()) {
-            const normalizedUrl = stripSignedUrlParams(image.url);
-            const createdImage = await tx.image.upsert({
-               where: { storageKey: image.storageKey },
-               create: {
-                  uploadedById: user.id,
-                  storageKey: image.storageKey,
-                  url: normalizedUrl,
-               },
-               update: {
-                  url: normalizedUrl,
-               },
-            });
+            try {
+               const normalizedUrl = stripSignedUrlParams(image.url);
+               const createdImage = await tx.image.upsert({
+                  where: { storageKey: image.storageKey },
+                  create: {
+                     uploadedById: user.id,
+                     storageKey: image.storageKey,
+                     url: normalizedUrl,
+                  },
+                  update: {
+                     url: normalizedUrl,
+                  },
+               });
 
-            await tx.catchImage.upsert({
-               where: {
-                  catchId_imageId: {
+               await tx.catchImage.upsert({
+                  where: {
+                     catchId_imageId: {
+                        catchId: catchRecord.id,
+                        imageId: createdImage.id,
+                     },
+                  },
+                  create: {
                      catchId: catchRecord.id,
                      imageId: createdImage.id,
+                     position,
                   },
-               },
-               create: {
-                  catchId: catchRecord.id,
-                  imageId: createdImage.id,
-                  position,
-               },
-               update: {
-                  position,
-               },
-            });
+                  update: {
+                     position,
+                  },
+               });
+            } catch (error) {
+               console.warn(
+                  '[fishing:create] Failed to persist one catch image; continuing without it.',
+                  {
+                     catchId: catchRecord.id,
+                     storageKey: image.storageKey,
+                     error,
+                  }
+               );
+            }
          }
 
          await tx.feedPost.create({
@@ -371,16 +477,28 @@ export const fishingService = {
    async listMyCatches(clerkId: string) {
       const user = await getUserByClerkId(clerkId);
 
-      return prisma.catch.findMany({
+      const catches = await prisma.catch.findMany({
          where: { createdById: user.id, deletedAt: null },
          orderBy: { caughtAt: 'desc' },
          select: {
             id: true,
             title: true,
             caughtAt: true,
+            count: true,
+            length: true,
+            weight: true,
             site: { select: { id: true, name: true } },
+            images: {
+               take: 1,
+               orderBy: { position: 'asc' },
+               include: {
+                  image: { select: { id: true, url: true, storageKey: true } },
+               },
+            },
          },
       });
+
+      return Promise.all(catches.map((entry) => withResolvedImageUrls(entry)));
    },
 
    async updateCatch(
@@ -435,7 +553,8 @@ export const fishingService = {
                length: input.length,
                count: input.count ?? 1,
                weather: input.weather,
-               waterTemp: input.waterTemp,
+               waterTemp: null,
+               ...mapWeatherSnapshotToCatchData(input.weatherSnapshot),
                depth: input.depth,
                gears: {
                   set: validGears.map((gear) => ({ id: gear.id })),
@@ -543,13 +662,23 @@ export const fishingService = {
          return null;
       }
 
-      return withResolvedImageUrls(site);
+      const siteWithResolvedImages = await withResolvedImageUrls(site);
+      const catchesWithResolvedImages = await Promise.all(
+         siteWithResolvedImages.catches.map((entry) =>
+            withResolvedImageUrls(entry)
+         )
+      );
+
+      return {
+         ...siteWithResolvedImages,
+         catches: catchesWithResolvedImages,
+      };
    },
 
    async listMyFishingSites(clerkId: string) {
       const user = await getUserByClerkId(clerkId);
 
-      return prisma.fishingSite.findMany({
+      const sites = await prisma.fishingSite.findMany({
          where: { createdById: user.id, deletedAt: null },
          orderBy: { createdAt: 'desc' },
          select: {
@@ -557,8 +686,17 @@ export const fishingService = {
             name: true,
             createdAt: true,
             catchCount: true,
+            images: {
+               take: 1,
+               orderBy: { position: 'asc' },
+               include: {
+                  image: { select: { id: true, url: true, storageKey: true } },
+               },
+            },
          },
       });
+
+      return Promise.all(sites.map((entry) => withResolvedImageUrls(entry)));
    },
 
    async updateFishingSite(

@@ -5,6 +5,11 @@ import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { Button } from '@/components/ui/button';
+import {
+   formatCardinal,
+   toMetricTemperature,
+   toMetricWindSpeed,
+} from '@/lib/weather';
 
 type CatchDetail = {
    id: string;
@@ -12,12 +17,28 @@ type CatchDetail = {
    notes: string | null;
    caughtAt: string;
    weather: string | null;
-   waterTemp: number | null;
+   weatherConditionText: string | null;
+   weatherTemperatureDegrees: number | null;
+   weatherTemperatureUnit: string | null;
+   weatherPrecipitationProbability: number | null;
+   weatherWindDirectionCardinal: string | null;
+   weatherWindSpeedValue: number | null;
+   weatherWindSpeedUnit: string | null;
+   weatherWindGustValue: number | null;
+   weatherWindGustUnit: string | null;
+   weatherCloudCover: number | null;
+   weatherRelativeHumidity: number | null;
+   weatherUvIndex: number | null;
    depth: number | null;
    count: number;
    length: number | null;
    weight: number | null;
-   site: { id: string; name: string } | null;
+   site: {
+      id: string;
+      name: string;
+      latitude: number | null;
+      longitude: number | null;
+   } | null;
    species: { commonName: string } | null;
    gears: {
       id: string;
@@ -45,6 +66,74 @@ export function CatchDetailPage() {
 
    const images = useMemo(() => data?.images ?? [], [data?.images]);
    const canSlide = images.length > 1;
+
+   const conditions = useMemo(() => {
+      if (!data) {
+         return [];
+      }
+
+      return [
+         {
+            label: 'Overview',
+            value: data.weather ?? data.weatherConditionText,
+         },
+         {
+            label: 'Temperature',
+            value:
+               data.weatherTemperatureDegrees !== null
+                  ? toMetricTemperature(
+                       data.weatherTemperatureDegrees,
+                       data.weatherTemperatureUnit
+                    )
+                  : null,
+         },
+         {
+            label: 'Precipitation',
+            value:
+               data.weatherPrecipitationProbability !== null
+                  ? `${data.weatherPrecipitationProbability}%`
+                  : null,
+         },
+         {
+            label: 'Wind',
+            value:
+               data.weatherWindSpeedValue !== null
+                  ? `${formatCardinal(data.weatherWindDirectionCardinal)} ${toMetricWindSpeed(data.weatherWindSpeedValue, data.weatherWindSpeedUnit) ?? ''}`.trim()
+                  : null,
+         },
+         {
+            label: 'Wind gusts',
+            value:
+               data.weatherWindGustValue !== null
+                  ? toMetricWindSpeed(
+                       data.weatherWindGustValue,
+                       data.weatherWindGustUnit
+                    )
+                  : null,
+         },
+         {
+            label: 'Cloud cover',
+            value:
+               data.weatherCloudCover !== null
+                  ? `${data.weatherCloudCover}%`
+                  : null,
+         },
+         {
+            label: 'Humidity',
+            value:
+               data.weatherRelativeHumidity !== null
+                  ? `${data.weatherRelativeHumidity}%`
+                  : null,
+         },
+         {
+            label: 'UV index',
+            value:
+               data.weatherUvIndex !== null
+                  ? String(data.weatherUvIndex)
+                  : null,
+         },
+      ].filter((item) => Boolean(item.value));
+   }, [data]);
 
    return (
       <div className="min-h-screen">
@@ -136,24 +225,80 @@ export function CatchDetailPage() {
                            </div>
                         )}
                      </div>
-                     <p>
-                        Conditions: {data.weather ?? 'Not specified'} | Water
-                        temp: {data.waterTemp ?? '—'}
-                     </p>
-                     <p>
-                        Size: {data.length ?? '—'} length / {data.weight ?? '—'}{' '}
-                        weight
-                     </p>
+                     <div className="space-y-2">
+                        <p className="font-medium">Conditions</p>
+                        {conditions.length === 0 ? (
+                           <p className="text-sm text-muted-foreground">
+                              No conditions recorded.
+                           </p>
+                        ) : (
+                           <ul className="grid gap-2 sm:grid-cols-2">
+                              {conditions.map((condition) => (
+                                 <li
+                                    key={condition.label}
+                                    className="rounded-lg border bg-slate-50 p-3"
+                                 >
+                                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                       {condition.label}
+                                    </p>
+                                    <p className="text-sm font-semibold text-slate-900">
+                                       {condition.value}
+                                    </p>
+                                 </li>
+                              ))}
+                           </ul>
+                        )}
+                     </div>
+                     <div className="space-y-2">
+                        <p className="font-medium">Size</p>
+                        <ul className="grid gap-2 sm:grid-cols-2">
+                           <li className="rounded-lg border bg-slate-50 p-3">
+                              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                 Length
+                              </p>
+                              <p className="text-sm font-semibold text-slate-900">
+                                 {data.length !== null
+                                    ? `${data.length} cm`
+                                    : '—'}
+                              </p>
+                           </li>
+                           <li className="rounded-lg border bg-slate-50 p-3">
+                              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                 Weight
+                              </p>
+                              <p className="text-sm font-semibold text-slate-900">
+                                 {data.weight !== null
+                                    ? `${data.weight} kg`
+                                    : '—'}
+                              </p>
+                           </li>
+                        </ul>
+                     </div>
                      {data.site && (
-                        <p>
-                           Site:{' '}
-                           <Link
-                              className="underline"
-                              to={`/sites/${data.site.id}`}
-                           >
-                              {data.site.name}
-                           </Link>
-                        </p>
+                        <section className="space-y-2">
+                           <p className="font-medium">Site</p>
+                           <p>
+                              <Link
+                                 className="underline"
+                                 to={`/sites/${data.site.id}`}
+                              >
+                                 {data.site.name}
+                              </Link>
+                           </p>
+                           {data.site.latitude !== null &&
+                           data.site.longitude !== null ? (
+                              <iframe
+                                 title={`Map for ${data.site.name}`}
+                                 src={`https://maps.google.com/maps?q=${data.site.latitude},${data.site.longitude}&z=14&output=embed`}
+                                 loading="lazy"
+                                 className="h-64 w-full rounded-lg border"
+                              />
+                           ) : (
+                              <p className="text-sm text-muted-foreground">
+                                 No coordinates recorded for this site.
+                              </p>
+                           )}
+                        </section>
                      )}
                      {data.notes && (
                         <p className="whitespace-pre-line">{data.notes}</p>

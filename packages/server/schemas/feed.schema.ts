@@ -8,6 +8,8 @@ export const listFeedSchema = z.object({
    type: feedTypeSchema.optional(),
    latitude: z.coerce.number().min(-90).max(90).optional(),
    longitude: z.coerce.number().min(-180).max(180).optional(),
+   limit: z.coerce.number().int().min(1).max(100).optional().default(25),
+   offset: z.coerce.number().int().min(0).optional().default(0),
 });
 
 export const createFeedPostSchema = z

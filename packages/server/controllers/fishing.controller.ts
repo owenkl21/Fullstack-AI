@@ -4,6 +4,7 @@ import {
    createCatchSchema,
    createFishingSiteSchema,
    fishingRequestSchema,
+   weatherLookupSchema,
    updateCatchSchema,
    updateFishingSiteSchema,
 } from '../schemas/fishing.schema';
@@ -18,6 +19,42 @@ const asSingleParam = (value: string | string[] | undefined) =>
    Array.isArray(value) ? value[0] : value;
 
 export const fishingController = {
+   async getCurrentWeatherByCoordinates(req: Request, res: Response) {
+      const parseResult = weatherLookupSchema.safeParse(req.query);
+
+      if (!parseResult.success) {
+         return res.status(400).json(parseResult.error.format());
+      }
+
+      try {
+         const weather = await fishingService.getCurrentWeatherByCoordinates(
+            parseResult.data.latitude,
+            parseResult.data.longitude
+         );
+
+         return res.json({ weather });
+      } catch (error) {
+         const message = error instanceof Error ? error.message : String(error);
+
+         console.warn(
+            'Failed to get weather by coordinates; returning null snapshot.',
+            {
+               latitude: parseResult.data.latitude,
+               longitude: parseResult.data.longitude,
+               message,
+            }
+         );
+
+         return res.json({
+            weather: null,
+            weatherError:
+               process.env.NODE_ENV === 'production'
+                  ? 'Weather lookup failed.'
+                  : message,
+         });
+      }
+   },
+
    async getConditions(req: Request, res: Response) {
       const parseResult = fishingRequestSchema.safeParse(req.body);
 
