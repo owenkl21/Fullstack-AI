@@ -227,15 +227,18 @@ export function CatchDetailPage() {
                               No conditions recorded.
                            </p>
                         ) : (
-                           <ul className="space-y-1 text-sm">
+                           <ul className="grid gap-2 sm:grid-cols-2">
                               {conditions.map((condition) => (
-                                 <li key={condition.label}>
-                                    <span className="font-medium">
-                                       {condition.label}:
-                                    </span>{' '}
-                                    <span className="text-muted-foreground">
+                                 <li
+                                    key={condition.label}
+                                    className="rounded-lg border bg-slate-50 p-3"
+                                 >
+                                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                                       {condition.label}
+                                    </p>
+                                    <p className="text-sm font-semibold text-slate-900">
                                        {condition.value}
-                                    </span>
+                                    </p>
                                  </li>
                               ))}
                            </ul>
