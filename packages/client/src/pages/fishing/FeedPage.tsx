@@ -11,9 +11,15 @@ import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+   Carousel,
+   CarouselContent,
+   CarouselItem,
+   CarouselNext,
+   CarouselPrevious,
+} from '@/components/ui/carousel';
 import { Slider } from '@/components/ui/slider';
 import { toast } from '@/components/ui/use-toast';
-import { cn } from '@/lib/utils';
 
 type FeedPost = {
    id: string;
@@ -337,28 +343,32 @@ export function FeedPage() {
                               </div>
 
                               {postImages.length > 0 ? (
-                                 <div
-                                    className={cn(
-                                       'grid gap-1 bg-muted/30',
-                                       postImages.length === 1
-                                          ? 'grid-cols-1'
-                                          : 'grid-cols-1 sm:grid-cols-2'
-                                    )}
-                                 >
-                                    {postImages.map((entry) => (
-                                       <img
-                                          key={entry.image.id}
-                                          src={entry.image.url}
-                                          alt="Post"
-                                          className={cn(
-                                             'w-full',
-                                             postImages.length === 1
-                                                ? 'h-auto max-h-[32rem] object-contain'
-                                                : 'h-64 object-cover sm:h-72'
-                                          )}
-                                          loading="lazy"
-                                       />
-                                    ))}
+                                 <div className="bg-muted/20 px-4">
+                                    <Carousel className="mx-auto w-full max-w-3xl">
+                                       <CarouselContent className="ml-0">
+                                          {postImages.map((entry) => (
+                                             <CarouselItem
+                                                key={entry.image.id}
+                                                className="pl-0"
+                                             >
+                                                <div className="relative h-[28rem] w-full overflow-hidden bg-muted sm:h-[32rem]">
+                                                   <img
+                                                      src={entry.image.url}
+                                                      alt="Post"
+                                                      className="h-full w-full object-cover"
+                                                      loading="lazy"
+                                                   />
+                                                </div>
+                                             </CarouselItem>
+                                          ))}
+                                       </CarouselContent>
+                                       {postImages.length > 1 ? (
+                                          <>
+                                             <CarouselPrevious className="left-2 border-background/80 bg-background/90 hover:bg-background" />
+                                             <CarouselNext className="right-2 border-background/80 bg-background/90 hover:bg-background" />
+                                          </>
+                                       ) : null}
+                                    </Carousel>
                                  </div>
                               ) : null}
 
