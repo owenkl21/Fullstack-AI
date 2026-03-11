@@ -50,6 +50,7 @@ type FeedPost = {
       avatarUrl?: string | null;
    };
    authorFollowedByMe?: boolean;
+   authorIsMe?: boolean;
    comments: Array<{
       id: string;
       body: string;
@@ -356,7 +357,7 @@ export function FeedPage() {
                                     </p>
 
                                     {isSignedIn ? (
-                                       post.authorFollowedByMe ? (
+                                       post.authorIsMe ? null : post.authorFollowedByMe ? (
                                           <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
                                              <Check className="size-3" />
                                              Following
