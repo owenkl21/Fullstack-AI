@@ -1,11 +1,18 @@
 import axios from 'axios';
 import { useClerk, useUser } from '@clerk/react';
 import { CalendarDays, Database, UserCircle2 } from 'lucide-react';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+   Dialog,
+   DialogContent,
+   DialogDescription,
+   DialogHeader,
+   DialogTitle,
+} from '@/components/ui/dialog';
 import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { toast } from '@/components/ui/use-toast';
 
@@ -32,6 +39,13 @@ type UserProfile = {
 type ProfileResponse = {
    profile: UserProfile;
    storage?: 'database' | 'clerk_fallback';
+};
+
+type ConnectionUser = {
+   id: string;
+   username: string;
+   displayName: string;
+   avatarUrl: string | null;
 };
 
 const extractStorageKey = (value: string | null | undefined) => {
@@ -86,6 +100,12 @@ export function ProfileSettingsPanel() {
    >([]);
    const [isLoading, setIsLoading] = useState(true);
    const [isSaving, setIsSaving] = useState(false);
+   const [connectionsDialog, setConnectionsDialog] = useState<
+      'followers' | 'following' | null
+   >(null);
+   const [connectionsSearch, setConnectionsSearch] = useState('');
+   const [connections, setConnections] = useState<ConnectionUser[]>([]);
+   const [isConnectionsLoading, setIsConnectionsLoading] = useState(false);
 
    useEffect(() => {
       const loadProfile = async () => {
@@ -123,6 +143,49 @@ export function ProfileSettingsPanel() {
 
       void loadProfile();
    }, []);
+
+   useEffect(() => {
+      const loadConnections = async () => {
+         if (!connectionsDialog) {
+            return;
+         }
+
+         try {
+            setIsConnectionsLoading(true);
+            const { data } = await axios.get<{ users: ConnectionUser[] }>(
+               '/api/users/me/connections',
+               {
+                  params: {
+                     type: connectionsDialog,
+                     search: connectionsSearch.trim(),
+                  },
+               }
+            );
+            setConnections(data.users ?? []);
+         } catch (error) {
+            console.error(error);
+            toast({
+               title: 'Unable to load connections',
+               description: 'Please try again.',
+               variant: 'error',
+            });
+         } finally {
+            setIsConnectionsLoading(false);
+         }
+      };
+
+      void loadConnections();
+   }, [connectionsDialog, connectionsSearch]);
+
+   const connectionsTitle = useMemo(() => {
+      if (connectionsDialog === 'followers') {
+         return 'Followers';
+      }
+      if (connectionsDialog === 'following') {
+         return 'Following';
+      }
+      return '';
+   }, [connectionsDialog]);
 
    const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -247,22 +310,36 @@ export function ProfileSettingsPanel() {
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
-                     <div className="rounded-lg border border-border bg-background p-4">
+                     <button
+                        type="button"
+                        className="rounded-lg border border-border bg-background p-4 text-left"
+                        onClick={() => {
+                           setConnectionsSearch('');
+                           setConnectionsDialog('followers');
+                        }}
+                     >
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">
                            Followers
                         </p>
                         <p className="mt-1 text-2xl font-semibold">
                            {profile?.followersCount ?? 0}
                         </p>
-                     </div>
-                     <div className="rounded-lg border border-border bg-background p-4">
+                     </button>
+                     <button
+                        type="button"
+                        className="rounded-lg border border-border bg-background p-4 text-left"
+                        onClick={() => {
+                           setConnectionsSearch('');
+                           setConnectionsDialog('following');
+                        }}
+                     >
                         <p className="text-xs uppercase tracking-wide text-muted-foreground">
                            Following
                         </p>
                         <p className="mt-1 text-2xl font-semibold">
                            {profile?.followingCount ?? 0}
                         </p>
-                     </div>
+                     </button>
                   </div>
 
                   <div className="space-y-3">
@@ -367,6 +444,72 @@ export function ProfileSettingsPanel() {
                   </form>
                </div>
             )}
+
+            <Dialog
+               open={Boolean(connectionsDialog)}
+               onOpenChange={(open) => {
+                  if (!open) {
+                     setConnectionsDialog(null);
+                  }
+               }}
+            >
+               <DialogContent>
+                  <DialogHeader>
+                     <DialogTitle>{connectionsTitle}</DialogTitle>
+                     <DialogDescription>
+                        Browse and search your {connectionsTitle.toLowerCase()}{' '}
+                        list.
+                     </DialogDescription>
+                  </DialogHeader>
+                  <input
+                     type="text"
+                     value={connectionsSearch}
+                     onChange={(event) =>
+                        setConnectionsSearch(event.target.value)
+                     }
+                     placeholder="Search by name or username"
+                     className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                  <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                     {isConnectionsLoading ? (
+                        <p className="text-sm text-muted-foreground">
+                           Loading...
+                        </p>
+                     ) : connections.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                           No users found.
+                        </p>
+                     ) : (
+                        connections.map((entry) => (
+                           <div
+                              key={entry.id}
+                              className="flex items-center gap-3 rounded-md border border-border px-3 py-2"
+                           >
+                              {entry.avatarUrl ? (
+                                 <img
+                                    src={entry.avatarUrl}
+                                    alt={entry.displayName}
+                                    className="size-10 rounded-full object-cover"
+                                 />
+                              ) : (
+                                 <span className="inline-flex size-10 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+                                    <UserCircle2 className="size-5" />
+                                 </span>
+                              )}
+                              <div className="min-w-0">
+                                 <p className="truncate text-sm font-medium">
+                                    {entry.displayName}
+                                 </p>
+                                 <p className="truncate text-xs text-muted-foreground">
+                                    @{entry.username}
+                                 </p>
+                              </div>
+                           </div>
+                        ))
+                     )}
+                  </div>
+               </DialogContent>
+            </Dialog>
          </Card>
       </section>
    );

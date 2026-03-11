@@ -141,6 +141,11 @@ router.patch(
    requireApiAuth,
    userController.updateCurrentProfile
 );
+router.get(
+   '/api/users/me/connections',
+   requireApiAuth,
+   userController.listMyConnections
+);
 router.post(
    '/api/users/:userId/follow',
    requireApiAuth,

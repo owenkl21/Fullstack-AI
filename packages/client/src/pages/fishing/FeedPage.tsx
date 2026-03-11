@@ -14,6 +14,14 @@ import { LandingHeader } from '@/components/landing/LandingHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
+   Dialog,
+   DialogContent,
+   DialogDescription,
+   DialogFooter,
+   DialogHeader,
+   DialogTitle,
+} from '@/components/ui/dialog';
+import {
    Carousel,
    CarouselContent,
    CarouselItem,
@@ -98,6 +106,10 @@ export function FeedPage() {
    const [hasMore, setHasMore] = useState(true);
    const [isLoading, setIsLoading] = useState(false);
    const [isLoadingMore, setIsLoadingMore] = useState(false);
+   const [pendingUnfollow, setPendingUnfollow] = useState<{
+      id: string;
+      username: string;
+   } | null>(null);
 
    const load = async (input?: { reset?: boolean }) => {
       const reset = Boolean(input?.reset);
@@ -255,6 +267,13 @@ export function FeedPage() {
       await load({ reset: true });
    };
 
+   const unfollow = async (authorId: string) => {
+      await axios.delete(`/api/users/${authorId}/follow`);
+      setOffset(0);
+      setHasMore(true);
+      await load({ reset: true });
+   };
+
    const toggleComments = (postId: string) => {
       setExpandedComments((prev) => ({
          ...prev,
@@ -360,10 +379,20 @@ export function FeedPage() {
 
                                     {isSignedIn ? (
                                        isOwnPost ? null : isFollowingAuthor ? (
-                                          <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                                          <button
+                                             type="button"
+                                             className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
+                                             onClick={() =>
+                                                setPendingUnfollow({
+                                                   id: post.author.id,
+                                                   username:
+                                                      post.author.username,
+                                                })
+                                             }
+                                          >
                                              <Check className="size-3" />
                                              Following
-                                          </span>
+                                          </button>
                                        ) : (
                                           <Button
                                              type="button"
@@ -540,6 +569,46 @@ export function FeedPage() {
                ) : null}
             </section>
          </main>
+
+         <Dialog
+            open={Boolean(pendingUnfollow)}
+            onOpenChange={(open) => {
+               if (!open) {
+                  setPendingUnfollow(null);
+               }
+            }}
+         >
+            <DialogContent>
+               <DialogHeader>
+                  <DialogTitle>Unfollow user</DialogTitle>
+                  <DialogDescription>
+                     Do you want to unfollow @{pendingUnfollow?.username}?
+                  </DialogDescription>
+               </DialogHeader>
+               <DialogFooter>
+                  <Button
+                     type="button"
+                     variant="outline"
+                     onClick={() => setPendingUnfollow(null)}
+                  >
+                     Cancel
+                  </Button>
+                  <Button
+                     type="button"
+                     onClick={() => {
+                        if (!pendingUnfollow) {
+                           return;
+                        }
+
+                        void unfollow(pendingUnfollow.id);
+                        setPendingUnfollow(null);
+                     }}
+                  >
+                     Unfollow
+                  </Button>
+               </DialogFooter>
+            </DialogContent>
+         </Dialog>
       </div>
    );
 }

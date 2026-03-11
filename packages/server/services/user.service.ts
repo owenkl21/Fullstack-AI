@@ -40,6 +40,13 @@ type ProfileResult = {
    storage: 'database' | 'clerk_fallback';
 };
 
+type ConnectionUser = {
+   id: string;
+   username: string;
+   displayName: string;
+   avatarUrl: string | null;
+};
+
 const maybeResolveAvatarReadUrl = async (avatarValue: string | null) => {
    if (!avatarValue) {
       return null;
@@ -659,6 +666,111 @@ export const userService = {
       return { following: true } as const;
    },
 
+   async listConnectionsByClerkId(
+      clerkUserId: string,
+      type: 'followers' | 'following',
+      search?: string
+   ) {
+      const actor = await this.syncAuthenticatedUser(clerkUserId);
+      const normalizedSearch = search?.trim();
+
+      const whereClause =
+         type === 'followers'
+            ? {
+                 followingId: actor.id,
+                 follower: {
+                    deletedAt: null,
+                    ...(normalizedSearch
+                       ? {
+                            OR: [
+                               {
+                                  username: {
+                                     contains: normalizedSearch,
+                                     mode: 'insensitive' as const,
+                                  },
+                               },
+                               {
+                                  displayName: {
+                                     contains: normalizedSearch,
+                                     mode: 'insensitive' as const,
+                                  },
+                               },
+                            ],
+                         }
+                       : {}),
+                 },
+              }
+            : {
+                 followerId: actor.id,
+                 following: {
+                    deletedAt: null,
+                    ...(normalizedSearch
+                       ? {
+                            OR: [
+                               {
+                                  username: {
+                                     contains: normalizedSearch,
+                                     mode: 'insensitive' as const,
+                                  },
+                               },
+                               {
+                                  displayName: {
+                                     contains: normalizedSearch,
+                                     mode: 'insensitive' as const,
+                                  },
+                               },
+                            ],
+                         }
+                       : {}),
+                 },
+              };
+
+      const rows = await prisma.follow.findMany({
+         where: whereClause,
+         orderBy: { createdAt: 'desc' },
+         select:
+            type === 'followers'
+               ? {
+                    follower: {
+                       select: {
+                          id: true,
+                          username: true,
+                          displayName: true,
+                          avatarUrl: true,
+                       },
+                    },
+                 }
+               : {
+                    following: {
+                       select: {
+                          id: true,
+                          username: true,
+                          displayName: true,
+                          avatarUrl: true,
+                       },
+                    },
+                 },
+      });
+
+      const users: ConnectionUser[] = await Promise.all(
+         rows.map(async (entry: any) => {
+            const target =
+               type === 'followers' ? entry.follower : entry.following;
+            const resolvedAvatar = await maybeResolveAvatarReadUrl(
+               target.avatarUrl
+            );
+
+            return {
+               id: target.id,
+               username: target.username,
+               displayName: target.displayName,
+               avatarUrl: resolvedAvatar,
+            };
+         })
+      );
+
+      return users;
+   },
    async unfollowByClerkId(clerkUserId: string, targetUserId: string) {
       const actor = await this.syncAuthenticatedUser(clerkUserId);
 
