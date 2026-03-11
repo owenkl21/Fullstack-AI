@@ -1,5 +1,4 @@
 import { Fish, LayoutGrid, MapPin, Plus, Radio, Wrench } from 'lucide-react';
-import { useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -22,56 +21,22 @@ const desktopDockItems = [
 ] as const;
 
 export function FishingActionBar() {
-   const [dockMagnification, setDockMagnification] = useState<number[]>(() =>
-      desktopDockItems.map(() => 0)
-   );
-   const itemRefs = useRef<Array<HTMLAnchorElement | null>>([]);
-
-   const updateDockMagnification = (pointerX: number) => {
-      const influence = 120;
-      setDockMagnification(
-         desktopDockItems.map((_, index) => {
-            const item = itemRefs.current[index];
-            if (!item) {
-               return 0;
-            }
-
-            const itemRect = item.getBoundingClientRect();
-            const itemCenter = itemRect.left + itemRect.width / 2;
-            const distance = Math.abs(pointerX - itemCenter);
-            return Math.max(0, (influence - distance) / influence);
-         })
-      );
-   };
-
    return (
       <>
          <nav className="pointer-events-none fixed inset-x-0 top-[5.25rem] z-40 hidden justify-center px-4 md:flex">
-            <div
-               className="pointer-events-auto flex items-end gap-2 rounded-full border border-border/70 bg-background/95 px-2 py-2 shadow-[0_8px_30px_rgb(0_0_0_/_0.12)] backdrop-blur"
-               onMouseMove={(event) => updateDockMagnification(event.clientX)}
-               onMouseLeave={() =>
-                  setDockMagnification(desktopDockItems.map(() => 0))
-               }
-            >
-               {desktopDockItems.map(({ to, label, icon: Icon }, index) => (
+            <div className="pointer-events-auto flex items-end gap-2 rounded-full border border-border/70 bg-background/95 px-2 py-2 shadow-[0_8px_30px_rgb(0_0_0_/_0.12)] backdrop-blur">
+               {desktopDockItems.map(({ to, label, icon: Icon }) => (
                   <NavLink
                      key={to}
                      to={to}
-                     ref={(element) => {
-                        itemRefs.current[index] = element;
-                     }}
                      className={({ isActive }) =>
                         cn(
-                           'group relative flex h-12 w-12 items-center justify-center rounded-full transition-[transform,background-color,color,box-shadow] duration-200',
+                           'group relative flex h-12 w-12 items-center justify-center rounded-full transition-[transform,background-color,color,box-shadow] duration-200 hover:-translate-y-1 hover:scale-110 focus-visible:-translate-y-1 focus-visible:scale-110',
                            isActive
                               ? 'bg-primary/15 text-primary shadow-sm'
                               : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                         )
                      }
-                     style={{
-                        transform: `translateY(${-dockMagnification[index] * 16}px) scale(${1 + dockMagnification[index] * 0.75})`,
-                     }}
                      aria-label={label}
                      title={label}
                   >
