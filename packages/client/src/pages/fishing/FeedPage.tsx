@@ -70,6 +70,7 @@ export function FeedPage() {
       latitude: number;
       longitude: number;
    } | null>(null);
+   const [locationError, setLocationError] = useState<string | null>(null);
    const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>(
       {}
    );
@@ -93,7 +94,7 @@ export function FeedPage() {
          }
 
          const params: Record<string, string | number> = {
-            scope,
+            scope: scope === 'NEARBY' ? 'GLOBAL' : scope,
             limit: pageSize,
             offset: targetOffset,
          };
@@ -101,26 +102,39 @@ export function FeedPage() {
             params.type = type;
          }
 
-         if (scope === 'NEARBY' && navigator.geolocation) {
-            await new Promise<void>((resolve) => {
-               navigator.geolocation.getCurrentPosition(
-                  (position) => {
-                     const coords = {
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                     };
-                     params.latitude = coords.latitude;
-                     params.longitude = coords.longitude;
-                     setCurrentPosition(coords);
-                     resolve();
-                  },
-                  () => {
-                     setCurrentPosition(null);
-                     resolve();
-                  },
-                  { enableHighAccuracy: false, timeout: 1500 }
+         if (scope === 'NEARBY') {
+            if (!navigator.geolocation) {
+               setCurrentPosition(null);
+               setLocationError(
+                  'Geolocation is not available in this browser.'
                );
-            });
+            } else {
+               await new Promise<void>((resolve) => {
+                  navigator.geolocation.getCurrentPosition(
+                     (position) => {
+                        const coords = {
+                           latitude: position.coords.latitude,
+                           longitude: position.coords.longitude,
+                        };
+                        params.latitude = coords.latitude;
+                        params.longitude = coords.longitude;
+                        setCurrentPosition(coords);
+                        setLocationError(null);
+                        resolve();
+                     },
+                     () => {
+                        setCurrentPosition(null);
+                        setLocationError(
+                           'We could not access your location. Enable location access to use Local radius filtering.'
+                        );
+                        resolve();
+                     },
+                     { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                  );
+               });
+            }
+         } else {
+            setLocationError(null);
          }
 
          const { data } = await axios.get('/api/feed', { params });
@@ -174,8 +188,12 @@ export function FeedPage() {
    }, [hasMore, isLoading, isLoadingMore, offset, scope, type]);
 
    const visiblePosts = useMemo(() => {
-      if (scope !== 'NEARBY' || !currentPosition) {
+      if (scope !== 'NEARBY') {
          return posts;
+      }
+
+      if (!currentPosition) {
+         return [];
       }
 
       return posts.filter((post) => {
@@ -276,6 +294,11 @@ export function FeedPage() {
                         value={[radiusKm]}
                         onValueChange={(value) => setRadiusKm(value[0] ?? 0)}
                      />
+                     {locationError ? (
+                        <p className="mt-2 text-sm text-destructive">
+                           {locationError}
+                        </p>
+                     ) : null}
                   </div>
                ) : null}
 
@@ -313,13 +336,13 @@ export function FeedPage() {
                               </div>
 
                               {postImages.length > 0 ? (
-                                 <div className="grid grid-cols-1 gap-1 bg-muted/50 sm:grid-cols-2">
+                                 <div className="grid grid-cols-1 gap-1 bg-muted/30 sm:grid-cols-2">
                                     {postImages.map((entry) => (
                                        <img
                                           key={entry.image.id}
                                           src={entry.image.url}
                                           alt="Post"
-                                          className="aspect-square w-full object-cover"
+                                          className="h-64 w-full object-cover sm:h-72"
                                           loading="lazy"
                                        />
                                     ))}
@@ -435,6 +458,13 @@ export function FeedPage() {
                {isLoadingMore ? (
                   <p className="text-sm text-muted-foreground">
                      Loading more posts...
+                  </p>
+               ) : null}
+               {visiblePosts.length === 0 && !isLoading ? (
+                  <p className="text-sm text-muted-foreground">
+                     {scope === 'NEARBY'
+                        ? 'No posts found inside this radius yet.'
+                        : 'No feed posts found.'}
                   </p>
                ) : null}
                {!hasMore && posts.length > 0 ? (
