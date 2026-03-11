@@ -122,6 +122,41 @@ export const userController = {
       return res.json(result);
    },
 
+   listMyConnections: async (req: Request, res: Response) => {
+      const auth = getAuth(req);
+
+      if (!auth.userId) {
+         return res.status(401).json({
+            code: 'unauthorized',
+            message: 'Authentication required.',
+         });
+      }
+
+      const typeParam = String(req.query.type ?? 'followers');
+      const type =
+         typeParam === 'following'
+            ? 'following'
+            : typeParam === 'followers'
+              ? 'followers'
+              : null;
+
+      if (!type) {
+         return res.status(400).json({
+            code: 'invalid_connection_type',
+            message: 'Connection type must be followers or following.',
+         });
+      }
+
+      const search = String(req.query.search ?? '').trim();
+      const users = await userService.listConnectionsByClerkId(
+         auth.userId,
+         type,
+         search
+      );
+
+      return res.json({ users });
+   },
+
    unfollowUser: async (req: Request, res: Response) => {
       const auth = getAuth(req);
 
