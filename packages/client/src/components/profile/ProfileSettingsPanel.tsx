@@ -16,6 +16,15 @@ type UserProfile = {
    bio: string | null;
    email: string;
    avatarUrl: string | null;
+   followersCount: number;
+   followingCount: number;
+   galleryImages: Array<{
+      id: string;
+      url: string;
+      sourceType: 'CATCH' | 'SITE';
+      sourceId: string;
+      sourceTitle: string;
+   }>;
    createdAt: string;
    updatedAt: string;
 };
@@ -235,6 +244,56 @@ export function ProfileSettingsPanel() {
                            </p>
                         </div>
                      </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                     <div className="rounded-lg border border-border bg-background p-4">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                           Followers
+                        </p>
+                        <p className="mt-1 text-2xl font-semibold">
+                           {profile?.followersCount ?? 0}
+                        </p>
+                     </div>
+                     <div className="rounded-lg border border-border bg-background p-4">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                           Following
+                        </p>
+                        <p className="mt-1 text-2xl font-semibold">
+                           {profile?.followingCount ?? 0}
+                        </p>
+                     </div>
+                  </div>
+
+                  <div className="space-y-3">
+                     <h2 className="text-lg font-semibold tracking-tight">
+                        Your catches & site images
+                     </h2>
+                     {profile && profile.galleryImages.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                           {profile.galleryImages.map((entry) => (
+                              <div
+                                 key={`${entry.sourceType}-${entry.sourceId}-${entry.id}`}
+                                 className="group relative overflow-hidden rounded-md border border-border bg-muted"
+                              >
+                                 <img
+                                    src={entry.url}
+                                    alt={entry.sourceTitle}
+                                    className="h-32 w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                                    loading="lazy"
+                                 />
+                                 <span className="absolute bottom-2 left-2 rounded bg-background/85 px-2 py-0.5 text-[10px] font-medium">
+                                    {entry.sourceType}
+                                 </span>
+                              </div>
+                           ))}
+                        </div>
+                     ) : (
+                        <p className="text-sm text-muted-foreground">
+                           Add catches or sites with images to build your
+                           gallery.
+                        </p>
+                     )}
                   </div>
 
                   <form className="space-y-4" onSubmit={saveProfile}>

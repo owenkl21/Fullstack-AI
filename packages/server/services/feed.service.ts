@@ -6,7 +6,9 @@ type FeedScope = 'GLOBAL' | 'NEARBY';
 type FeedType = 'CATCH' | 'SITE';
 
 const feedInclude = {
-   author: { select: { id: true, username: true, displayName: true } },
+   author: {
+      select: { id: true, username: true, displayName: true, avatarUrl: true },
+   },
    catch: {
       select: {
          id: true,
@@ -170,6 +172,7 @@ export const feedService = {
          return postsWithResolvedImageUrls.map((post: any) => ({
             ...post,
             likedByMe: false,
+            authorFollowedByMe: false,
          }));
       }
 
@@ -182,9 +185,25 @@ export const feedService = {
       });
       const likedSet = new Set(likes.map((l: any) => l.postId));
 
+      const follows = await prisma.follow.findMany({
+         where: {
+            followerId: input.userId,
+            followingId: {
+               in: postsWithResolvedImageUrls.map(
+                  (post: any) => post.author.id
+               ),
+            },
+         },
+         select: { followingId: true },
+      });
+      const followingSet = new Set(
+         follows.map((entry: any) => entry.followingId)
+      );
+
       return postsWithResolvedImageUrls.map((post: any) => ({
          ...post,
          likedByMe: likedSet.has(post.id),
+         authorFollowedByMe: followingSet.has(post.author.id),
       }));
    },
 

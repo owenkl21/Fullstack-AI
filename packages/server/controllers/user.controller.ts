@@ -81,4 +81,84 @@ export const userController = {
          });
       }
    },
+
+   followUser: async (req: Request, res: Response) => {
+      const auth = getAuth(req);
+
+      if (!auth.userId) {
+         return res.status(401).json({
+            code: 'unauthorized',
+            message: 'Authentication required.',
+         });
+      }
+
+      const targetUserId = String(req.params.userId ?? '');
+      if (!targetUserId) {
+         return res.status(400).json({
+            code: 'invalid_user_id',
+            message: 'Target user id is required.',
+         });
+      }
+
+      const result = await userService.followByClerkId(
+         auth.userId,
+         targetUserId
+      );
+
+      if (!result) {
+         return res.status(404).json({
+            code: 'profile_not_found',
+            message: 'Target profile was not found.',
+         });
+      }
+
+      if ('code' in result && result.code === 'cannot_follow_self') {
+         return res.status(400).json({
+            code: result.code,
+            message: 'You cannot follow yourself.',
+         });
+      }
+
+      return res.json(result);
+   },
+
+   unfollowUser: async (req: Request, res: Response) => {
+      const auth = getAuth(req);
+
+      if (!auth.userId) {
+         return res.status(401).json({
+            code: 'unauthorized',
+            message: 'Authentication required.',
+         });
+      }
+
+      const targetUserId = String(req.params.userId ?? '');
+      if (!targetUserId) {
+         return res.status(400).json({
+            code: 'invalid_user_id',
+            message: 'Target user id is required.',
+         });
+      }
+
+      const result = await userService.unfollowByClerkId(
+         auth.userId,
+         targetUserId
+      );
+
+      if (!result) {
+         return res.status(404).json({
+            code: 'profile_not_found',
+            message: 'Target profile was not found.',
+         });
+      }
+
+      if ('code' in result && result.code === 'cannot_follow_self') {
+         return res.status(400).json({
+            code: result.code,
+            message: 'You cannot unfollow yourself.',
+         });
+      }
+
+      return res.json(result);
+   },
 };

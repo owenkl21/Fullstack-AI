@@ -1,10 +1,12 @@
 import axios from 'axios';
-import { Show } from '@clerk/react';
+import { Show, useAuth } from '@clerk/react';
 import {
+   Check,
    MessageCircle,
    SendHorizontal,
    SlidersHorizontal,
    ThumbsUp,
+   UserPlus,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
@@ -41,7 +43,13 @@ type FeedPost = {
       name: string;
       images: Array<{ image: { id: string; url: string } }>;
    } | null;
-   author: { displayName: string; username: string };
+   author: {
+      id: string;
+      displayName: string;
+      username: string;
+      avatarUrl?: string | null;
+   };
+   authorFollowedByMe?: boolean;
    comments: Array<{
       id: string;
       body: string;
@@ -68,6 +76,7 @@ function distanceInKm(
 }
 
 export function FeedPage() {
+   const { isSignedIn } = useAuth();
    const pageSize = 25;
    const [posts, setPosts] = useState<FeedPost[]>([]);
    const [scope, setScope] = useState<'GLOBAL' | 'NEARBY'>('GLOBAL');
@@ -238,6 +247,13 @@ export function FeedPage() {
       await load({ reset: true });
    };
 
+   const follow = async (authorId: string) => {
+      await axios.post(`/api/users/${authorId}/follow`);
+      setOffset(0);
+      setHasMore(true);
+      await load({ reset: true });
+   };
+
    const toggleComments = (postId: string) => {
       setExpandedComments((prev) => ({
          ...prev,
@@ -330,14 +346,38 @@ export function FeedPage() {
                            className="overflow-hidden gap-0 py-0"
                         >
                            <CardContent className="space-y-3 p-0">
-                              <div className="flex flex-col gap-1 px-4 pt-4 sm:flex-row sm:items-start sm:justify-between">
-                                 <p className="min-w-0 text-sm font-medium leading-tight">
-                                    <span>{post.author.displayName}</span>
-                                    <span className="block min-w-0 truncate text-muted-foreground sm:ml-1 sm:inline sm:max-w-[24ch]">
-                                       @{post.author.username}
-                                    </span>
-                                 </p>
-                                 <p className="shrink-0 text-xs text-muted-foreground">
+                              <div className="flex flex-col gap-2 px-4 pt-4">
+                                 <div className="flex items-start justify-between gap-3">
+                                    <p className="min-w-0 text-sm font-medium leading-tight">
+                                       <span>{post.author.displayName}</span>
+                                       <span className="block min-w-0 truncate text-muted-foreground sm:ml-1 sm:inline sm:max-w-[24ch]">
+                                          @{post.author.username}
+                                       </span>
+                                    </p>
+
+                                    {isSignedIn ? (
+                                       post.authorFollowedByMe ? (
+                                          <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                                             <Check className="size-3" />
+                                             Following
+                                          </span>
+                                       ) : (
+                                          <Button
+                                             type="button"
+                                             size="sm"
+                                             variant="outline"
+                                             className="shrink-0"
+                                             onClick={() =>
+                                                void follow(post.author.id)
+                                             }
+                                          >
+                                             <UserPlus className="size-4" />
+                                             Follow
+                                          </Button>
+                                       )
+                                    ) : null}
+                                 </div>
+                                 <p className="text-xs text-muted-foreground">
                                     {post.type} • {post.scope}
                                  </p>
                               </div>

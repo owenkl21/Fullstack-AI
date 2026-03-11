@@ -141,5 +141,15 @@ router.patch(
    requireApiAuth,
    userController.updateCurrentProfile
 );
+router.post(
+   '/api/users/:userId/follow',
+   requireApiAuth,
+   userController.followUser
+);
+router.delete(
+   '/api/users/:userId/follow',
+   requireApiAuth,
+   userController.unfollowUser
+);
 
 export default router;
