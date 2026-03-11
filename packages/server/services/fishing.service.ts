@@ -479,6 +479,8 @@ export const fishingService = {
             title: true,
             caughtAt: true,
             count: true,
+            length: true,
+            weight: true,
             site: { select: { id: true, name: true } },
             images: {
                take: 1,
