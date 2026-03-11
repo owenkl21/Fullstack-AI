@@ -173,12 +173,15 @@ export const feedService = {
             ...post,
             likedByMe: false,
             authorFollowedByMe: false,
+            authorIsMe: false,
          }));
       }
 
+      const viewerUserId = await getUserId(input.userId);
+
       const likes = await prisma.feedLike.findMany({
          where: {
-            userId: input.userId,
+            userId: viewerUserId,
             postId: { in: postsWithResolvedImageUrls.map((p: any) => p.id) },
          },
          select: { postId: true },
@@ -187,7 +190,7 @@ export const feedService = {
 
       const follows = await prisma.follow.findMany({
          where: {
-            followerId: input.userId,
+            followerId: viewerUserId,
             followingId: {
                in: postsWithResolvedImageUrls.map(
                   (post: any) => post.author.id
@@ -204,6 +207,7 @@ export const feedService = {
          ...post,
          likedByMe: likedSet.has(post.id),
          authorFollowedByMe: followingSet.has(post.author.id),
+         authorIsMe: post.author.id === viewerUserId,
       }));
    },
 
