@@ -662,7 +662,7 @@ export const fishingService = {
    async listMyFishingSites(clerkId: string) {
       const user = await getUserByClerkId(clerkId);
 
-      return prisma.fishingSite.findMany({
+      const sites = await prisma.fishingSite.findMany({
          where: { createdById: user.id, deletedAt: null },
          orderBy: { createdAt: 'desc' },
          select: {
@@ -670,8 +670,17 @@ export const fishingService = {
             name: true,
             createdAt: true,
             catchCount: true,
+            images: {
+               take: 1,
+               orderBy: { position: 'asc' },
+               include: {
+                  image: { select: { id: true, url: true, storageKey: true } },
+               },
+            },
          },
       });
+
+      return Promise.all(sites.map((entry) => withResolvedImageUrls(entry)));
    },
 
    async updateFishingSite(
