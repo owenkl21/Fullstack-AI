@@ -330,14 +330,14 @@ export function FeedPage() {
                            className="overflow-hidden gap-0 py-0"
                         >
                            <CardContent className="space-y-3 p-0">
-                              <div className="flex items-center justify-between px-4 pt-4">
-                                 <p className="text-sm font-medium">
-                                    {post.author.displayName}
-                                    <span className="ml-1 text-muted-foreground">
+                              <div className="flex flex-col gap-1 px-4 pt-4 sm:flex-row sm:items-start sm:justify-between">
+                                 <p className="min-w-0 text-sm font-medium leading-tight">
+                                    <span>{post.author.displayName}</span>
+                                    <span className="block min-w-0 truncate text-muted-foreground sm:ml-1 sm:inline sm:max-w-[24ch]">
                                        @{post.author.username}
                                     </span>
                                  </p>
-                                 <p className="text-xs text-muted-foreground">
+                                 <p className="shrink-0 text-xs text-muted-foreground">
                                     {post.type} • {post.scope}
                                  </p>
                               </div>
