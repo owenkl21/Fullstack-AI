@@ -12,7 +12,9 @@ type CatchSummary = {
    id: string;
    title: string;
    caughtAt: string;
+   count: number;
    site: { id: string; name: string } | null;
+   images: { image: { id: string; url: string } }[];
 };
 
 export function MyCatchesPage() {
@@ -64,19 +66,33 @@ export function MyCatchesPage() {
                      items.map((entry) => (
                         <div
                            key={entry.id}
-                           className="flex flex-wrap items-center justify-between gap-2 rounded border p-3"
+                           className="flex flex-wrap items-center justify-between gap-3 rounded border p-3"
                         >
-                           <div>
-                              <Link
-                                 className="font-medium underline"
-                                 to={`/catches/${entry.id}`}
-                              >
-                                 {entry.title}
-                              </Link>
-                              <p className="text-sm text-muted-foreground">
-                                 {new Date(entry.caughtAt).toLocaleString()} •{' '}
-                                 {entry.site?.name ?? 'No site'}
-                              </p>
+                           <div className="flex min-w-0 items-center gap-3">
+                              {entry.images[0]?.image.url ? (
+                                 <img
+                                    src={entry.images[0].image.url}
+                                    alt={entry.title}
+                                    className="h-14 w-14 rounded-md border object-cover"
+                                 />
+                              ) : (
+                                 <div className="flex h-14 w-14 items-center justify-center rounded-md border text-xs text-muted-foreground">
+                                    No img
+                                 </div>
+                              )}
+                              <div>
+                                 <Link
+                                    className="font-medium underline"
+                                    to={`/catches/${entry.id}`}
+                                 >
+                                    {entry.title}
+                                 </Link>
+                                 <p className="text-sm text-muted-foreground">
+                                    {entry.count} catches •{' '}
+                                    {new Date(entry.caughtAt).toLocaleString()}{' '}
+                                    • {entry.site?.name ?? 'No site'}
+                                 </p>
+                              </div>
                            </div>
                            <div className="flex gap-2">
                               <Button asChild size="sm" variant="outline">

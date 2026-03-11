@@ -471,16 +471,26 @@ export const fishingService = {
    async listMyCatches(clerkId: string) {
       const user = await getUserByClerkId(clerkId);
 
-      return prisma.catch.findMany({
+      const catches = await prisma.catch.findMany({
          where: { createdById: user.id, deletedAt: null },
          orderBy: { caughtAt: 'desc' },
          select: {
             id: true,
             title: true,
             caughtAt: true,
+            count: true,
             site: { select: { id: true, name: true } },
+            images: {
+               take: 1,
+               orderBy: { position: 'asc' },
+               include: {
+                  image: { select: { id: true, url: true, storageKey: true } },
+               },
+            },
          },
       });
+
+      return Promise.all(catches.map((entry) => withResolvedImageUrls(entry)));
    },
 
    async updateCatch(

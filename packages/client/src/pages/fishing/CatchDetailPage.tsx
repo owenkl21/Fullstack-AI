@@ -5,6 +5,7 @@ import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type CatchDetail = {
    id: string;
@@ -12,6 +13,18 @@ type CatchDetail = {
    notes: string | null;
    caughtAt: string;
    weather: string | null;
+   weatherConditionText: string | null;
+   weatherTemperatureDegrees: number | null;
+   weatherTemperatureUnit: string | null;
+   weatherPrecipitationProbability: number | null;
+   weatherWindDirectionCardinal: string | null;
+   weatherWindSpeedValue: number | null;
+   weatherWindSpeedUnit: string | null;
+   weatherWindGustValue: number | null;
+   weatherWindGustUnit: string | null;
+   weatherCloudCover: number | null;
+   weatherRelativeHumidity: number | null;
+   weatherUvIndex: number | null;
    depth: number | null;
    count: number;
    length: number | null;
@@ -44,6 +57,68 @@ export function CatchDetailPage() {
 
    const images = useMemo(() => data?.images ?? [], [data?.images]);
    const canSlide = images.length > 1;
+
+   const conditions = useMemo(() => {
+      if (!data) {
+         return [];
+      }
+
+      return [
+         {
+            label: 'Overview',
+            value: data.weather ?? data.weatherConditionText,
+         },
+         {
+            label: 'Temperature',
+            value:
+               data.weatherTemperatureDegrees !== null
+                  ? `${data.weatherTemperatureDegrees} ${data.weatherTemperatureUnit ?? ''}`.trim()
+                  : null,
+         },
+         {
+            label: 'Precipitation',
+            value:
+               data.weatherPrecipitationProbability !== null
+                  ? `${data.weatherPrecipitationProbability}%`
+                  : null,
+         },
+         {
+            label: 'Wind',
+            value:
+               data.weatherWindSpeedValue !== null
+                  ? `${data.weatherWindDirectionCardinal ?? ''} ${data.weatherWindSpeedValue} ${data.weatherWindSpeedUnit ?? ''}`.trim()
+                  : null,
+         },
+         {
+            label: 'Wind gusts',
+            value:
+               data.weatherWindGustValue !== null
+                  ? `${data.weatherWindGustValue} ${data.weatherWindGustUnit ?? ''}`.trim()
+                  : null,
+         },
+         {
+            label: 'Cloud cover',
+            value:
+               data.weatherCloudCover !== null
+                  ? `${data.weatherCloudCover}%`
+                  : null,
+         },
+         {
+            label: 'Humidity',
+            value:
+               data.weatherRelativeHumidity !== null
+                  ? `${data.weatherRelativeHumidity}%`
+                  : null,
+         },
+         {
+            label: 'UV index',
+            value:
+               data.weatherUvIndex !== null
+                  ? String(data.weatherUvIndex)
+                  : null,
+         },
+      ].filter((item) => Boolean(item.value));
+   }, [data]);
 
    return (
       <div className="min-h-screen">
@@ -135,7 +210,34 @@ export function CatchDetailPage() {
                            </div>
                         )}
                      </div>
-                     <p>Conditions: {data.weather ?? 'Not specified'}</p>
+                     <Card className="gap-3 py-4">
+                        <CardHeader className="px-4">
+                           <CardTitle>Conditions</CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-4">
+                           {conditions.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">
+                                 No conditions recorded.
+                              </p>
+                           ) : (
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                 {conditions.map((condition) => (
+                                    <div
+                                       key={condition.label}
+                                       className="rounded border p-2"
+                                    >
+                                       <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                          {condition.label}
+                                       </p>
+                                       <p className="text-sm font-medium">
+                                          {condition.value}
+                                       </p>
+                                    </div>
+                                 ))}
+                              </div>
+                           )}
+                        </CardContent>
+                     </Card>
                      <p>
                         Size: {data.length ?? '—'} length / {data.weight ?? '—'}{' '}
                         weight
