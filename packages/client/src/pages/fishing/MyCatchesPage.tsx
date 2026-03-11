@@ -94,28 +94,6 @@ export function MyCatchesPage() {
                                     {new Date(entry.caughtAt).toLocaleString()}{' '}
                                     • {entry.site?.name ?? 'No site'}
                                  </p>
-                                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                    <div className="rounded-lg border bg-slate-50 p-2">
-                                       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                                          Length
-                                       </p>
-                                       <p className="text-sm font-semibold text-slate-900">
-                                          {entry.length !== null
-                                             ? `${entry.length} cm`
-                                             : '—'}
-                                       </p>
-                                    </div>
-                                    <div className="rounded-lg border bg-slate-50 p-2">
-                                       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                                          Weight
-                                       </p>
-                                       <p className="text-sm font-semibold text-slate-900">
-                                          {entry.weight !== null
-                                             ? `${entry.weight} kg`
-                                             : '—'}
-                                       </p>
-                                    </div>
-                                 </div>
                               </div>
                            </div>
                            <div className="flex gap-2">
