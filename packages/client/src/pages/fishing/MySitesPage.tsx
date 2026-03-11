@@ -8,7 +8,12 @@ import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 
-type SiteSummary = { id: string; name: string; catchCount: number };
+type SiteSummary = {
+   id: string;
+   name: string;
+   catchCount: number;
+   images: { image: { id: string; url: string } }[];
+};
 
 export function MySitesPage() {
    const [items, setItems] = useState<SiteSummary[]>([]);
@@ -59,18 +64,31 @@ export function MySitesPage() {
                      items.map((entry) => (
                         <div
                            key={entry.id}
-                           className="flex flex-wrap items-center justify-between gap-2 rounded border p-3"
+                           className="flex flex-wrap items-center justify-between gap-3 rounded border p-3"
                         >
-                           <div>
-                              <Link
-                                 className="font-medium underline"
-                                 to={`/sites/${entry.id}`}
-                              >
-                                 {entry.name}
-                              </Link>
-                              <p className="text-sm text-muted-foreground">
-                                 {entry.catchCount} catches logged
-                              </p>
+                           <div className="flex min-w-0 items-center gap-3">
+                              {entry.images[0]?.image.url ? (
+                                 <img
+                                    src={entry.images[0].image.url}
+                                    alt={entry.name}
+                                    className="h-14 w-14 rounded-md border object-cover"
+                                 />
+                              ) : (
+                                 <div className="flex h-14 w-14 items-center justify-center rounded-md border text-xs text-muted-foreground">
+                                    No img
+                                 </div>
+                              )}
+                              <div>
+                                 <Link
+                                    className="font-medium underline"
+                                    to={`/sites/${entry.id}`}
+                                 >
+                                    {entry.name}
+                                 </Link>
+                                 <p className="text-sm text-muted-foreground">
+                                    {entry.catchCount} catches logged
+                                 </p>
+                              </div>
                            </div>
                            <div className="flex gap-2">
                               <Button asChild size="sm" variant="outline">

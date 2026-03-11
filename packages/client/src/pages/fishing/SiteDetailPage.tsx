@@ -36,6 +36,14 @@ export function SiteDetailPage() {
       void load();
    }, [siteId]);
 
+   const hasCoordinates = data?.latitude != null && data?.longitude != null;
+   const mapUrl = hasCoordinates
+      ? `https://www.google.com/maps?q=${data.latitude},${data.longitude}&z=13&output=embed`
+      : null;
+   const openMapUrl = hasCoordinates
+      ? `https://www.google.com/maps?q=${data.latitude},${data.longitude}`
+      : null;
+
    return (
       <div className="min-h-screen">
          <LandingHeader />
@@ -44,35 +52,31 @@ export function SiteDetailPage() {
             {!data ? (
                <FishingBobberLoader label="Loading site details..." />
             ) : (
-               <article className="space-y-4 rounded-lg border p-4">
-                  <h1 className="text-2xl font-semibold">{data.name}</h1>
-                  <p>{data.description ?? 'No description yet.'}</p>
-                  <p>Water type: {data.waterType ?? 'Not specified'}</p>
-                  <p>
-                     Coordinates: {data.latitude ?? '—'},{' '}
-                     {data.longitude ?? '—'}
-                  </p>
-                  {data.latitude && data.longitude && (
-                     <a
-                        className="underline"
-                        href={`https://www.google.com/maps?q=${data.latitude},${data.longitude}`}
-                        target="_blank"
-                        rel="noreferrer"
-                     >
-                        Open map location
-                     </a>
-                  )}
-                  <p>Access notes: {data.accessNotes ?? 'Not specified'}</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                     {data.images.map((entry) => (
-                        <img
-                           key={entry.image.id}
-                           src={entry.image.url}
-                           alt="Site"
-                           className="aspect-[4/3] w-full rounded-md object-cover"
-                        />
-                     ))}
-                  </div>
+               <article className="space-y-6 rounded-lg border p-4">
+                  <section className="grid gap-4 md:grid-cols-[240px_1fr] md:items-start">
+                     <div>
+                        {data.images[0]?.image.url ? (
+                           <img
+                              src={data.images[0].image.url}
+                              alt={data.name}
+                              className="aspect-[4/3] w-full rounded-md object-cover"
+                           />
+                        ) : (
+                           <div className="flex aspect-[4/3] w-full items-center justify-center rounded-md border text-sm text-muted-foreground">
+                              No image yet
+                           </div>
+                        )}
+                     </div>
+                     <div className="space-y-2">
+                        <h1 className="text-2xl font-semibold">{data.name}</h1>
+                        <p>{data.description ?? 'No description yet.'}</p>
+                        <p>Water type: {data.waterType ?? 'Not specified'}</p>
+                        <p>
+                           Access notes: {data.accessNotes ?? 'Not specified'}
+                        </p>
+                     </div>
+                  </section>
+
                   <section className="space-y-2">
                      <h2 className="text-lg font-semibold">
                         Recent catches at this site
@@ -99,6 +103,26 @@ export function SiteDetailPage() {
                         ))
                      )}
                   </section>
+
+                  {hasCoordinates ? (
+                     <section className="space-y-2">
+                        <a
+                           className="text-sm underline"
+                           href={openMapUrl!}
+                           target="_blank"
+                           rel="noreferrer"
+                        >
+                           Open map location
+                        </a>
+                        <iframe
+                           title={`Map of ${data.name}`}
+                           src={mapUrl!}
+                           className="h-72 w-full rounded-md border"
+                           loading="lazy"
+                           referrerPolicy="no-referrer-when-downgrade"
+                        />
+                     </section>
+                  ) : null}
                </article>
             )}
          </main>
