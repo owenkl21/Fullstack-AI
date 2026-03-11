@@ -1,12 +1,4 @@
-import {
-   Fish,
-   LayoutGrid,
-   MapPin,
-   Plus,
-   Radio,
-   Shield,
-   Wrench,
-} from 'lucide-react';
+import { Fish, LayoutGrid, MapPin, Plus, Radio, Wrench } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -16,7 +8,6 @@ const mobileNavItems = [
    { to: '/catches/me', label: 'Catches', icon: Fish },
    { to: '/sites/me', label: 'Sites', icon: MapPin },
    { to: '/gear/me', label: 'Gear', icon: Wrench },
-   { to: '/profile', label: 'Profile', icon: Shield },
 ] as const;
 
 const desktopDockItems = [
@@ -57,52 +48,40 @@ export function FishingActionBar() {
          <div className="hidden h-24 md:block" aria-hidden="true" />
 
          <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden">
-            <div className="mx-auto grid w-full max-w-md grid-cols-5 items-end gap-1">
-               {mobileNavItems.slice(0, 2).map(({ to, label, icon: Icon }) => (
-                  <NavLink
-                     key={to}
-                     to={to}
-                     className={({ isActive }) =>
-                        cn(
-                           'flex flex-col items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
-                           isActive
-                              ? 'text-primary'
-                              : 'text-muted-foreground hover:text-foreground'
-                        )
-                     }
-                  >
-                     <Icon className="h-5 w-5" />
-                     <span>{label}</span>
-                  </NavLink>
-               ))}
+            <div className="relative mx-auto w-full max-w-md">
+               <div className="grid grid-cols-5 items-end gap-1">
+                  {mobileNavItems.map(({ to, label, icon: Icon }, index) => (
+                     <NavLink
+                        key={to}
+                        to={to}
+                        className={({ isActive }) =>
+                           cn(
+                              index === 2
+                                 ? 'col-start-4 flex flex-col items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors'
+                                 : index === 3
+                                   ? 'col-start-5 flex flex-col items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors'
+                                   : 'flex flex-col items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
+                              isActive
+                                 ? 'text-primary'
+                                 : 'text-muted-foreground hover:text-foreground'
+                           )
+                        }
+                     >
+                        <Icon className="h-5 w-5" />
+                        <span>{label}</span>
+                     </NavLink>
+                  ))}
+               </div>
 
                <Button
                   asChild
                   size="icon"
-                  className="mx-auto mb-3 h-12 w-12 rounded-full shadow-lg"
+                  className="absolute left-1/2 top-0 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-lg"
                >
                   <NavLink to="/catches/new" aria-label="Log a catch">
                      <Plus className="h-5 w-5" />
                   </NavLink>
                </Button>
-
-               {mobileNavItems.slice(2).map(({ to, label, icon: Icon }) => (
-                  <NavLink
-                     key={to}
-                     to={to}
-                     className={({ isActive }) =>
-                        cn(
-                           'flex flex-col items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
-                           isActive
-                              ? 'text-primary'
-                              : 'text-muted-foreground hover:text-foreground'
-                        )
-                     }
-                  >
-                     <Icon className="h-5 w-5" />
-                     <span>{label}</span>
-                  </NavLink>
-               ))}
             </div>
          </nav>
       </>
