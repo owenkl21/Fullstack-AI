@@ -5,7 +5,6 @@ import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
    formatCardinal,
    toMetricTemperature,
@@ -221,34 +220,27 @@ export function CatchDetailPage() {
                            </div>
                         )}
                      </div>
-                     <Card className="gap-3 py-4">
-                        <CardHeader className="px-4">
-                           <CardTitle>Conditions</CardTitle>
-                        </CardHeader>
-                        <CardContent className="px-4">
-                           {conditions.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">
-                                 No conditions recorded.
-                              </p>
-                           ) : (
-                              <div className="grid gap-2 sm:grid-cols-2">
-                                 {conditions.map((condition) => (
-                                    <div
-                                       key={condition.label}
-                                       className="rounded border p-2"
-                                    >
-                                       <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                          {condition.label}
-                                       </p>
-                                       <p className="text-sm font-medium">
-                                          {condition.value}
-                                       </p>
-                                    </div>
-                                 ))}
-                              </div>
-                           )}
-                        </CardContent>
-                     </Card>
+                     <div className="space-y-2">
+                        <p className="font-medium">Conditions</p>
+                        {conditions.length === 0 ? (
+                           <p className="text-sm text-muted-foreground">
+                              No conditions recorded.
+                           </p>
+                        ) : (
+                           <ul className="space-y-1 text-sm">
+                              {conditions.map((condition) => (
+                                 <li key={condition.label}>
+                                    <span className="font-medium">
+                                       {condition.label}:
+                                    </span>{' '}
+                                    <span className="text-muted-foreground">
+                                       {condition.value}
+                                    </span>
+                                 </li>
+                              ))}
+                           </ul>
+                        )}
+                     </div>
                      <p>
                         Size: {data.length ?? '—'} length / {data.weight ?? '—'}{' '}
                         weight
