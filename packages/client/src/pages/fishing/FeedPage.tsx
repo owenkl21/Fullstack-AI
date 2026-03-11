@@ -340,6 +340,8 @@ export function FeedPage() {
                         ...(post.site?.images ?? []),
                      ];
                      const commentsOpen = Boolean(expandedComments[post.id]);
+                     const isOwnPost = post.authorIsMe === true;
+                     const isFollowingAuthor = post.authorFollowedByMe === true;
 
                      return (
                         <Card
@@ -357,7 +359,7 @@ export function FeedPage() {
                                     </p>
 
                                     {isSignedIn ? (
-                                       post.authorIsMe ? null : post.authorFollowedByMe ? (
+                                       isOwnPost ? null : isFollowingAuthor ? (
                                           <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
                                              <Check className="size-3" />
                                              Following
