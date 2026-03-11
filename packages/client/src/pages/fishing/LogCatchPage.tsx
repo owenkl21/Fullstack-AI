@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { FishingActionBar } from '@/components/fishing/FishingActionBar';
+import { GoogleMapLocationPicker } from '@/components/fishing/GoogleMapLocationPicker';
 import { Button } from '@/components/ui/button';
 import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { toast } from '@/components/ui/use-toast';
@@ -107,6 +108,8 @@ export function LogCatchPage() {
    );
    const [sites, setSites] = useState<SiteOption[]>([]);
    const [siteChoice, setSiteChoice] = useState('');
+   const [locationSearch, setLocationSearch] = useState('');
+   const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
    const [gear, setGear] = useState<GearOption[]>([]);
    const [gearSearch, setGearSearch] = useState('');
    const [selectedGearIds, setSelectedGearIds] = useState<string[]>([]);
@@ -122,6 +125,10 @@ export function LogCatchPage() {
       latitude: number;
       longitude: number;
    } | null>(null);
+   const [customLatitude, setCustomLatitude] = useState('');
+   const [customLongitude, setCustomLongitude] = useState('');
+   const [lengthUnit, setLengthUnit] = useState<'cm' | 'ft'>('cm');
+   const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
 
    useEffect(() => {
       const loadData = async () => {
@@ -171,14 +178,14 @@ export function LogCatchPage() {
 
    useEffect(() => {
       const loadWeather = async () => {
-         if (siteChoice === '__other') {
-            setWeatherSnapshot(null);
-            return;
-         }
-
          const selectedSite = sites.find((site) => site.id === siteChoice);
-         const latitude = selectedSite?.latitude ?? currentCoords?.latitude;
-         const longitude = selectedSite?.longitude ?? currentCoords?.longitude;
+         const isOtherSpot = siteChoice === '__other';
+         const latitude = isOtherSpot
+            ? Number(customLatitude)
+            : (selectedSite?.latitude ?? currentCoords?.latitude);
+         const longitude = isOtherSpot
+            ? Number(customLongitude)
+            : (selectedSite?.longitude ?? currentCoords?.longitude);
 
          if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
             setWeatherSnapshot(null);
@@ -200,13 +207,20 @@ export function LogCatchPage() {
       };
 
       void loadWeather();
-   }, [siteChoice, sites, currentCoords]);
+   }, [siteChoice, sites, currentCoords, customLatitude, customLongitude]);
+
+   const setCustomCoordinates = (latitude: number, longitude: number) => {
+      setCustomLatitude(latitude.toFixed(6));
+      setCustomLongitude(longitude.toFixed(6));
+   };
 
    const submitCatch = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       const formData = new FormData(event.currentTarget);
       const isOtherSpot = siteChoice === '__other';
       const customSpot = String(formData.get('customSpot') ?? '').trim();
+      const normalizedLength = Number(formData.get('length')) || null;
+      const normalizedWeight = Number(formData.get('weight')) || null;
       const notes = String(formData.get('notes') ?? '').trim();
       const rawCaughtAt = caughtAt.trim();
 
@@ -221,18 +235,72 @@ export function LogCatchPage() {
          return;
       }
 
+      let siteId = isOtherSpot ? null : siteChoice || null;
+
+      if (isOtherSpot) {
+         const latitude = Number(customLatitude);
+         const longitude = Number(customLongitude);
+
+         if (!customSpot) {
+            toast({
+               title: 'Site name is required',
+               description: 'Add a name for your custom location.',
+               variant: 'error',
+            });
+            return;
+         }
+
+         if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            toast({
+               title: 'Drop a pin on the map',
+               description:
+                  'Choose your custom location by dropping a pin on the map.',
+               variant: 'error',
+            });
+            return;
+         }
+
+         try {
+            const { data } = await axios.post('/api/sites', {
+               name: customSpot,
+               latitude,
+               longitude,
+               description: null,
+               waterType: null,
+               accessNotes: null,
+               images: [],
+            });
+            siteId = data.site.id;
+         } catch (siteError) {
+            console.error('Unable to create site from catch log', siteError);
+            toast({
+               title: 'Unable to create location',
+               description: 'Please try dropping your pin again.',
+               variant: 'error',
+            });
+            return;
+         }
+      }
+
       const basePayload = {
          title: String(formData.get('title') ?? ''),
          caughtAt: parsedCaughtAt.toISOString(),
-         notes:
-            (isOtherSpot && customSpot
-               ? `${notes ? `${notes}\n\n` : ''}Spot: ${customSpot}`
-               : notes) || null,
-         siteId: isOtherSpot ? null : siteChoice || null,
+         notes: notes || null,
+         siteId,
          weather: weatherSnapshot?.weatherCondition?.description?.text ?? null,
          weatherSnapshot,
-         length: Number(formData.get('length')) || null,
-         weight: Number(formData.get('weight')) || null,
+         length:
+            normalizedLength === null
+               ? null
+               : lengthUnit === 'ft'
+                 ? Number((normalizedLength * 30.48).toFixed(2))
+                 : normalizedLength,
+         weight:
+            normalizedWeight === null
+               ? null
+               : weightUnit === 'lbs'
+                 ? Number((normalizedWeight * 0.453592).toFixed(2))
+                 : normalizedWeight,
          images,
          gearIds: selectedGearIds,
       };
@@ -307,6 +375,17 @@ export function LogCatchPage() {
       );
    }, [gear, gearSearch]);
 
+   const filteredSites = useMemo(() => {
+      const normalizedSearch = locationSearch.trim().toLowerCase();
+      if (!normalizedSearch) {
+         return sites;
+      }
+
+      return sites.filter((site) =>
+         site.name.toLowerCase().includes(normalizedSearch)
+      );
+   }, [sites, locationSearch]);
+
    return (
       <div className="min-h-screen">
          <LandingHeader />
@@ -321,46 +400,120 @@ export function LogCatchPage() {
                   {isLoadingOptions && (
                      <FishingBobberLoader label="Loading your fishing spots and gear..." />
                   )}
-                  <input
-                     name="title"
-                     placeholder="Catch title"
-                     className="rounded border p-2"
-                     required
-                  />
-                  <input
-                     name="caughtAt"
-                     type="datetime-local"
-                     value={caughtAt}
-                     onChange={(event) => setCaughtAt(event.target.value)}
-                     className="rounded border p-2"
-                     required
-                  />
-                  <textarea
-                     name="notes"
-                     placeholder="Notes"
-                     className="rounded border p-2"
-                  />
-                  <select
-                     name="siteId"
-                     value={siteChoice}
-                     onChange={(event) => setSiteChoice(event.target.value)}
-                     className="rounded border p-2"
-                  >
-                     <option value="">Use current location</option>
-                     {sites.map((site) => (
-                        <option key={site.id} value={site.id}>
-                           {site.name}
-                        </option>
-                     ))}
-                     <option value="__other">Other (add new spot name)</option>
-                  </select>
-                  {siteChoice === '__other' && (
+                  <label className="grid gap-1 text-sm font-medium">
+                     <span>Catch title</span>
                      <input
-                        name="customSpot"
-                        placeholder="Enter fishing spot name"
+                        name="title"
+                        placeholder="Catch title"
                         className="rounded border p-2"
                         required
                      />
+                  </label>
+                  <label className="grid gap-1 text-sm font-medium">
+                     <span>Date and time</span>
+                     <input
+                        name="caughtAt"
+                        type="datetime-local"
+                        value={caughtAt}
+                        onChange={(event) => setCaughtAt(event.target.value)}
+                        className="rounded border p-2"
+                        required
+                     />
+                  </label>
+                  <label className="grid gap-1 text-sm font-medium">
+                     <span>Notes</span>
+                     <textarea
+                        name="notes"
+                        placeholder="Notes"
+                        className="rounded border p-2"
+                     />
+                  </label>
+                  <fieldset className="grid gap-2 rounded border p-3">
+                     <legend className="px-1 text-sm font-medium">
+                        Location
+                     </legend>
+                     <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-between"
+                        onClick={() =>
+                           setIsLocationDropdownOpen((previous) => !previous)
+                        }
+                     >
+                        <span>
+                           {siteChoice === '__other'
+                              ? 'Other (create new location)'
+                              : siteChoice
+                                ? (sites.find((site) => site.id === siteChoice)
+                                     ?.name ?? 'Select location')
+                                : 'Use current location'}
+                        </span>
+                        <span>{isLocationDropdownOpen ? '▲' : '▼'}</span>
+                     </Button>
+                     {isLocationDropdownOpen ? (
+                        <div className="grid gap-2 rounded border p-2">
+                           <input
+                              type="search"
+                              value={locationSearch}
+                              onChange={(event) =>
+                                 setLocationSearch(event.target.value)
+                              }
+                              placeholder="Search locations"
+                              className="rounded border p-2 text-sm"
+                           />
+                           <button
+                              type="button"
+                              className="rounded border p-2 text-left text-sm"
+                              onClick={() => {
+                                 setSiteChoice('');
+                                 setIsLocationDropdownOpen(false);
+                              }}
+                           >
+                              Use current location
+                           </button>
+                           {filteredSites.map((site) => (
+                              <button
+                                 key={site.id}
+                                 type="button"
+                                 className="rounded border p-2 text-left text-sm"
+                                 onClick={() => {
+                                    setSiteChoice(site.id);
+                                    setIsLocationDropdownOpen(false);
+                                 }}
+                              >
+                                 {site.name}
+                              </button>
+                           ))}
+                           <button
+                              type="button"
+                              className="rounded border p-2 text-left text-sm"
+                              onClick={() => {
+                                 setSiteChoice('__other');
+                                 setIsLocationDropdownOpen(false);
+                              }}
+                           >
+                              Other (add new spot)
+                           </button>
+                        </div>
+                     ) : null}
+                  </fieldset>
+                  {siteChoice === '__other' && (
+                     <div className="grid gap-3 rounded border p-3">
+                        <label className="grid gap-1 text-sm font-medium">
+                           <span>New location name</span>
+                           <input
+                              name="customSpot"
+                              placeholder="Enter fishing spot name"
+                              className="rounded border p-2"
+                              required
+                           />
+                        </label>
+                        <GoogleMapLocationPicker
+                           latitude={customLatitude}
+                           longitude={customLongitude}
+                           onChange={setCustomCoordinates}
+                        />
+                     </div>
                   )}
                   <fieldset className="grid gap-2 rounded border p-3">
                      <legend className="px-1 text-sm font-medium">
@@ -449,26 +602,30 @@ export function LogCatchPage() {
                         {isWeatherLoading ? '(loading...)' : ''}
                      </legend>
                      <div className="grid gap-2 sm:grid-cols-2">
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              formatWeatherMetric(
-                                 weatherSnapshot?.temperature?.degrees,
-                                 weatherSnapshot?.temperature?.unit
-                              )
-                           )}
-                           placeholder="Temp"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              weatherSnapshot?.weatherCondition?.description
-                                 ?.text
-                           )}
-                           placeholder="Weather"
-                           className="rounded border p-2"
-                        />
+                        <label className="grid gap-1 text-sm font-medium">
+                           <span>Temperature</span>
+                           <input
+                              readOnly
+                              value={toDisplay(
+                                 formatWeatherMetric(
+                                    weatherSnapshot?.temperature?.degrees,
+                                    weatherSnapshot?.temperature?.unit
+                                 )
+                              )}
+                              className="rounded border p-2"
+                           />
+                        </label>
+                        <label className="grid gap-1 text-sm font-medium">
+                           <span>Weather description</span>
+                           <input
+                              readOnly
+                              value={toDisplay(
+                                 weatherSnapshot?.weatherCondition?.description
+                                    ?.text
+                              )}
+                              className="rounded border p-2"
+                           />
+                        </label>
                         <div className="flex items-center gap-2 rounded border p-2 text-sm text-muted-foreground">
                            {weatherSnapshot?.weatherCondition?.iconBaseUri ? (
                               <img
@@ -487,59 +644,69 @@ export function LogCatchPage() {
                               )}
                            </span>
                         </div>
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              weatherSnapshot?.cloudCover !== undefined
-                                 ? `${weatherSnapshot.cloudCover}%`
-                                 : ''
-                           )}
-                           placeholder="Cloud cover"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              formatCardinal(
-                                 weatherSnapshot?.wind?.direction?.cardinal
-                              )
-                           )}
-                           placeholder="Wind direction"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              formatWeatherMetric(
-                                 weatherSnapshot?.wind?.speed?.value,
-                                 weatherSnapshot?.wind?.speed?.unit
-                              )
-                           )}
-                           placeholder="Wind speed"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              formatWeatherMetric(
-                                 weatherSnapshot?.wind?.gust?.value,
-                                 weatherSnapshot?.wind?.gust?.unit
-                              )
-                           )}
-                           placeholder="Wind gust"
-                           className="rounded border p-2"
-                        />
-                        <input
-                           readOnly
-                           value={toDisplay(
-                              weatherSnapshot?.precipitation?.probability
-                                 ?.percent !== undefined
-                                 ? `${weatherSnapshot.precipitation.probability.percent}%`
-                                 : ''
-                           )}
-                           placeholder="Precipitation"
-                           className="rounded border p-2"
-                        />
+                        <label className="grid gap-1 text-sm font-medium">
+                           <span>Cloud cover</span>
+                           <input
+                              readOnly
+                              value={toDisplay(
+                                 weatherSnapshot?.cloudCover !== undefined
+                                    ? `${weatherSnapshot.cloudCover}%`
+                                    : ''
+                              )}
+                              className="rounded border p-2"
+                           />
+                        </label>
+                        <label className="grid gap-1 text-sm font-medium">
+                           <span>Wind direction</span>
+                           <input
+                              readOnly
+                              value={toDisplay(
+                                 formatCardinal(
+                                    weatherSnapshot?.wind?.direction?.cardinal
+                                 )
+                              )}
+                              className="rounded border p-2"
+                           />
+                        </label>
+                        <label className="grid gap-1 text-sm font-medium">
+                           <span>Wind speed</span>
+                           <input
+                              readOnly
+                              value={toDisplay(
+                                 formatWeatherMetric(
+                                    weatherSnapshot?.wind?.speed?.value,
+                                    weatherSnapshot?.wind?.speed?.unit
+                                 )
+                              )}
+                              className="rounded border p-2"
+                           />
+                        </label>
+                        <label className="grid gap-1 text-sm font-medium">
+                           <span>Wind gust</span>
+                           <input
+                              readOnly
+                              value={toDisplay(
+                                 formatWeatherMetric(
+                                    weatherSnapshot?.wind?.gust?.value,
+                                    weatherSnapshot?.wind?.gust?.unit
+                                 )
+                              )}
+                              className="rounded border p-2"
+                           />
+                        </label>
+                        <label className="grid gap-1 text-sm font-medium">
+                           <span>Precipitation chance</span>
+                           <input
+                              readOnly
+                              value={toDisplay(
+                                 weatherSnapshot?.precipitation?.probability
+                                    ?.percent !== undefined
+                                    ? `${weatherSnapshot.precipitation.probability.percent}%`
+                                    : ''
+                              )}
+                              className="rounded border p-2"
+                           />
+                        </label>
                      </div>
                      {siteChoice === '__other' ? (
                         <p className="text-xs text-muted-foreground">
@@ -549,20 +716,56 @@ export function LogCatchPage() {
                      ) : null}
                   </fieldset>
                   <div className="grid gap-3 sm:grid-cols-2">
-                     <input
-                        name="length"
-                        placeholder="Length"
-                        type="number"
-                        step="0.1"
-                        className="rounded border p-2"
-                     />
-                     <input
-                        name="weight"
-                        placeholder="Weight"
-                        type="number"
-                        step="0.1"
-                        className="rounded border p-2"
-                     />
+                     <label className="grid gap-1 text-sm font-medium">
+                        <span>Length</span>
+                        <div className="grid grid-cols-[1fr_auto] gap-2">
+                           <input
+                              name="length"
+                              placeholder="Length"
+                              type="number"
+                              inputMode="decimal"
+                              step="0.1"
+                              className="rounded border p-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                           />
+                           <select
+                              value={lengthUnit}
+                              onChange={(event) =>
+                                 setLengthUnit(
+                                    event.target.value as 'cm' | 'ft'
+                                 )
+                              }
+                              className="rounded border p-2"
+                           >
+                              <option value="cm">cm</option>
+                              <option value="ft">ft</option>
+                           </select>
+                        </div>
+                     </label>
+                     <label className="grid gap-1 text-sm font-medium">
+                        <span>Weight</span>
+                        <div className="grid grid-cols-[1fr_auto] gap-2">
+                           <input
+                              name="weight"
+                              placeholder="Weight"
+                              type="number"
+                              inputMode="decimal"
+                              step="0.1"
+                              className="rounded border p-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                           />
+                           <select
+                              value={weightUnit}
+                              onChange={(event) =>
+                                 setWeightUnit(
+                                    event.target.value as 'kg' | 'lbs'
+                                 )
+                              }
+                              className="rounded border p-2"
+                           >
+                              <option value="kg">kg</option>
+                              <option value="lbs">lbs</option>
+                           </select>
+                        </div>
+                     </label>
                   </div>
                   <R2ImagePicker
                      scope="catch"
