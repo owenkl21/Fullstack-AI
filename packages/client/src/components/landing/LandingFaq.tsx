@@ -1,20 +1,22 @@
+import { HelpCircle } from 'lucide-react';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const faqs = [
    {
-      question: 'When will the chatbot be available on the landing page?',
+      question: 'Can we swap in real illustrations later?',
       answer:
-         'For now, the landing experience is focused on product marketing and onboarding. Chat functionality will be introduced in a dedicated app flow soon.',
+         'Yes. We added dedicated placeholder blocks with clear sizing intent so design assets can drop in with minimal refactoring.',
    },
    {
-      question: 'Is this layout mobile friendly?',
+      question: 'Does this visual design support both dark and light mode?',
       answer:
-         'Yes. The page uses responsive spacing, typography, and stacked sections so it reads cleanly on phones, tablets, and desktop screens.',
+         'It does. The page now uses semantic tokens, soft gradients, and contrast-safe cards that adapt to the selected mode.',
    },
    {
-      question: 'Can this structure scale as we add more pages?',
+      question: 'Is the layout still easy to scale?',
       answer:
-         'Absolutely. The landing page is split into reusable sections and UI primitives, making it easy to add pricing, testimonials, or blog pages later.',
+         'Absolutely. Sections are modular and can be extended with testimonials, pricing, docs links, or release notes.',
    },
 ];
 
@@ -25,18 +27,22 @@ export function LandingFaq() {
          className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 lg:px-8"
       >
          <div className="mb-8 text-left">
-            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            <p className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+               <HelpCircle className="size-3.5" />
+               FAQ
+            </p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
                Frequently asked questions
             </h2>
             <p className="mt-3 max-w-2xl text-muted-foreground">
-               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque
-               elementum feugiat sem, ac faucibus velit dapibus sed.
+               Built to feel like a polished SaaS landing page while staying
+               consistent with your existing component stack.
             </p>
          </div>
 
          <div className="grid gap-4">
             {faqs.map((faq) => (
-               <Card key={faq.question}>
+               <Card key={faq.question} className="border-primary/15">
                   <CardHeader>
                      <CardTitle className="text-lg">{faq.question}</CardTitle>
                   </CardHeader>
