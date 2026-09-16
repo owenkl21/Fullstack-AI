@@ -14,7 +14,7 @@ export function Wordmark({
          to={to}
          aria-label="Home"
          className={cn(
-            'g-tracked inline-flex items-center gap-2.5 text-[28px] text-paper',
+            'g-tracked inline-flex min-h-11 items-center gap-2.5 text-[28px] text-paper',
             className
          )}
       >

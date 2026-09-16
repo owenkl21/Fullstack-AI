@@ -527,8 +527,15 @@ h1[tabindex='-1']:focus:not(:focus-visible),
    outline: none;
 }
 
-/* Leaflet ships 30px controls. The brief asks for 44px minimum targets. */
-.map-surface .leaflet-bar a {
+/*
+ * Leaflet ships 30px controls against a brief that asks for 44px. Its stylesheet
+ * is imported by the map module, which is in a lazily loaded chunk, so it lands
+ * after this file and wins on order. Hence the doubled selector: specificity
+ * rather than !important.
+ */
+.map-surface .map-surface .leaflet-bar a,
+.map-surface .leaflet-bar a.leaflet-control-zoom-in,
+.map-surface .leaflet-bar a.leaflet-control-zoom-out {
    width: 2.75rem;
    height: 2.75rem;
    line-height: 2.75rem;

@@ -155,7 +155,8 @@ function Chip({
          onClick={onClick}
          className={cn(
             'g-tracked inline-flex items-center border border-ink px-3 transition-[background-color,color] duration-150 [transition-timing-function:var(--ease)]',
-            small ? 'h-9 text-[16px]' : 'h-11 text-[19px]',
+            /* 44px even when small: the brief's minimum is not negotiable. */
+            small ? 'h-11 text-[16px]' : 'h-11 text-[19px]',
             pressed ? 'bg-ink text-background' : 'text-ink hover:bg-bg-2'
          )}
       >
