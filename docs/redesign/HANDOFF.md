@@ -43,6 +43,7 @@ Two commits on `redesign-theme`, neither pushed:
 
 | Queue item | State |
 |---|---|
+| 5.0 Off the deprecated Railway config | **Not started, high priority.** Hard deadline 1 December 2026 |
 | 5.1 Railway and deploy wiring | **Backend live.** Server online, schema pushed, species seeded. Vercel still waiting on the account |
 | 5.2 better-auth replacing Clerk | Not started. Needs a verified Resend domain first |
 | 5.3 Species and Open-Meteo | **Done.** Species wired and seeded, conditions read at the hour of the catch |
@@ -99,6 +100,27 @@ The design language itself is not open for reinterpretation: it is in [00-prompt
 ## 5. The work queue, in order
 
 Each item says what "done" means. The order matters: later items are blocked by earlier ones.
+
+### 5.0 Migrate off the deprecated Railway config (high priority)
+
+`railway.json` is Config as Code, which Railway CLI 5.57 deprecates in favour of
+Infrastructure as Code at `.railway/railway.ts`. **Existing files keep working
+only until 1 December 2026.**
+
+This was deliberately deferred while the first deploy was unproven, on the
+grounds that a first deploy is the wrong moment to introduce a config format
+nothing has validated. That reason has expired: the deploy is green, the server
+is online and the schema is pushed, so there is now a known-good build to
+compare a migrated config against.
+
+`railway config migrate` translates the current file cleanly; it has been run as
+a dry run and the output is faithful. Run it with `--apply`, rename the generated
+project and service from `Fullstack-AI` to `fishlogger` to match the repo, redeploy,
+and confirm the service comes back Online with `/api/hello` answering before
+deleting `railway.json`.
+
+Done when: a deploy succeeds from `.railway/railway.ts` alone and `railway.json`
+is gone.
 
 ### 5.1 Railway database and deployment wiring
 **Written out in full in [09-deploy.md](09-deploy.md). Read that rather than this paragraph.** The repo side is done: `railway.json` exists at the root, `prisma db push` no longer runs on every container boot, `DATABASE_URL` reaches the driver intact, and the four problems a deploy audit confirmed are fixed. What is left is the part that needs a Railway account.
@@ -184,8 +206,8 @@ The entry chunk was 661.14 kB raw and 197.80 kB gzipped before the split, so fir
 
 ## 8. What needs the owner, not an agent
 
-1. The **Railway MySQL connection string** in `packages/server/.env`. Step by step in [09-deploy.md](09-deploy.md) section 4.
-2. The **Railway API domain** in `packages/client/vercel.json`. Step by step in [09-deploy.md](09-deploy.md) section 5.2.
+1. ~~The Railway MySQL connection string~~. Done. The service references `${{MySQL.MYSQL_URL}}`, the schema is pushed and the species are seeded.
+2. The **Railway API domain** in `packages/client/vercel.json`. The domain now exists: `server-production-a002.up.railway.app`. It still has to be committed into the file, which is also still untracked. The Vercel account is `owen-kleinhans-projects`.
 3. A **CORS policy on the R2 bucket**, now that photos upload straight to R2 rather than through the API. Without it every upload fails with an opaque browser error and nothing reaches the server logs. The policy is in [09-deploy.md](09-deploy.md) section 4.5.
 4. A **verified sending domain in Resend**, before email verification and password reset can work.
 5. ~~A Stadia Maps account~~. No longer needed. The maps went in on keyless OpenStreetMap tiles with a CSS filter for night, so there is no account, no key and no registered domain anywhere in the map path.

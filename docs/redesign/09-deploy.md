@@ -64,7 +64,8 @@ There was no Railway configuration of any kind, and the root `package.json` has 
 
 It sits at the **root**, not in `packages/server`, because that is where `bun.lock` and the `workspaces` array live, so that is where `bun install` has to run.
 
-**This format is deprecated.** Railway CLI 5.57 warns that Config as Code (`railway.json`) is superseded by Infrastructure as Code at `.railway/railway.ts`, and that existing files keep working until **1 December 2026**. `railway config migrate` translates this file cleanly; it was run as a dry run and the output is faithful. It has deliberately not been applied yet, because a first deploy is the wrong moment to introduce an untested config format. Migrate once a deploy is known good.
+**This format is deprecated.** Railway CLI 5.57 warns that Config as Code (`railway.json`) is superseded by Infrastructure as Code at `.railway/railway.ts`, and that existing files keep working until **1 December 2026**. `railway config migrate` translates this file cleanly; it was run as a dry run and the output is faithful. It has deliberately not been applied yet, because a first deploy is the wrong moment to introduce an untested config format. Migrate once a deploy is known good. **The deploy is now known good, so this is
+scheduled**: see queue item 5.0 in [HANDOFF.md](HANDOFF.md).
 
 `/api/hello` ([routes.ts:47](../../packages/server/routes.ts)) is the health check rather than `/` ([routes.ts:43](../../packages/server/routes.ts)) because it exercises the same `/api` prefix that Vercel proxies. Both are trivial handlers that touch no database, which is what a health check needs.
 
@@ -249,6 +250,16 @@ In the Cloudflare dashboard, on the bucket, under Settings, CORS policy:
 The failure mode is worth recognising: the upload fails in the browser with an opaque CORS error and nothing appears in the Railway logs at all, because the request never reached the server.
 
 ## 5. Then Vercel
+
+### 5.0 Which account
+
+**`owen-kleinhans-projects`**, at https://vercel.com/owen-kleinhans-projects. It is
+Owen's personal Vercel account and it is already linked to his GitHub, so the
+private `owenkl21/fishlogger` repo can be imported without extra wiring.
+
+Do not create the project on any other account, and do not guess a domain: the
+domain has to be committed into `vercel.json` (5.2), so a wrong one means a
+redeploy to fix.
 
 ### 5.1 The two settings that decide whether it works
 
