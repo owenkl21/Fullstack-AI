@@ -122,10 +122,22 @@ const siteDetailInclude = {
    },
 };
 
+/*
+ * On create, an absent snapshot means every weather column starts null. On
+ * update it means the catch was edited without re-reading the weather, so the
+ * columns must be left exactly as they are. Prisma treats undefined as "do not
+ * touch" and null as "set to null", and the difference between those two is the
+ * difference between editing a catch and truncating it.
+ */
 const mapWeatherSnapshotToCatchData = (
-   weatherSnapshot?: WeatherSnapshotInput | null
+   weatherSnapshot?: WeatherSnapshotInput | null,
+   { partial = false }: { partial?: boolean } = {}
 ) => {
    if (!weatherSnapshot) {
+      if (partial) {
+         return {};
+      }
+
       return {
          weatherCurrentTime: null,
          weatherTimeZoneId: null,
@@ -381,7 +393,7 @@ export const fishingService = {
                length: input.length,
                count: input.count ?? 1,
                weather: input.weather,
-               waterTemp: null,
+               waterTemp: input.waterTemp ?? null,
                ...mapWeatherSnapshotToCatchData(input.weatherSnapshot),
                depth: input.depth,
                gears: {
@@ -551,10 +563,12 @@ export const fishingService = {
                siteId: relations.siteId,
                weight: input.weight,
                length: input.length,
-               count: input.count ?? 1,
+               count: input.count,
                weather: input.weather,
-               waterTemp: null,
-               ...mapWeatherSnapshotToCatchData(input.weatherSnapshot),
+               waterTemp: input.waterTemp,
+               ...mapWeatherSnapshotToCatchData(input.weatherSnapshot, {
+                  partial: true,
+               }),
                depth: input.depth,
                gears: {
                   set: validGears.map((gear) => ({ id: gear.id })),
@@ -581,9 +595,21 @@ export const fishingService = {
             return null;
          }
 
+         const deletedAt = new Date();
+
          await tx.catch.update({
             where: { id: catchId },
-            data: { deletedAt: new Date() },
+            data: { deletedAt },
+         });
+
+         /*
+          * Feed rows are snapshots rather than pointers, so a post outlives the
+          * catch it was written from and keeps showing its title and photo.
+          * Retire the posts with the catch.
+          */
+         await tx.feedPost.updateMany({
+            where: { catchId, deletedAt: null },
+            data: { deletedAt },
          });
 
          if (existing.siteId) {
@@ -745,9 +771,22 @@ export const fishingService = {
          return null;
       }
 
-      await prisma.fishingSite.update({
-         where: { id: siteId },
-         data: { deletedAt: new Date() },
+      const deletedAt = new Date();
+
+      /*
+       * One transaction, so a site never ends up retired while its posts stay
+       * up. Same reason as deleteCatch: feed rows are snapshots, not pointers.
+       */
+      await prisma.$transaction(async (tx) => {
+         await tx.fishingSite.update({
+            where: { id: siteId },
+            data: { deletedAt },
+         });
+
+         await tx.feedPost.updateMany({
+            where: { siteId, deletedAt: null },
+            data: { deletedAt },
+         });
       });
 
       return { id: siteId };
