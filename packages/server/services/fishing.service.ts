@@ -881,7 +881,8 @@ export const fishingService = {
               }
             : undefined,
          orderBy: { commonName: 'asc' },
-         take: q ? limit : Math.min(limit, 50),
+         /* With no query this is the picker's whole list, so do not page it. */
+         take: q ? limit : 200,
          select: {
             id: true,
             commonName: true,

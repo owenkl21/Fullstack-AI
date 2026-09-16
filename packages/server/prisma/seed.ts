@@ -46,19 +46,17 @@ async function main() {
    console.log(`[seed] ${seeded} species`);
 
    /*
-    * The sample catch below still points at one species. Kob rather than the
-    * Californian halibut this used to seed, since this is a South African
-    * shore-angling app.
+    * The sample catch points at a real seeded species rather than a duplicate
+    * of one. An earlier version created its own "Dusky kob (sample)", which
+    * showed up twice in the picker.
     */
-   const species = await prisma.species.upsert({
-      where: { id: 'phase0-sample-species' },
-      update: {},
-      create: {
-         id: 'phase0-sample-species',
-         commonName: 'Dusky kob',
-         scientificName: 'Argyrosomus japonicus (sample)',
-      },
+   const species = await prisma.species.findFirstOrThrow({
+      where: { scientificName: 'Argyrosomus japonicus' },
+      select: { id: true },
    });
+
+   /* Retire the duplicate the earlier seed left behind. */
+   await prisma.species.deleteMany({ where: { id: 'phase0-sample-species' } });
 
    const gear = await prisma.gear.upsert({
       where: { id: 'phase0-sample-gear' },
