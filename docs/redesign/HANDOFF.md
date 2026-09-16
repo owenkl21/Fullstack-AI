@@ -26,9 +26,31 @@ Work is on branch **`redesign-theme`**, committed but never pushed. Nothing has 
 - One shell in `src/components/shell`: `AppLayout`, `AppHeader`, `BottomBar` (four words around a raised teal Log key), `RequireSignIn`, `ThemedClerk`.
 - Surfaces: landing page with a live in-device demo, signed-in home, the fast log path at `/log`, the catch record, the three lists with shared rows and states, catch/spot/gear forms, the uploader, the map picker, the feed, the spot page, the profile, dialogs, toasts, a real not-found page.
 
-**Gates pass.** `bunx tsc -b --noEmit`, `bunx eslint src` and `bun run build` are all clean from `packages/client`, last run 16 September 2026.
+**Gates pass.** `bunx tsc -b --noEmit`, `bunx eslint src` and `bun run build` are all clean from `packages/client`. `bunx tsc --noEmit` from `packages/server` is now clean too, which it had never been. Last run 16 September 2026.
 
-**Not done.** Everything in section 5.
+**Deploy wiring is done on the repo side** (queue item 5.1, written out in [09-deploy.md](09-deploy.md)). `railway.json` exists at the root, `prisma db push` no longer runs on every container boot, and `DATABASE_URL` reaches the driver intact. The four problems a deploy audit confirmed are fixed: the OpenAI client is lazy, text columns are annotated, photos upload straight to R2, and `feed.service.ts` typechecks. What remains is the part that needs a Railway account, in section 8.
+
+**Not done.** Everything else in section 5.
+
+### Progress marker
+
+Two commits on `redesign-theme`, neither pushed:
+
+| | |
+|---|---|
+| `17b3fd1` | The client rebuild and this documentation |
+| `c8b2c89` | The four deploy-audit fixes |
+
+| Queue item | State |
+|---|---|
+| 5.1 Railway and deploy wiring | Repo side done. Owner actions in section 8 remain |
+| 5.2 better-auth replacing Clerk | Not started. Needs a verified Resend domain first |
+| 5.3 Species and Open-Meteo | Not started |
+| 5.4 Seed data | Not started |
+| 5.5 The social layer | Not started |
+| 5.6 Leaflet, off Google | **In progress** |
+
+5.6 was taken before 5.2 deliberately. It is self-contained and leaves the app working at every point, where a half-finished auth migration would not, since `Show` from `@clerk/react` gates most pages.
 
 ---
 
