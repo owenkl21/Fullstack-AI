@@ -56,6 +56,12 @@ export const auth = betterAuth({
    emailVerification: {
       sendVerificationEmail,
       autoSignInAfterVerification: true,
+      /*
+       * Send it even though it is not a gate yet. Otherwise nothing is written
+       * to the log at sign-up and the verification flow cannot be exercised at
+       * all until a mail provider exists, which is the opposite of the point.
+       */
+      sendOnSignUp: true,
    },
 
    /*
@@ -63,7 +69,13 @@ export const auth = betterAuth({
     * catch, spot and follow keeps pointing at the same row it always did.
     */
    user: {
-      modelName: 'User',
+      /*
+       * Lowercase. The Prisma adapter addresses models by their client
+       * property, which is the model name with a lowercased first letter, so
+       * 'User' is looked up as a table that does not exist. @@map does not
+       * come into it.
+       */
+      modelName: 'user',
       fields: {
          name: 'displayName',
          image: 'avatarUrl',

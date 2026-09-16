@@ -38,10 +38,12 @@ export default defineRailway(() => {
       healthcheck: '/api/hello',
       healthcheckTimeout: 60,
 
-      deploy: {
-         restartPolicyType: 'ON_FAILURE',
-         restartPolicyMaxRetries: 10,
-      },
+      /*
+       * No restartPolicy here. Railway accepts it and then reads it back as
+       * null, so `railway config plan` never converges and shows a change that
+       * can never be applied. ON_FAILURE is Railway's own default, so stating
+       * it bought nothing anyway.
+       */
 
       /*
        * Declared, never valued. DATABASE_URL is a reference to the MySQL
@@ -50,8 +52,10 @@ export default defineRailway(() => {
        */
       variables: {
          DATABASE_URL: preserve(),
-         CLERK_PUBLISHABLE_KEY: preserve(),
-         CLERK_SECRET_KEY: preserve(),
+         BETTER_AUTH_SECRET: preserve(),
+         BETTER_AUTH_URL: preserve(),
+         APP_ORIGIN: preserve(),
+         MAIL_PROVIDER_READY: preserve(),
          OPENAI_API_KEY: preserve(),
          CLOUDFLARE_ACCOUNT_ID: preserve(),
          CLOUDFLARE_R2_ACCESS_KEY_ID: preserve(),
