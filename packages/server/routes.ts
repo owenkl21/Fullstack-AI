@@ -6,36 +6,35 @@ import { userController } from './controllers/user.controller';
 import { uploadsController } from './controllers/uploads.controller';
 import { gearController } from './controllers/gear.controller';
 import { feedController } from './controllers/feed.controller';
-import { getAuth } from '@clerk/express';
+import { fromNodeHeaders } from 'better-auth/node';
+import { auth } from './lib/auth';
+import { setAuthContext } from './lib/auth-context';
 import { userService } from './services/user.service';
 
 const router = express.Router();
 
+/*
+ * The session lives in our own MySQL, so this is a local read rather than the
+ * round trip to Clerk every authenticated request used to make. It also drops
+ * the upsert that ran on every request, and the swallowed error around it.
+ */
 async function requireApiAuth(
    req: Request,
    res: Response,
    next: express.NextFunction
 ) {
-   const auth = getAuth(req);
+   const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+   });
 
-   if (!auth.isAuthenticated || !auth.userId) {
+   if (!session?.user) {
       return res.status(401).json({
          code: 'unauthorized',
          message: 'Authentication required.',
       });
    }
 
-   try {
-      await userService.syncAuthenticatedUser(auth.userId);
-   } catch (error) {
-      console.warn(
-         '[auth] Failed to sync user from Clerk to database. Continuing with authenticated request.',
-         {
-            userId: auth.userId,
-            error,
-         }
-      );
-   }
+   setAuthContext(req, session.user);
 
    return next();
 }

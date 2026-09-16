@@ -267,8 +267,8 @@ const mapWeatherSnapshotToCatchData = (
    };
 };
 
-const buildPlaceholderIdentity = (clerkId: string) => {
-   const normalized = clerkId.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+const buildPlaceholderIdentity = (userId: string) => {
+   const normalized = userId.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
    const username = `clerk_${normalized}`;
 
    return {
@@ -278,20 +278,13 @@ const buildPlaceholderIdentity = (clerkId: string) => {
    };
 };
 
-async function getUserByClerkId(clerkId: string) {
-   const existing = await prisma.user.findUnique({
-      where: { clerkId },
-      select: { id: true },
-   });
-
-   if (existing) {
-      return existing;
-   }
-
-   await userService.syncAuthenticatedUser(clerkId);
-
+/*
+ * The id on the request is this app's own User.id now, so this is an existence
+ * check rather than the lookup-and-sync-from-Clerk it used to be.
+ */
+async function getUserById(userId: string) {
    return prisma.user.findUniqueOrThrow({
-      where: { clerkId },
+      where: { id: userId },
       select: { id: true },
    });
 }
@@ -438,8 +431,8 @@ export const fishingService = {
       return toWeatherSnapshot(conditions);
    },
 
-   async createCatch(clerkId: string, input: CreateCatchInput) {
-      const user = await getUserByClerkId(clerkId);
+   async createCatch(userId: string, input: CreateCatchInput) {
+      const user = await getUserById(userId);
       const relations = await resolveOptionalRelationIds({
          siteId: input.siteId,
          speciesId: input.speciesId,
@@ -585,8 +578,8 @@ export const fishingService = {
       return withResolvedGearImageUrls(withResolvedImages);
    },
 
-   async listMyCatches(clerkId: string) {
-      const user = await getUserByClerkId(clerkId);
+   async listMyCatches(userId: string) {
+      const user = await getUserById(userId);
 
       const catches = await prisma.catch.findMany({
          where: { createdById: user.id, deletedAt: null },
@@ -612,12 +605,8 @@ export const fishingService = {
       return Promise.all(catches.map((entry) => withResolvedImageUrls(entry)));
    },
 
-   async updateCatch(
-      clerkId: string,
-      catchId: string,
-      input: UpdateCatchInput
-   ) {
-      const user = await getUserByClerkId(clerkId);
+   async updateCatch(userId: string, catchId: string, input: UpdateCatchInput) {
+      const user = await getUserById(userId);
       const relations = await resolveOptionalRelationIds(
          {
             siteId: input.siteId,
@@ -685,8 +674,8 @@ export const fishingService = {
       });
    },
 
-   async deleteCatch(clerkId: string, catchId: string) {
-      const user = await getUserByClerkId(clerkId);
+   async deleteCatch(userId: string, catchId: string) {
+      const user = await getUserById(userId);
 
       return prisma.$transaction(async (tx) => {
          const existing = await tx.catch.findFirst({
@@ -726,8 +715,8 @@ export const fishingService = {
       });
    },
 
-   async createFishingSite(clerkId: string, input: CreateFishingSiteInput) {
-      const user = await getUserByClerkId(clerkId);
+   async createFishingSite(userId: string, input: CreateFishingSiteInput) {
+      const user = await getUserById(userId);
 
       const created = await prisma.$transaction(async (tx) => {
          const site = await tx.fishingSite.create({
@@ -804,8 +793,8 @@ export const fishingService = {
       };
    },
 
-   async listMyFishingSites(clerkId: string) {
-      const user = await getUserByClerkId(clerkId);
+   async listMyFishingSites(userId: string) {
+      const user = await getUserById(userId);
 
       const sites = await prisma.fishingSite.findMany({
          where: { createdById: user.id, deletedAt: null },
@@ -833,11 +822,11 @@ export const fishingService = {
    },
 
    async updateFishingSite(
-      clerkId: string,
+      userId: string,
       siteId: string,
       input: UpdateFishingSiteInput
    ) {
-      const user = await getUserByClerkId(clerkId);
+      const user = await getUserById(userId);
       const existing = await prisma.fishingSite.findFirst({
          where: { id: siteId, createdById: user.id, deletedAt: null },
          select: { id: true },
@@ -930,8 +919,8 @@ export const fishingService = {
       return [...species, ...extra].slice(0, limit);
    },
 
-   async deleteFishingSite(clerkId: string, siteId: string) {
-      const user = await getUserByClerkId(clerkId);
+   async deleteFishingSite(userId: string, siteId: string) {
+      const user = await getUserById(userId);
       const existing = await prisma.fishingSite.findFirst({
          where: { id: siteId, createdById: user.id, deletedAt: null },
          select: { id: true },

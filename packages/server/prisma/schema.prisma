@@ -36,9 +36,13 @@ enum FeedScope {
 
 model User {
   id           String        @id @default(cuid())
-  clerkId      String        @unique
   email        String        @unique
-  username     String        @unique
+  emailVerified Boolean      @default(false)
+  // The R2 key prefix. Objects are stored under users/<storagePrefixId>/, so
+  // this has to stay stable even though the auth id it used to be has gone.
+  storagePrefixId String     @unique
+  // Nullable now: a new sign-up has no username until the angler picks one.
+  username     String?       @unique
   displayName  String
   bio          String?       @db.Text
   avatarUrl    String?
@@ -55,6 +59,8 @@ model User {
   feedPosts    FeedPost[]
   feedLikes    FeedLike[]
   feedComments FeedComment[]
+  sessions     Session[]
+  accounts     Account[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
@@ -319,4 +325,53 @@ model FeedComment {
   deletedAt DateTime?
 
   @@index([postId, createdAt(sort: Desc)])
+}
+
+/* ---------- better-auth. Field names are its own, do not rename them. ---------- */
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?  @db.Text
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?   @db.Text
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verifications")
 }

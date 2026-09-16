@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { getAuth } from '@clerk/express';
+import { getAuth } from '../lib/auth-context';
 import { Prisma } from '@prisma/client';
 import { updateProfileSchema } from '../schemas/user.schema';
 import { userService } from '../services/user.service';
@@ -15,7 +15,7 @@ export const userController = {
          });
       }
 
-      const result = await userService.getProfileByClerkId(auth.userId);
+      const result = await userService.getProfile(auth.userId);
 
       if (!result?.profile) {
          return res.status(404).json({
@@ -26,7 +26,6 @@ export const userController = {
 
       return res.json({
          profile: result.profile,
-         storage: result.storage,
       });
    },
 
@@ -46,14 +45,13 @@ export const userController = {
       }
 
       try {
-         const result = await userService.updateProfileByClerkId(
+         const result = await userService.updateProfile(
             auth.userId,
             parsed.data
          );
 
          return res.json({
             profile: result.profile,
-            storage: result.storage,
          });
       } catch (error) {
          const prismaErrorCode =
@@ -71,7 +69,7 @@ export const userController = {
          }
 
          console.error('[user:updateCurrentProfile] failed to update profile', {
-            clerkId: auth.userId,
+            userId: auth.userId,
             error,
          });
 
@@ -100,10 +98,7 @@ export const userController = {
          });
       }
 
-      const result = await userService.followByClerkId(
-         auth.userId,
-         targetUserId
-      );
+      const result = await userService.follow(auth.userId, targetUserId);
 
       if (!result) {
          return res.status(404).json({
@@ -148,7 +143,7 @@ export const userController = {
       }
 
       const search = String(req.query.search ?? '').trim();
-      const users = await userService.listConnectionsByClerkId(
+      const users = await userService.listConnections(
          auth.userId,
          type,
          search
@@ -175,10 +170,7 @@ export const userController = {
          });
       }
 
-      const result = await userService.unfollowByClerkId(
-         auth.userId,
-         targetUserId
-      );
+      const result = await userService.unfollow(auth.userId, targetUserId);
 
       if (!result) {
          return res.status(404).json({

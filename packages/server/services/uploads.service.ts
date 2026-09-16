@@ -9,7 +9,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 type UploadScope = 'catch' | 'site' | 'avatar' | 'gear';
 
 type SignUploadInput = {
-   clerkUserId: string;
+   storagePrefixId: string;
    scope: UploadScope;
    fileName: string;
    contentType: 'image/jpeg' | 'image/png' | 'image/webp';
@@ -90,13 +90,13 @@ const extensionByMime: Record<SignUploadInput['contentType'], string> = {
 };
 
 const buildStorageKey = ({
-   clerkUserId,
+   storagePrefixId,
    scope,
    fileName,
    contentType,
 }: Pick<
    SignUploadInput,
-   'clerkUserId' | 'scope' | 'fileName' | 'contentType'
+   'storagePrefixId' | 'scope' | 'fileName' | 'contentType'
 >) => {
    const timestamp = Date.now();
    const safeSlug = slugify(fileName) || 'image';
@@ -104,13 +104,13 @@ const buildStorageKey = ({
    const randomSuffix = randomUUID().slice(0, 8);
 
    if (scope === 'avatar') {
-      return `users/${clerkUserId}/avatar/${timestamp}-${randomSuffix}-${safeSlug}.${extension}`;
+      return `users/${storagePrefixId}/avatar/${timestamp}-${randomSuffix}-${safeSlug}.${extension}`;
    }
 
    const pathSegment =
       scope === 'catch' ? 'catches' : scope === 'site' ? 'sites' : 'gear';
 
-   return `users/${clerkUserId}/${pathSegment}/temp/${timestamp}-${randomSuffix}-${safeSlug}.${extension}`;
+   return `users/${storagePrefixId}/${pathSegment}/temp/${timestamp}-${randomSuffix}-${safeSlug}.${extension}`;
 };
 
 const buildUnsignedObjectUrl = (storageKey: string) => {
@@ -161,13 +161,13 @@ const buildSignedUploadUrl = async ({
 };
 
 const inferScopeFromStorageKey = (
-   clerkUserId: string,
+   storagePrefixId: string,
    storageKey: string
 ): UploadScope => {
-   const catchPrefix = `users/${clerkUserId}/catches/temp/`;
-   const sitePrefix = `users/${clerkUserId}/sites/temp/`;
-   const avatarPrefix = `users/${clerkUserId}/avatar/`;
-   const gearPrefix = `users/${clerkUserId}/gear/temp/`;
+   const catchPrefix = `users/${storagePrefixId}/catches/temp/`;
+   const sitePrefix = `users/${storagePrefixId}/sites/temp/`;
+   const avatarPrefix = `users/${storagePrefixId}/avatar/`;
+   const gearPrefix = `users/${storagePrefixId}/gear/temp/`;
 
    if (storageKey.startsWith(catchPrefix)) {
       return 'catch';
@@ -228,7 +228,7 @@ export const uploadsService = {
    },
 
    async getDirectUploadData(input: {
-      clerkUserId: string;
+      storagePrefixId: string;
       scope: UploadScope;
       storageKey: string;
       contentType: SignUploadInput['contentType'];
@@ -241,7 +241,7 @@ export const uploadsService = {
               : input.scope === 'site'
                 ? 'sites/temp'
                 : 'gear/temp';
-      const expectedPrefix = `users/${input.clerkUserId}/${expectedPathSegment}/`;
+      const expectedPrefix = `users/${input.storagePrefixId}/${expectedPathSegment}/`;
 
       if (!input.storageKey.startsWith(expectedPrefix)) {
          throw new Error(
@@ -261,7 +261,7 @@ export const uploadsService = {
    },
 
    async proxyUpload(input: {
-      clerkUserId: string;
+      storagePrefixId: string;
       scope: UploadScope;
       storageKey: string;
       contentType: SignUploadInput['contentType'];
@@ -275,7 +275,7 @@ export const uploadsService = {
               : input.scope === 'site'
                 ? 'sites/temp'
                 : 'gear/temp';
-      const expectedPrefix = `users/${input.clerkUserId}/${expectedPathSegment}/`;
+      const expectedPrefix = `users/${input.storagePrefixId}/${expectedPathSegment}/`;
 
       if (!input.storageKey.startsWith(expectedPrefix)) {
          throw new Error(

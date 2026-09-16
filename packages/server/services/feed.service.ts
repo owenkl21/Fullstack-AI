@@ -103,20 +103,13 @@ const withResolvedFeedImageUrls = async <
    };
 };
 
-async function getUserId(clerkId: string) {
-   const existing = await prisma.user.findUnique({
-      where: { clerkId },
-      select: { id: true },
-   });
-
-   if (existing) {
-      return existing.id;
-   }
-
-   await userService.syncAuthenticatedUser(clerkId);
-
+/*
+ * The id on the request is this app's own User.id now, so this is an existence
+ * check rather than the lookup-and-sync-from-Clerk it used to be.
+ */
+async function getUserId(userId: string) {
    const user = await prisma.user.findUniqueOrThrow({
-      where: { clerkId },
+      where: { id: userId },
       select: { id: true },
    });
 
@@ -212,7 +205,7 @@ export const feedService = {
    },
 
    async createFeedPost(
-      clerkId: string,
+      userId: string,
       input: {
          type: FeedType;
          scope: FeedScope;
@@ -223,7 +216,7 @@ export const feedService = {
          longitude?: number | null;
       }
    ) {
-      const userId = await getUserId(clerkId);
+      await getUserId(userId); // throws if the user is gone
 
       return prisma.feedPost.create({
          data: {
@@ -241,11 +234,11 @@ export const feedService = {
    },
 
    async updateFeedPost(
-      clerkId: string,
+      userId: string,
       postId: string,
       input: { content?: string | null; scope?: FeedScope }
    ) {
-      const userId = await getUserId(clerkId);
+      await getUserId(userId); // throws if the user is gone
       const existing = await prisma.feedPost.findFirst({
          where: { id: postId, authorId: userId, deletedAt: null },
          select: { id: true },
@@ -262,8 +255,8 @@ export const feedService = {
       });
    },
 
-   async deleteFeedPost(clerkId: string, postId: string) {
-      const userId = await getUserId(clerkId);
+   async deleteFeedPost(userId: string, postId: string) {
+      await getUserId(userId); // throws if the user is gone
       const existing = await prisma.feedPost.findFirst({
          where: { id: postId, authorId: userId, deletedAt: null },
          select: { id: true },
@@ -281,8 +274,8 @@ export const feedService = {
       return { id: postId };
    },
 
-   async toggleLike(clerkId: string, postId: string) {
-      const userId = await getUserId(clerkId);
+   async toggleLike(userId: string, postId: string) {
+      await getUserId(userId); // throws if the user is gone
       const post = await prisma.feedPost.findFirst({
          where: { id: postId, deletedAt: null },
          select: { id: true },
@@ -327,8 +320,8 @@ export const feedService = {
       });
    },
 
-   async createComment(clerkId: string, postId: string, body: string) {
-      const userId = await getUserId(clerkId);
+   async createComment(userId: string, postId: string, body: string) {
+      await getUserId(userId); // throws if the user is gone
       const post = await prisma.feedPost.findFirst({
          where: { id: postId, deletedAt: null },
          select: { id: true },
@@ -361,8 +354,8 @@ export const feedService = {
       });
    },
 
-   async deleteComment(clerkId: string, commentId: string) {
-      const userId = await getUserId(clerkId);
+   async deleteComment(userId: string, commentId: string) {
+      await getUserId(userId); // throws if the user is gone
       const existing = await prisma.feedComment.findFirst({
          where: { id: commentId, userId, deletedAt: null },
          select: { id: true, postId: true },

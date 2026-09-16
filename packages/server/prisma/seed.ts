@@ -7,7 +7,7 @@ async function main() {
          where: { email: 'angler.one@example.com' },
          update: {},
          create: {
-            clerkId: 'seed_angler_one',
+            storagePrefixId: 'seed_angler_one',
             email: 'angler.one@example.com',
             username: 'anglerone',
             displayName: 'Angler One',
@@ -18,7 +18,7 @@ async function main() {
          where: { email: 'angler.two@example.com' },
          update: {},
          create: {
-            clerkId: 'seed_angler_two',
+            storagePrefixId: 'seed_angler_two',
             email: 'angler.two@example.com',
             username: 'anglertwo',
             displayName: 'Angler Two',

@@ -27,20 +27,13 @@ const stripSignedUrlParams = (url: string) => {
    }
 };
 
-async function getUserByClerkId(clerkId: string) {
-   const existing = await prisma.user.findUnique({
-      where: { clerkId },
-      select: { id: true },
-   });
-
-   if (existing) {
-      return existing;
-   }
-
-   await userService.syncAuthenticatedUser(clerkId);
-
+/*
+ * The id on the request is this app's own User.id now, so this is an existence
+ * check rather than the lookup-and-sync-from-Clerk it used to be.
+ */
+async function getUserById(userId: string) {
    return prisma.user.findUniqueOrThrow({
-      where: { clerkId },
+      where: { id: userId },
       select: { id: true },
    });
 }
@@ -95,8 +88,8 @@ const withSignedImageUrls = async <T extends { imageUrl: string | null }>(
 };
 
 export const gearService = {
-   async createGear(clerkId: string, input: GearInput) {
-      const user = await getUserByClerkId(clerkId);
+   async createGear(userId: string, input: GearInput) {
+      const user = await getUserById(userId);
 
       return prisma.$transaction(async (tx) => {
          const gear = await tx.gear.create({
@@ -137,8 +130,8 @@ export const gearService = {
       return withSignedImageUrls(gear);
    },
 
-   async listMyGear(clerkId: string) {
-      const user = await getUserByClerkId(clerkId);
+   async listMyGear(userId: string) {
+      const user = await getUserById(userId);
 
       const gear = await prisma.gear.findMany({
          where: { createdById: user.id },
@@ -148,8 +141,8 @@ export const gearService = {
       return withSignedImageUrls(gear);
    },
 
-   async updateGear(clerkId: string, gearId: string, input: GearInput) {
-      const user = await getUserByClerkId(clerkId);
+   async updateGear(userId: string, gearId: string, input: GearInput) {
+      const user = await getUserById(userId);
 
       const existing = await prisma.gear.findFirst({
          where: { id: gearId, createdById: user.id },
@@ -193,8 +186,8 @@ export const gearService = {
       return updated;
    },
 
-   async deleteGear(clerkId: string, gearId: string) {
-      const user = await getUserByClerkId(clerkId);
+   async deleteGear(userId: string, gearId: string) {
+      const user = await getUserById(userId);
 
       const existing = await prisma.gear.findFirst({
          where: { id: gearId, createdById: user.id },
