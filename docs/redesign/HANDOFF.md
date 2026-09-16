@@ -48,7 +48,7 @@ Two commits on `redesign-theme`, neither pushed:
 | 5.3 Species and Open-Meteo | Not started |
 | 5.4 Seed data | Not started |
 | 5.5 The social layer | Not started |
-| 5.6 Leaflet, off Google | **In progress.** Route splitting done. leaflet@1.9.4 installed, map components not written |
+| 5.6 Leaflet, off Google | **Done.** Picker, both record maps and the all-spots map. No iframes left |
 
 **Railway is provisioned** (16 September 2026): project `fishlogger`, MySQL online, `server` service created from the repo but not deployed, all variables set. Details in [09-deploy.md](09-deploy.md) section 4.0.
 
@@ -134,7 +134,13 @@ In this order, because each ring is useful alone: personal bests and profile sta
 Ship the per-record privacy switch **with** the group feature, not after it.
 
 ### 5.6 Maps off Google
-Leaflet, per decision 4. Replaces `GoogleMapLocationPicker.tsx`, the embed iframes on the record and spot pages, and adds the all-spots map that `MySitesPage` currently stubs.
+**Done.** Leaflet 1.9.4 direct, per decision 4. `GoogleMapLocationPicker.tsx` is gone, replaced by `MapLocationPicker` with the same three props and all five ways of setting the pin. Both record iframes are `StaticMap`, and there are now no iframes anywhere in the client. `MySitesPage`'s stub is a real `SpotsMap`.
+
+Tiles are keyless OpenStreetMap with the OpenSeaMap seamark overlay, so no account, no API key and no registered domain. **Stadia was not used**, and day and night are a CSS filter over the tile pane rather than a second styled tile set. That is the honest free answer: raster tiles are pictures on someone else's server and cannot take the product's tokens, so the filter is an approximation rather than a designed dark style. Revisit if it reads badly on a phone.
+
+`VITE_GOOGLE_MAPS_API_KEY` is read nowhere now and has been dropped from `.env.example`.
+
+One server change was needed: `/api/sites/me` returned no coordinates, which is why the map could only ever be a stub. It now selects `latitude` and `longitude`. These are the angler's own spots, so the appendix E rule about coarsening a published pin does not apply.
 
 ---
 
@@ -180,7 +186,7 @@ The entry chunk was 661.14 kB raw and 197.80 kB gzipped before the split, so fir
 2. The **Railway API domain** in `packages/client/vercel.json`. Step by step in [09-deploy.md](09-deploy.md) section 5.2.
 3. A **CORS policy on the R2 bucket**, now that photos upload straight to R2 rather than through the API. Without it every upload fails with an opaque browser error and nothing reaches the server logs. The policy is in [09-deploy.md](09-deploy.md) section 4.5.
 4. A **verified sending domain in Resend**, before email verification and password reset can work.
-5. A **Stadia Maps account** if the styled day and night basemaps are wanted; otherwise the keyless OpenStreetMap layer works with no account.
+5. ~~A Stadia Maps account~~. No longer needed. The maps went in on keyless OpenStreetMap tiles with a CSS filter for night, so there is no account, no key and no registered domain anywhere in the map path.
 6. A **product name**. Everything currently says `Name`, deliberately, including the wordmark and the page titles.
 
 ---

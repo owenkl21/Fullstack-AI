@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useRevealIn } from '@/components/brand/Reveal';
 import { Chip } from '@/components/fishing/rows/Chip';
 import { RowList } from '@/components/fishing/rows/Row';
@@ -15,6 +15,7 @@ import { useShowMore } from '@/components/states/useShowMore';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
 import { useDocumentTitle } from '@/lib/title';
+import { SpotsMap } from '@/components/map/SpotsMap';
 
 /*
  * The places the angler fishes, in the same row grammar as the catches, with the
@@ -41,6 +42,7 @@ export function MySitesPage() {
 }
 
 function MySitesList() {
+   const navigate = useNavigate();
    const root = useRef<HTMLElement>(null);
    useRevealIn(root);
 
@@ -125,6 +127,25 @@ function MySitesList() {
    const total = plural(items.length, 'spot');
    const countLine = query.trim() ? `${filtered.length} of ${total}` : total;
    const visible = filtered.slice(0, shown);
+   /* The map shows every saved spot, not just the page of rows on screen. */
+   const pins = useMemo(
+      () =>
+         items.flatMap((entry) =>
+            entry.latitude != null && entry.longitude != null
+               ? [
+                    {
+                       id: entry.id,
+                       name: entry.name,
+                       latitude: entry.latitude,
+                       longitude: entry.longitude,
+                       catchCount: entry.catchCount,
+                    },
+                 ]
+               : []
+         ),
+      [items]
+   );
+   const withoutPosition = items.length - pins.length;
 
    return (
       <section
@@ -177,15 +198,31 @@ function MySitesList() {
 
          <div className="mt-8">
             {onMap ? (
-               <PlainState sentence="Map view is coming, and until it lands the list holds every spot you have saved.">
-                  <Button
-                     type="button"
-                     variant="outline"
-                     onClick={() => setParam('view', '')}
-                  >
-                     Back to the list
-                  </Button>
-               </PlainState>
+               pins.length > 0 ? (
+                  <>
+                     <SpotsMap
+                        spots={pins}
+                        onOpen={(id) => navigate(`/sites/${id}`)}
+                     />
+                     {withoutPosition > 0 ? (
+                        <p className="mt-3 text-[15px] text-ink-2">
+                           {withoutPosition === 1
+                              ? 'One spot has no position saved, so it is not on the map. Edit it to drop a pin.'
+                              : `${withoutPosition} spots have no position saved, so they are not on the map. Edit them to drop a pin.`}
+                        </p>
+                     ) : null}
+                  </>
+               ) : (
+                  <PlainState sentence="None of your spots has a position saved yet, so there is nothing to map. Edit a spot to drop a pin on it.">
+                     <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setParam('view', '')}
+                     >
+                        Back to the list
+                     </Button>
+                  </PlainState>
+               )
             ) : status === 'loading' ? (
                <ListSkeleton
                   key={attempt}

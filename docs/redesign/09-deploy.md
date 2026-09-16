@@ -263,14 +263,13 @@ Because rewrite destinations do not expand environment variables, this value liv
 | Variable | Required | Notes |
 |---|---|---|
 | `VITE_CLERK_PUBLISHABLE_KEY` | **Yes** | Without it the site is a blank white page |
-| `VITE_GOOGLE_MAPS_API_KEY` | No | Unset is supported, the picker falls back to typed coordinates |
+
+That is the only one. `VITE_GOOGLE_MAPS_API_KEY` used to be listed here and is now read nowhere: the maps are Leaflet on keyless tiles, so there is no browser key to set, restrict by referrer, or leak.
 
 `VITE_*` variables are **inlined into the bundle at build time**, not read at runtime. Two consequences:
 
 - Missing `VITE_CLERK_PUBLISHABLE_KEY` gives a **successful green build and a white screen**, because `main.tsx` throws above `createRoot(...).render(...)`. The Vercel dashboard will show the deploy as fine.
 - Adding or changing one of these after a deploy does nothing until you **rebuild**. Redeploy from the Deployments tab with the build cache disabled.
-
-If the Maps browser key is set, its HTTP-referrer restrictions need the Vercel origin added, or Maps requests from the deployed site are rejected.
 
 ### 5.4 Check it
 

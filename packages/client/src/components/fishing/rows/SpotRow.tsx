@@ -15,6 +15,8 @@ export type SpotRowItem = {
     * date (appendix E, B3 and B6). Both render the moment the endpoint sends them. */
    waterType?: string | null;
    lastCatchAt?: string | null;
+   latitude?: number | null;
+   longitude?: number | null;
 };
 
 export function SpotRow({

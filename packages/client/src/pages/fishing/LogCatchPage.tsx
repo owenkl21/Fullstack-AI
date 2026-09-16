@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GoogleMapLocationPicker } from '@/components/fishing/GoogleMapLocationPicker';
+import { MapLocationPicker } from '@/components/fishing/MapLocationPicker';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
@@ -1299,7 +1299,7 @@ export function CatchForm({
                      />
                   </div>
                   <div data-field="spot" tabIndex={-1}>
-                     <GoogleMapLocationPicker
+                     <MapLocationPicker
                         latitude={newLatitude}
                         longitude={newLongitude}
                         onChange={setNewCoordinates}

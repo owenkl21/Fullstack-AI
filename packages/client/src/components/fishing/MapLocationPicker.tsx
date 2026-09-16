@@ -1,48 +1,20 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ViewfinderCircleIcon } from '@heroicons/react/24/outline';
+import type { Map as LeafletMap, Marker } from 'leaflet';
 import { Button } from '@/components/ui/button';
+import { L, createMap, pinIcon, refreshSize } from '@/lib/leaflet';
 import {
-   buildMapStyle,
-   canDrawMap,
    formatCoordinate,
-   loadGoogleMapsScript,
    parseGoogleMapsCoordinates,
    readPosition,
    type MapPosition,
 } from '@/lib/maps';
-import { useTheme } from '@/lib/theme';
 
-type GoogleMapLocationPickerProps = {
+type MapLocationPickerProps = {
    latitude: string;
    longitude: string;
    onChange: (latitude: number, longitude: number) => void;
 };
-
-type MapsListener = { remove: () => void };
-
-type MapInstance = {
-   addListener: (
-      eventName: 'click',
-      handler: (event: {
-         latLng?: { lat: () => number; lng: () => number } | null;
-      }) => void
-   ) => MapsListener;
-   panTo: (position: MapPosition) => void;
-   setZoom: (zoom: number) => void;
-   getZoom: () => number | undefined;
-   setOptions: (options: Record<string, unknown>) => void;
-};
-
-type MarkerInstance = {
-   getPosition: () => { lat: () => number; lng: () => number } | null;
-   setPosition: (position: MapPosition) => void;
-   setMap: (map: MapInstance | null) => void;
-   addListener: (eventName: 'dragend', handler: () => void) => MapsListener;
-};
-
-type MarkerConstructor = new (
-   options: Record<string, unknown>
-) => MarkerInstance;
 
 /* The country the first anglers fish, rather than a continent they do not. */
 const DEFAULT_CENTER: MapPosition = { lat: -30.5595, lng: 22.9375 };
@@ -55,29 +27,31 @@ const SAME_POSITION = 0.000001;
  * One pin, four ways to set it: tap the map, drag the pin, paste a link from Maps,
  * or ask for your own position. The map never asks for a position on its own, and
  * where it cannot be drawn the two coordinate fields take over.
+ *
+ * Day and night need no work here: the tile pane is filtered by a :root rule, so
+ * the map follows the theme without JavaScript watching for it.
  */
-export function GoogleMapLocationPicker({
+export function MapLocationPicker({
    latitude,
    longitude,
    onChange,
-}: GoogleMapLocationPickerProps) {
-   const theme = useTheme();
+}: MapLocationPickerProps) {
    const fieldId = useId();
    const mapContainerRef = useRef<HTMLDivElement | null>(null);
-   const mapRef = useRef<MapInstance | null>(null);
-   const markerRef = useRef<MarkerInstance | null>(null);
-   const markerConstructorRef = useRef<MarkerConstructor | null>(null);
-   const markerListenerRef = useRef<MapsListener | null>(null);
+   const mapRef = useRef<LeafletMap | null>(null);
+   const markerRef = useRef<Marker | null>(null);
    const lastSentRef = useRef<MapPosition | null>(null);
    const onChangeRef = useRef(onChange);
    const startRef = useRef<MapPosition | null>(
       readPosition(latitude, longitude)
    );
-   const themeRef = useRef(theme);
 
-   const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable'>(
-      canDrawMap() ? 'loading' : 'unavailable'
-   );
+   /*
+    * Leaflet needs no script, no key and no network to draw, so there is no
+    * loading state to show. This only ever flips if constructing the map
+    * throws, and then the typed fields take over.
+    */
+   const [mapFailed, setMapFailed] = useState(false);
    const [isLocating, setIsLocating] = useState(false);
    const [locationError, setLocationError] = useState<string | null>(null);
    const [link, setLink] = useState('');
@@ -92,10 +66,6 @@ export function GoogleMapLocationPicker({
    useEffect(() => {
       onChangeRef.current = onChange;
    }, [onChange]);
-
-   useEffect(() => {
-      themeRef.current = theme;
-   }, [theme]);
 
    const position = readPosition(latitude, longitude);
 
@@ -112,120 +82,84 @@ export function GoogleMapLocationPicker({
       }
 
       if (markerRef.current) {
-         markerRef.current.setPosition(next);
-      } else if (markerConstructorRef.current) {
-         const marker = new markerConstructorRef.current({
-            position: next,
-            map,
+         markerRef.current.setLatLng([next.lat, next.lng]);
+      } else {
+         const marker = L.marker([next.lat, next.lng], {
+            icon: pinIcon(),
             draggable: true,
             title: 'The pin for this spot',
-         });
+            keyboard: true,
+         }).addTo(map);
 
-         markerListenerRef.current = marker.addListener('dragend', () => {
-            const moved = marker.getPosition();
+         marker.on('dragend', () => {
+            const moved = marker.getLatLng();
 
-            if (!moved) {
-               return;
-            }
-
-            lastSentRef.current = { lat: moved.lat(), lng: moved.lng() };
-            onChangeRef.current(moved.lat(), moved.lng());
+            lastSentRef.current = { lat: moved.lat, lng: moved.lng };
+            onChangeRef.current(moved.lat, moved.lng);
          });
 
          markerRef.current = marker;
       }
 
       if (recentre) {
-         map.panTo(next);
+         map.panTo([next.lat, next.lng]);
 
-         if ((map.getZoom() ?? 0) < FOCUSED_ZOOM) {
+         if (map.getZoom() < FOCUSED_ZOOM) {
             map.setZoom(FOCUSED_ZOOM);
          }
       }
    }, []);
 
    useEffect(() => {
-      if (!canDrawMap()) {
+      const node = mapContainerRef.current;
+
+      if (!node || mapRef.current) {
          return;
       }
 
-      let isCancelled = false;
-      const listeners: MapsListener[] = [];
+      let observer: ResizeObserver | null = null;
 
-      const drawMap = async () => {
-         try {
-            const googleSdk = await loadGoogleMapsScript();
-            const mapsLibrary = (await googleSdk.maps.importLibrary(
-               'maps'
-            )) as {
-               Map: new (
-                  mapDiv: HTMLElement,
-                  options?: Record<string, unknown>
-               ) => MapInstance;
-            };
+      try {
+         const start = startRef.current;
+         const map = createMap(node, {
+            centre: start ?? DEFAULT_CENTER,
+            zoom: start ? FOCUSED_ZOOM : DEFAULT_ZOOM,
+         });
 
-            if (isCancelled || !mapContainerRef.current) {
-               return;
-            }
+         mapRef.current = map;
 
-            const start = startRef.current;
-            const map = new mapsLibrary.Map(mapContainerRef.current, {
-               center: start ?? DEFAULT_CENTER,
-               zoom: start ? FOCUSED_ZOOM : DEFAULT_ZOOM,
-               gestureHandling: 'cooperative',
-               disableDefaultUI: true,
-               zoomControl: true,
-               clickableIcons: false,
-               styles: buildMapStyle(themeRef.current),
-            });
-
-            mapRef.current = map;
-            markerConstructorRef.current = googleSdk.maps
-               .Marker as unknown as MarkerConstructor;
-
-            if (start) {
-               setPin(start, false);
-            }
-
-            listeners.push(
-               map.addListener('click', (event) => {
-                  if (!event.latLng) {
-                     return;
-                  }
-
-                  const next = {
-                     lat: event.latLng.lat(),
-                     lng: event.latLng.lng(),
-                  };
-
-                  setPin(next);
-                  send(next);
-               })
-            );
-
-            setStatus('ready');
-         } catch (error) {
-            console.error(error);
-            setStatus('unavailable');
+         if (start) {
+            setPin(start, false);
          }
-      };
 
-      void drawMap();
+         map.on('click', (event) => {
+            const next = { lat: event.latlng.lat, lng: event.latlng.lng };
+
+            setPin(next);
+            send(next);
+         });
+
+         observer = new ResizeObserver(() => refreshSize(map));
+         observer.observe(node);
+      } catch (error) {
+         console.error(error);
+         // Deferred: setting state straight from an effect body cascades a
+         // render, and this is a report from an external system, not a value
+         // React already knows.
+         queueMicrotask(() => setMapFailed(true));
+      }
 
       return () => {
-         isCancelled = true;
-         listeners.forEach((listener) => listener.remove());
-         markerListenerRef.current?.remove();
-         markerListenerRef.current = null;
-         markerRef.current?.setMap(null);
+         observer?.disconnect();
          markerRef.current = null;
+         mapRef.current?.remove();
          mapRef.current = null;
       };
    }, [send, setPin]);
 
    /* The pin follows the form, but not the keystroke it just sent itself. */
    useEffect(() => {
-      if (status !== 'ready') {
+      if (mapFailed) {
          return;
       }
 
@@ -246,15 +180,7 @@ export function GoogleMapLocationPicker({
       }
 
       setPin(next);
-   }, [latitude, longitude, setPin, status]);
-
-   useEffect(() => {
-      if (status !== 'ready') {
-         return;
-      }
-
-      mapRef.current?.setOptions({ styles: buildMapStyle(theme) });
-   }, [status, theme]);
+   }, [latitude, longitude, mapFailed, setPin]);
 
    const useMyPosition = () => {
       if (!navigator.geolocation) {
@@ -339,19 +265,14 @@ export function GoogleMapLocationPicker({
 
    return (
       <div className="grid gap-4">
-         {status === 'unavailable' ? (
+         {mapFailed ? (
             <p className="text-[15px] text-ink-2">
                The map cannot be drawn here. Type the position, paste a link
                from Maps, or use your own position.
             </p>
          ) : (
-            <div className="relative aspect-[3/2] w-full border border-line bg-bg-2">
+            <div className="map-surface relative aspect-[3/2] w-full border border-line">
                <div ref={mapContainerRef} className="absolute inset-0" />
-               {status === 'loading' ? (
-                  <div className="absolute inset-0 grid place-items-center">
-                     <span className="lab">Drawing the map</span>
-                  </div>
-               ) : null}
                <button
                   type="button"
                   onClick={useMyPosition}
@@ -362,7 +283,7 @@ export function GoogleMapLocationPicker({
                   title={
                      isLocating ? 'Finding your position' : 'Use my position'
                   }
-                  className="absolute bottom-3 left-3 grid size-11 place-items-center rounded-full border border-line bg-background text-ink transition-transform duration-150 [transition-timing-function:var(--ease)] active:scale-[0.96] disabled:opacity-50"
+                  className="absolute bottom-3 left-3 z-[400] grid size-11 place-items-center rounded-full border border-line bg-background text-ink transition-transform duration-150 [transition-timing-function:var(--ease)] active:scale-[0.96] disabled:opacity-50"
                >
                   <ViewfinderCircleIcon
                      className="size-6"
@@ -373,7 +294,7 @@ export function GoogleMapLocationPicker({
             </div>
          )}
 
-         {status === 'unavailable' ? (
+         {mapFailed ? (
             <div className="grid gap-4 sm:grid-cols-2">
                <div className="grid gap-2">
                   <label className="lab" htmlFor={`${fieldId}-lat`}>
@@ -472,7 +393,7 @@ export function GoogleMapLocationPicker({
             ) : null}
          </div>
 
-         {status === 'unavailable' ? (
+         {mapFailed ? (
             <Button
                type="button"
                variant="outline"

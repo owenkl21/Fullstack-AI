@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useId, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { GoogleMapLocationPicker } from '@/components/fishing/GoogleMapLocationPicker';
+import { MapLocationPicker } from '@/components/fishing/MapLocationPicker';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 import { useRevealIn } from '@/components/brand/Reveal';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
@@ -336,7 +336,7 @@ export function SpotForm({
          </Group>
 
          <Group title="Where it is">
-            <GoogleMapLocationPicker
+            <MapLocationPicker
                latitude={values.latitude}
                longitude={values.longitude}
                onChange={setCoordinates}

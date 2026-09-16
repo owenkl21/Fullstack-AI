@@ -686,6 +686,10 @@ export const fishingService = {
             name: true,
             createdAt: true,
             catchCount: true,
+            // The angler's own spots, so the exact pin is theirs to see. The
+            // coarsening rule in appendix E is about publishing someone else's.
+            latitude: true,
+            longitude: true,
             images: {
                take: 1,
                orderBy: { position: 'asc' },
