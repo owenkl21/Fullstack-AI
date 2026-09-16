@@ -20,7 +20,15 @@ const baseURL =
    process.env.APP_ORIGIN?.trim() ||
    'http://localhost:5173';
 
-const appOrigin = process.env.APP_ORIGIN?.trim() || baseURL;
+/*
+ * A list, not one value. The same API serves the deployed site and a developer
+ * running the client locally against it, and better-auth rejects an Origin it
+ * does not know.
+ */
+const trustedOrigins = (process.env.APP_ORIGIN?.trim() || baseURL)
+   .split(',')
+   .map((origin) => origin.trim())
+   .filter(Boolean);
 
 /*
  * There is no mail provider yet, so requiring a verified address would lock
@@ -45,7 +53,7 @@ export const auth = betterAuth({
    database: prismaAdapter(prisma, { provider: 'mysql' }),
    baseURL,
    secret: process.env.BETTER_AUTH_SECRET,
-   trustedOrigins: [appOrigin],
+   trustedOrigins,
 
    emailAndPassword: {
       enabled: true,

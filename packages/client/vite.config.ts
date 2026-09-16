@@ -12,7 +12,18 @@ export default defineConfig({
    },
    server: {
       proxy: {
-         '/api': 'http://localhost:3000',
+         /*
+          * Point at a deployed API with VITE_API_TARGET when there is no server
+          * running locally. cookieDomainRewrite matters: the session cookie
+          * comes back stamped with the API's domain, and a browser would
+          * discard it for localhost without this.
+          */
+         '/api': {
+            target: process.env.VITE_API_TARGET || 'http://localhost:3000',
+            changeOrigin: true,
+            cookieDomainRewrite: '',
+            secure: true,
+         },
       },
    },
 });
