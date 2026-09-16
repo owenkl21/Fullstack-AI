@@ -147,7 +147,8 @@ Done on 16 September 2026, so do not create these again.
 | Project | `fishlogger`, id `57064410-6d06-4111-a7e9-369790c758fd`, workspace "Owen Kleinhans's Projects" |
 | Environment | `production` |
 | MySQL | Online, on a volume |
-| server | Created from `owenkl21/fishlogger` branch `main`. **Not yet deployed** |
+| server | **Deployed and Online** at `https://server-production-a002.up.railway.app` |
+| Schema | Pushed. Seeded with 24 species |
 
 Ten variables are set on `server`: the four Cloudflare R2 keys, both Clerk keys, `OPENAI_API_KEY`, both Google weather values, and `DATABASE_URL`. `CLOUDFLARE_R2_PUBLIC_BASE_URL` and `PORT` are deliberately absent, for the reasons in 4.2.
 
@@ -197,9 +198,17 @@ Then create the schema. **This cannot be done from the laptop**, which an earlie
 Run it from inside the network instead, once the server service has deployed:
 
 ```bash
-railway ssh --service server
-cd packages/server && bun run prisma:db:push
+railway ssh --service server "cd packages/server && bunx prisma db push --accept-data-loss"
+railway ssh --service server "cd packages/server && bun run prisma/seed.ts"
 ```
+
+`railway ssh` needs two things first, both one-off. A key registered with
+`railway ssh keys add` (it reads the SSH agent; passing a path to the `.pub`
+file fails with "Key not found"), and `ssh.railway.com` in `known_hosts`, or the
+connection dies on "Host key verification failed" with no hint as to why.
+
+Note that `--skip-generate` is not a flag Prisma 7 accepts on `db push`; passing
+it silently prints the help text instead of doing anything.
 
 The alternative, exposing a public TCP proxy on the database so the laptop can reach it, works but bills egress and puts the database on the public internet for the sake of one command. Not worth it.
 

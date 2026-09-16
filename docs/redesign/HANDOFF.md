@@ -43,7 +43,7 @@ Two commits on `redesign-theme`, neither pushed:
 
 | Queue item | State |
 |---|---|
-| 5.1 Railway and deploy wiring | Repo side done. Owner actions in section 8 remain |
+| 5.1 Railway and deploy wiring | **Backend live.** Server online, schema pushed, species seeded. Vercel still waiting on the account |
 | 5.2 better-auth replacing Clerk | Not started. Needs a verified Resend domain first |
 | 5.3 Species and Open-Meteo | **Done.** Species wired and seeded, conditions read at the hour of the catch |
 | 5.4 Seed data | Not started |
@@ -71,7 +71,9 @@ The client proxies `/api` to `localhost:3000` in development (`vite.config.ts`),
 cd packages/server && bun run dev
 ```
 
-**There is no database yet.** `DATABASE_URL` in `packages/server/.env` points at `127.0.0.1:3306/fishing_app` and nothing is listening; this Mac has no MySQL installed. The decision (section 4) is to use Railway's MySQL for both development and production. Until that connection string is in `.env`, the server cannot start and no signed-in screen can be seen in a browser.
+**There is a live backend now**, at `https://server-production-a002.up.railway.app`, with the schema pushed and 24 species seeded. `/api/hello` and `/api/species` answer.
+
+Local `packages/server/.env` still points at `127.0.0.1:3306/fishing_app` and this Mac has no MySQL, so the server will not start locally. The Railway database is private-only (`mysql.railway.internal`) and cannot be reached from a laptop, so local work either needs its own MySQL or should run against the deployed API.
 
 The desktop preview tool cannot start this dev server (it ignores `cwd`, and `bun --cwd` hangs behind a helper process). Use a background shell.
 
