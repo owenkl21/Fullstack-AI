@@ -48,7 +48,11 @@ Two commits on `redesign-theme`, neither pushed:
 | 5.3 Species and Open-Meteo | Not started |
 | 5.4 Seed data | Not started |
 | 5.5 The social layer | Not started |
-| 5.6 Leaflet, off Google | **In progress** |
+| 5.6 Leaflet, off Google | **In progress.** leaflet@1.9.4 installed, spec done, code not written |
+
+**Railway is provisioned** (16 September 2026): project `fishlogger`, MySQL online, `server` service created from the repo but not deployed, all variables set. Details in [09-deploy.md](09-deploy.md) section 4.0.
+
+**Vercel is not started, and is deliberately not mine to start.** The frontend goes on a different Vercel account than the one this work assumed. Owen is setting it up and will say which account and project, so nothing here should create a Vercel project or guess at a domain.
 
 5.6 was taken before 5.2 deliberately. It is self-contained and leaves the app working at every point, where a half-finished auth migration would not, since `Show` from `@clerk/react` gates most pages.
 

@@ -64,6 +64,8 @@ There was no Railway configuration of any kind, and the root `package.json` has 
 
 It sits at the **root**, not in `packages/server`, because that is where `bun.lock` and the `workspaces` array live, so that is where `bun install` has to run.
 
+**This format is deprecated.** Railway CLI 5.57 warns that Config as Code (`railway.json`) is superseded by Infrastructure as Code at `.railway/railway.ts`, and that existing files keep working until **1 December 2026**. `railway config migrate` translates this file cleanly; it was run as a dry run and the output is faithful. It has deliberately not been applied yet, because a first deploy is the wrong moment to introduce an untested config format. Migrate once a deploy is known good.
+
 `/api/hello` ([routes.ts:47](../../packages/server/routes.ts)) is the health check rather than `/` ([routes.ts:43](../../packages/server/routes.ts)) because it exercises the same `/api` prefix that Vercel proxies. Both are trivial handlers that touch no database, which is what a health check needs.
 
 ### 3.2 `prisma db push` no longer runs on every boot
@@ -136,6 +138,23 @@ With that, `bunx tsc --noEmit` in `packages/server` reports zero errors, which i
 
 ## 4. Railway first
 
+### 4.0 What already exists
+
+Done on 16 September 2026, so do not create these again.
+
+| | |
+|---|---|
+| Project | `fishlogger`, id `57064410-6d06-4111-a7e9-369790c758fd`, workspace "Owen Kleinhans's Projects" |
+| Environment | `production` |
+| MySQL | Online, on a volume |
+| server | Created from `owenkl21/fishlogger` branch `main`. **Not yet deployed** |
+
+Ten variables are set on `server`: the four Cloudflare R2 keys, both Clerk keys, `OPENAI_API_KEY`, both Google weather values, and `DATABASE_URL`. `CLOUDFLARE_R2_PUBLIC_BASE_URL` and `PORT` are deliberately absent, for the reasons in 4.2.
+
+`DATABASE_URL` is set to the reference `${{MySQL.MYSQL_URL}}` rather than a copied literal, so it follows the database and hardcodes no password.
+
+**The database is private only.** `MYSQL_URL` resolves to `mysql.railway.internal:3306` and no public TCP proxy is exposed, which is what decision 1 asked for and means no egress billing. The consequence is in 4.3.
+
 ### 4.1 Create the project and the database
 
 New project, then **Add MySQL**. Railway provisions it and exposes `MYSQL_URL` on the database service.
@@ -174,13 +193,18 @@ Set these variables on the **server** service:
 
 On the server service, **Settings, Networking, Generate Domain**. You get something shaped like `<name>-production.up.railway.app`. Write it down, section 5 needs it.
 
-Then, once from the laptop, with `DATABASE_URL` in `packages/server/.env` pointed at the Railway database:
+Then create the schema. **This cannot be done from the laptop**, which an earlier draft of this document got wrong. `mysql.railway.internal` only resolves inside Railway's private network, so a `prisma db push` from here cannot reach it.
+
+Run it from inside the network instead, once the server service has deployed:
 
 ```bash
+railway ssh --service server
 cd packages/server && bun run prisma:db:push
 ```
 
-This creates the schema. It is no longer done by the container, by design.
+The alternative, exposing a public TCP proxy on the database so the laptop can reach it, works but bills egress and puts the database on the public internet for the sake of one command. Not worth it.
+
+This is a deliberate step because `start` no longer does it (3.2).
 
 ### 4.4 Check it
 
