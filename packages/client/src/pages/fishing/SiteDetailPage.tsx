@@ -23,6 +23,7 @@ import {
 import { toast } from '@/components/ui/use-toast';
 import { useDocumentTitle } from '@/lib/title';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { StaticMap } from '@/components/map/StaticMap';
 
 /*
  * A spot: the photograph and the name first, then what the place is and how to get
@@ -293,10 +294,11 @@ function SiteRecord({
    const facts = [water, `${caughtLine} logged here`]
       .filter(Boolean)
       .join(' · ');
-   const hasPosition = data.latitude != null && data.longitude != null;
-   const mapUrl = hasPosition
-      ? `https://www.google.com/maps?q=${data.latitude},${data.longitude}&z=13&output=embed`
-      : null;
+   const position =
+      data.latitude != null && data.longitude != null
+         ? { lat: data.latitude, lng: data.longitude }
+         : null;
+   const hasPosition = position !== null;
    const openMapUrl = hasPosition
       ? `https://www.google.com/maps?q=${data.latitude},${data.longitude}`
       : null;
@@ -354,19 +356,17 @@ function SiteRecord({
             <section className="rv mt-12">
                <h2 className="g text-[30px] md:text-[36px]">Position</h2>
 
-               {hasPosition ? (
+               {position ? (
                   <>
                      {/* TODO(api): a coarse position for anglers who did not save
                          the spot, so a pin is never published exactly (appendix E). */}
-                     <div className="mt-5 aspect-[3/2] w-full bg-bg-2">
-                        <iframe
-                           title={`Map of ${data.name}`}
-                           src={mapUrl ?? ''}
-                           className="size-full border-0"
-                           loading="lazy"
-                           referrerPolicy="no-referrer-when-downgrade"
-                        />
-                     </div>
+                     <StaticMap
+                        latitude={position.lat}
+                        longitude={position.lng}
+                        label={`Map of ${data.name}`}
+                        zoom={13}
+                        className="mt-5"
+                     />
                      <p className="num mt-4 text-base text-ink-2">
                         {data.latitude?.toFixed(5)},{' '}
                         {data.longitude?.toFixed(5)}

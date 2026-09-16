@@ -5,6 +5,7 @@ import { useAuth } from '@clerk/react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { StaticMap } from '@/components/map/StaticMap';
 import { useDocumentTitle } from '@/lib/title';
 import {
    formatCardinal,
@@ -264,6 +265,10 @@ function CatchRecord({
    const stamp = formatStamp(data.caughtAt);
    const spot = data.site?.name ?? 'No spot recorded';
    const coords = formatCoords(data.site?.latitude, data.site?.longitude);
+   const sitePosition =
+      data.site && data.site.latitude != null && data.site.longitude != null
+         ? { lat: data.site.latitude, lng: data.site.longitude }
+         : null;
    const lengthDecimals =
       data.length !== null && Number.isInteger(data.length) ? 0 : 1;
    const summary = `${[name, lengthText, stamp].filter(Boolean).join(', ')}.`;
@@ -456,14 +461,14 @@ function CatchRecord({
             </RecordCell>
          </RecordRail>
 
-         {coords && data.site ? (
+         {coords && data.site && sitePosition ? (
             <section className="px-4 pt-6 md:px-8">
                <h2 className="g text-[30px]">Position</h2>
-               <iframe
-                  title={`Map of ${data.site.name}`}
-                  src={`https://maps.google.com/maps?q=${data.site.latitude},${data.site.longitude}&z=14&output=embed`}
-                  loading="lazy"
-                  className="mt-3 aspect-[3/2] w-full border border-line"
+               <StaticMap
+                  latitude={sitePosition.lat}
+                  longitude={sitePosition.lng}
+                  label={`Map of ${data.site.name}`}
+                  className="mt-3"
                />
                <p className="mt-2 flex flex-wrap items-baseline gap-x-2 text-[15px] text-ink-2">
                   <Link
