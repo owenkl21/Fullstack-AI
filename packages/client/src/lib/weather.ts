@@ -216,4 +216,4 @@ export const conditionLines = (
 };
 
 /* Required wherever a Google reading is shown. */
-export const WEATHER_SOURCE_LINE = 'Includes weather data from Google.';
+export const WEATHER_SOURCE_LINE = 'Weather data by Open-Meteo.com';

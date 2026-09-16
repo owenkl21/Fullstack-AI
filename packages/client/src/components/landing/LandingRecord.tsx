@@ -86,7 +86,7 @@ export function LandingRecord() {
                   <p className="border-t border-paper/10 pt-3 text-[14px] text-paper-2">
                      Weight by eye. Position from a live fix. Conditions taken 2
                      minutes after the catch from a forecast point 4.2 km away.
-                     Source: Includes weather data from Google.
+                     Weather data by Open-Meteo.com.
                   </p>
                </div>
             </article>

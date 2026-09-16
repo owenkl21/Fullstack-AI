@@ -454,7 +454,7 @@ function CatchRecord({
                         ))}
                      </ul>
                      <p className="mt-3 text-[14px] text-ink-3">
-                        Source: Includes weather data from Google
+                        Weather data by Open-Meteo.com
                      </p>
                   </>
                ) : null}

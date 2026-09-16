@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { getCoordinates } from '../clients/geocoding.client';
 import { getCurrentWeather } from '../clients/weather.client';
+import { getConditionsAt, type Conditions } from '../clients/open-meteo.client';
 import { uploadsService } from './uploads.service';
 import { userService } from './user.service';
 
@@ -152,6 +153,46 @@ const siteDetailInclude = {
  * touch" and null as "set to null", and the difference between those two is the
  * difference between editing a catch and truncating it.
  */
+/*
+ * Open-Meteo conditions to the catch's own columns. This is the path that
+ * fills the thirteen columns the Google snapshot mapper hard-codes to null.
+ *
+ * Two are still null and honestly so: Open-Meteo publishes no icon set, and it
+ * does not separate thunderstorm probability from the weather code.
+ */
+const mapConditionsToCatchData = (conditions: Conditions) => ({
+   weatherCurrentTime: conditions.observedAt,
+   weatherTimeZoneId: conditions.timeZoneId,
+   weatherConditionType: conditions.conditionText,
+   weatherConditionText: conditions.conditionText,
+   weatherConditionIconBaseUri: null,
+   weatherTemperatureDegrees: conditions.temperatureC,
+   weatherTemperatureUnit: conditions.temperatureC === null ? null : 'CELSIUS',
+   weatherFeelsLikeTemperatureDegrees: conditions.feelsLikeC,
+   weatherFeelsLikeTemperatureUnit:
+      conditions.feelsLikeC === null ? null : 'CELSIUS',
+   weatherDewPointDegrees: conditions.dewPointC,
+   weatherDewPointUnit: conditions.dewPointC === null ? null : 'CELSIUS',
+   weatherPrecipitationProbability: conditions.precipitationProbability,
+   weatherAirPressureMeanSeaLevelMillibars: conditions.pressureMsl,
+   weatherWindDirectionDegrees: conditions.windDirectionDegrees,
+   weatherWindDirectionCardinal: conditions.windDirectionCardinal,
+   weatherWindSpeedValue: conditions.windSpeedKph,
+   weatherWindSpeedUnit:
+      conditions.windSpeedKph === null ? null : 'KILOMETERS_PER_HOUR',
+   weatherWindGustValue: conditions.windGustKph,
+   weatherWindGustUnit:
+      conditions.windGustKph === null ? null : 'KILOMETERS_PER_HOUR',
+   weatherVisibilityDistanceValue: conditions.visibilityM,
+   weatherVisibilityDistanceUnit:
+      conditions.visibilityM === null ? null : 'METERS',
+   weatherIsDaytime: conditions.isDaytime,
+   weatherRelativeHumidity: conditions.relativeHumidity,
+   weatherUvIndex: conditions.uvIndex,
+   weatherThunderstormProbability: null,
+   weatherCloudCover: conditions.cloudCover,
+});
+
 const mapWeatherSnapshotToCatchData = (
    weatherSnapshot?: WeatherSnapshotInput | null,
    { partial = false }: { partial?: boolean } = {}
@@ -405,6 +446,31 @@ export const fishingService = {
            })
          : [];
 
+      /*
+       * Read the conditions for the hour the fish was caught, at the spot it
+       * was caught, rather than trusting whatever the client happened to see
+       * when the sheet opened. A catch logged from the car park at 21:00 was
+       * caught at 18:40, and 18:40 is what the record should carry.
+       *
+       * Falls back to the client's snapshot when there is no spot to read a
+       * position from. Never throws: a catch is worth more than its weather.
+       */
+      const site = relations.siteId
+         ? await prisma.fishingSite.findUnique({
+              where: { id: relations.siteId },
+              select: { latitude: true, longitude: true },
+           })
+         : null;
+
+      const conditions =
+         site?.latitude != null && site.longitude != null
+            ? await getConditionsAt(
+                 site.latitude,
+                 site.longitude,
+                 input.caughtAt
+              )
+            : null;
+
       const created = await prisma.$transaction(async (tx) => {
          const catchRecord = await tx.catch.create({
             data: {
@@ -417,8 +483,11 @@ export const fishingService = {
                length: input.length,
                count: input.count ?? 1,
                weather: input.weather,
-               waterTemp: input.waterTemp ?? null,
-               ...mapWeatherSnapshotToCatchData(input.weatherSnapshot),
+               waterTemp:
+                  input.waterTemp ?? conditions?.seaSurfaceTemperatureC ?? null,
+               ...(conditions
+                  ? mapConditionsToCatchData(conditions)
+                  : mapWeatherSnapshotToCatchData(input.weatherSnapshot)),
                depth: input.depth,
                gears: {
                   connect: validGears.map((gear) => ({ id: gear.id })),

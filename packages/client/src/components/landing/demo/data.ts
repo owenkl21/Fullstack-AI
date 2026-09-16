@@ -186,7 +186,7 @@ export const recordPosition = {
 };
 
 export const recordProvenance =
-   'Weight by eye. Position from a live fix, ±8 m. Conditions taken 2 minutes after the catch from a forecast point 4.2 km away. Source: Includes weather data from Google.';
+   'Weight by eye. Position from a live fix, ±8 m. Conditions taken 2 minutes after the catch from a forecast point 4.2 km away. Weather data by Open-Meteo.com';
 
 export const steps = [
    {
