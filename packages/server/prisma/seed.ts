@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { seedSpecies } from './species.seed';
 
 async function main() {
    const [anglerOne, anglerTwo] = await Promise.all([
@@ -41,13 +42,21 @@ async function main() {
       },
    });
 
+   const seeded = await seedSpecies();
+   console.log(`[seed] ${seeded} species`);
+
+   /*
+    * The sample catch below still points at one species. Kob rather than the
+    * Californian halibut this used to seed, since this is a South African
+    * shore-angling app.
+    */
    const species = await prisma.species.upsert({
       where: { id: 'phase0-sample-species' },
       update: {},
       create: {
          id: 'phase0-sample-species',
-         commonName: 'Halibut',
-         scientificName: 'Paralichthys californicus',
+         commonName: 'Dusky kob',
+         scientificName: 'Argyrosomus japonicus (sample)',
       },
    });
 

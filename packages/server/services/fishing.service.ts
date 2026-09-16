@@ -40,6 +40,7 @@ type CreateCatchInput = {
    notes?: string | null;
    caughtAt: Date;
    siteId?: string | null;
+   speciesId?: string | null;
    weight?: number | null;
    length?: number | null;
    count?: number;
@@ -64,19 +65,41 @@ type CreateFishingSiteInput = {
 type UpdateCatchInput = Omit<CreateCatchInput, 'images'>;
 type UpdateFishingSiteInput = Omit<CreateFishingSiteInput, 'images'>;
 
-const resolveOptionalRelationIds = async (input: {
-   siteId?: string | null;
-}) => {
-   const site = input.siteId
-      ? await prisma.fishingSite.findUnique({
-           where: { id: input.siteId },
-           select: { id: true },
-        })
-      : null;
+/*
+ * Resolves the optional relations, dropping an id that does not exist rather
+ * than failing the write. On update, `partial` keeps the difference between a
+ * field the client did not send (leave it alone) and one it sent as null
+ * (clear it), which is the same distinction the weather columns needed.
+ */
+const resolveOptionalRelationIds = async (
+   input: { siteId?: string | null; speciesId?: string | null },
+   { partial = false }: { partial?: boolean } = {}
+) => {
+   const relations: { siteId?: string | null; speciesId?: string | null } = {};
 
-   return {
-      siteId: site?.id ?? null,
-   };
+   if (!partial || input.siteId !== undefined) {
+      const site = input.siteId
+         ? await prisma.fishingSite.findUnique({
+              where: { id: input.siteId },
+              select: { id: true },
+           })
+         : null;
+
+      relations.siteId = site?.id ?? null;
+   }
+
+   if (!partial || input.speciesId !== undefined) {
+      const species = input.speciesId
+         ? await prisma.species.findUnique({
+              where: { id: input.speciesId },
+              select: { id: true },
+           })
+         : null;
+
+      relations.speciesId = species?.id ?? null;
+   }
+
+   return relations;
 };
 
 const catchDetailInclude = {
@@ -372,6 +395,7 @@ export const fishingService = {
       const user = await getUserByClerkId(clerkId);
       const relations = await resolveOptionalRelationIds({
          siteId: input.siteId,
+         speciesId: input.speciesId,
       });
 
       const validGears = input.gearIds.length
@@ -385,7 +409,7 @@ export const fishingService = {
          const catchRecord = await tx.catch.create({
             data: {
                createdById: user.id,
-               siteId: relations.siteId,
+               ...relations,
                title: input.title,
                notes: input.notes,
                caughtAt: input.caughtAt,
@@ -519,9 +543,13 @@ export const fishingService = {
       input: UpdateCatchInput
    ) {
       const user = await getUserByClerkId(clerkId);
-      const relations = await resolveOptionalRelationIds({
-         siteId: input.siteId,
-      });
+      const relations = await resolveOptionalRelationIds(
+         {
+            siteId: input.siteId,
+            speciesId: input.speciesId,
+         },
+         { partial: true }
+      );
 
       const validGears = input.gearIds.length
          ? await prisma.gear.findMany({
@@ -560,7 +588,7 @@ export const fishingService = {
                title: input.title,
                notes: input.notes,
                caughtAt: input.caughtAt,
-               siteId: relations.siteId,
+               ...relations,
                weight: input.weight,
                length: input.length,
                count: input.count,
@@ -758,6 +786,72 @@ export const fishingService = {
       });
 
       return withResolvedImageUrls(updated);
+   },
+
+   /*
+    * Species search for the log form. Matches the common name, the scientific
+    * name and the aliases, because a South African angler types "leervis" or
+    * "garrick" for the same fish and neither is wrong.
+    */
+   async searchSpecies(query: string | undefined, limit: number) {
+      const q = query?.trim();
+
+      const species = await prisma.species.findMany({
+         where: q
+            ? {
+                 OR: [
+                    { commonName: { contains: q } },
+                    { scientificName: { contains: q } },
+                 ],
+              }
+            : undefined,
+         orderBy: { commonName: 'asc' },
+         take: q ? limit : Math.min(limit, 50),
+         select: {
+            id: true,
+            commonName: true,
+            scientificName: true,
+            aliases: true,
+         },
+      });
+
+      if (!q) {
+         return species;
+      }
+
+      /*
+       * Aliases are JSON, which MySQL cannot index or match with `contains`,
+       * so they are filtered here. The name match above already narrowed the
+       * set, so this runs over a short list rather than the whole table.
+       */
+      const lowered = q.toLowerCase();
+      const byAlias = await prisma.species.findMany({
+         orderBy: { commonName: 'asc' },
+         select: {
+            id: true,
+            commonName: true,
+            scientificName: true,
+            aliases: true,
+         },
+      });
+
+      const seen = new Set(species.map((entry) => entry.id));
+      const extra = byAlias.filter((entry) => {
+         if (seen.has(entry.id)) {
+            return false;
+         }
+
+         return (
+            Array.isArray(entry.aliases) &&
+            entry.aliases.some(
+               (alias) =>
+                  typeof alias === 'string' &&
+                  alias.toLowerCase().includes(lowered)
+            )
+         );
+      });
+
+      return [...species, ...extra].slice(0, limit);
    },
 
    async deleteFishingSite(clerkId: string, siteId: string) {

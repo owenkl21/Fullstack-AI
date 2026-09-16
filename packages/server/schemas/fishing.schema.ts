@@ -56,6 +56,7 @@ const catchPayloadSchema = z.object({
    notes: z.string().trim().min(1).max(2000).optional().nullable(),
    caughtAt: z.coerce.date(),
    siteId: z.string().trim().min(1).optional().nullable(),
+   speciesId: z.string().trim().min(1).optional().nullable(),
    weight: z.coerce.number().positive().optional().nullable(),
    length: z.coerce.number().positive().optional().nullable(),
    count: z.coerce.number().int().positive().max(999).optional(),
@@ -89,3 +90,8 @@ export const createFishingSiteSchema = fishingSitePayloadSchema.extend({
 });
 
 export const updateFishingSiteSchema = fishingSitePayloadSchema;
+
+export const speciesSearchSchema = z.object({
+   q: z.string().trim().max(120).optional(),
+   limit: z.coerce.number().int().positive().max(50).optional().default(20),
+});

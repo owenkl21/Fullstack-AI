@@ -86,6 +86,9 @@ router.get(
 router.get('/api/catches/:catchId', fishingController.getCatchById);
 router.get('/api/sites', fishingController.listFishingSites);
 
+/* A reference table, not anyone's data, so no sign-in needed to name a fish. */
+router.get('/api/species', fishingController.searchSpecies);
+
 router.get(
    '/api/sites/me',
    requireApiAuth,
