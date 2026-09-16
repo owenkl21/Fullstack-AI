@@ -33,7 +33,7 @@ export function AppHeader() {
                         to={d.to}
                         className={({ isActive }) =>
                            cn(
-                              'g-tracked py-2 text-[19px] text-paper-2 transition-colors hover:text-teal',
+                              'g-tracked inline-flex min-h-11 items-center text-[19px] text-paper-2 transition-colors hover:text-teal',
                               isActive &&
                                  'text-paper shadow-[inset_0_-2px_0_var(--teal)]'
                            )
@@ -49,7 +49,7 @@ export function AppHeader() {
                <SignedOut>
                   <Link
                      to="/sign-in"
-                     className="g-tracked hidden text-[19px] text-paper-2 hover:text-paper sm:inline"
+                     className="g-tracked hidden min-h-11 items-center text-[19px] text-paper-2 hover:text-paper sm:inline-flex"
                   >
                      Sign in
                   </Link>

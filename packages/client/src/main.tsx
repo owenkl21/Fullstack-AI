@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import './index.css';
 import { Toaster } from '@/components/ui/toaster';
+import { BootGate } from '@/components/shell/BootGate';
 
 /*
  * No provider and no key. Auth is a cookie against our own API, so there is
@@ -15,9 +16,11 @@ import { Toaster } from '@/components/ui/toaster';
  */
 createRoot(document.getElementById('root')!).render(
    <StrictMode>
-      <BrowserRouter>
-         <App />
-         <Toaster />
-      </BrowserRouter>
+      <BootGate>
+         <BrowserRouter>
+            <App />
+            <Toaster />
+         </BrowserRouter>
+      </BootGate>
    </StrictMode>
 );

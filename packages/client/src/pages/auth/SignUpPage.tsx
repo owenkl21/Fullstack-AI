@@ -46,9 +46,12 @@ export function SignUpPage() {
          title="Start your log"
          lead="A record of what you caught, where, and what the weather was doing."
          footer={
-            <p className="text-[17px] text-ink-2">
+            <p className="inline-flex min-h-11 items-center text-[17px] text-ink-2">
                Already logging?{' '}
-               <Link to="/sign-in" className="text-teal-text">
+               <Link
+                  to="/sign-in"
+                  className="inline-flex min-h-11 items-center text-teal-text"
+               >
                   Sign in
                </Link>
             </p>

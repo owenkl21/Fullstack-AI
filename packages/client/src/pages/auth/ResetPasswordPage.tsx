@@ -24,8 +24,11 @@ export function ResetPasswordPage() {
             title="That link will not work"
             lead="It may have been opened already, or copied without its whole address. Ask for a new one."
             footer={
-               <p className="text-[17px] text-ink-2">
-                  <Link to="/forgot-password" className="text-teal-text">
+               <p className="inline-flex min-h-11 items-center text-[17px] text-ink-2">
+                  <Link
+                     to="/forgot-password"
+                     className="inline-flex min-h-11 items-center text-teal-text"
+                  >
                      Send another link
                   </Link>
                </p>

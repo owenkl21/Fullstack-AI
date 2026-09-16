@@ -44,9 +44,12 @@ export function SignInPage() {
          title="Sign in"
          lead="Your catches, your spots and your gear are where you left them."
          footer={
-            <p className="text-[17px] text-ink-2">
+            <p className="inline-flex min-h-11 items-center text-[17px] text-ink-2">
                No account yet?{' '}
-               <Link to="/sign-up" className="text-teal-text">
+               <Link
+                  to="/sign-up"
+                  className="inline-flex min-h-11 items-center text-teal-text"
+               >
                   Start your log
                </Link>
             </p>
@@ -71,7 +74,10 @@ export function SignInPage() {
                <Button type="submit" size="lg" disabled={busy}>
                   {busy ? 'Signing in' : 'Sign in'}
                </Button>
-               <Link to="/forgot-password" className="text-[17px] text-ink-2">
+               <Link
+                  to="/forgot-password"
+                  className="inline-flex min-h-11 items-center text-[17px] text-ink-2"
+               >
                   Forgotten your password?
                </Link>
             </div>

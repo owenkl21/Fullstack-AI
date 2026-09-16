@@ -291,12 +291,18 @@
    }
    /* Photo scrims, the only gradients in the product */
    .scrim-hero {
+      /*
+       * Holds a readable floor through the middle, which is where the headline
+       * sits. The old ramp fell to 5 per cent there and put white type straight
+       * onto a lit sunset.
+       */
       background: linear-gradient(
          180deg,
-         rgba(11, 9, 9, 0.35) 0%,
-         rgba(11, 9, 9, 0) 30%,
-         rgba(11, 9, 9, 0.05) 55%,
-         rgba(11, 9, 9, 0.82) 100%
+         rgba(11, 9, 9, 0.55) 0%,
+         rgba(11, 9, 9, 0.42) 22%,
+         rgba(11, 9, 9, 0.46) 52%,
+         rgba(11, 9, 9, 0.62) 74%,
+         rgba(11, 9, 9, 0.88) 100%
       );
    }
    .scrim-photo {
@@ -310,21 +316,46 @@
    }
    /* Dashed underline inputs */
    .input-line {
-      background: transparent;
-      border: 0;
-      border-bottom: 1px dashed var(--teal);
+      /*
+       * A field you can see the edges of. The old one was a dashed hairline on
+       * nothing, which read as decoration rather than somewhere to type.
+       * Radius stays 0 and every colour is a token.
+       */
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-bottom: 2px solid var(--line-2);
       color: var(--foreground);
-      padding: 8px 0;
+      padding: 0.75rem 0.875rem;
+      /* 44px is the minimum target the brief asks for. */
+      min-height: 2.75rem;
       outline: none;
       width: 100%;
       font: inherit;
+      transition:
+         border-color 150ms var(--ease),
+         background-color 150ms var(--ease);
+   }
+   .input-line:hover:not(:disabled) {
+      border-bottom-color: var(--ink-3);
    }
    .input-line:focus {
-      border-bottom-style: solid;
+      background: var(--bg);
+      border-color: var(--line-2);
+      border-bottom-color: var(--teal);
       outline: none;
+   }
+   .input-line[aria-invalid='true'] {
+      border-bottom-color: var(--destructive);
+   }
+   .input-line:disabled {
+      opacity: 0.55;
    }
    .input-line::placeholder {
       color: var(--ink-3);
+   }
+   textarea.input-line {
+      min-height: 7rem;
+      resize: vertical;
    }
    /* The fix line inside the capture receipt */
    .fixline {
@@ -484,4 +515,22 @@
 .map-pin-icon {
    display: block;
    color: var(--teal);
+}
+
+/*
+ * Headings are focused on navigation so a screen reader lands in the right
+ * place. That focus is not a user action, so it must not paint a ring. A real
+ * keyboard focus still does, through :focus-visible.
+ */
+h1[tabindex='-1']:focus:not(:focus-visible),
+[tabindex='-1']:focus:not(:focus-visible) {
+   outline: none;
+}
+
+/* Leaflet ships 30px controls. The brief asks for 44px minimum targets. */
+.map-surface .leaflet-bar a {
+   width: 2.75rem;
+   height: 2.75rem;
+   line-height: 2.75rem;
+   font-size: 1.125rem;
 }

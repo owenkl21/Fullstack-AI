@@ -54,12 +54,12 @@ async function seedImages() {
    for (const photo of PHOTOS) {
       await prisma.image.upsert({
          where: { id: photo.id },
-         update: { url: photo.path },
+         update: { url: photo.path, storageKey: photo.path },
          create: {
             id: photo.id,
             url: photo.path,
-            /* Local files under public/, not R2 objects. */
-            storageKey: `seed${photo.path}`,
+            /* The path itself, so getReadUrl can tell it is not an R2 object. */
+            storageKey: photo.path,
             uploadedById: cycle(ANGLERS, 0).id,
          },
       });

@@ -221,6 +221,17 @@ export const uploadsService = {
    },
 
    async getReadUrl(storageKey: string) {
+      /*
+       * A key that starts with / is a file the client serves out of public/,
+       * not an R2 object. Presigning it hands back a signed URL for something
+       * that was never uploaded, which is what broke every seeded photograph.
+       * Every image resolver funnels through here, so this is the one place
+       * that needs to know.
+       */
+      if (storageKey.startsWith('/')) {
+         return { storageKey, readUrl: storageKey };
+      }
+
       return {
          storageKey,
          readUrl: await resolveReadUrl(storageKey),

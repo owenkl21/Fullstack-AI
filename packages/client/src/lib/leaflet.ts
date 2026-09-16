@@ -83,6 +83,11 @@ export const createMap = (
 
    L.tileLayer(SEAMARK_TILES, {
       attribution: SEAMARK_ATTRIBUTION,
+      /*
+       * Seamarks only exist close in. Below this the server returns 404 for
+       * every tile, which fills the console with errors and paints nothing.
+       */
+      minZoom: 9,
       maxZoom: 18,
       opacity: 0.9,
    }).addTo(map);

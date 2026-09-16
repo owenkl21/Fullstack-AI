@@ -16,8 +16,11 @@ export function VerifyEmailPage() {
             title="That link will not work"
             lead="It may have expired, or been opened already. Signing in will send a fresh one."
             footer={
-               <p className="text-[17px] text-ink-2">
-                  <Link to="/sign-in" className="text-teal-text">
+               <p className="inline-flex min-h-11 items-center text-[17px] text-ink-2">
+                  <Link
+                     to="/sign-in"
+                     className="inline-flex min-h-11 items-center text-teal-text"
+                  >
                      Go to sign in
                   </Link>
                </p>
@@ -34,8 +37,11 @@ export function VerifyEmailPage() {
             title="Check your email"
             lead="A link to confirm your address is on its way. You can start logging before you open it."
             footer={
-               <p className="text-[17px] text-ink-2">
-                  <Link to="/" className="text-teal-text">
+               <p className="inline-flex min-h-11 items-center text-[17px] text-ink-2">
+                  <Link
+                     to="/"
+                     className="inline-flex min-h-11 items-center text-teal-text"
+                  >
                      Go to your log
                   </Link>
                </p>
@@ -54,8 +60,11 @@ export function VerifyEmailPage() {
          title="Your email is confirmed"
          lead="That is the last of the paperwork."
          footer={
-            <p className="text-[17px] text-ink-2">
-               <Link to="/" className="text-teal-text">
+            <p className="inline-flex min-h-11 items-center text-[17px] text-ink-2">
+               <Link
+                  to="/"
+                  className="inline-flex min-h-11 items-center text-teal-text"
+               >
                   Go to your log
                </Link>
             </p>

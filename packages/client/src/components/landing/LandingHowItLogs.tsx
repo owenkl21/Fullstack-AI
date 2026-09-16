@@ -49,41 +49,56 @@ export function LandingHowItLogs() {
                         const on = demo.step === n;
                         const done = demo.step > n;
                         return (
-                           <li
-                              key={s.n}
-                              className={cn(
-                                 'relative grid grid-cols-[52px_minmax(0,1fr)] items-start gap-[18px] py-3.5 pl-[18px] transition-opacity duration-[400ms] [transition-timing-function:var(--ease)] lg:grid-cols-[64px_minmax(0,1fr)] lg:py-[18px] lg:pl-[22px]',
-                                 on
-                                    ? 'opacity-100'
-                                    : done
-                                      ? 'opacity-80'
-                                      : 'opacity-45'
-                              )}
-                           >
-                              <span
-                                 aria-hidden="true"
+                           <li key={s.n} className="relative">
+                              {/*
+                               * The row is the control. Hovering it lifts the
+                               * step out of the dimmed state and warms the
+                               * number, so the list reads as something you can
+                               * touch rather than a static caption; pressing it
+                               * runs the sequence from the top.
+                               */}
+                              <button
+                                 type="button"
+                                 onClick={demo.play}
+                                 aria-label={`${s.title}. Watch it log.`}
                                  className={cn(
-                                    'absolute top-[30px] -left-[7px] size-3 rounded-full border-2 border-teal transition-[background-color,transform] duration-300 [transition-timing-function:var(--ease)]',
-                                    on || done ? 'bg-teal' : 'bg-background',
-                                    on && 'scale-125'
-                                 )}
-                              />
-                              <span
-                                 className={cn(
-                                    'g num text-[44px] leading-[0.9] transition-colors duration-300 lg:text-[56px]',
-                                    on || done ? 'text-teal-text' : 'text-ink-3'
+                                    'group relative grid w-full grid-cols-[52px_minmax(0,1fr)] items-start gap-[18px] py-3.5 pl-[18px] text-left transition-[opacity,background-color] duration-[400ms] [transition-timing-function:var(--ease)] hover:bg-bg-2 focus-visible:bg-bg-2 lg:grid-cols-[64px_minmax(0,1fr)] lg:py-[18px] lg:pl-[22px]',
+                                    on
+                                       ? 'opacity-100'
+                                       : done
+                                         ? 'opacity-80'
+                                         : 'opacity-45 hover:opacity-90'
                                  )}
                               >
-                                 {s.n}
-                              </span>
-                              <div>
-                                 <b className="g mb-1.5 block text-[28px] leading-none font-normal tracking-[0.04em]">
-                                    {s.title}
-                                 </b>
-                                 <p className="max-w-[40ch] text-[15px] leading-[1.5] text-ink-2">
-                                    {s.body}
-                                 </p>
-                              </div>
+                                 <span
+                                    aria-hidden="true"
+                                    className={cn(
+                                       'absolute top-[30px] -left-[7px] size-3 rounded-full border-2 border-teal transition-[background-color,transform] duration-300 [transition-timing-function:var(--ease)]',
+                                       on || done
+                                          ? 'bg-teal'
+                                          : 'bg-background group-hover:bg-teal/40',
+                                       on && 'scale-125'
+                                    )}
+                                 />
+                                 <span
+                                    className={cn(
+                                       'g num text-[44px] leading-[0.9] transition-colors duration-300 lg:text-[56px]',
+                                       on || done
+                                          ? 'text-teal-text'
+                                          : 'text-ink-3 group-hover:text-ink'
+                                    )}
+                                 >
+                                    {s.n}
+                                 </span>
+                                 <div>
+                                    <b className="g mb-1.5 block text-[28px] leading-none font-normal tracking-[0.04em]">
+                                       {s.title}
+                                    </b>
+                                    <p className="max-w-[40ch] text-[15px] leading-[1.5] text-ink-2">
+                                       {s.body}
+                                    </p>
+                                 </div>
+                              </button>
                            </li>
                         );
                      })}

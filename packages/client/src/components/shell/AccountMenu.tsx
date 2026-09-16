@@ -39,7 +39,7 @@ export function AccountMenu() {
             aria-expanded={open}
             aria-label="Your account"
             onClick={() => setOpen((was) => !was)}
-            className="grid size-9 place-items-center rounded-full border border-paper-2 text-[15px] text-paper"
+            className="grid size-11 place-items-center rounded-full border border-paper-2 text-[15px] text-paper"
          >
             {user.image ? (
                <img

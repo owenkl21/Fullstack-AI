@@ -22,6 +22,13 @@ export function AppLayout() {
        */
       const focusHeading = (h1: HTMLElement) => {
          h1.setAttribute('tabindex', '-1');
+         /*
+          * Focus moves for screen readers and keyboard users. It should not
+          * paint a ring: this focus was not asked for, and the browser cannot
+          * tell the difference, so say so. :focus-visible still rings a real
+          * keyboard focus.
+          */
+         h1.style.outline = 'none';
          h1.focus({ preventScroll: true });
       };
 
