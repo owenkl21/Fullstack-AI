@@ -180,14 +180,13 @@ Set these variables on the **server** service:
 | `CLOUDFLARE_R2_ACCESS_KEY_ID` | From `packages/server/.env` |
 | `CLOUDFLARE_R2_SECRET_ACCESS_KEY` | From `packages/server/.env` |
 | `CLOUDFLARE_R2_BUCKET` | From `packages/server/.env` |
-| `GOOGLE_WEATHER_API_KEY` | Only until queue item 5.3 replaces it with Open-Meteo |
-| `GOOGLE_WEATHER_API_REFERER` | Same, and see the warning below |
+
 
 **Do not set `PORT`.** Railway injects it and the server already reads it ([index.ts:71](../../packages/server/index.ts), `process.env.PORT || 3000`).
 
 **Do not set `CLOUDFLARE_R2_PUBLIC_BASE_URL`.** It is in `.env.example` as `https://media.example.com`, which is a placeholder, and pasting it verbatim breaks every image on the site. Left unset, `uploads.service.ts` presigns a short-lived read URL per fetch against a private bucket, which is free and correct for this app.
 
-**`GOOGLE_WEATHER_API_REFERER` is `http://localhost:5173` in `.env.example`.** If the Google weather path is still live when you deploy, that value has to become the Vercel origin or the requests are rejected. HANDOFF.md section 7 also warns that `weather.client.ts` falls back to `GOOGLE_MAPS_API_KEY`, so removing only the weather key does not disable the path, it silently starts billing the Maps key. The clean answer is to finish queue item 5.3 and delete both.
+**There are no Google variables left.** The weather moved to Open-Meteo, which is keyless, and `weather.client.ts` is deleted, so the fallback that silently billed the Maps key is gone with it. Both were removed from the Railway service as well as from `.env.example`.
 
 ### 4.3 Generate the domain, then create the tables
 
@@ -289,8 +288,6 @@ The four problems the audit confirmed have been fixed, in 3.4 to 3.7. What follo
 **There are still no migrations.** `prisma/migrations` does not exist, and schema changes are now applied by hand (3.2). That is the correct trade for test data, and the wrong one the moment competition standings are real. HANDOFF.md section 7 already flags the crossover point.
 
 **`/api/uploads/proxy` still exists on the server** even though no client calls it. Harmless, and worth keeping until direct uploads have been exercised against a real bucket with the policy from 4.5 in place. Delete it after that, not before.
-
-**The Google weather path is still live.** Queue item 5.3 replaces it with Open-Meteo. Until then `weather.client.ts` falls back to `GOOGLE_MAPS_API_KEY`, so removing only the weather key does not disable it, it silently starts billing the Maps key.
 
 ## 7. What still needs you
 

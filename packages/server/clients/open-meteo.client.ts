@@ -341,3 +341,44 @@ async function fetchMarine(
       swellPeriodS: readAt(hourly, 'swell_wave_period', index),
    };
 }
+
+/*
+ * Open-Meteo reading in the shape the client already knows. The interface has a
+ * mapping layer built around the old provider's payload, and rebuilding that to
+ * change where the numbers come from would be churn for no gain.
+ *
+ * Returns null rather than filling gaps with zeros: a missing reading is
+ * missing, and a zero would read as still air under clear sky.
+ */
+export const toWeatherSnapshot = (conditions: Conditions) => {
+   if (
+      conditions.temperatureC === null ||
+      conditions.windSpeedKph === null ||
+      conditions.cloudCover === null
+   ) {
+      return null;
+   }
+
+   return {
+      weatherCondition: {
+         iconBaseUri: '',
+         description: { text: conditions.conditionText ?? '' },
+      },
+      temperature: { degrees: conditions.temperatureC, unit: 'CELSIUS' },
+      precipitation: {
+         probability: { percent: conditions.precipitationProbability ?? 0 },
+      },
+      wind: {
+         direction: { cardinal: conditions.windDirectionCardinal ?? '' },
+         speed: {
+            value: conditions.windSpeedKph,
+            unit: 'KILOMETERS_PER_HOUR',
+         },
+         gust: {
+            value: conditions.windGustKph ?? conditions.windSpeedKph,
+            unit: 'KILOMETERS_PER_HOUR',
+         },
+      },
+      cloudCover: conditions.cloudCover,
+   };
+};

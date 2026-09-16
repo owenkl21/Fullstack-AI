@@ -45,7 +45,7 @@ Two commits on `redesign-theme`, neither pushed:
 |---|---|
 | 5.1 Railway and deploy wiring | Repo side done. Owner actions in section 8 remain |
 | 5.2 better-auth replacing Clerk | Not started. Needs a verified Resend domain first |
-| 5.3 Species and Open-Meteo | Not started |
+| 5.3 Species and Open-Meteo | **Done.** Species wired and seeded, conditions read at the hour of the catch |
 | 5.4 Seed data | Not started |
 | 5.5 The social layer | Not started |
 | 5.6 Leaflet, off Google | **Done.** Picker, both record maps and the all-spots map. No iframes left |
@@ -162,7 +162,7 @@ These are in [00-prompt.md](00-prompt.md) but they are the ones agents get wrong
 ## 7. Gotchas that will bite
 
 - **No `prisma/migrations` directory.** `dev` still runs `prisma db push`; `start` no longer does, so schema changes on a deployed database are applied deliberately rather than on every boot. That is fine now and dangerous the moment competition standings are real. Introduce migrations before that point.
-- **`weather.client.ts` falls back to `GOOGLE_MAPS_API_KEY`.** Removing only `GOOGLE_WEATHER_API_KEY` does not disable it, it silently starts billing the Maps key.
+- ~~`weather.client.ts` falls back to `GOOGLE_MAPS_API_KEY`~~. Gone. The file is deleted, the weather is Open-Meteo, and both `GOOGLE_WEATHER_*` variables are off the Railway service and out of `.env.example`. No Google key of any kind is read by either package now.
 - **The feed has no author filter**, so seeded posts will be visible to every signed-in user. Deleting no longer leaves a stale post: `deleteCatch` and `deleteFishingSite` now retire the posts that reference them, in the same transaction. Editing still does, because feed rows are snapshots rather than pointers (appendix E A5).
 - **Photos now upload straight to R2.** Both uploaders PUT to the presigned URL that `/api/uploads/sign` already returned, so no image bytes pass through Express. `/api/uploads/proxy` still exists on the server but nothing calls it. The cost of this is a hard dependency: the bucket needs a CORS policy allowing PUT from the site's origin, or every upload fails with an opaque browser error and nothing reaches the server logs. See [09-deploy.md](09-deploy.md) section 4.5.
 - ~~Editing a catch truncates it~~. Fixed. The update path wrote `null` over all twenty-six weather columns whenever a catch was edited without re-reading the weather, hardcoded `waterTemp: null`, and reset `count` to 1. It now passes `undefined` for anything not supplied, which Prisma leaves alone. Separately, `waterTemp` was accepted by the input type and validated by zod on **create** too, then discarded; it is now saved.

@@ -1,7 +1,10 @@
 import { prisma } from '../lib/prisma';
 import { getCoordinates } from '../clients/geocoding.client';
-import { getCurrentWeather } from '../clients/weather.client';
-import { getConditionsAt, type Conditions } from '../clients/open-meteo.client';
+import {
+   getConditionsAt,
+   toWeatherSnapshot,
+   type Conditions,
+} from '../clients/open-meteo.client';
 import { uploadsService } from './uploads.service';
 import { userService } from './user.service';
 
@@ -418,18 +421,21 @@ export const fishingService = {
 
    async getFishingConditions(locationName: string) {
       const coordinates = await getCoordinates(locationName);
-      const weather = await getCurrentWeather(
+      const conditions = await getConditionsAt(
          coordinates.latitude,
-         coordinates.longitude
+         coordinates.longitude,
+         new Date()
       );
+
       return {
          location: coordinates,
-         weather,
+         weather: toWeatherSnapshot(conditions),
       };
    },
 
    async getCurrentWeatherByCoordinates(latitude: number, longitude: number) {
-      return getCurrentWeather(latitude, longitude);
+      const conditions = await getConditionsAt(latitude, longitude, new Date());
+      return toWeatherSnapshot(conditions);
    },
 
    async createCatch(clerkId: string, input: CreateCatchInput) {
