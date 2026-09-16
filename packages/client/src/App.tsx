@@ -1,5 +1,7 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
+import { AppLayout } from '@/components/shell/AppLayout';
 import { HomePage } from '@/pages/HomePage';
+import { NotFoundPage } from '@/pages/NotFoundPage';
 import { ProfilePage } from '@/pages/ProfilePage';
 import { CatchDetailPage } from '@/pages/fishing/CatchDetailPage';
 import { EditCatchPage } from '@/pages/fishing/EditCatchPage';
@@ -13,25 +15,29 @@ import { LogGearPage } from '@/pages/fishing/LogGearPage';
 import { MyGearPage } from '@/pages/fishing/MyGearPage';
 import { EditGearPage } from '@/pages/fishing/EditGearPage';
 import { FeedPage } from '@/pages/fishing/FeedPage';
+import { QuickLogPage } from '@/pages/fishing/QuickLogPage';
 
 function App() {
    return (
       <Routes>
-         <Route path="/" element={<HomePage />} />
-         <Route path="/profile" element={<ProfilePage />} />
-         <Route path="/catches/new" element={<LogCatchPage />} />
-         <Route path="/catches/me" element={<MyCatchesPage />} />
-         <Route path="/catches/:catchId" element={<CatchDetailPage />} />
-         <Route path="/catches/:catchId/edit" element={<EditCatchPage />} />
-         <Route path="/sites/new" element={<LogSitePage />} />
-         <Route path="/sites/me" element={<MySitesPage />} />
-         <Route path="/sites/:siteId" element={<SiteDetailPage />} />
-         <Route path="/sites/:siteId/edit" element={<EditSitePage />} />
-         <Route path="/gear/new" element={<LogGearPage />} />
-         <Route path="/gear/me" element={<MyGearPage />} />
-         <Route path="/gear/:gearId/edit" element={<EditGearPage />} />
-         <Route path="/feed" element={<FeedPage />} />
-         <Route path="*" element={<Navigate to="/" replace />} />
+         <Route element={<AppLayout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/log" element={<QuickLogPage />} />
+            <Route path="/catches/new" element={<LogCatchPage />} />
+            <Route path="/catches/me" element={<MyCatchesPage />} />
+            <Route path="/catches/:catchId" element={<CatchDetailPage />} />
+            <Route path="/catches/:catchId/edit" element={<EditCatchPage />} />
+            <Route path="/sites/new" element={<LogSitePage />} />
+            <Route path="/sites/me" element={<MySitesPage />} />
+            <Route path="/sites/:siteId" element={<SiteDetailPage />} />
+            <Route path="/sites/:siteId/edit" element={<EditSitePage />} />
+            <Route path="/gear/new" element={<LogGearPage />} />
+            <Route path="/gear/me" element={<MyGearPage />} />
+            <Route path="/gear/:gearId/edit" element={<EditGearPage />} />
+            <Route path="/feed" element={<FeedPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+         </Route>
       </Routes>
    );
 }

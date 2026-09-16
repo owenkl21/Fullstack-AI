@@ -1,19 +1,18 @@
 import axios from 'axios';
-import { Show, SignInButton } from '@clerk/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LandingHeader } from '@/components/landing/LandingHeader';
-import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { GoogleMapLocationPicker } from '@/components/fishing/GoogleMapLocationPicker';
-import { Button } from '@/components/ui/button';
-import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
-import { toast } from '@/components/ui/use-toast';
 import { R2ImagePicker } from '@/components/r2-image-picker';
+import { RequireSignIn } from '@/components/shell/RequireSignIn';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/use-toast';
+import { useDocumentTitle } from '@/lib/title';
+import { cn } from '@/lib/utils';
 import {
-   formatCardinal,
-   toMetricTemperature,
-   toMetricWindSpeed,
+   WEATHER_SOURCE_LINE,
+   conditionLines,
+   type WeatherSnapshot,
 } from '@/lib/weather';
 
 type SiteOption = {
@@ -22,7 +21,8 @@ type SiteOption = {
    latitude: number | null;
    longitude: number | null;
 };
-type GearOption = {
+
+export type GearOption = {
    id: string;
    name: string;
    brand: string;
@@ -30,295 +30,780 @@ type GearOption = {
    imageUrl: string | null;
 };
 
-type WeatherSnapshot = {
-   weatherCondition: {
-      iconBaseUri: string;
-      description: { text: string };
-   };
-   temperature: { degrees: number; unit: string };
-   precipitation: { probability: { percent: number } };
-   wind: {
-      direction: { cardinal: string };
-      speed: { value: number; unit: string };
-      gust: { value: number; unit: string };
-   };
-   cloudCover: number;
+type UploadedImage = { storageKey: string; url: string };
+
+/* Everything the edit route hands back so the one form can open prefilled. */
+export type CatchFormInitial = {
+   title: string;
+   notes: string | null;
+   caughtAt: string;
+   siteId: string | null;
+   length: number | null;
+   weight: number | null;
+   count: number | null;
+   depth: number | null;
+   waterTemp: number | null;
+   gearIds: string[];
+   gears: GearOption[];
+   images: UploadedImage[];
+   snapshot: WeatherSnapshot | null;
+   weather: string | null;
 };
 
-const formatForDateTimeLocal = (date: Date) => {
-   const pad = (value: number) => String(value).padStart(2, '0');
+type SpotMode = 'here' | 'saved' | 'new';
+type LengthUnit = 'cm' | 'in';
+type WeightUnit = 'kg' | 'lb';
 
-   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
+const CM_PER_INCH = 2.54;
+const KG_PER_POUND = 0.453592;
+const NOTES_LIMIT = 2000;
+const TITLE_LIMIT = 120;
+const MAX_PHOTOS = 8;
 
-const toDisplay = (value: string | number | boolean | null | undefined) =>
-   value === null || value === undefined ? '' : String(value);
+const pad = (value: number) => String(value).padStart(2, '0');
 
-const formatWeatherMetric = (
-   value: number | undefined,
-   unit?: string,
-   kind: 'temperature' | 'wind' = 'wind'
-) => {
-   if (kind === 'temperature') {
-      return toMetricTemperature(value, unit) ?? '';
+/* datetime-local speaks local time, so the record has to be read in local time too. */
+const toLocalInputValue = (date: Date) =>
+   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+const fromLocalInputValue = (value: string) => {
+   const trimmed = value.trim();
+   if (!trimmed) {
+      return null;
    }
-
-   return toMetricWindSpeed(value, unit) ?? '';
+   const parsed = new Date(trimmed);
+   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-export function LogCatchPage() {
+const numberOrNull = (value: string) => {
+   const trimmed = value.trim();
+   if (!trimmed) {
+      return null;
+   }
+   const parsed = Number(trimmed);
+   return Number.isFinite(parsed) ? parsed : Number.NaN;
+};
+
+const round = (value: number, places: number) => Number(value.toFixed(places));
+
+const zoneName = () => {
+   try {
+      const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      return zone ? (zone.split('/').pop()?.replace(/_/g, ' ') ?? zone) : null;
+   } catch {
+      return null;
+   }
+};
+
+const dateSentence = (date: Date) =>
+   new Intl.DateTimeFormat('en-ZA', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+   }).format(date);
+
+type FieldErrors = Partial<
+   Record<
+      | 'species'
+      | 'length'
+      | 'weight'
+      | 'count'
+      | 'depth'
+      | 'waterTemp'
+      | 'caughtAt'
+      | 'spot'
+      | 'newSpotName',
+      string
+   >
+>;
+
+/* ------------------------------------------------------------------ */
+
+function GroupHeading({ children }: { children: string }) {
+   return <h2 className="g text-[30px] md:text-[36px]">{children}</h2>;
+}
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+   if (!message) {
+      return null;
+   }
+   return (
+      <p id={id} role="alert" className="mt-2 text-[14px] text-destructive">
+         {message}
+      </p>
+   );
+}
+
+function Chip({
+   children,
+   pressed,
+   onClick,
+   small = false,
+}: {
+   children: string;
+   pressed: boolean;
+   onClick: () => void;
+   small?: boolean;
+}) {
+   return (
+      <button
+         type="button"
+         aria-pressed={pressed}
+         onClick={onClick}
+         className={cn(
+            'g-tracked inline-flex items-center border border-ink px-3 transition-[background-color,color] duration-150 [transition-timing-function:var(--ease)]',
+            small ? 'h-9 text-[16px]' : 'h-11 text-[19px]',
+            pressed ? 'bg-ink text-background' : 'text-ink hover:bg-bg-2'
+         )}
+      >
+         {children}
+      </button>
+   );
+}
+
+/* ------------------------------------------------------------------ */
+
+export function CatchForm({
+   mode,
+   catchId,
+   initial,
+}: {
+   mode: 'create' | 'edit';
+   catchId?: string;
+   initial?: CatchFormInitial;
+}) {
    const navigate = useNavigate();
-   const [isSaving, setIsSaving] = useState(false);
-   const [images, setImages] = useState<{ storageKey: string; url: string }[]>(
-      []
+   const isEdit = mode === 'edit';
+
+   const [species, setSpecies] = useState(initial?.title ?? '');
+   const [recentSpecies, setRecentSpecies] = useState<string[]>([]);
+
+   const [lengthValue, setLengthValue] = useState(
+      initial?.length != null ? String(initial.length) : ''
    );
+   const [lengthUnit, setLengthUnit] = useState<LengthUnit>('cm');
+   const [weightValue, setWeightValue] = useState(
+      initial?.weight != null ? String(initial.weight) : ''
+   );
+   const [weightUnit, setWeightUnit] = useState<WeightUnit>('kg');
+
+   const [countValue, setCountValue] = useState(String(initial?.count ?? 1));
+   const [depthValue, setDepthValue] = useState(
+      initial?.depth != null ? String(initial.depth) : ''
+   );
+   const [waterTempValue, setWaterTempValue] = useState(
+      initial?.waterTemp != null ? String(initial.waterTemp) : ''
+   );
+   const [showMore, setShowMore] = useState(
+      initial?.depth != null || initial?.waterTemp != null
+   );
+
+   const [images, setImages] = useState<UploadedImage[]>(
+      isEdit ? [] : (initial?.images ?? [])
+   );
+   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+
    const [sites, setSites] = useState<SiteOption[]>([]);
-   const [siteChoice, setSiteChoice] = useState('');
-   const [locationSearch, setLocationSearch] = useState('');
-   const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
-   const [gear, setGear] = useState<GearOption[]>([]);
-   const [gearSearch, setGearSearch] = useState('');
-   const [selectedGearIds, setSelectedGearIds] = useState<string[]>([]);
-   const [isGearDropdownOpen, setIsGearDropdownOpen] = useState(false);
-   const [caughtAt, setCaughtAt] = useState(() =>
-      formatForDateTimeLocal(new Date())
+   const [spotMode, setSpotMode] = useState<SpotMode>(
+      initial?.siteId ? 'saved' : 'here'
    );
-   const [isLoadingOptions, setIsLoadingOptions] = useState(true);
-   const [weatherSnapshot, setWeatherSnapshot] =
-      useState<WeatherSnapshot | null>(null);
-   const [isWeatherLoading, setIsWeatherLoading] = useState(false);
-   const [currentCoords, setCurrentCoords] = useState<{
+   const [savedSiteId, setSavedSiteId] = useState(initial?.siteId ?? '');
+   const [siteSearch, setSiteSearch] = useState('');
+   const [newSpotName, setNewSpotName] = useState('');
+   const [newLatitude, setNewLatitude] = useState('');
+   const [newLongitude, setNewLongitude] = useState('');
+   const [herePosition, setHerePosition] = useState<{
       latitude: number;
       longitude: number;
    } | null>(null);
-   const [customLatitude, setCustomLatitude] = useState('');
-   const [customLongitude, setCustomLongitude] = useState('');
-   const [lengthUnit, setLengthUnit] = useState<'cm' | 'ft'>('cm');
-   const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
+   const [hereState, setHereState] = useState<
+      'idle' | 'locating' | 'ready' | 'refused'
+   >('idle');
+
+   const [caughtAt, setCaughtAt] = useState(() =>
+      initial?.caughtAt
+         ? toLocalInputValue(new Date(initial.caughtAt))
+         : toLocalInputValue(new Date())
+   );
+
+   const [snapshot, setSnapshot] = useState<WeatherSnapshot | null>(
+      initial?.snapshot ?? null
+   );
+   const [conditionsState, setConditionsState] = useState<
+      'idle' | 'loading' | 'failed'
+   >('idle');
+   const [isConfirmingRefresh, setIsConfirmingRefresh] = useState(false);
+
+   const [gear, setGear] = useState<GearOption[]>(initial?.gears ?? []);
+   const [gearSearch, setGearSearch] = useState('');
+   const [selectedGearIds, setSelectedGearIds] = useState<string[]>(
+      initial?.gearIds ?? []
+   );
+
+   const [notes, setNotes] = useState(initial?.notes ?? '');
+
+   const [errors, setErrors] = useState<FieldErrors>({});
+   const [isSaving, setIsSaving] = useState(false);
+   const [sitesState, setSitesState] = useState<'loading' | 'ready' | 'failed'>(
+      'loading'
+   );
+   const [gearState, setGearState] = useState<'loading' | 'ready' | 'failed'>(
+      'loading'
+   );
+   const [conditionsMessage, setConditionsMessage] = useState<string | null>(
+      null
+   );
+
+   const weatherRequestRef = useRef(0);
+
+   /* --- options ---------------------------------------------------- */
+
+   /* Spots, gear and recent names are asked for separately, so one failing
+      does not empty the other two and blame the wrong thing. */
+   const loadOptions = useCallback(async () => {
+      const [siteResult, gearResult, catchResult] = await Promise.allSettled([
+         axios.get('/api/sites'),
+         axios.get('/api/gear/me'),
+         axios.get('/api/catches/me'),
+      ]);
+
+      if (siteResult.status === 'fulfilled') {
+         setSites(siteResult.value.data.sites ?? []);
+         setSitesState('ready');
+      } else {
+         console.error('Unable to read your spots', siteResult.reason);
+         setSitesState('failed');
+      }
+
+      if (gearResult.status === 'fulfilled') {
+         const own: GearOption[] = gearResult.value.data.gear ?? [];
+         // Gear already on this catch stays in the list so editing never drops it.
+         const attached = (initial?.gears ?? []).filter(
+            (entry) => !own.some((item) => item.id === entry.id)
+         );
+         setGear([...own, ...attached]);
+         setGearState('ready');
+      } else {
+         console.error('Unable to read your gear', gearResult.reason);
+         setGearState('failed');
+      }
+
+      if (catchResult.status === 'fulfilled') {
+         const titles: string[] = (catchResult.value.data.catches ?? [])
+            .map((entry: { title?: string }) => entry.title?.trim())
+            .filter((title: string | undefined): title is string =>
+               Boolean(title)
+            );
+         setRecentSpecies([...new Set(titles)].slice(0, 6));
+      }
+   }, [initial?.gears]);
+
+   const retryOptions = () => {
+      setSitesState('loading');
+      setGearState('loading');
+      void loadOptions();
+   };
 
    useEffect(() => {
-      const loadData = async () => {
-         try {
-            setIsLoadingOptions(true);
-            const [{ data: siteData }, { data: gearData }] = await Promise.all([
-               axios.get('/api/sites'),
-               axios.get('/api/gear'),
-            ]);
-            setSites(siteData.sites ?? []);
-            setGear(gearData.gear ?? []);
-         } catch (error) {
-            console.error('Unable to load fishing sites/gear', error);
-            setSites([]);
-            setGear([]);
-            toast({
-               title: 'Unable to load fishing spots',
-               description:
-                  'You can still save a catch without selecting a spot.',
-               variant: 'error',
-            });
-         } finally {
-            setIsLoadingOptions(false);
-         }
-      };
-
-      void loadData();
-   }, []);
+      void loadOptions();
+   }, [loadOptions]);
 
    useEffect(() => {
+      if (isEdit) {
+         setGear((current) => {
+            const attached = (initial?.gears ?? []).filter(
+               (entry) => !current.some((item) => item.id === entry.id)
+            );
+            return attached.length > 0 ? [...current, ...attached] : current;
+         });
+      }
+   }, [initial?.gears, isEdit]);
+
+   /* --- where ------------------------------------------------------ */
+
+   const askForPosition = useCallback(() => {
       if (!navigator.geolocation) {
+         setHereState('refused');
          return;
       }
 
+      setHereState('locating');
       navigator.geolocation.getCurrentPosition(
          (position) => {
-            setCurrentCoords({
+            setHerePosition({
                latitude: position.coords.latitude,
                longitude: position.coords.longitude,
             });
+            setHereState('ready');
          },
          () => {
-            setCurrentCoords(null);
-         }
+            setHerePosition(null);
+            setHereState('refused');
+         },
+         { enableHighAccuracy: true, timeout: 12000 }
       );
    }, []);
 
-   useEffect(() => {
-      const loadWeather = async () => {
-         const selectedSite = sites.find((site) => site.id === siteChoice);
-         const isOtherSpot = siteChoice === '__other';
-         const latitude = isOtherSpot
-            ? Number(customLatitude)
-            : (selectedSite?.latitude ?? currentCoords?.latitude);
-         const longitude = isOtherSpot
-            ? Number(customLongitude)
-            : (selectedSite?.longitude ?? currentCoords?.longitude);
-
-         if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-            setWeatherSnapshot(null);
-            return;
-         }
-
-         try {
-            setIsWeatherLoading(true);
-            const { data } = await axios.get('/api/weather/current', {
-               params: { latitude, longitude },
-            });
-            setWeatherSnapshot(data.weather ?? null);
-         } catch (error) {
-            console.error('Unable to fetch weather snapshot', error);
-            setWeatherSnapshot(null);
-         } finally {
-            setIsWeatherLoading(false);
-         }
-      };
-
-      void loadWeather();
-   }, [siteChoice, sites, currentCoords, customLatitude, customLongitude]);
-
-   const setCustomCoordinates = (latitude: number, longitude: number) => {
-      setCustomLatitude(latitude.toFixed(6));
-      setCustomLongitude(longitude.toFixed(6));
+   const chooseSpotMode = (next: SpotMode) => {
+      setSpotMode(next);
+      setErrors((current) => ({ ...current, spot: undefined }));
+      // The position is only ever asked for when this is the choice made.
+      if (next === 'here' && hereState === 'idle') {
+         askForPosition();
+      }
    };
 
-   const submitCatch = async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const formData = new FormData(event.currentTarget);
-      const isOtherSpot = siteChoice === '__other';
-      const customSpot = String(formData.get('customSpot') ?? '').trim();
-      const normalizedLength = Number(formData.get('length')) || null;
-      const normalizedWeight = Number(formData.get('weight')) || null;
-      const notes = String(formData.get('notes') ?? '').trim();
-      const rawCaughtAt = caughtAt.trim();
+   const setNewCoordinates = useCallback(
+      (latitude: number, longitude: number) => {
+         setNewLatitude(latitude.toFixed(6));
+         setNewLongitude(longitude.toFixed(6));
+         setErrors((current) => ({ ...current, spot: undefined }));
+      },
+      []
+   );
 
-      const parsedCaughtAt = rawCaughtAt ? new Date(rawCaughtAt) : null;
+   const selectedSite = useMemo(
+      () => sites.find((site) => site.id === savedSiteId) ?? null,
+      [sites, savedSiteId]
+   );
 
-      if (!parsedCaughtAt || Number.isNaN(parsedCaughtAt.getTime())) {
-         toast({
-            title: 'Invalid catch date/time',
-            description: 'Please choose a valid date and time.',
-            variant: 'error',
-         });
+   const activeCoordinates = useMemo(() => {
+      if (spotMode === 'here') {
+         return herePosition;
+      }
+
+      if (spotMode === 'saved') {
+         if (
+            selectedSite &&
+            typeof selectedSite.latitude === 'number' &&
+            typeof selectedSite.longitude === 'number'
+         ) {
+            return {
+               latitude: selectedSite.latitude,
+               longitude: selectedSite.longitude,
+            };
+         }
+         return null;
+      }
+
+      const latitude = numberOrNull(newLatitude);
+      const longitude = numberOrNull(newLongitude);
+      if (
+         latitude === null ||
+         longitude === null ||
+         Number.isNaN(latitude) ||
+         Number.isNaN(longitude)
+      ) {
+         return null;
+      }
+      return { latitude, longitude };
+   }, [spotMode, herePosition, selectedSite, newLatitude, newLongitude]);
+
+   const spotLabel = useMemo(() => {
+      if (spotMode === 'saved') {
+         return selectedSite?.name ?? 'the spot you picked';
+      }
+      if (spotMode === 'new') {
+         return newSpotName.trim() || 'the pin you dropped';
+      }
+      return 'where you are';
+   }, [spotMode, selectedSite, newSpotName]);
+
+   const filteredSites = useMemo(() => {
+      const term = siteSearch.trim().toLowerCase();
+      if (!term) {
+         return sites;
+      }
+      return sites.filter((site) => site.name.toLowerCase().includes(term));
+   }, [sites, siteSearch]);
+
+   /* --- conditions ------------------------------------------------- */
+
+   const fetchConditions = useCallback(
+      async (
+         coordinates: { latitude: number; longitude: number },
+         announce: boolean
+      ) => {
+         const ticket = weatherRequestRef.current + 1;
+         weatherRequestRef.current = ticket;
+         setConditionsState('loading');
+         setConditionsMessage(null);
+
+         try {
+            const { data } = await axios.get('/api/weather/current', {
+               params: coordinates,
+            });
+
+            // A reading that arrived after a newer one was asked for is dropped.
+            if (weatherRequestRef.current !== ticket) {
+               return;
+            }
+
+            const next: WeatherSnapshot | null = data.weather ?? null;
+
+            if (!next) {
+               // The lookup answers 200 with nothing when it fails upstream, so the
+               // stored reading is kept rather than wiped and called a success.
+               setConditionsState('failed');
+               setConditionsMessage(
+                  'The reading did not come back. What is here is what was stored.'
+               );
+               return;
+            }
+
+            setSnapshot(next);
+            setConditionsState('idle');
+            if (announce) {
+               toast({ title: 'Conditions replaced.', variant: 'success' });
+            }
+         } catch (error) {
+            if (weatherRequestRef.current !== ticket) {
+               return;
+            }
+            console.error('Unable to read conditions', error);
+            setConditionsState('failed');
+            setConditionsMessage(
+               'The reading did not come back. What is here is what was stored.'
+            );
+         }
+      },
+      []
+   );
+
+   /*
+    * A new catch reads the conditions on its own once a position settles. An edit
+    * keeps what was stored until the angler asks for a fresh reading.
+    */
+   useEffect(() => {
+      if (isEdit || !activeCoordinates) {
          return;
       }
 
-      let siteId = isOtherSpot ? null : siteChoice || null;
+      const timer = window.setTimeout(() => {
+         void fetchConditions(activeCoordinates, false);
+      }, 400);
 
-      if (isOtherSpot) {
-         const latitude = Number(customLatitude);
-         const longitude = Number(customLongitude);
+      return () => window.clearTimeout(timer);
+   }, [isEdit, activeCoordinates, fetchConditions]);
 
-         if (!customSpot) {
-            toast({
-               title: 'Site name is required',
-               description: 'Add a name for your custom location.',
-               variant: 'error',
-            });
-            return;
+   const refreshConditions = () => {
+      setIsConfirmingRefresh(false);
+      if (!activeCoordinates) {
+         setConditionsState('failed');
+         setConditionsMessage(
+            'There is no position to read from. Pick a spot with a position first.'
+         );
+         return;
+      }
+      void fetchConditions(activeCoordinates, true);
+   };
+
+   const lines = useMemo(() => conditionLines(snapshot), [snapshot]);
+
+   /* --- measurements ----------------------------------------------- */
+
+   const switchLengthUnit = (next: LengthUnit) => {
+      if (next === lengthUnit) {
+         return;
+      }
+      const current = numberOrNull(lengthValue);
+      if (current !== null && !Number.isNaN(current)) {
+         setLengthValue(
+            String(
+               round(
+                  next === 'in' ? current / CM_PER_INCH : current * CM_PER_INCH,
+                  1
+               )
+            )
+         );
+      }
+      setLengthUnit(next);
+   };
+
+   const switchWeightUnit = (next: WeightUnit) => {
+      if (next === weightUnit) {
+         return;
+      }
+      const current = numberOrNull(weightValue);
+      if (current !== null && !Number.isNaN(current)) {
+         setWeightValue(
+            String(
+               round(
+                  next === 'lb'
+                     ? current / KG_PER_POUND
+                     : current * KG_PER_POUND,
+                  2
+               )
+            )
+         );
+      }
+      setWeightUnit(next);
+   };
+
+   const lengthInCm = () => {
+      const raw = numberOrNull(lengthValue);
+      if (raw === null || Number.isNaN(raw)) {
+         return raw;
+      }
+      return round(lengthUnit === 'in' ? raw * CM_PER_INCH : raw, 2);
+   };
+
+   const weightInKg = () => {
+      const raw = numberOrNull(weightValue);
+      if (raw === null || Number.isNaN(raw)) {
+         return raw;
+      }
+      return round(weightUnit === 'lb' ? raw * KG_PER_POUND : raw, 3);
+   };
+
+   /* --- validation -------------------------------------------------- */
+
+   const validateField = (field: keyof FieldErrors): string | undefined => {
+      switch (field) {
+         case 'species': {
+            const trimmed = species.trim();
+            if (trimmed.length < 2) {
+               return 'Name the fish, at least two letters. Write Not sure if you do not know.';
+            }
+            if (trimmed.length > TITLE_LIMIT) {
+               return `Keep this under ${TITLE_LIMIT} characters.`;
+            }
+            return undefined;
          }
-
-         if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-            toast({
-               title: 'Drop a pin on the map',
-               description:
-                  'Choose your custom location by dropping a pin on the map.',
-               variant: 'error',
-            });
-            return;
+         case 'length': {
+            const raw = numberOrNull(lengthValue);
+            if (raw === null) return undefined;
+            if (Number.isNaN(raw)) return 'Use numbers only, like 44 or 44.5.';
+            if (raw < 0) return 'A length cannot be negative.';
+            if (raw === 0)
+               return 'Leave this empty if the fish was not measured.';
+            return undefined;
          }
+         case 'weight': {
+            const raw = numberOrNull(weightValue);
+            if (raw === null) return undefined;
+            if (Number.isNaN(raw)) return 'Use numbers only, like 1.9.';
+            if (raw < 0) return 'A weight cannot be negative.';
+            if (raw === 0)
+               return 'Leave this empty if the fish was not weighed.';
+            return undefined;
+         }
+         case 'count': {
+            const raw = numberOrNull(countValue);
+            if (raw === null) return undefined;
+            if (Number.isNaN(raw) || !Number.isInteger(raw))
+               return 'Use a whole number of fish.';
+            if (raw < 1) return 'One fish is the smallest a catch can be.';
+            if (raw > 999) return 'That is more fish than this can hold.';
+            return undefined;
+         }
+         case 'depth': {
+            const raw = numberOrNull(depthValue);
+            if (raw === null) return undefined;
+            if (Number.isNaN(raw)) return 'Use numbers only, like 6.5.';
+            if (raw < 0) return 'A depth cannot be negative.';
+            return undefined;
+         }
+         case 'waterTemp': {
+            const raw = numberOrNull(waterTempValue);
+            if (raw === null) return undefined;
+            if (Number.isNaN(raw)) return 'Use numbers only, like 16.';
+            return undefined;
+         }
+         case 'caughtAt': {
+            const parsed = fromLocalInputValue(caughtAt);
+            if (!parsed) return 'Pick the date and time the fish came out.';
+            return undefined;
+         }
+         case 'newSpotName': {
+            if (spotMode !== 'new') return undefined;
+            if (newSpotName.trim().length < 2)
+               return 'Give the spot a name, at least two letters.';
+            return undefined;
+         }
+         case 'spot': {
+            if (spotMode === 'saved' && !savedSiteId) {
+               return 'Pick a spot from the list.';
+            }
+            if (spotMode !== 'new') return undefined;
+            if (!activeCoordinates)
+               return 'Drop a pin on the map so the spot has a position.';
+            return undefined;
+         }
+         default:
+            return undefined;
+      }
+   };
 
-         try {
+   const markTouched = (field: keyof FieldErrors) => {
+      setErrors((current) => ({ ...current, [field]: validateField(field) }));
+   };
+
+   /* --- save -------------------------------------------------------- */
+
+   const buildPayload = (siteId: string | null) => {
+      const parsedCaughtAt = fromLocalInputValue(caughtAt);
+      const trimmedNotes = notes.trim();
+      const count = numberOrNull(countValue);
+      const depth = numberOrNull(depthValue);
+      const waterTemp = numberOrNull(waterTempValue);
+      const length = lengthInCm();
+      const weight = weightInKg();
+      const sky = snapshot?.weatherCondition?.description?.text?.trim();
+
+      return {
+         title: species.trim(),
+         caughtAt: parsedCaughtAt ? parsedCaughtAt.toISOString() : '',
+         notes: trimmedNotes ? trimmedNotes.slice(0, NOTES_LIMIT) : null,
+         siteId,
+         weather: sky ? sky.slice(0, 280) : null,
+         weatherSnapshot: snapshot,
+         length: length === null || Number.isNaN(length) ? null : length,
+         weight: weight === null || Number.isNaN(weight) ? null : weight,
+         // Always sent: the update path writes the whole record, so a field the
+         // form does not send comes back as the server's default, not as it was.
+         count: count === null || Number.isNaN(count) ? 1 : count,
+         depth: depth === null || Number.isNaN(depth) ? null : depth,
+         // TODO(api): appendix E item 11. The write path accepts waterTemp and
+         // then stores null for it, so this reading cannot be kept yet.
+         waterTemp:
+            waterTemp === null || Number.isNaN(waterTemp) ? null : waterTemp,
+         gearIds: selectedGearIds,
+      };
+   };
+
+   const successSentence = (payload: ReturnType<typeof buildPayload>) => {
+      const parts = [payload.title];
+      if (payload.length !== null) {
+         parts.push(`${round(payload.length, 1)} cm`);
+      }
+      const when = fromLocalInputValue(caughtAt);
+      if (when) {
+         parts.push(dateSentence(when));
+      }
+      if (spotMode === 'saved' && selectedSite) {
+         parts.push(selectedSite.name);
+      }
+      if (spotMode === 'new' && newSpotName.trim()) {
+         parts.push(newSpotName.trim());
+      }
+      return `${parts.join(', ')}.`;
+   };
+
+   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+
+      if (isSaving || isPhotoUploading) {
+         return;
+      }
+
+      const fields: (keyof FieldErrors)[] = [
+         'species',
+         'length',
+         'weight',
+         'count',
+         'depth',
+         'waterTemp',
+         'caughtAt',
+         'newSpotName',
+         'spot',
+      ];
+      const found: FieldErrors = {};
+      for (const field of fields) {
+         const message = validateField(field);
+         if (message) {
+            found[field] = message;
+         }
+      }
+      setErrors(found);
+
+      const firstBroken = fields.find((field) => found[field]);
+      if (firstBroken) {
+         document
+            .querySelector<HTMLElement>(`[data-field="${firstBroken}"]`)
+            ?.focus();
+         return;
+      }
+
+      // Set before the spot is created, so a second tap cannot make a second spot.
+      setIsSaving(true);
+
+      try {
+         let siteId: string | null =
+            spotMode === 'saved' ? savedSiteId || null : null;
+
+         if (spotMode === 'new' && activeCoordinates) {
             const { data } = await axios.post('/api/sites', {
-               name: customSpot,
-               latitude,
-               longitude,
+               name: newSpotName.trim(),
+               latitude: activeCoordinates.latitude,
+               longitude: activeCoordinates.longitude,
                description: null,
                waterType: null,
                accessNotes: null,
                images: [],
             });
             siteId = data.site.id;
-         } catch (siteError) {
-            console.error('Unable to create site from catch log', siteError);
+         }
+
+         const payload = buildPayload(siteId);
+
+         if (isEdit && catchId) {
+            // TODO(api): appendix E item 1. The update route takes the whole record,
+            // not a patch, so every field the form holds is sent back with it.
+            // TODO(api): appendix E item 6. It takes no images, so photos on an
+            // existing catch cannot be changed here yet.
+            await axios.put(`/api/catches/${catchId}`, payload);
             toast({
-               title: 'Unable to create location',
-               description: 'Please try dropping your pin again.',
-               variant: 'error',
+               title: 'Catch saved.',
+               description: successSentence(payload),
+               variant: 'success',
             });
+            navigate(`/catches/${catchId}`, { replace: true });
             return;
          }
-      }
 
-      const basePayload = {
-         title: String(formData.get('title') ?? ''),
-         caughtAt: parsedCaughtAt.toISOString(),
-         notes: notes || null,
-         siteId,
-         weather: weatherSnapshot?.weatherCondition?.description?.text ?? null,
-         weatherSnapshot,
-         length:
-            normalizedLength === null
-               ? null
-               : lengthUnit === 'ft'
-                 ? Number((normalizedLength * 30.48).toFixed(2))
-                 : normalizedLength,
-         weight:
-            normalizedWeight === null
-               ? null
-               : weightUnit === 'lbs'
-                 ? Number((normalizedWeight * 0.453592).toFixed(2))
-                 : normalizedWeight,
-         images,
-         gearIds: selectedGearIds,
-      };
-
-      try {
-         setIsSaving(true);
-         const { data } = await axios.post('/api/catches', basePayload);
-         toast({ title: 'Catch logged!', variant: 'success' });
-         navigate(`/catches/${data.catch.id}`);
+         const { data } = await axios.post('/api/catches', {
+            ...payload,
+            images,
+         });
+         toast({
+            title: 'Catch saved.',
+            description: successSentence(payload),
+            variant: 'success',
+         });
+         navigate(`/catches/${data.catch.id}`, { replace: true });
       } catch (error) {
-         const shouldRetryWithoutImages =
-            axios.isAxiosError(error) &&
-            error.response?.status === 500 &&
-            images.length > 0;
-
-         if (shouldRetryWithoutImages) {
-            try {
-               const { data } = await axios.post('/api/catches', {
-                  ...basePayload,
-                  images: [],
-               });
-
-               toast({
-                  title: 'Catch logged without images',
-                  description:
-                     'Your catch was saved. You can add images later while we improve upload reliability.',
-               });
-               navigate(`/catches/${data.catch.id}`);
-               return;
-            } catch (retryError) {
-               console.error('Catch save retry failed', retryError);
-            }
-         }
-
-         console.error(error);
+         console.error('Unable to save the catch', error);
          const message =
             axios.isAxiosError(error) &&
             typeof error.response?.data?.message === 'string'
                ? error.response.data.message
-               : 'Check your values and try again.';
-
-         toast({
-            title: 'Unable to log catch',
-            description: message,
-            variant: 'error',
-         });
+               : 'Nothing was saved. Check the fields above and try again.';
+         toast({ title: 'Not saved', description: message, variant: 'error' });
       } finally {
          setIsSaving(false);
       }
    };
 
-   const toggleGearSelection = (gearId: string) => {
+   /* --- gear -------------------------------------------------------- */
+
+   const filteredGear = useMemo(() => {
+      const term = gearSearch.trim().toLowerCase();
+      if (!term) {
+         return gear;
+      }
+      return gear.filter((entry) =>
+         [entry.name, entry.brand, entry.type]
+            .join(' ')
+            .toLowerCase()
+            .includes(term)
+      );
+   }, [gear, gearSearch]);
+
+   const toggleGear = (gearId: string) => {
       setSelectedGearIds((previous) =>
          previous.includes(gearId)
             ? previous.filter((id) => id !== gearId)
@@ -326,435 +811,751 @@ export function LogCatchPage() {
       );
    };
 
-   const filteredGear = useMemo(() => {
-      const normalizedSearch = gearSearch.trim().toLowerCase();
+   /* --- render ------------------------------------------------------ */
 
-      if (!normalizedSearch) {
-         return gear;
-      }
-
-      return gear.filter((entry) =>
-         [entry.name, entry.brand, entry.type]
-            .join(' ')
-            .toLowerCase()
-            .includes(normalizedSearch)
-      );
-   }, [gear, gearSearch]);
-
-   const filteredSites = useMemo(() => {
-      const normalizedSearch = locationSearch.trim().toLowerCase();
-      if (!normalizedSearch) {
-         return sites;
-      }
-
-      return sites.filter((site) =>
-         site.name.toLowerCase().includes(normalizedSearch)
-      );
-   }, [sites, locationSearch]);
+   const zone = zoneName();
+   const caughtAtDate = fromLocalInputValue(caughtAt);
+   const isBusy = isSaving || isPhotoUploading;
 
    return (
-      <div className="min-h-screen">
-         <LandingHeader />
-         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-            <FishingActionBar />
-            <Show when="signed-in">
-               <form
-                  onSubmit={submitCatch}
-                  className="grid gap-3 rounded-lg border p-4"
-               >
-                  <h1 className="text-2xl font-semibold">Log a catch</h1>
-                  {isLoadingOptions && (
-                     <FishingBobberLoader label="Loading your fishing spots and gear..." />
-                  )}
-                  <label className="grid gap-1 text-sm font-medium">
-                     <span>Catch title</span>
-                     <input
-                        name="title"
-                        placeholder="Catch title"
-                        className="rounded border p-2"
-                        required
-                     />
-                  </label>
-                  <label className="grid gap-1 text-sm font-medium">
-                     <span>Date and time</span>
-                     <input
-                        name="caughtAt"
-                        type="datetime-local"
-                        value={caughtAt}
-                        onChange={(event) => setCaughtAt(event.target.value)}
-                        className="rounded border p-2"
-                        required
-                     />
-                  </label>
-                  <label className="grid gap-1 text-sm font-medium">
-                     <span>Notes</span>
-                     <textarea
-                        name="notes"
-                        placeholder="Notes"
-                        className="rounded border p-2"
-                     />
-                  </label>
-                  <fieldset className="grid gap-2 rounded border p-3">
-                     <legend className="px-1 text-sm font-medium">
-                        Location
-                     </legend>
-                     <Button
-                        type="button"
-                        variant="outline"
-                        className="justify-between"
-                        onClick={() =>
-                           setIsLocationDropdownOpen((previous) => !previous)
-                        }
-                     >
-                        <span>
-                           {siteChoice === '__other'
-                              ? 'Other (create new location)'
-                              : siteChoice
-                                ? (sites.find((site) => site.id === siteChoice)
-                                     ?.name ?? 'Select location')
-                                : 'Use current location'}
-                        </span>
-                        <span>{isLocationDropdownOpen ? '▲' : '▼'}</span>
-                     </Button>
-                     {isLocationDropdownOpen ? (
-                        <div className="grid gap-2 rounded border p-2">
-                           <input
-                              type="search"
-                              value={locationSearch}
-                              onChange={(event) =>
-                                 setLocationSearch(event.target.value)
-                              }
-                              placeholder="Search locations"
-                              className="rounded border p-2 text-sm"
-                           />
-                           <button
-                              type="button"
-                              className="rounded border p-2 text-left text-sm"
-                              onClick={() => {
-                                 setSiteChoice('');
-                                 setIsLocationDropdownOpen(false);
-                              }}
-                           >
-                              Use current location
-                           </button>
-                           {filteredSites.map((site) => (
-                              <button
-                                 key={site.id}
-                                 type="button"
-                                 className="rounded border p-2 text-left text-sm"
-                                 onClick={() => {
-                                    setSiteChoice(site.id);
-                                    setIsLocationDropdownOpen(false);
-                                 }}
-                              >
-                                 {site.name}
-                              </button>
-                           ))}
-                           <button
-                              type="button"
-                              className="rounded border p-2 text-left text-sm"
-                              onClick={() => {
-                                 setSiteChoice('__other');
-                                 setIsLocationDropdownOpen(false);
-                              }}
-                           >
-                              Other (add new spot)
-                           </button>
-                        </div>
-                     ) : null}
-                  </fieldset>
-                  {siteChoice === '__other' && (
-                     <div className="grid gap-3 rounded border p-3">
-                        <label className="grid gap-1 text-sm font-medium">
-                           <span>New location name</span>
-                           <input
-                              name="customSpot"
-                              placeholder="Enter fishing spot name"
-                              className="rounded border p-2"
-                              required
-                           />
-                        </label>
-                        <GoogleMapLocationPicker
-                           latitude={customLatitude}
-                           longitude={customLongitude}
-                           onChange={setCustomCoordinates}
-                        />
-                     </div>
-                  )}
-                  <fieldset className="grid gap-2 rounded border p-3">
-                     <legend className="px-1 text-sm font-medium">
-                        Gear used
-                     </legend>
-                     <Button
-                        type="button"
-                        variant="outline"
-                        className="justify-between"
-                        onClick={() =>
-                           setIsGearDropdownOpen((previous) => !previous)
-                        }
-                     >
-                        <span>
-                           {selectedGearIds.length > 0
-                              ? `${selectedGearIds.length} gear selected`
-                              : 'Select gear'}
-                        </span>
-                        <span>{isGearDropdownOpen ? '▲' : '▼'}</span>
-                     </Button>
-                     {isGearDropdownOpen ? (
-                        <div className="grid gap-2 rounded border p-2">
-                           <input
-                              type="search"
-                              value={gearSearch}
-                              onChange={(event) =>
-                                 setGearSearch(event.target.value)
-                              }
-                              placeholder="Search gear by name, brand, or type"
-                              className="rounded border p-2 text-sm"
-                           />
-                           {gear.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">
-                                 No gear found in the database yet.
-                              </p>
-                           ) : filteredGear.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">
-                                 No gear matches your search.
-                              </p>
-                           ) : (
-                              <div className="grid max-h-64 gap-2 overflow-y-auto pr-1">
-                                 {filteredGear.map((entry) => {
-                                    const selected = selectedGearIds.includes(
-                                       entry.id
-                                    );
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-10">
+         {/* ---------------- The fish ---------------- */}
+         <section className="flex flex-col gap-6">
+            <GroupHeading>The fish</GroupHeading>
 
-                                    return (
-                                       <label
-                                          key={entry.id}
-                                          className="flex cursor-pointer items-center gap-3 rounded border p-2"
-                                       >
-                                          <input
-                                             type="checkbox"
-                                             checked={selected}
-                                             onChange={() =>
-                                                toggleGearSelection(entry.id)
-                                             }
-                                          />
-                                          {entry.imageUrl ? (
-                                             <img
-                                                src={entry.imageUrl}
-                                                alt={entry.name}
-                                                className="h-10 w-10 rounded border object-cover"
-                                             />
-                                          ) : null}
-                                          <span className="text-sm">
-                                             <span className="font-medium">
-                                                {entry.name}
-                                             </span>{' '}
-                                             <span className="text-muted-foreground">
-                                                • {entry.brand} •{' '}
-                                                {entry.type.toLowerCase()}
-                                             </span>
-                                          </span>
-                                       </label>
-                                    );
-                                 })}
-                              </div>
-                           )}
-                        </div>
-                     ) : null}
-                  </fieldset>
-                  <fieldset className="grid gap-2 rounded border p-3">
-                     <legend className="px-1 text-sm font-medium">
-                        Weather snapshot{' '}
-                        {isWeatherLoading ? '(loading...)' : ''}
-                     </legend>
-                     <div className="grid gap-2 sm:grid-cols-2">
-                        <label className="grid gap-1 text-sm font-medium">
-                           <span>Temperature</span>
-                           <input
-                              readOnly
-                              value={toDisplay(
-                                 formatWeatherMetric(
-                                    weatherSnapshot?.temperature?.degrees,
-                                    weatherSnapshot?.temperature?.unit,
-                                    'temperature'
-                                 )
-                              )}
-                              className="rounded border p-2"
-                           />
-                        </label>
-                        <label className="grid gap-1 text-sm font-medium">
-                           <span>Weather description</span>
-                           <input
-                              readOnly
-                              value={toDisplay(
-                                 weatherSnapshot?.weatherCondition?.description
-                                    ?.text
-                              )}
-                              className="rounded border p-2"
-                           />
-                        </label>
-                        <div className="flex items-center gap-2 rounded border p-2 text-sm text-muted-foreground">
-                           {weatherSnapshot?.weatherCondition?.iconBaseUri ? (
+            {isEdit ? (
+               <div className="flex flex-col gap-3">
+                  <span className="lab">Photos</span>
+                  {initial?.images.length ? (
+                     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {initial.images.map((image, index) => (
+                           <li
+                              key={image.storageKey}
+                              className="aspect-[4/3] bg-bg-2"
+                           >
                               <img
-                                 src={`${weatherSnapshot.weatherCondition.iconBaseUri}.svg`}
-                                 alt={
-                                    weatherSnapshot.weatherCondition.description
-                                       ?.text ?? 'Weather icon'
-                                 }
-                                 className="h-6 w-6"
+                                 src={image.url}
+                                 alt={`Photo ${index + 1}`}
+                                 width={400}
+                                 height={300}
+                                 loading="lazy"
+                                 className="h-full w-full object-cover"
                               />
-                           ) : null}
-                           <span>
-                              {toDisplay(
-                                 weatherSnapshot?.weatherCondition?.description
-                                    ?.text || 'Weather icon'
-                              )}
-                           </span>
-                        </div>
-                        <label className="grid gap-1 text-sm font-medium">
-                           <span>Cloud cover</span>
-                           <input
-                              readOnly
-                              value={toDisplay(
-                                 weatherSnapshot?.cloudCover !== undefined
-                                    ? `${weatherSnapshot.cloudCover}%`
-                                    : ''
-                              )}
-                              className="rounded border p-2"
-                           />
-                        </label>
-                        <label className="grid gap-1 text-sm font-medium">
-                           <span>Wind direction</span>
-                           <input
-                              readOnly
-                              value={toDisplay(
-                                 formatCardinal(
-                                    weatherSnapshot?.wind?.direction?.cardinal
-                                 )
-                              )}
-                              className="rounded border p-2"
-                           />
-                        </label>
-                        <label className="grid gap-1 text-sm font-medium">
-                           <span>Wind speed</span>
-                           <input
-                              readOnly
-                              value={toDisplay(
-                                 formatWeatherMetric(
-                                    weatherSnapshot?.wind?.speed?.value,
-                                    weatherSnapshot?.wind?.speed?.unit
-                                 )
-                              )}
-                              className="rounded border p-2"
-                           />
-                        </label>
-                        <label className="grid gap-1 text-sm font-medium">
-                           <span>Wind gust</span>
-                           <input
-                              readOnly
-                              value={toDisplay(
-                                 formatWeatherMetric(
-                                    weatherSnapshot?.wind?.gust?.value,
-                                    weatherSnapshot?.wind?.gust?.unit
-                                 )
-                              )}
-                              className="rounded border p-2"
-                           />
-                        </label>
-                        <label className="grid gap-1 text-sm font-medium">
-                           <span>Precipitation chance</span>
-                           <input
-                              readOnly
-                              value={toDisplay(
-                                 weatherSnapshot?.precipitation?.probability
-                                    ?.percent !== undefined
-                                    ? `${weatherSnapshot.precipitation.probability.percent}%`
-                                    : ''
-                              )}
-                              className="rounded border p-2"
-                           />
-                        </label>
-                     </div>
-                     {siteChoice === '__other' ? (
-                        <p className="text-xs text-muted-foreground">
-                           Weather fields are cleared for custom locations
-                           without coordinates.
-                        </p>
-                     ) : null}
-                  </fieldset>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                     <label className="grid gap-1 text-sm font-medium">
-                        <span>Length</span>
-                        <div className="grid grid-cols-[1fr_auto] gap-2">
-                           <input
-                              name="length"
-                              placeholder="Length"
-                              type="number"
-                              inputMode="decimal"
-                              step="0.1"
-                              className="rounded border p-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                           />
-                           <select
-                              value={lengthUnit}
-                              onChange={(event) =>
-                                 setLengthUnit(
-                                    event.target.value as 'cm' | 'ft'
-                                 )
-                              }
-                              className="rounded border p-2"
-                           >
-                              <option value="cm">cm</option>
-                              <option value="ft">ft</option>
-                           </select>
-                        </div>
-                     </label>
-                     <label className="grid gap-1 text-sm font-medium">
-                        <span>Weight</span>
-                        <div className="grid grid-cols-[1fr_auto] gap-2">
-                           <input
-                              name="weight"
-                              placeholder="Weight"
-                              type="number"
-                              inputMode="decimal"
-                              step="0.1"
-                              className="rounded border p-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                           />
-                           <select
-                              value={weightUnit}
-                              onChange={(event) =>
-                                 setWeightUnit(
-                                    event.target.value as 'kg' | 'lbs'
-                                 )
-                              }
-                              className="rounded border p-2"
-                           >
-                              <option value="kg">kg</option>
-                              <option value="lbs">lbs</option>
-                           </select>
-                        </div>
-                     </label>
-                  </div>
-                  <R2ImagePicker
-                     scope="catch"
-                     label="Catch images"
-                     maxItems={8}
-                     value={images}
-                     onChange={setImages}
-                  />
-                  <Button type="submit" disabled={isSaving}>
-                     {isSaving ? 'Saving...' : 'Save catch'}
-                  </Button>
-               </form>
-            </Show>
-            <Show when="signed-out">
-               <div className="rounded-lg border p-4">
-                  <p className="mb-3">Sign in to log a catch.</p>
-                  <SignInButton mode="modal">
-                     <Button>Sign in</Button>
-                  </SignInButton>
+                           </li>
+                        ))}
+                     </ul>
+                  ) : (
+                     <p className="text-ink-2">No photos on this catch.</p>
+                  )}
+                  <p className="text-[14px] text-ink-3">
+                     Photos stay as they were logged. Changing them comes with
+                     the next release.
+                  </p>
                </div>
-            </Show>
-         </main>
-      </div>
+            ) : (
+               <R2ImagePicker
+                  scope="catch"
+                  label="Photos of the catch"
+                  maxItems={MAX_PHOTOS}
+                  value={images}
+                  onChange={setImages}
+                  disabled={isSaving}
+                  onUploadingChange={setIsPhotoUploading}
+               />
+            )}
+
+            <div>
+               <label htmlFor="species" className="lab block">
+                  Species
+               </label>
+               <input
+                  id="species"
+                  data-field="species"
+                  className="input-line mt-2 text-[16px]"
+                  value={species}
+                  maxLength={TITLE_LIMIT}
+                  autoComplete="off"
+                  aria-invalid={errors.species ? true : undefined}
+                  aria-describedby={
+                     errors.species ? 'species-error' : undefined
+                  }
+                  onChange={(event) => setSpecies(event.target.value)}
+                  onBlur={() => markTouched('species')}
+                  placeholder="Kob"
+               />
+               <FieldError id="species-error" message={errors.species} />
+               {recentSpecies.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                     {recentSpecies.map((name) => (
+                        <Chip
+                           key={name}
+                           small
+                           pressed={species.trim() === name}
+                           onClick={() => {
+                              setSpecies(name);
+                              setErrors((current) => ({
+                                 ...current,
+                                 species: undefined,
+                              }));
+                           }}
+                        >
+                           {name}
+                        </Chip>
+                     ))}
+                     <Chip
+                        small
+                        pressed={species.trim() === 'Not sure'}
+                        onClick={() => {
+                           setSpecies('Not sure');
+                           setErrors((current) => ({
+                              ...current,
+                              species: undefined,
+                           }));
+                        }}
+                     >
+                        Not sure
+                     </Chip>
+                  </div>
+               ) : null}
+               {/* TODO(api): appendix E item 2. There is no species route yet, so the
+                   name typed here is what the record carries. */}
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+               <div className="rule-dashed pt-3">
+                  <label htmlFor="length" className="lab block">
+                     Length
+                  </label>
+                  <div className="mt-1 flex items-baseline gap-2">
+                     <input
+                        id="length"
+                        data-field="length"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        className="g num w-full border-0 bg-transparent p-0 text-[48px] outline-none"
+                        value={lengthValue}
+                        aria-invalid={errors.length ? true : undefined}
+                        aria-describedby={
+                           errors.length ? 'length-error' : undefined
+                        }
+                        onChange={(event) => setLengthValue(event.target.value)}
+                        onBlur={() => markTouched('length')}
+                        placeholder="0"
+                     />
+                  </div>
+                  <div
+                     className="mt-2 flex gap-2"
+                     role="group"
+                     aria-label="Length unit"
+                  >
+                     <Chip
+                        small
+                        pressed={lengthUnit === 'cm'}
+                        onClick={() => switchLengthUnit('cm')}
+                     >
+                        cm
+                     </Chip>
+                     <Chip
+                        small
+                        pressed={lengthUnit === 'in'}
+                        onClick={() => switchLengthUnit('in')}
+                     >
+                        in
+                     </Chip>
+                  </div>
+                  <FieldError id="length-error" message={errors.length} />
+               </div>
+
+               <div className="rule-dashed pt-3">
+                  <label htmlFor="weight" className="lab block">
+                     Weight
+                  </label>
+                  <div className="mt-1 flex items-baseline gap-2">
+                     <input
+                        id="weight"
+                        data-field="weight"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        className="g num w-full border-0 bg-transparent p-0 text-[48px] outline-none"
+                        value={weightValue}
+                        aria-invalid={errors.weight ? true : undefined}
+                        aria-describedby={
+                           errors.weight ? 'weight-error' : undefined
+                        }
+                        onChange={(event) => setWeightValue(event.target.value)}
+                        onBlur={() => markTouched('weight')}
+                        placeholder="0"
+                     />
+                  </div>
+                  <div
+                     className="mt-2 flex gap-2"
+                     role="group"
+                     aria-label="Weight unit"
+                  >
+                     <Chip
+                        small
+                        pressed={weightUnit === 'kg'}
+                        onClick={() => switchWeightUnit('kg')}
+                     >
+                        kg
+                     </Chip>
+                     <Chip
+                        small
+                        pressed={weightUnit === 'lb'}
+                        onClick={() => switchWeightUnit('lb')}
+                     >
+                        lb
+                     </Chip>
+                  </div>
+                  <FieldError id="weight-error" message={errors.weight} />
+               </div>
+            </div>
+
+            <div>
+               <label htmlFor="count" className="lab block">
+                  How many
+               </label>
+               <input
+                  id="count"
+                  data-field="count"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className="input-line num mt-2 max-w-[120px] text-[16px]"
+                  value={countValue}
+                  aria-invalid={errors.count ? true : undefined}
+                  aria-describedby={errors.count ? 'count-error' : undefined}
+                  onChange={(event) => setCountValue(event.target.value)}
+                  onBlur={() => markTouched('count')}
+               />
+               <FieldError id="count-error" message={errors.count} />
+            </div>
+
+            <div>
+               <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-expanded={showMore}
+                  aria-controls="more-fish"
+                  onClick={() => setShowMore((open) => !open)}
+                  className="px-0"
+               >
+                  {showMore ? 'Less' : 'More'}
+               </Button>
+               <div id="more-fish" hidden={!showMore}>
+                  <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
+                     <div>
+                        <label htmlFor="depth" className="lab block">
+                           Depth in metres
+                        </label>
+                        <input
+                           id="depth"
+                           data-field="depth"
+                           inputMode="decimal"
+                           autoComplete="off"
+                           className="input-line num mt-2 text-[16px]"
+                           value={depthValue}
+                           aria-invalid={errors.depth ? true : undefined}
+                           aria-describedby={
+                              errors.depth ? 'depth-error' : undefined
+                           }
+                           onChange={(event) =>
+                              setDepthValue(event.target.value)
+                           }
+                           onBlur={() => markTouched('depth')}
+                           placeholder="Not recorded"
+                        />
+                        <FieldError id="depth-error" message={errors.depth} />
+                     </div>
+                     <div>
+                        <label htmlFor="water-temp" className="lab block">
+                           Water temperature in °C
+                        </label>
+                        <input
+                           id="water-temp"
+                           data-field="waterTemp"
+                           inputMode="decimal"
+                           autoComplete="off"
+                           className="input-line num mt-2 text-[16px]"
+                           value={waterTempValue}
+                           aria-invalid={errors.waterTemp ? true : undefined}
+                           aria-describedby={
+                              errors.waterTemp ? 'water-temp-error' : undefined
+                           }
+                           onChange={(event) =>
+                              setWaterTempValue(event.target.value)
+                           }
+                           onBlur={() => markTouched('waterTemp')}
+                           placeholder="Not recorded"
+                        />
+                        <FieldError
+                           id="water-temp-error"
+                           message={errors.waterTemp}
+                        />
+                        <p className="mt-2 text-[14px] text-ink-3">
+                           Water temperature is not kept on the record yet.
+                        </p>
+                     </div>
+                  </div>
+               </div>
+            </div>
+         </section>
+
+         <hr className="rule-dashed border-0" />
+
+         {/* ---------------- Where ---------------- */}
+         <section className="flex flex-col gap-6">
+            <GroupHeading>Where</GroupHeading>
+
+            <div
+               role="radiogroup"
+               aria-label="Where you caught it"
+               className="flex flex-col"
+            >
+               {(
+                  [
+                     ['here', 'The spot I am at'],
+                     ['saved', 'A saved spot'],
+                     ['new', 'A new spot'],
+                  ] as [SpotMode, string][]
+               ).map(([value, text]) => (
+                  <label
+                     key={value}
+                     className="flex min-h-12 cursor-pointer items-center gap-3 border-t border-line py-3 first:border-t-0"
+                  >
+                     <input
+                        type="radio"
+                        name="spot-mode"
+                        className="size-5 accent-teal"
+                        checked={spotMode === value}
+                        onChange={() => chooseSpotMode(value)}
+                     />
+                     <span className="g-tracked text-[19px]">{text}</span>
+                  </label>
+               ))}
+            </div>
+
+            {spotMode === 'here' ? (
+               <div className="bg-bg-2 p-4">
+                  {hereState === 'locating' ? (
+                     <p className="text-ink-2">Getting a fix.</p>
+                  ) : null}
+                  {hereState === 'ready' && herePosition ? (
+                     <p className="num text-ink-2">
+                        {herePosition.latitude.toFixed(4)},{' '}
+                        {herePosition.longitude.toFixed(4)}
+                     </p>
+                  ) : null}
+                  {hereState === 'refused' ? (
+                     <div className="flex flex-col items-start gap-3">
+                        <p className="text-ink-2">
+                           No position came back. Your phone may have location
+                           turned off for this site.
+                        </p>
+                        <Button
+                           type="button"
+                           variant="outline"
+                           size="sm"
+                           onClick={askForPosition}
+                        >
+                           Try again
+                        </Button>
+                     </div>
+                  ) : null}
+                  {hereState === 'idle' ? (
+                     <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={askForPosition}
+                     >
+                        Get a fix
+                     </Button>
+                  ) : null}
+                  {/* TODO(api): appendix E item 3. The catch has no coordinates of
+                      its own yet, so this position reads the conditions only. */}
+                  <p className="mt-3 text-[14px] text-ink-3">
+                     Your position sets the conditions. It is not stored on the
+                     catch yet.
+                  </p>
+                  {isEdit && initial?.siteId ? (
+                     <p className="mt-2 text-[14px] text-ink-3">
+                        This catch is filed under a spot. Saving with this
+                        chosen leaves it with no spot.
+                     </p>
+                  ) : null}
+               </div>
+            ) : null}
+
+            {spotMode === 'saved' ? (
+               <div className="flex flex-col gap-3">
+                  <label htmlFor="spot-search" className="lab block">
+                     Search your spots
+                  </label>
+                  <input
+                     id="spot-search"
+                     type="search"
+                     className="input-line text-[16px]"
+                     value={siteSearch}
+                     onChange={(event) => setSiteSearch(event.target.value)}
+                     placeholder="Kalk Bay"
+                  />
+                  {sitesState === 'loading' ? (
+                     <p className="text-ink-2">Reading your spots.</p>
+                  ) : sitesState === 'failed' ? (
+                     <div className="flex flex-col items-start gap-3">
+                        <p className="text-destructive">
+                           Could not read your spots.
+                        </p>
+                        <Button
+                           type="button"
+                           variant="outline"
+                           size="sm"
+                           onClick={retryOptions}
+                        >
+                           Try again
+                        </Button>
+                     </div>
+                  ) : sites.length === 0 ? (
+                     <p className="text-ink-2">
+                        You have no spots yet. Choose A new spot and drop a pin.
+                     </p>
+                  ) : filteredSites.length === 0 ? (
+                     <div className="flex flex-col items-start gap-3">
+                        <p className="text-ink-2">No spot goes by that name.</p>
+                        <Button
+                           type="button"
+                           variant="outline"
+                           size="sm"
+                           onClick={() => setSiteSearch('')}
+                        >
+                           Clear search
+                        </Button>
+                     </div>
+                  ) : (
+                     <ul
+                        data-field="spot"
+                        tabIndex={-1}
+                        className="max-h-[320px] overflow-y-auto"
+                     >
+                        {filteredSites.map((site) => (
+                           <li key={site.id}>
+                              <label className="flex min-h-12 cursor-pointer items-center gap-3 border-t border-line py-3">
+                                 <input
+                                    type="radio"
+                                    name="saved-site"
+                                    className="size-5 accent-teal"
+                                    checked={savedSiteId === site.id}
+                                    onChange={() => {
+                                       setSavedSiteId(site.id);
+                                       setErrors((current) => ({
+                                          ...current,
+                                          spot: undefined,
+                                       }));
+                                    }}
+                                 />
+                                 <span className="text-[16px]">
+                                    {site.name}
+                                 </span>
+                              </label>
+                           </li>
+                        ))}
+                     </ul>
+                  )}
+                  <FieldError id="spot-picked-error" message={errors.spot} />
+                  {selectedSite && !activeCoordinates ? (
+                     <p className="text-[14px] text-ink-3">
+                        This spot has no position recorded, so no conditions can
+                        be read for it.
+                     </p>
+                  ) : null}
+               </div>
+            ) : null}
+
+            {spotMode === 'new' ? (
+               <div className="flex flex-col gap-4">
+                  <div>
+                     <label htmlFor="new-spot" className="lab block">
+                        Name this spot
+                     </label>
+                     <input
+                        id="new-spot"
+                        data-field="newSpotName"
+                        className="input-line mt-2 text-[16px]"
+                        value={newSpotName}
+                        maxLength={TITLE_LIMIT}
+                        autoComplete="off"
+                        aria-invalid={errors.newSpotName ? true : undefined}
+                        aria-describedby={
+                           errors.newSpotName ? 'new-spot-error' : undefined
+                        }
+                        onChange={(event) => setNewSpotName(event.target.value)}
+                        onBlur={() => markTouched('newSpotName')}
+                        placeholder="Rooi-Els"
+                     />
+                     <FieldError
+                        id="new-spot-error"
+                        message={errors.newSpotName}
+                     />
+                  </div>
+                  <div data-field="spot" tabIndex={-1}>
+                     <GoogleMapLocationPicker
+                        latitude={newLatitude}
+                        longitude={newLongitude}
+                        onChange={setNewCoordinates}
+                     />
+                     <FieldError id="spot-error" message={errors.spot} />
+                  </div>
+               </div>
+            ) : null}
+         </section>
+
+         <hr className="rule-dashed border-0" />
+
+         {/* ---------------- When and conditions ---------------- */}
+         <section className="flex flex-col gap-6">
+            <GroupHeading>When and conditions</GroupHeading>
+
+            <div>
+               <label htmlFor="caught-at" className="lab block">
+                  Caught at
+               </label>
+               <input
+                  id="caught-at"
+                  data-field="caughtAt"
+                  type="datetime-local"
+                  className="input-line num mt-2 text-[16px]"
+                  value={caughtAt}
+                  aria-invalid={errors.caughtAt ? true : undefined}
+                  aria-describedby="caught-at-zone"
+                  onChange={(event) => setCaughtAt(event.target.value)}
+                  onBlur={() => markTouched('caughtAt')}
+               />
+               <p id="caught-at-zone" className="mt-2 text-[14px] text-ink-3">
+                  {caughtAtDate ? `${dateSentence(caughtAtDate)}. ` : ''}
+                  {zone ? `Your time, ${zone}.` : 'Your own time.'}
+               </p>
+               <FieldError id="caught-at-error" message={errors.caughtAt} />
+            </div>
+
+            <div className="bg-bg-2 p-4">
+               <span className="lab lab-rule">Conditions</span>
+               <dl className="mt-4 flex flex-col">
+                  {lines.map((line) => (
+                     <div
+                        key={line.label}
+                        className="flex items-baseline justify-between gap-4 border-t border-line py-2 first:border-t-0"
+                     >
+                        <dt className="lab">{line.label}</dt>
+                        <dd className="num text-right text-[15px] text-ink-2">
+                           {line.value}
+                        </dd>
+                     </div>
+                  ))}
+               </dl>
+               {conditionsState === 'loading' ? (
+                  <p className="mt-3 text-[14px] text-ink-3">
+                     Reading the conditions.
+                  </p>
+               ) : null}
+               {conditionsState === 'failed' && conditionsMessage ? (
+                  <p role="alert" className="mt-3 text-[14px] text-destructive">
+                     {conditionsMessage}
+                  </p>
+               ) : null}
+               <p className="mt-3 text-[14px] text-ink-3">
+                  {WEATHER_SOURCE_LINE}
+               </p>
+
+               <div className="mt-4">
+                  {isConfirmingRefresh ? (
+                     <div className="flex flex-col items-start gap-3">
+                        <p className="text-[15px] text-ink-2">
+                           This replaces the wind, air, cloud and rain kept with
+                           this catch with the conditions right now at{' '}
+                           {spotLabel}.
+                        </p>
+                        <div className="flex flex-wrap gap-3">
+                           <Button
+                              type="button"
+                              size="sm"
+                              onClick={refreshConditions}
+                           >
+                              Replace them
+                           </Button>
+                           <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsConfirmingRefresh(false)}
+                           >
+                              Keep what is here
+                           </Button>
+                        </div>
+                     </div>
+                  ) : (
+                     <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={conditionsState === 'loading'}
+                        onClick={() => setIsConfirmingRefresh(true)}
+                     >
+                        Refresh conditions
+                     </Button>
+                  )}
+               </div>
+            </div>
+         </section>
+
+         <hr className="rule-dashed border-0" />
+
+         {/* ---------------- Gear and notes ---------------- */}
+         <section className="flex flex-col gap-6">
+            <GroupHeading>Gear and notes</GroupHeading>
+
+            <div className="flex flex-col gap-3">
+               <label htmlFor="gear-search" className="lab block">
+                  Search your gear
+               </label>
+               <input
+                  id="gear-search"
+                  type="search"
+                  className="input-line text-[16px]"
+                  value={gearSearch}
+                  onChange={(event) => setGearSearch(event.target.value)}
+                  placeholder="Daiwa"
+               />
+               {gearState === 'loading' ? (
+                  <p className="text-ink-2">Reading your gear.</p>
+               ) : gearState === 'failed' ? (
+                  <div className="flex flex-col items-start gap-3">
+                     <p className="text-destructive">
+                        Could not read your gear.
+                     </p>
+                     <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={retryOptions}
+                     >
+                        Try again
+                     </Button>
+                  </div>
+               ) : gear.length === 0 ? (
+                  <p className="text-ink-2">
+                     You have no gear yet. Add a rod or a reel and it shows up
+                     here.
+                  </p>
+               ) : filteredGear.length === 0 ? (
+                  <div className="flex flex-col items-start gap-3">
+                     <p className="text-ink-2">No gear goes by that name.</p>
+                     <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setGearSearch('')}
+                     >
+                        Clear search
+                     </Button>
+                  </div>
+               ) : (
+                  <ul className="max-h-[360px] overflow-y-auto">
+                     {filteredGear.map((entry) => (
+                        <li key={entry.id}>
+                           <label className="flex min-h-12 cursor-pointer items-center gap-3 border-t border-line py-3">
+                              <input
+                                 type="checkbox"
+                                 className="size-5 accent-teal"
+                                 checked={selectedGearIds.includes(entry.id)}
+                                 onChange={() => toggleGear(entry.id)}
+                              />
+                              {entry.imageUrl ? (
+                                 <img
+                                    src={entry.imageUrl}
+                                    alt=""
+                                    width={44}
+                                    height={44}
+                                    loading="lazy"
+                                    className="size-11 bg-bg-2 object-cover"
+                                 />
+                              ) : null}
+                              <span className="flex flex-col">
+                                 <span className="g text-[22px]">
+                                    {entry.name}
+                                 </span>
+                                 <span className="text-[14px] text-ink-2">
+                                    {entry.brand} · {entry.type.toLowerCase()}
+                                 </span>
+                              </span>
+                           </label>
+                        </li>
+                     ))}
+                  </ul>
+               )}
+            </div>
+
+            <div>
+               <label htmlFor="notes" className="lab block">
+                  Notes
+               </label>
+               <textarea
+                  id="notes"
+                  rows={4}
+                  maxLength={NOTES_LIMIT}
+                  className="input-line mt-2 resize-y text-[16px]"
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="What the water was doing, what it took."
+               />
+               <p className="num mt-2 text-[14px] text-ink-3">
+                  {notes.length} of {NOTES_LIMIT}
+               </p>
+            </div>
+         </section>
+
+         <div className="flex flex-wrap items-center gap-4 pb-4">
+            <Button type="submit" size="xl" disabled={isBusy}>
+               {isEdit ? 'Save changes' : 'Save catch'}
+            </Button>
+            <Button
+               type="button"
+               variant="ghost"
+               size="lg"
+               onClick={() =>
+                  navigate(
+                     isEdit && catchId ? `/catches/${catchId}` : '/catches/me'
+                  )
+               }
+            >
+               Cancel
+            </Button>
+            {isPhotoUploading ? (
+               <span className="text-[14px] text-ink-3">
+                  A photo is still going up.
+               </span>
+            ) : null}
+         </div>
+      </form>
+   );
+}
+
+/* ------------------------------------------------------------------ */
+
+export function LogCatchPage() {
+   useDocumentTitle('Log a catch');
+
+   return (
+      <RequireSignIn what="your log">
+         <section className="mx-auto w-[min(720px,100%-32px)] py-8 md:py-12">
+            <h1 className="g text-[44px] md:text-[56px]">Log a catch</h1>
+            <p className="mt-3 max-w-[52ch] text-ink-2">
+               Everything here is optional except the fish and the time.
+            </p>
+            <div className="mt-10">
+               <CatchForm mode="create" />
+            </div>
+         </section>
+      </RequireSignIn>
    );
 }

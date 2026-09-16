@@ -1,33 +1,38 @@
 import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
 import { Slot } from 'radix-ui';
+import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
 
+/*
+ * Buttons carry their label in League Gothic, uppercase, square corners.
+ * `default` is the one teal action on a screen. `outline` and `secondary` are the quiet ones.
+ * `ghost` is a text control. `destructive` is text plus a red outline, never a red block.
+ */
 const buttonVariants = cva(
-   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+   "g-tracked inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap border border-transparent text-[19px] transition-[background-color,color,filter,transform] duration-150 outline-none select-none disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-5 [&_svg]:shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal aria-invalid:border-destructive",
    {
       variants: {
          variant: {
-            default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+            default: 'bg-teal text-teal-ink hover:brightness-105',
+            secondary: 'bg-bg-2 text-ink border-line-2 hover:bg-accent',
+            outline: 'border-ink text-ink hover:bg-bg-2',
+            ghost: 'text-ink-2 hover:text-ink hover:bg-bg-2',
             destructive:
-               'bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
-            outline:
-               'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
-            secondary:
-               'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-            ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
-            link: 'text-primary underline-offset-4 hover:underline',
+               'border-destructive text-destructive hover:bg-destructive/10',
+            link: 'text-teal-text underline-offset-4 hover:underline',
+            paper: 'bg-paper text-black-block hover:brightness-95',
          },
          size: {
-            default: 'h-9 px-4 py-2 has-[>svg]:px-3',
-            xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
-            sm: 'h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
-            lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
-            icon: 'size-9',
-            'icon-xs': "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-            'icon-sm': 'size-8',
-            'icon-lg': 'size-10',
+            default: 'h-11 px-5',
+            xs: 'h-8 px-3 text-[15px]',
+            sm: 'h-10 px-4 text-[17px]',
+            lg: 'h-12 px-6 text-[22px]',
+            xl: 'h-14 px-7 text-[24px]',
+            icon: 'size-11 p-0',
+            'icon-xs': 'size-8 p-0',
+            'icon-sm': 'size-10 p-0',
+            'icon-lg': 'size-12 p-0',
          },
       },
       defaultVariants: {
@@ -60,4 +65,4 @@ function Button({
    );
 }
 
-export { Button, buttonVariants };
+export { Button };

@@ -1,17 +1,26 @@
 import * as React from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+
+/*
+ * A photo carousel for a black block. The controls are the only round things in
+ * the product: 48px circles on the photograph itself, in Heroicons outline. The
+ * track wraps, drags on touch, answers the arrow keys, and says where you are
+ * underneath rather than dotting the photo.
+ */
 
 type CarouselApi = {
    scrollPrev: () => void;
    scrollNext: () => void;
+   scrollTo: (index: number) => void;
    selectedIndex: () => number;
 };
 
 type CarouselProps = {
    setApi?: (api: CarouselApi) => void;
+   /** Names the set of photos for a screen reader, e.g. `Photos of Kob, 78 cm`. */
+   label?: string;
 };
 
 type CarouselContextProps = {
@@ -36,6 +45,7 @@ function useCarousel() {
 
 function Carousel({
    setApi,
+   label,
    className,
    children,
    ...props
@@ -44,41 +54,67 @@ function Carousel({
    const [itemCount, setItemCount] = React.useState(0);
 
    const scrollPrev = React.useCallback(() => {
-      setIndex((prev) => Math.max(prev - 1, 0));
-   }, []);
-
-   const scrollNext = React.useCallback(() => {
-      setIndex((prev) => Math.min(prev + 1, Math.max(itemCount - 1, 0)));
+      setIndex((prev) =>
+         itemCount > 0 ? (prev - 1 + itemCount) % itemCount : 0
+      );
    }, [itemCount]);
 
+   const scrollNext = React.useCallback(() => {
+      setIndex((prev) => (itemCount > 0 ? (prev + 1) % itemCount : 0));
+   }, [itemCount]);
+
+   const scrollTo = React.useCallback(
+      (next: number) => {
+         setIndex(
+            itemCount > 0 ? Math.min(Math.max(next, 0), itemCount - 1) : 0
+         );
+      },
+      [itemCount]
+   );
+
    React.useEffect(() => {
-      if (index > itemCount - 1) {
-         setIndex(Math.max(itemCount - 1, 0));
+      if (itemCount > 0 && index > itemCount - 1) {
+         setIndex(itemCount - 1);
       }
    }, [index, itemCount]);
 
    React.useEffect(() => {
       if (!setApi) return;
-      setApi({
-         scrollPrev,
-         scrollNext,
-         selectedIndex: () => index,
-      });
-   }, [index, scrollNext, scrollPrev, setApi]);
+      setApi({ scrollPrev, scrollNext, scrollTo, selectedIndex: () => index });
+   }, [index, scrollNext, scrollPrev, scrollTo, setApi]);
+
+   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (itemCount < 2) return;
+      if (event.key === 'ArrowLeft') {
+         event.preventDefault();
+         scrollPrev();
+      }
+      if (event.key === 'ArrowRight') {
+         event.preventDefault();
+         scrollNext();
+      }
+   };
 
    return (
       <CarouselContext.Provider
          value={{
             index,
             itemCount,
-            canScrollPrev: index > 0,
-            canScrollNext: index < itemCount - 1,
+            canScrollPrev: itemCount > 1,
+            canScrollNext: itemCount > 1,
             setItemCount,
             scrollPrev,
             scrollNext,
          }}
       >
-         <div className={cn('relative', className)} {...props}>
+         <div
+            className={cn('relative', className)}
+            role="group"
+            aria-roledescription="carousel"
+            aria-label={label}
+            onKeyDown={onKeyDown}
+            {...props}
+         >
             {children}
          </div>
       </CarouselContext.Provider>
@@ -90,21 +126,49 @@ function CarouselContent({
    children,
    ...props
 }: React.ComponentProps<'div'>) {
-   const { index, setItemCount } = useCarousel();
+   const { index, itemCount, setItemCount, scrollPrev, scrollNext } =
+      useCarousel();
    const slides = React.Children.toArray(children);
+   const dragStart = React.useRef<number | null>(null);
 
    React.useEffect(() => {
       setItemCount(slides.length);
    }, [setItemCount, slides.length]);
 
+   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType === 'mouse' || itemCount < 2) return;
+      dragStart.current = event.clientX;
+   };
+
+   const onPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+      const start = dragStart.current;
+      dragStart.current = null;
+      if (start === null) return;
+
+      const travel = event.clientX - start;
+      if (Math.abs(travel) < 44) return;
+      if (travel < 0) {
+         scrollNext();
+      } else {
+         scrollPrev();
+      }
+   };
+
    return (
-      <div className="overflow-hidden">
+      <div
+         className="overflow-hidden touch-pan-y"
+         onPointerDown={onPointerDown}
+         onPointerUp={onPointerEnd}
+         onPointerCancel={() => {
+            dragStart.current = null;
+         }}
+      >
          <div
             className={cn(
-               'flex transition-transform duration-300 ease-out',
+               'flex transition-transform duration-500 [transition-timing-function:var(--ease)]',
                className
             )}
-            style={{ transform: `translateX(-${index * 100}%)` }}
+            style={{ transform: `translate3d(-${index * 100}%, 0, 0)` }}
             {...props}
          >
             {slides}
@@ -122,53 +186,63 @@ function CarouselItem({ className, ...props }: React.ComponentProps<'div'>) {
    );
 }
 
+const controlClasses =
+   'absolute top-1/2 z-10 inline-flex size-12 -translate-y-1/2 items-center justify-center rounded-full border border-paper/45 bg-black-block/55 text-paper transition-[background-color,transform] duration-150 [transition-timing-function:var(--ease)] hover:bg-black-block/80 active:scale-[0.96] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal';
+
 function CarouselPrevious({
    className,
-   size = 'icon',
-   variant = 'outline',
    ...props
-}: React.ComponentProps<typeof Button>) {
+}: React.ComponentProps<'button'>) {
    const { canScrollPrev, scrollPrev } = useCarousel();
+   if (!canScrollPrev) return null;
+
    return (
-      <Button
-         size={size}
-         variant={variant}
-         className={cn(
-            'absolute left-2 top-1/2 z-10 size-8 -translate-y-1/2 rounded-full',
-            className
-         )}
-         disabled={!canScrollPrev}
+      <button
+         type="button"
+         className={cn(controlClasses, 'left-3', className)}
          onClick={scrollPrev}
          {...props}
       >
-         <ArrowLeft className="size-4" />
-         <span className="sr-only">Previous slide</span>
-      </Button>
+         <ChevronLeftIcon
+            className="size-6"
+            strokeWidth={1.5}
+            aria-hidden="true"
+         />
+         <span className="sr-only">Previous photo</span>
+      </button>
    );
 }
 
-function CarouselNext({
-   className,
-   size = 'icon',
-   variant = 'outline',
-   ...props
-}: React.ComponentProps<typeof Button>) {
+function CarouselNext({ className, ...props }: React.ComponentProps<'button'>) {
    const { canScrollNext, scrollNext } = useCarousel();
+   if (!canScrollNext) return null;
+
    return (
-      <Button
-         size={size}
-         variant={variant}
-         className={cn(
-            'absolute right-2 top-1/2 z-10 size-8 -translate-y-1/2 rounded-full',
-            className
-         )}
-         disabled={!canScrollNext}
+      <button
+         type="button"
+         className={cn(controlClasses, 'right-3', className)}
          onClick={scrollNext}
          {...props}
       >
-         <ArrowRight className="size-4" />
-         <span className="sr-only">Next slide</span>
-      </Button>
+         <ChevronRightIcon
+            className="size-6"
+            strokeWidth={1.5}
+            aria-hidden="true"
+         />
+         <span className="sr-only">Next photo</span>
+      </button>
+   );
+}
+
+/** `2 of 5`, sitting under the photograph rather than on it. */
+function CarouselCounter({ className, ...props }: React.ComponentProps<'p'>) {
+   const { index, itemCount } = useCarousel();
+   if (itemCount < 2) return null;
+
+   return (
+      <p className={cn('lab num', className)} aria-live="polite" {...props}>
+         {index + 1} of {itemCount}
+      </p>
    );
 }
 
@@ -179,4 +253,5 @@ export {
    CarouselItem,
    CarouselNext,
    CarouselPrevious,
+   CarouselCounter,
 };

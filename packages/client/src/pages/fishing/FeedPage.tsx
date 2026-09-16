@@ -1,18 +1,16 @@
 import axios from 'axios';
-import { Show, useAuth } from '@clerk/react';
+import { Show, useAuth, useUser } from '@clerk/react';
 import {
-   Check,
-   MessageCircle,
-   SendHorizontal,
-   SlidersHorizontal,
-   ThumbsUp,
-   UserPlus,
-} from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { FishingActionBar } from '@/components/fishing/FishingActionBar';
-import { LandingHeader } from '@/components/landing/LandingHeader';
+   useCallback,
+   useEffect,
+   useMemo,
+   useRef,
+   useState,
+   type CSSProperties,
+} from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
    Dialog,
    DialogContent,
@@ -21,586 +19,739 @@ import {
    DialogHeader,
    DialogTitle,
 } from '@/components/ui/dialog';
-import {
-   Carousel,
-   CarouselContent,
-   CarouselItem,
-   CarouselNext,
-   CarouselPrevious,
-} from '@/components/ui/carousel';
-import { Slider } from '@/components/ui/slider';
 import { toast } from '@/components/ui/use-toast';
+import { useRevealIn } from '@/components/brand/Reveal';
+import {
+   FeedFilters,
+   MAX_RADIUS_KM,
+   MIN_RADIUS_KM,
+   type LocationState,
+} from '@/components/feed/FeedFilters';
+import { FeedPostBlock } from '@/components/feed/FeedPostBlock';
+import { FeedSkeleton } from '@/components/feed/FeedSkeleton';
+import { distanceInKm, plural } from '@/components/feed/format';
+import type {
+   FeedAuthor,
+   FeedComment,
+   FeedPost,
+   FeedPostInView,
+   ScopeFilter,
+   ShowFilter,
+} from '@/components/feed/types';
+import { useDocumentTitle } from '@/lib/title';
 
-type FeedPost = {
-   id: string;
-   type: 'CATCH' | 'SITE';
-   scope: 'GLOBAL' | 'NEARBY';
-   content: string | null;
-   likeCount: number;
-   commentCount: number;
-   likedByMe: boolean;
-   latitude?: number | null;
-   longitude?: number | null;
-   catch: {
-      id: string;
-      title: string;
-      images: Array<{ image: { id: string; url: string } }>;
-   } | null;
-   site: {
-      id: string;
-      name: string;
-      images: Array<{ image: { id: string; url: string } }>;
-   } | null;
-   author: {
-      id: string;
-      displayName: string;
-      username: string;
-      avatarUrl?: string | null;
-   };
-   authorFollowedByMe?: boolean;
-   authorIsMe?: boolean;
-   comments: Array<{
-      id: string;
-      body: string;
-      user: { displayName: string; username: string };
-   }>;
-};
+const PAGE_SIZE = 25;
+const SLOW_LOAD_MS = 5000;
+const DEFAULT_RADIUS_KM = 50;
 
-function distanceInKm(
-   origin: { latitude: number; longitude: number },
-   target: { latitude: number; longitude: number }
-) {
-   const toRad = (value: number) => (value * Math.PI) / 180;
-   const radius = 6371;
-   const dLat = toRad(target.latitude - origin.latitude);
-   const dLon = toRad(target.longitude - origin.longitude);
-   const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(toRad(origin.latitude)) *
-         Math.cos(toRad(target.latitude)) *
-         Math.sin(dLon / 2) *
-         Math.sin(dLon / 2);
-
-   return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+function readScope(value: string | null): ScopeFilter {
+   return value === 'near-me' ? 'near-me' : 'everywhere';
 }
 
+function readShow(value: string | null): ShowFilter {
+   return value === 'catches' || value === 'spots' ? value : 'all';
+}
+
+function readRadius(value: string | null): number {
+   const parsed = Number(value);
+   if (!Number.isFinite(parsed)) return DEFAULT_RADIUS_KM;
+   const stepped = Math.round(parsed / 5) * 5;
+   return Math.min(Math.max(stepped, MIN_RADIUS_KM), MAX_RADIUS_KM);
+}
+
+/** The feed embeds the five newest comments newest first; a thread reads oldest first. */
+function normalisePost(post: FeedPost): FeedPost {
+   return { ...post, comments: [...(post.comments ?? [])].reverse() };
+}
+
+const inlineControl =
+   'g-tracked inline-flex h-12 items-center text-[19px] text-teal-text transition-[opacity] duration-150 [transition-timing-function:var(--ease)] hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal';
+
 export function FeedPage() {
+   useDocumentTitle('Feed');
    const { isSignedIn } = useAuth();
-   const pageSize = 25;
+   const { user } = useUser();
+   const pageRef = useRef<HTMLDivElement>(null);
+   useRevealIn(pageRef);
+
+   const [searchParams, setSearchParams] = useSearchParams();
+   const scope = readScope(searchParams.get('scope'));
+   const show = readShow(searchParams.get('show'));
+   const committedRadius = readRadius(searchParams.get('radius'));
+   const [radiusKm, setRadiusKm] = useState(committedRadius);
+
    const [posts, setPosts] = useState<FeedPost[]>([]);
-   const [scope, setScope] = useState<'GLOBAL' | 'NEARBY'>('GLOBAL');
-   const [type, setType] = useState<'ALL' | 'CATCH' | 'SITE'>('ALL');
-   const [radiusKm, setRadiusKm] = useState(50);
-   const [currentPosition, setCurrentPosition] = useState<{
+   const [offset, setOffset] = useState(0);
+   const [hasMore, setHasMore] = useState(true);
+   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
+      'loading'
+   );
+   const [isSlow, setIsSlow] = useState(false);
+   const [isLoadingMore, setIsLoadingMore] = useState(false);
+   const [moreFailed, setMoreFailed] = useState(false);
+
+   const [position, setPosition] = useState<{
       latitude: number;
       longitude: number;
    } | null>(null);
-   const [locationError, setLocationError] = useState<string | null>(null);
-   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>(
-      {}
-   );
-   const [expandedComments, setExpandedComments] = useState<
+   const [locationState, setLocationState] = useState<LocationState>('idle');
+
+   const [openThreads, setOpenThreads] = useState<Record<string, boolean>>({});
+   const [drafts, setDrafts] = useState<Record<string, string>>({});
+   const [sendingComment, setSendingComment] = useState<
       Record<string, boolean>
    >({});
-   const [offset, setOffset] = useState(0);
-   const [hasMore, setHasMore] = useState(true);
-   const [isLoading, setIsLoading] = useState(false);
-   const [isLoadingMore, setIsLoadingMore] = useState(false);
-   const [pendingUnfollow, setPendingUnfollow] = useState<{
-      id: string;
-      username: string;
-   } | null>(null);
+   const [commentErrors, setCommentErrors] = useState<
+      Record<string, string | null>
+   >({});
+   const [actionErrors, setActionErrors] = useState<
+      Record<string, string | null>
+   >({});
+   const [readingThread, setReadingThread] = useState<Record<string, boolean>>(
+      {}
+   );
+   const [wholeThread, setWholeThread] = useState<Record<string, boolean>>({});
+   const [pendingUnfollow, setPendingUnfollow] = useState<FeedAuthor | null>(
+      null
+   );
 
-   const load = async (input?: { reset?: boolean }) => {
-      const reset = Boolean(input?.reset);
-      const targetOffset = reset ? 0 : offset;
-
-      try {
-         if (reset) {
-            setIsLoading(true);
-         } else {
-            setIsLoadingMore(true);
-         }
-
-         const params: Record<string, string | number> = {
-            scope: scope === 'NEARBY' ? 'GLOBAL' : scope,
-            limit: pageSize,
-            offset: targetOffset,
-         };
-         if (type !== 'ALL') {
-            params.type = type;
-         }
-
-         if (scope === 'NEARBY') {
-            if (!navigator.geolocation) {
-               setCurrentPosition(null);
-               setLocationError(
-                  'Geolocation is not available in this browser.'
-               );
-            } else {
-               await new Promise<void>((resolve) => {
-                  navigator.geolocation.getCurrentPosition(
-                     (position) => {
-                        const coords = {
-                           latitude: position.coords.latitude,
-                           longitude: position.coords.longitude,
-                        };
-                        params.latitude = coords.latitude;
-                        params.longitude = coords.longitude;
-                        setCurrentPosition(coords);
-                        setLocationError(null);
-                        resolve();
-                     },
-                     () => {
-                        setCurrentPosition(null);
-                        setLocationError(
-                           'We could not access your location. Enable location access to use Local radius filtering.'
-                        );
-                        resolve();
-                     },
-                     { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-                  );
-               });
-            }
-         } else {
-            setLocationError(null);
-         }
-
-         const { data } = await axios.get('/api/feed', { params });
-         const nextPosts = data.posts ?? [];
-
-         if (reset) {
-            setPosts(nextPosts);
-         } else {
-            setPosts((prev) => [...prev, ...nextPosts]);
-         }
-
-         setOffset(data.nextOffset ?? targetOffset + nextPosts.length);
-         setHasMore(Boolean(data.hasMore));
-      } catch (error) {
-         console.error(error);
-         toast({ title: 'Unable to load feed', variant: 'error' });
-      } finally {
-         if (reset) {
-            setIsLoading(false);
-         } else {
-            setIsLoadingMore(false);
-         }
-      }
-   };
+   const requestToken = useRef(0);
+   const sentinelRef = useRef<HTMLDivElement>(null);
+   const knownSignedIn = useRef<boolean | null>(null);
 
    useEffect(() => {
-      setOffset(0);
-      setHasMore(true);
-      void load({ reset: true });
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [scope, type]);
+      setRadiusKm(committedRadius);
+   }, [committedRadius]);
 
-   useEffect(() => {
-      if (!hasMore || isLoading || isLoadingMore) {
+   const setFilter = useCallback(
+      (
+         patch: Partial<{
+            scope: ScopeFilter;
+            show: ShowFilter;
+            radius: number;
+         }>,
+         options?: { replace?: boolean }
+      ) => {
+         setSearchParams(
+            (previous) => {
+               const next = new URLSearchParams(previous);
+               if (patch.scope) {
+                  if (patch.scope === 'everywhere') next.delete('scope');
+                  else next.set('scope', patch.scope);
+               }
+               if (patch.show) {
+                  if (patch.show === 'all') next.delete('show');
+                  else next.set('show', patch.show);
+               }
+               if (typeof patch.radius === 'number') {
+                  if (patch.radius === DEFAULT_RADIUS_KM) next.delete('radius');
+                  else next.set('radius', String(patch.radius));
+               }
+               return next;
+            },
+            /* Chips push, so Back undoes a filter. A slider drag replaces, so it
+               does not fill the history with every step it passed through. */
+            { replace: options?.replace === true }
+         );
+      },
+      [setSearchParams]
+   );
+
+   const requestPosition = useCallback(() => {
+      if (!('geolocation' in navigator)) {
+         setLocationState('unsupported');
          return;
       }
 
-      const onScroll = () => {
-         const scrollBottom =
-            window.innerHeight + window.scrollY >=
-            document.body.offsetHeight - 500;
+      setLocationState('asking');
+      navigator.geolocation.getCurrentPosition(
+         (result) => {
+            setPosition({
+               latitude: result.coords.latitude,
+               longitude: result.coords.longitude,
+            });
+            setLocationState('ready');
+         },
+         () => {
+            setPosition(null);
+            setLocationState('denied');
+         },
+         /* A radius of kilometres does not need a high accuracy fix, and a cached
+            one keeps the feed from asking the hardware on every page. */
+         { enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 }
+      );
+   }, []);
 
-         if (scrollBottom) {
-            void load();
+   useEffect(() => {
+      if (scope !== 'near-me' || locationState !== 'idle') return;
+      requestPosition();
+   }, [locationState, requestPosition, scope]);
+
+   const load = useCallback(
+      async (reset: boolean, from: number) => {
+         const token = requestToken.current + 1;
+         requestToken.current = token;
+
+         if (reset) {
+            setStatus('loading');
+            setIsSlow(false);
+         } else {
+            setIsLoadingMore(true);
+            setMoreFailed(false);
          }
-      };
 
-      window.addEventListener('scroll', onScroll);
-      return () => window.removeEventListener('scroll', onScroll);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [hasMore, isLoading, isLoadingMore, offset, scope, type]);
+         const params: Record<string, string | number> = {
+            scope: scope === 'near-me' ? 'NEARBY' : 'GLOBAL',
+            limit: PAGE_SIZE,
+            offset: from,
+         };
+         if (show !== 'all') {
+            params.type = show === 'catches' ? 'CATCH' : 'SITE';
+         }
+         if (scope === 'near-me' && position) {
+            params.latitude = position.latitude;
+            params.longitude = position.longitude;
+         }
 
-   const visiblePosts = useMemo(() => {
-      if (scope !== 'NEARBY') {
-         return posts;
+         try {
+            const { data } = await axios.get('/api/feed', { params });
+            if (token !== requestToken.current) return;
+
+            const incoming: FeedPost[] = (data.posts ?? []).map(normalisePost);
+            setPosts((previous) =>
+               reset ? incoming : [...previous, ...incoming]
+            );
+            setOffset(
+               typeof data.nextOffset === 'number'
+                  ? data.nextOffset
+                  : from + incoming.length
+            );
+            setHasMore(Boolean(data.hasMore));
+            setStatus('ready');
+         } catch {
+            if (token !== requestToken.current) return;
+            if (reset) {
+               setStatus('error');
+            } else {
+               setMoreFailed(true);
+            }
+         } finally {
+            if (token === requestToken.current) {
+               setIsLoadingMore(false);
+               setIsSlow(false);
+            }
+         }
+      },
+      [position, scope, show]
+   );
+
+   const awaitingPosition = scope === 'near-me' && !position;
+   /* Null once there is something to fetch, so a location answer we no longer
+      care about cannot trigger a reload of the whole feed. */
+   const awaitingStatus: 'loading' | 'ready' | null = awaitingPosition
+      ? locationState === 'asking' || locationState === 'idle'
+         ? 'loading'
+         : 'ready'
+      : null;
+
+   useEffect(() => {
+      setPosts([]);
+      setOffset(0);
+
+      if (awaitingStatus) {
+         setHasMore(false);
+         setStatus(awaitingStatus);
+         return;
       }
 
-      if (!currentPosition) {
-         return [];
+      setHasMore(true);
+      void load(true, 0);
+   }, [awaitingStatus, load]);
+
+   /* Signing in changes what every post says about itself: whether you liked it,
+      whether it is yours, whether you already follow the angler. */
+   useEffect(() => {
+      if (isSignedIn === undefined) return;
+      if (knownSignedIn.current === null) {
+         knownSignedIn.current = isSignedIn;
+         return;
+      }
+      if (knownSignedIn.current === isSignedIn) return;
+
+      knownSignedIn.current = isSignedIn;
+      if (awaitingPosition) return;
+      setOffset(0);
+      setHasMore(true);
+      void load(true, 0);
+   }, [awaitingPosition, isSignedIn, load]);
+
+   useEffect(() => {
+      if (status !== 'loading') {
+         setIsSlow(false);
+         return;
+      }
+      const timer = window.setTimeout(() => setIsSlow(true), SLOW_LOAD_MS);
+      return () => window.clearTimeout(timer);
+   }, [status]);
+
+   /* An observer rather than a scroll listener, so a page that filters down
+      shorter than the viewport still reaches for the next one. */
+   useEffect(() => {
+      const target = sentinelRef.current;
+      if (!target) return;
+      if (!hasMore || status !== 'ready' || isLoadingMore || moreFailed) return;
+
+      const observer = new IntersectionObserver(
+         (entries) => {
+            if (entries.some((entry) => entry.isIntersecting)) {
+               void load(false, offset);
+            }
+         },
+         { rootMargin: '400px 0px' }
+      );
+      observer.observe(target);
+      return () => observer.disconnect();
+   }, [hasMore, isLoadingMore, load, moreFailed, offset, status]);
+
+   const visiblePosts = useMemo<FeedPostInView[]>(() => {
+      if (scope !== 'near-me' || !position) {
+         return posts.map((post) => ({ ...post, distanceKm: null }));
       }
 
-      return posts.filter((post) => {
+      return posts.flatMap((post) => {
          if (
             typeof post.latitude !== 'number' ||
             typeof post.longitude !== 'number'
          ) {
-            return false;
+            return [];
          }
-
-         return (
-            distanceInKm(currentPosition, {
-               latitude: post.latitude,
-               longitude: post.longitude,
-            }) <= radiusKm
-         );
+         const km = distanceInKm(position, {
+            latitude: post.latitude,
+            longitude: post.longitude,
+         });
+         return km <= radiusKm ? [{ ...post, distanceKm: km }] : [];
       });
-   }, [currentPosition, posts, radiusKm, scope]);
+   }, [position, posts, radiusKm, scope]);
 
-   const like = async (postId: string) => {
-      await axios.post(`/api/feed/${postId}/likes`);
-      setOffset(0);
-      setHasMore(true);
-      await load({ reset: true });
-   };
+   const patchPost = useCallback(
+      (postId: string, update: (post: FeedPost) => FeedPost) => {
+         setPosts((previous) =>
+            previous.map((post) => (post.id === postId ? update(post) : post))
+         );
+      },
+      []
+   );
 
-   const comment = async (postId: string) => {
-      const body = commentDrafts[postId]?.trim();
-      if (!body) return;
-      await axios.post(`/api/feed/${postId}/comments`, { body });
-      setCommentDrafts((prev) => ({ ...prev, [postId]: '' }));
-      setExpandedComments((prev) => ({ ...prev, [postId]: true }));
-      setOffset(0);
-      setHasMore(true);
-      await load({ reset: true });
-   };
+   const patchAuthor = useCallback(
+      (authorId: string, update: (post: FeedPost) => FeedPost) => {
+         setPosts((previous) =>
+            previous.map((post) =>
+               post.author.id === authorId ? update(post) : post
+            )
+         );
+      },
+      []
+   );
 
-   const follow = async (authorId: string) => {
-      await axios.post(`/api/users/${authorId}/follow`);
-      setOffset(0);
-      setHasMore(true);
-      await load({ reset: true });
-   };
-
-   const unfollow = async (authorId: string) => {
-      await axios.delete(`/api/users/${authorId}/follow`);
-      setOffset(0);
-      setHasMore(true);
-      await load({ reset: true });
-   };
-
-   const toggleComments = (postId: string) => {
-      setExpandedComments((prev) => ({
-         ...prev,
-         [postId]: !prev[postId],
+   const toggleLike = async (post: FeedPostInView) => {
+      const liking = !post.likedByMe;
+      setActionErrors((previous) => ({ ...previous, [post.id]: null }));
+      patchPost(post.id, (current) => ({
+         ...current,
+         likedByMe: liking,
+         likeCount: Math.max(0, current.likeCount + (liking ? 1 : -1)),
       }));
+
+      try {
+         const { data } = await axios.post(`/api/feed/${post.id}/likes`);
+         if (typeof data?.liked === 'boolean' && data.liked !== liking) {
+            patchPost(post.id, (current) => ({
+               ...current,
+               likedByMe: data.liked,
+               likeCount: Math.max(
+                  0,
+                  current.likeCount + (data.liked ? 1 : -1)
+               ),
+            }));
+         }
+      } catch {
+         patchPost(post.id, (current) => ({
+            ...current,
+            likedByMe: !liking,
+            likeCount: Math.max(0, current.likeCount + (liking ? -1 : 1)),
+         }));
+         setActionErrors((previous) => ({
+            ...previous,
+            [post.id]: 'That did not save. Try again.',
+         }));
+      }
    };
+
+   const submitComment = async (post: FeedPostInView) => {
+      const body = (drafts[post.id] ?? '').trim();
+      if (!body) return;
+
+      const pendingId = `pending-${post.id}-${Date.now()}`;
+      const optimistic: FeedComment = {
+         id: pendingId,
+         body,
+         createdAt: new Date().toISOString(),
+         user: {
+            displayName: user?.fullName ?? user?.username ?? 'You',
+            username: user?.username ?? '',
+         },
+      };
+
+      setSendingComment((previous) => ({ ...previous, [post.id]: true }));
+      setCommentErrors((previous) => ({ ...previous, [post.id]: null }));
+      setDrafts((previous) => ({ ...previous, [post.id]: '' }));
+      patchPost(post.id, (current) => ({
+         ...current,
+         comments: [...current.comments, optimistic],
+         commentCount: current.commentCount + 1,
+      }));
+
+      try {
+         const { data } = await axios.post(`/api/feed/${post.id}/comments`, {
+            body,
+         });
+         const saved: FeedComment | undefined = data?.comment;
+         if (saved) {
+            patchPost(post.id, (current) => ({
+               ...current,
+               comments: current.comments.map((entry) =>
+                  entry.id === pendingId ? saved : entry
+               ),
+            }));
+         }
+      } catch {
+         patchPost(post.id, (current) => ({
+            ...current,
+            comments: current.comments.filter(
+               (entry) => entry.id !== pendingId
+            ),
+            commentCount: Math.max(0, current.commentCount - 1),
+         }));
+         setDrafts((previous) => ({ ...previous, [post.id]: body }));
+         setCommentErrors((previous) => ({
+            ...previous,
+            [post.id]: 'That comment did not send. Try again.',
+         }));
+      } finally {
+         setSendingComment((previous) => ({ ...previous, [post.id]: false }));
+      }
+   };
+
+   const readWholeThread = async (post: FeedPostInView) => {
+      setReadingThread((previous) => ({ ...previous, [post.id]: true }));
+      setCommentErrors((previous) => ({ ...previous, [post.id]: null }));
+
+      try {
+         const { data } = await axios.get(`/api/feed/${post.id}/comments`);
+         const all: FeedComment[] = data.comments ?? [];
+         patchPost(post.id, (current) => ({
+            ...current,
+            comments: all,
+            commentCount: Math.max(current.commentCount, all.length),
+         }));
+         setWholeThread((previous) => ({ ...previous, [post.id]: true }));
+      } catch {
+         setCommentErrors((previous) => ({
+            ...previous,
+            [post.id]: 'The rest of the thread did not load. Try again.',
+         }));
+      } finally {
+         setReadingThread((previous) => ({ ...previous, [post.id]: false }));
+      }
+   };
+
+   const follow = async (post: FeedPostInView) => {
+      setActionErrors((previous) => ({ ...previous, [post.id]: null }));
+      patchAuthor(post.author.id, (current) => ({
+         ...current,
+         authorFollowedByMe: true,
+      }));
+
+      try {
+         await axios.post(`/api/users/${post.author.id}/follow`);
+      } catch {
+         patchAuthor(post.author.id, (current) => ({
+            ...current,
+            authorFollowedByMe: false,
+         }));
+         setActionErrors((previous) => ({
+            ...previous,
+            [post.id]: `Could not follow @${post.author.username}. Try again.`,
+         }));
+      }
+   };
+
+   const unfollow = async (author: FeedAuthor) => {
+      patchAuthor(author.id, (current) => ({
+         ...current,
+         authorFollowedByMe: false,
+      }));
+
+      try {
+         await axios.delete(`/api/users/${author.id}/follow`);
+         toast({
+            title: `You no longer follow @${author.username}.`,
+            variant: 'success',
+         });
+      } catch {
+         patchAuthor(author.id, (current) => ({
+            ...current,
+            authorFollowedByMe: true,
+         }));
+         toast({
+            title: `Could not unfollow @${author.username}.`,
+            description: 'Try again in a moment.',
+            variant: 'error',
+         });
+      }
+   };
+
+   const emptyState = () => {
+      if (scope === 'near-me') {
+         return (
+            <div className="flex flex-col gap-3 py-6">
+               <p className="text-[17px] text-ink-2">
+                  {show === 'catches'
+                     ? `No catches within ${radiusKm} km.`
+                     : show === 'spots'
+                       ? `No spots within ${radiusKm} km.`
+                       : `Nothing logged within ${radiusKm} km.`}
+               </p>
+               {show !== 'spots' ? (
+                  /* TODO(api): appendix E A2.1. A catch is saved without coordinates,
+                     so it can never appear in a nearby list until the write path keeps them. */
+                  <p className="text-[15px] text-ink-3">
+                     A catch does not carry a position yet, so Near me finds
+                     spots only.
+                  </p>
+               ) : null}
+               <div className="flex flex-wrap gap-6">
+                  {radiusKm < MAX_RADIUS_KM ? (
+                     <button
+                        type="button"
+                        className={inlineControl}
+                        onClick={() => {
+                           const wider = Math.min(radiusKm * 2, MAX_RADIUS_KM);
+                           setRadiusKm(wider);
+                           setFilter({ radius: wider }, { replace: true });
+                        }}
+                     >
+                        Widen the radius
+                     </button>
+                  ) : null}
+                  <button
+                     type="button"
+                     className={inlineControl}
+                     onClick={() => setFilter({ scope: 'everywhere' })}
+                  >
+                     Show everywhere
+                  </button>
+               </div>
+            </div>
+         );
+      }
+
+      return (
+         <div className="flex flex-col gap-3 py-6">
+            <p className="text-[17px] text-ink-2">
+               {show === 'catches'
+                  ? 'No one has logged a catch yet.'
+                  : show === 'spots'
+                    ? 'No one has added a spot yet.'
+                    : 'No one has logged a catch or added a spot yet.'}
+            </p>
+            <Link
+               to={show === 'spots' ? '/sites/new' : '/catches/new'}
+               className={inlineControl}
+            >
+               {show === 'spots' ? 'Add a spot' : 'Log a catch'}
+            </Link>
+         </div>
+      );
+   };
+
+   const showList = !awaitingPosition || locationState === 'ready';
 
    return (
-      <div className="min-h-screen">
-         <LandingHeader />
-         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-            <FishingActionBar />
-            <section className="space-y-4 rounded-2xl border bg-card/70 p-4 shadow-sm backdrop-blur-sm">
-               <h1 className="text-2xl font-semibold">Feed</h1>
-               <div className="flex flex-wrap gap-2">
-                  <Button
-                     variant={scope === 'GLOBAL' ? 'default' : 'outline'}
-                     onClick={() => setScope('GLOBAL')}
-                  >
-                     Global
-                  </Button>
-                  <Button
-                     variant={scope === 'NEARBY' ? 'default' : 'outline'}
-                     onClick={() => setScope('NEARBY')}
-                  >
-                     Local
-                  </Button>
-                  <Button
-                     variant={type === 'ALL' ? 'default' : 'outline'}
-                     onClick={() => setType('ALL')}
-                  >
-                     All feed
-                  </Button>
-                  <Button
-                     variant={type === 'CATCH' ? 'default' : 'outline'}
-                     onClick={() => setType('CATCH')}
-                  >
-                     Catch feed
-                  </Button>
-                  <Button
-                     variant={type === 'SITE' ? 'default' : 'outline'}
-                     onClick={() => setType('SITE')}
-                  >
-                     Site feed
-                  </Button>
-               </div>
+      <div
+         ref={pageRef}
+         className="mx-auto w-[min(720px,100%-32px)] py-8 md:py-12"
+      >
+         <header className="rv flex flex-col gap-3">
+            <h1 className="g text-[44px] md:text-[56px]">Feed</h1>
+            <p className="max-w-[46ch] text-[17px] text-ink-2">
+               What other anglers logged, newest first.
+            </p>
+            <Show when="signed-in">
+               <p className="text-[15px] text-ink-3">
+                  Your own posts appear here when you log a catch or add a spot.
+               </p>
+            </Show>
+         </header>
 
-               {scope === 'NEARBY' ? (
-                  <div className="rounded-lg border bg-background p-4">
-                     <div className="mb-2 flex items-center justify-between text-sm text-muted-foreground">
-                        <span className="inline-flex items-center gap-2">
-                           <SlidersHorizontal className="size-4" />
-                           Local radius
-                        </span>
-                        <span>{radiusKm} km</span>
-                     </div>
-                     <Slider
-                        min={0}
-                        max={250}
-                        step={1}
-                        value={[radiusKm]}
-                        onValueChange={(value) => setRadiusKm(value[0] ?? 0)}
-                     />
-                     {locationError ? (
-                        <p className="mt-2 text-sm text-destructive">
-                           {locationError}
+         <div className="rv mt-8" style={{ '--i': 1 } as CSSProperties}>
+            <FeedFilters
+               scope={scope}
+               onScopeChange={(next) => setFilter({ scope: next })}
+               show={show}
+               onShowChange={(next) => setFilter({ show: next })}
+               radiusKm={radiusKm}
+               onRadiusChange={setRadiusKm}
+               onRadiusCommit={(next) =>
+                  setFilter({ radius: next }, { replace: true })
+               }
+               matchCount={
+                  status === 'ready' && position ? visiblePosts.length : null
+               }
+               locationState={locationState}
+               onRetryLocation={requestPosition}
+            />
+         </div>
+
+         <section aria-label="Posts" className="mt-10 flex flex-col gap-6">
+            {status === 'loading' ? (
+               <>
+                  <FeedSkeleton />
+                  <p className="sr-only" role="status">
+                     Loading the feed.
+                  </p>
+                  {isSlow ? (
+                     <div className="flex flex-col gap-2">
+                        <p className="text-[17px] text-ink-2">
+                           The feed is taking a while.
                         </p>
-                     ) : null}
-                  </div>
-               ) : null}
-
-               <Show when="signed-in">
-                  <p className="rounded border p-3 text-sm text-muted-foreground">
-                     Your feed posts are created when you log a catch or log a
-                     fishing site.
-                  </p>
-               </Show>
-
-               <div className="space-y-5">
-                  {visiblePosts.map((post) => {
-                     const postImages = [
-                        ...(post.catch?.images ?? []),
-                        ...(post.site?.images ?? []),
-                     ];
-                     const commentsOpen = Boolean(expandedComments[post.id]);
-                     const isOwnPost = post.authorIsMe === true;
-                     const isFollowingAuthor = post.authorFollowedByMe === true;
-
-                     return (
-                        <Card
-                           key={post.id}
-                           className="overflow-hidden gap-0 py-0"
+                        <button
+                           type="button"
+                           className={`${inlineControl} self-start`}
+                           onClick={() => void load(true, 0)}
                         >
-                           <CardContent className="space-y-3 p-0">
-                              <div className="flex flex-col gap-2 px-4 pt-4">
-                                 <div className="flex items-start justify-between gap-3">
-                                    <p className="min-w-0 text-sm font-medium leading-tight">
-                                       <span>{post.author.displayName}</span>
-                                       <span className="block min-w-0 truncate text-muted-foreground sm:ml-1 sm:inline sm:max-w-[24ch]">
-                                          @{post.author.username}
-                                       </span>
-                                    </p>
+                           Try again
+                        </button>
+                     </div>
+                  ) : null}
+               </>
+            ) : null}
 
-                                    {isSignedIn ? (
-                                       isOwnPost ? null : isFollowingAuthor ? (
-                                          <button
-                                             type="button"
-                                             className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-medium text-primary"
-                                             onClick={() =>
-                                                setPendingUnfollow({
-                                                   id: post.author.id,
-                                                   username:
-                                                      post.author.username,
-                                                })
-                                             }
-                                          >
-                                             <Check className="size-3" />
-                                             Following
-                                          </button>
-                                       ) : (
-                                          <Button
-                                             type="button"
-                                             size="sm"
-                                             variant="outline"
-                                             className="shrink-0"
-                                             onClick={() =>
-                                                void follow(post.author.id)
-                                             }
-                                          >
-                                             <UserPlus className="size-4" />
-                                             Follow
-                                          </Button>
-                                       )
-                                    ) : null}
-                                 </div>
-                                 <p className="text-xs text-muted-foreground">
-                                    {post.type} • {post.scope}
-                                 </p>
-                              </div>
-
-                              {postImages.length > 0 ? (
-                                 <div className="bg-muted/20 px-4">
-                                    <Carousel className="mx-auto w-full max-w-3xl">
-                                       <CarouselContent className="ml-0">
-                                          {postImages.map((entry) => (
-                                             <CarouselItem
-                                                key={entry.image.id}
-                                                className="pl-0"
-                                             >
-                                                <div className="relative h-64 w-full overflow-hidden bg-muted sm:h-[32rem]">
-                                                   <img
-                                                      src={entry.image.url}
-                                                      alt="Post"
-                                                      className="h-full w-full object-cover"
-                                                      loading="lazy"
-                                                   />
-                                                </div>
-                                             </CarouselItem>
-                                          ))}
-                                       </CarouselContent>
-                                       {postImages.length > 1 ? (
-                                          <>
-                                             <CarouselPrevious className="left-2 border-background/80 bg-background/90 hover:bg-background" />
-                                             <CarouselNext className="right-2 border-background/80 bg-background/90 hover:bg-background" />
-                                          </>
-                                       ) : null}
-                                    </Carousel>
-                                 </div>
-                              ) : null}
-
-                              <div className="space-y-2 px-4 pb-4">
-                                 <p className="text-sm leading-relaxed">
-                                    {post.content ?? 'No text'}
-                                 </p>
-                                 {post.catch ? (
-                                    <p className="text-sm text-muted-foreground">
-                                       Catch: {post.catch.title}
-                                    </p>
-                                 ) : null}
-                                 {post.site ? (
-                                    <p className="text-sm text-muted-foreground">
-                                       Site: {post.site.name}
-                                    </p>
-                                 ) : null}
-
-                                 <div className="flex items-center gap-4 border-y py-2">
-                                    <Button
-                                       size="sm"
-                                       variant="ghost"
-                                       className={
-                                          post.likedByMe ? 'text-primary' : ''
-                                       }
-                                       onClick={() => void like(post.id)}
-                                    >
-                                       <ThumbsUp className="size-4" />
-                                       Like
-                                    </Button>
-                                    <Button
-                                       size="sm"
-                                       variant="ghost"
-                                       className={
-                                          commentsOpen ? 'text-primary' : ''
-                                       }
-                                       onClick={() => toggleComments(post.id)}
-                                    >
-                                       <MessageCircle className="size-4" />
-                                       Comment
-                                    </Button>
-                                 </div>
-
-                                 <p className="text-xs text-muted-foreground">
-                                    {post.commentCount} comments •{' '}
-                                    {post.likeCount} likes
-                                 </p>
-
-                                 {commentsOpen ? (
-                                    <>
-                                       <div className="space-y-2">
-                                          {post.comments.map((entry) => (
-                                             <p
-                                                key={entry.id}
-                                                className="text-sm"
-                                             >
-                                                <span className="font-medium">
-                                                   {entry.user.displayName}:
-                                                </span>{' '}
-                                                {entry.body}
-                                             </p>
-                                          ))}
-                                          {post.comments.length === 0 ? (
-                                             <p className="text-sm text-muted-foreground">
-                                                No comments yet.
-                                             </p>
-                                          ) : null}
-                                       </div>
-                                       <Show when="signed-in">
-                                          <div className="flex gap-2">
-                                             <input
-                                                className="flex-1 rounded-full border px-3 py-2 text-sm"
-                                                value={
-                                                   commentDrafts[post.id] ?? ''
-                                                }
-                                                onChange={(event) =>
-                                                   setCommentDrafts((prev) => ({
-                                                      ...prev,
-                                                      [post.id]:
-                                                         event.target.value,
-                                                   }))
-                                                }
-                                                placeholder="Add comment"
-                                             />
-                                             <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                onClick={() =>
-                                                   void comment(post.id)
-                                                }
-                                             >
-                                                <SendHorizontal className="size-4" />
-                                             </Button>
-                                          </div>
-                                       </Show>
-                                    </>
-                                 ) : null}
-                              </div>
-                           </CardContent>
-                        </Card>
-                     );
-                  })}
+            {status === 'error' ? (
+               <div className="flex flex-col gap-2 py-6">
+                  <p className="text-[17px] text-ink-2">
+                     Could not load the feed. Check your connection.
+                  </p>
+                  <button
+                     type="button"
+                     className={`${inlineControl} self-start`}
+                     onClick={() => void load(true, 0)}
+                  >
+                     Try again
+                  </button>
                </div>
+            ) : null}
 
-               {isLoading ? (
-                  <p className="text-sm text-muted-foreground">
-                     Loading feed...
+            {status === 'ready' && showList && visiblePosts.length === 0
+               ? emptyState()
+               : null}
+
+            {status === 'ready' && showList && visiblePosts.length > 0
+               ? visiblePosts.map((post) => (
+                    <FeedPostBlock
+                       key={post.id}
+                       post={post}
+                       isSignedIn={isSignedIn === true}
+                       showDistance={scope === 'near-me'}
+                       commentsOpen={Boolean(openThreads[post.id])}
+                       onToggleComments={() =>
+                          setOpenThreads((previous) => ({
+                             ...previous,
+                             [post.id]: !previous[post.id],
+                          }))
+                       }
+                       onLike={() => void toggleLike(post)}
+                       onFollow={() => void follow(post)}
+                       onUnfollow={() => setPendingUnfollow(post.author)}
+                       actionError={actionErrors[post.id] ?? null}
+                       draft={drafts[post.id] ?? ''}
+                       onDraftChange={(next) =>
+                          setDrafts((previous) => ({
+                             ...previous,
+                             [post.id]: next,
+                          }))
+                       }
+                       onSubmitComment={() => void submitComment(post)}
+                       isSubmittingComment={Boolean(sendingComment[post.id])}
+                       commentError={commentErrors[post.id] ?? null}
+                       onReadAllComments={() => void readWholeThread(post)}
+                       isReadingAllComments={Boolean(readingThread[post.id])}
+                       hasReadAllComments={Boolean(wholeThread[post.id])}
+                    />
+                 ))
+               : null}
+
+            {isLoadingMore ? <FeedSkeleton count={1} /> : null}
+
+            {moreFailed ? (
+               <div className="flex flex-col gap-2">
+                  <p className="text-[17px] text-ink-2">
+                     The next posts did not load.
                   </p>
-               ) : null}
-               {isLoadingMore ? (
-                  <p className="text-sm text-muted-foreground">
-                     Loading more posts...
-                  </p>
-               ) : null}
-               {visiblePosts.length === 0 && !isLoading ? (
-                  <p className="text-sm text-muted-foreground">
-                     {scope === 'NEARBY'
-                        ? 'No posts found inside this radius yet.'
-                        : 'No feed posts found.'}
-                  </p>
-               ) : null}
-               {!hasMore && posts.length > 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                     You reached the end of the feed.
-                  </p>
-               ) : null}
-            </section>
-         </main>
+                  <button
+                     type="button"
+                     className={`${inlineControl} self-start`}
+                     onClick={() => void load(false, offset)}
+                  >
+                     Try again
+                  </button>
+               </div>
+            ) : null}
+
+            {status === 'ready' && !hasMore && visiblePosts.length > 0 ? (
+               <p className="rule-dashed pt-4 text-[15px] text-ink-3">
+                  That is the end of the feed.{' '}
+                  {plural(visiblePosts.length, 'post', 'posts')} in all.
+               </p>
+            ) : null}
+
+            <div ref={sentinelRef} aria-hidden="true" className="h-px" />
+         </section>
 
          <Dialog
             open={Boolean(pendingUnfollow)}
             onOpenChange={(open) => {
-               if (!open) {
-                  setPendingUnfollow(null);
-               }
+               if (!open) setPendingUnfollow(null);
             }}
          >
-            <DialogContent>
-               <DialogHeader>
-                  <DialogTitle>Unfollow user</DialogTitle>
-                  <DialogDescription>
-                     Do you want to unfollow @{pendingUnfollow?.username}?
+            <DialogContent className="gap-0 sm:max-w-[480px]">
+               <DialogHeader className="text-left">
+                  <DialogTitle className="g pr-10 text-[32px] font-normal text-paper">
+                     Unfollow {pendingUnfollow?.displayName}
+                  </DialogTitle>
+                  <DialogDescription className="text-[15px] text-paper-2">
+                     @{pendingUnfollow?.username} stays in the feed. You just
+                     stop following.
                   </DialogDescription>
                </DialogHeader>
-               <DialogFooter>
+               <DialogFooter className="mt-6 flex-col gap-3 sm:flex-row">
                   <Button
                      type="button"
-                     variant="outline"
+                     size="lg"
+                     variant="ghost"
+                     className="text-paper-2 hover:bg-paper/10 hover:text-paper"
                      onClick={() => setPendingUnfollow(null)}
                   >
                      Cancel
                   </Button>
                   <Button
                      type="button"
+                     size="lg"
+                     variant="outline"
+                     className="border-paper text-paper hover:bg-paper/10"
                      onClick={() => {
-                        if (!pendingUnfollow) {
-                           return;
-                        }
-
-                        void unfollow(pendingUnfollow.id);
+                        if (!pendingUnfollow) return;
+                        void unfollow(pendingUnfollow);
                         setPendingUnfollow(null);
                      }}
                   >

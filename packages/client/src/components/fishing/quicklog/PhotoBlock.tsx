@@ -1,0 +1,213 @@
+import { useEffect, useRef, useState } from 'react';
+import axios from 'axios';
+import { cn } from '@/lib/utils';
+
+/*
+ * The photo, taken and sent while the rest of the catch is being filled in. It uses
+ * the same upload the other forms use; the shutter flashes, the picture fades in and
+ * settles, and a photo still going up is the one thing that holds the save.
+ */
+export type UploadedPhoto = { storageKey: string; url: string };
+
+const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_BYTES = 10 * 1024 * 1024;
+
+export function PhotoBlock({
+   onChange,
+   onBusyChange,
+}: {
+   onChange: (photo: UploadedPhoto | null) => void;
+   onBusyChange: (busy: boolean) => void;
+}) {
+   const inputRef = useRef<HTMLInputElement>(null);
+   const previewRef = useRef<string | null>(null);
+   const [preview, setPreview] = useState<string | null>(null);
+   const [settled, setSettled] = useState(false);
+   const [flash, setFlash] = useState(false);
+   const [progress, setProgress] = useState(0);
+   const [isUploading, setIsUploading] = useState(false);
+   const [error, setError] = useState<string | null>(null);
+
+   useEffect(() => {
+      return () => {
+         if (previewRef.current) {
+            URL.revokeObjectURL(previewRef.current);
+         }
+      };
+   }, []);
+
+   const showPreview = (file: File) => {
+      if (previewRef.current) {
+         URL.revokeObjectURL(previewRef.current);
+      }
+      const url = URL.createObjectURL(file);
+      previewRef.current = url;
+      setPreview(url);
+      setSettled(false);
+      setFlash(true);
+      window.setTimeout(() => setFlash(false), 420);
+      requestAnimationFrame(() =>
+         requestAnimationFrame(() => setSettled(true))
+      );
+   };
+
+   const upload = async (file: File) => {
+      setError(null);
+      setProgress(0);
+      setIsUploading(true);
+      onBusyChange(true);
+      try {
+         const { data: signed } = await axios.post<{ storageKey: string }>(
+            '/api/uploads/sign',
+            {
+               scope: 'catch',
+               fileName: file.name,
+               contentType: file.type,
+               sizeBytes: file.size,
+            }
+         );
+         const { data: uploaded } = await axios.put<{
+            storageKey: string;
+            readUrl: string;
+         }>('/api/uploads/proxy', file, {
+            params: { storageKey: signed.storageKey, contentType: file.type },
+            headers: { 'Content-Type': file.type },
+            onUploadProgress: (event) => {
+               if (event.total) {
+                  setProgress(Math.round((event.loaded / event.total) * 100));
+               }
+            },
+         });
+         onChange({ storageKey: uploaded.storageKey, url: uploaded.readUrl });
+      } catch {
+         onChange(null);
+         setError(
+            'The photo did not go up. Take it again, or save the catch without it.'
+         );
+      } finally {
+         setIsUploading(false);
+         onBusyChange(false);
+      }
+   };
+
+   const onSelect = (file: File | undefined) => {
+      if (!file) {
+         return;
+      }
+      if (!ACCEPTED.includes(file.type)) {
+         setError('That kind of photo will not go up. Use a JPG, PNG or WebP.');
+         return;
+      }
+      if (file.size > MAX_BYTES) {
+         setError('That photo is over 10 MB. Take it again at a smaller size.');
+         return;
+      }
+      showPreview(file);
+      void upload(file);
+      // Cleared so taking the same photo twice still fires a change.
+      if (inputRef.current) {
+         inputRef.current.value = '';
+      }
+   };
+
+   const clear = () => {
+      if (previewRef.current) {
+         URL.revokeObjectURL(previewRef.current);
+         previewRef.current = null;
+      }
+      setPreview(null);
+      setProgress(0);
+      setError(null);
+      onChange(null);
+      if (inputRef.current) {
+         inputRef.current.value = '';
+      }
+   };
+
+   const control =
+      'g-tracked relative z-[1] inline-flex h-11 items-center border border-paper/50 bg-black-block/45 px-5 text-[20px] text-paper transition-[background-color,transform] duration-150 [transition-timing-function:var(--ease)] active:scale-[0.98]';
+
+   return (
+      <div className="flex flex-col gap-2">
+         <label className="lab" htmlFor="quicklog-photo">
+            Photo
+         </label>
+         <div className="relative flex h-[200px] items-center justify-center overflow-hidden bg-black-block">
+            {preview ? (
+               <img
+                  src={preview}
+                  alt="The catch you just photographed"
+                  className={cn(
+                     'absolute inset-0 h-full w-full object-cover [transition:opacity_700ms_var(--ease),transform_1400ms_var(--ease)]',
+                     settled
+                        ? 'scale-100 opacity-100'
+                        : 'scale-[1.04] opacity-0'
+                  )}
+               />
+            ) : null}
+            {flash ? (
+               <span
+                  className="shutter pointer-events-none absolute inset-0 bg-paper"
+                  aria-hidden="true"
+               />
+            ) : null}
+            <input
+               ref={inputRef}
+               id="quicklog-photo"
+               type="file"
+               accept={ACCEPTED.join(',')}
+               capture="environment"
+               className="sr-only"
+               onChange={(event) => onSelect(event.target.files?.[0])}
+            />
+            {!preview ? (
+               <button
+                  type="button"
+                  className={control}
+                  onClick={() => inputRef.current?.click()}
+               >
+                  Take a photo
+               </button>
+            ) : null}
+            {isUploading ? (
+               <span
+                  style={{ width: `${progress}%` }}
+                  className="absolute bottom-0 left-0 z-[1] h-[2px] bg-teal transition-[width] duration-150"
+                  aria-hidden="true"
+               />
+            ) : null}
+         </div>
+         {preview ? (
+            <div className="flex flex-wrap items-center gap-4">
+               <button
+                  type="button"
+                  className="g-tracked inline-flex h-11 items-center text-[18px] text-ink-2 hover:text-ink"
+                  onClick={() => inputRef.current?.click()}
+               >
+                  Take another
+               </button>
+               <button
+                  type="button"
+                  className="g-tracked inline-flex h-11 items-center text-[18px] text-ink-2 hover:text-ink"
+                  onClick={clear}
+               >
+                  Remove
+               </button>
+               {isUploading ? (
+                  <span
+                     className="num text-[14px] text-ink-3"
+                     aria-live="polite"
+                  >
+                     Sending the photo, {progress}%
+                  </span>
+               ) : null}
+            </div>
+         ) : null}
+         {error ? (
+            <p className="text-[14px] text-destructive" role="alert">
+               {error}
+            </p>
+         ) : null}
+      </div>
+   );
+}

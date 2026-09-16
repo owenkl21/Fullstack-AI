@@ -1,185 +1,282 @@
 import axios from 'axios';
-import { Show } from '@clerk/react';
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FishingActionBar } from '@/components/fishing/FishingActionBar';
-import { LandingHeader } from '@/components/landing/LandingHeader';
-import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useRevealIn } from '@/components/brand/Reveal';
+import {
+   CatchRow,
+   type CatchRowItem,
+} from '@/components/fishing/rows/CatchRow';
+import { Chip } from '@/components/fishing/rows/Chip';
+import { RowList } from '@/components/fishing/rows/Row';
+import { plural, timeOf, yearOf } from '@/components/fishing/rows/format';
+import { EmptyState } from '@/components/states/EmptyState';
+import { InlineError } from '@/components/states/InlineError';
+import { ListSkeleton } from '@/components/states/ListSkeleton';
+import { NoMatchState } from '@/components/states/NoMatchState';
+import { useShowMore } from '@/components/states/useShowMore';
+import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/use-toast';
+import { useDocumentTitle } from '@/lib/title';
 
-type CatchSummary = {
-   id: string;
-   title: string;
-   caughtAt: string;
-   count: number;
-   length: number | null;
-   weight: number | null;
-   site: { id: string; name: string } | null;
+/*
+ * The angler's own log. One column of rows with a hairline between them, the count
+ * beside the heading, a search and a year filter that both live in the URL so a
+ * filtered log can be sent to somebody or kept in a tab. Edit and delete are not
+ * here: they belong to the record, where the fish is.
+ */
+
+type CatchSummary = CatchRowItem & {
+   /* TODO(api): the row wants the species, which listMyCatches does not select
+    * (appendix E, A1). Until then the title the angler typed is the row title. */
    images: { image: { id: string; url: string } }[];
 };
 
+type LoadStatus = 'loading' | 'ready' | 'error';
+
+const LOAD_FAILED = 'Could not load your catches.';
+
 export function MyCatchesPage() {
-   const pageSize = 10;
-   const [items, setItems] = useState<CatchSummary[]>([]);
-   const [searchTerm, setSearchTerm] = useState('');
-   const [page, setPage] = useState(1);
-   const [isLoading, setIsLoading] = useState(true);
+   useDocumentTitle('My catches');
 
-   const filteredItems = useMemo(() => {
-      const query = searchTerm.trim().toLowerCase();
-      if (!query) {
-         return items;
-      }
-
-      return items.filter((entry) => {
-         const siteName = entry.site?.name ?? '';
-         return [entry.title, siteName].some((value) =>
-            value.toLowerCase().includes(query)
-         );
-      });
-   }, [items, searchTerm]);
-
-   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
-   const pagedItems = filteredItems.slice(
-      (page - 1) * pageSize,
-      page * pageSize
+   return (
+      <RequireSignIn what="your catches">
+         <MyCatchesList />
+      </RequireSignIn>
    );
+}
+
+function MyCatchesList() {
+   const root = useRef<HTMLElement>(null);
+   useRevealIn(root);
+
+   const [params, setParams] = useSearchParams();
+   const [items, setItems] = useState<CatchSummary[]>([]);
+   const [status, setStatus] = useState<LoadStatus>('loading');
+
+   const query = params.get('q') ?? '';
+   const year = params.get('year') ?? '';
+   const justSaved = params.get('new') ?? '';
+   const { shown, showMore } = useShowMore(`${query}|${year}`);
+
+   /* The row that just landed keeps its teal rule for four seconds, then lets go. */
+   const [faded, setFaded] = useState('');
+   const marked = justSaved && faded !== justSaved ? justSaved : '';
 
    useEffect(() => {
-      const load = async () => {
-         try {
-            setIsLoading(true);
-            const { data } = await axios.get('/api/catches/me');
-            setItems(data.catches ?? []);
-         } catch (error) {
-            console.error(error);
-            toast({ title: 'Unable to load your catches', variant: 'error' });
-         } finally {
-            setIsLoading(false);
-         }
-      };
-
-      void load();
-   }, []);
-
-   const deleteCatch = async (catchId: string) => {
-      if (!window.confirm('Delete this catch?')) {
+      if (!justSaved) {
          return;
       }
 
-      await axios.delete(`/api/catches/${catchId}`);
-      setItems((prev) => prev.filter((entry) => entry.id !== catchId));
-      toast({ title: 'Catch deleted', variant: 'success' });
-   };
+      const timer = window.setTimeout(() => setFaded(justSaved), 4000);
+      return () => window.clearTimeout(timer);
+   }, [justSaved]);
+
+   const [attempt, setAttempt] = useState(0);
 
    useEffect(() => {
-      setPage(1);
-   }, [searchTerm]);
+      let cancelled = false;
 
-   useEffect(() => {
-      if (page > totalPages) {
-         setPage(totalPages);
-      }
-   }, [page, totalPages]);
+      axios
+         .get('/api/catches/me')
+         .then(({ data }) => {
+            if (cancelled) {
+               return;
+            }
+
+            setItems(data.catches ?? []);
+            setStatus('ready');
+         })
+         .catch((error: unknown) => {
+            if (cancelled) {
+               return;
+            }
+
+            console.error(error);
+            setStatus('error');
+         });
+
+      return () => {
+         cancelled = true;
+      };
+   }, [attempt]);
+
+   /* Try again keeps the skeleton honest: the count moves, so the skeleton remounts
+    * and starts its five seconds over rather than staying on the old error. */
+   const retry = useCallback(() => {
+      setStatus('loading');
+      setAttempt((current) => current + 1);
+   }, []);
+
+   const setParam = useCallback(
+      (key: string, value: string) => {
+         setParams(
+            (previous) => {
+               const next = new URLSearchParams(previous);
+               if (value) {
+                  next.set(key, value);
+               } else {
+                  next.delete(key);
+               }
+               next.delete('new');
+               return next;
+            },
+            { replace: true }
+         );
+      },
+      [setParams]
+   );
+
+   const clearFilters = useCallback(() => {
+      setParams(new URLSearchParams(), { replace: true });
+   }, [setParams]);
+
+   const years = useMemo(() => {
+      const counts = new Map<string, number>();
+      items.forEach((entry) => {
+         const value = yearOf(entry.caughtAt);
+         if (value) {
+            counts.set(value, (counts.get(value) ?? 0) + 1);
+         }
+      });
+
+      return Array.from(counts.entries()).sort(
+         (a, b) => Number(b[0]) - Number(a[0])
+      );
+   }, [items]);
+
+   const filtered = useMemo(() => {
+      const needle = query.trim().toLowerCase();
+
+      return items
+         .filter((entry) => (year ? yearOf(entry.caughtAt) === year : true))
+         .filter((entry) => {
+            if (!needle) {
+               return true;
+            }
+
+            return [entry.title, entry.site?.name ?? ''].some((value) =>
+               value.toLowerCase().includes(needle)
+            );
+         })
+         .sort((a, b) => timeOf(b.caughtAt) - timeOf(a.caughtAt));
+   }, [items, query, year]);
+
+   const narrowed = Boolean(query.trim() || year);
+   const total = plural(items.length, 'catch', 'catches');
+   const countLine = narrowed ? `${filtered.length} of ${total}` : total;
+   const visible = filtered.slice(0, shown);
 
    return (
-      <div className="min-h-screen">
-         <LandingHeader />
-         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-            <FishingActionBar />
-            <Show when="signed-in">
-               <section className="space-y-3 rounded-lg border p-4">
-                  <h1 className="text-2xl font-semibold">My catches</h1>
-                  <input
-                     className="w-full rounded border px-3 py-2 text-sm"
-                     value={searchTerm}
-                     onChange={(event) => setSearchTerm(event.target.value)}
-                     placeholder="Search catches"
-                  />
-                  {isLoading ? (
-                     <FishingBobberLoader label="Loading your catches..." />
-                  ) : filteredItems.length === 0 ? (
-                     <p className="text-sm text-muted-foreground">
-                        No catches found.
-                     </p>
-                  ) : (
-                     pagedItems.map((entry) => (
-                        <div
+      <section
+         ref={root}
+         className="mx-auto w-[min(820px,100%-32px)] py-10 md:py-14"
+      >
+         <header className="rv">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+               <h1 className="g text-[44px] md:text-[56px]">My catches</h1>
+               {status === 'ready' ? (
+                  <p className="lab num">{countLine}</p>
+               ) : null}
+            </div>
+
+            <div className="mt-8 max-w-[420px]">
+               <label htmlFor="catch-search" className="lab lab-rule">
+                  Search your catches
+               </label>
+               <input
+                  id="catch-search"
+                  type="search"
+                  value={query}
+                  onChange={(event) => setParam('q', event.target.value)}
+                  className="input-line mt-1 h-11 text-base"
+               />
+            </div>
+
+            {years.length > 1 ? (
+               <div
+                  className="mt-6 flex flex-wrap gap-2"
+                  role="group"
+                  aria-label="Filter by year"
+               >
+                  <Chip
+                     pressed={!year}
+                     count={items.length}
+                     onClick={() => setParam('year', '')}
+                  >
+                     All
+                  </Chip>
+                  {years.map(([value, count]) => (
+                     <Chip
+                        key={value}
+                        pressed={year === value}
+                        count={count}
+                        onClick={() =>
+                           setParam('year', year === value ? '' : value)
+                        }
+                     >
+                        {value}
+                     </Chip>
+                  ))}
+               </div>
+            ) : null}
+         </header>
+
+         <div className="mt-8">
+            {status === 'loading' ? (
+               <ListSkeleton
+                  key={attempt}
+                  label="Loading your catches"
+                  errorMessage={LOAD_FAILED}
+                  onRetry={retry}
+               />
+            ) : status === 'error' ? (
+               <InlineError message={LOAD_FAILED} onRetry={retry} />
+            ) : items.length === 0 ? (
+               <EmptyState
+                  sentence="Nothing in your log yet."
+                  actionLabel="Log a catch"
+                  to="/log"
+               />
+            ) : filtered.length === 0 ? (
+               <NoMatchState
+                  sentence={
+                     query.trim()
+                        ? 'No catch matches that search.'
+                        : `Nothing logged in ${year}.`
+                  }
+                  clearLabel={query.trim() ? 'Clear search' : 'Show every year'}
+                  onClear={clearFilters}
+               />
+            ) : (
+               <>
+                  <RowList>
+                     {visible.map((entry) => (
+                        <CatchRow
                            key={entry.id}
-                           className="flex flex-wrap items-center justify-between gap-3 rounded border p-3"
+                           item={entry}
+                           photoUrl={entry.images[0]?.image.url ?? null}
+                           marked={marked === entry.id}
+                        />
+                     ))}
+                  </RowList>
+
+                  {filtered.length > visible.length ? (
+                     <div className="mt-6 flex flex-wrap items-center gap-5 border-t border-line pt-6">
+                        <Button
+                           type="button"
+                           variant="outline"
+                           onClick={showMore}
                         >
-                           <div className="flex min-w-0 items-center gap-3">
-                              {entry.images[0]?.image.url ? (
-                                 <img
-                                    src={entry.images[0].image.url}
-                                    alt={entry.title}
-                                    className="h-14 w-14 rounded-md border object-cover"
-                                 />
-                              ) : (
-                                 <div className="flex h-14 w-14 items-center justify-center rounded-md border text-xs text-muted-foreground">
-                                    No img
-                                 </div>
-                              )}
-                              <div>
-                                 <Link
-                                    className="font-medium underline"
-                                    to={`/catches/${entry.id}`}
-                                 >
-                                    {entry.title}
-                                 </Link>
-                                 <p className="text-sm text-muted-foreground">
-                                    {entry.count} catches •{' '}
-                                    {new Date(entry.caughtAt).toLocaleString()}{' '}
-                                    • {entry.site?.name ?? 'No site'}
-                                 </p>
-                              </div>
-                           </div>
-                           <div className="flex gap-2">
-                              <Button asChild size="sm" variant="outline">
-                                 <Link to={`/catches/${entry.id}/edit`}>
-                                    Edit
-                                 </Link>
-                              </Button>
-                              <Button
-                                 size="sm"
-                                 variant="destructive"
-                                 onClick={() => void deleteCatch(entry.id)}
-                              >
-                                 Delete
-                              </Button>
-                           </div>
-                        </div>
-                     ))
-                  )}
-                  {filteredItems.length > pageSize ? (
-                     <div className="flex items-center justify-between pt-2">
-                        <p className="text-sm text-muted-foreground">
-                           Page {page} of {totalPages}
+                           Show more
+                        </Button>
+                        <p className="lab num">
+                           Showing {visible.length} of {filtered.length} catches
                         </p>
-                        <div className="flex gap-2">
-                           <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={page === 1}
-                              onClick={() => setPage((current) => current - 1)}
-                           >
-                              Previous
-                           </Button>
-                           <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={page === totalPages}
-                              onClick={() => setPage((current) => current + 1)}
-                           >
-                              Next
-                           </Button>
-                        </div>
                      </div>
                   ) : null}
-               </section>
-            </Show>
-         </main>
-      </div>
+               </>
+            )}
+         </div>
+      </section>
    );
 }

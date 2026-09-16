@@ -1,13 +1,17 @@
-import { FishingActionBar } from '@/components/fishing/FishingActionBar';
+import { Show } from '@clerk/react';
 import { LandingPage } from '@/components/landing/LandingPage';
+import { HomeNowPage } from '@/pages/fishing/HomeNowPage';
 
+/** Signed out: the landing page. Signed in: the log, never the marketing page. */
 export function HomePage() {
    return (
-      <div className="scroll-smooth">
-         <LandingPage />
-         <section className="mx-auto w-full max-w-6xl px-4 pb-16">
-            <FishingActionBar />
-         </section>
-      </div>
+      <>
+         <Show when="signed-out">
+            <LandingPage />
+         </Show>
+         <Show when="signed-in">
+            <HomeNowPage />
+         </Show>
+      </>
    );
 }

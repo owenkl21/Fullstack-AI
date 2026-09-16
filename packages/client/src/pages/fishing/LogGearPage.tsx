@@ -1,113 +1,380 @@
 import axios from 'axios';
-import { Show, SignInButton } from '@clerk/react';
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FishingActionBar } from '@/components/fishing/FishingActionBar';
-import { LandingHeader } from '@/components/landing/LandingHeader';
+import { useId, useRef, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useRevealIn } from '@/components/brand/Reveal';
 import { R2ImagePicker } from '@/components/r2-image-picker';
+import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
+import { useDocumentTitle } from '@/lib/title';
+import { cn } from '@/lib/utils';
 
-const GEAR_TYPES = [
-   'ROD',
-   'REEL',
-   'BAIT',
-   'LURE',
-   'LINE',
-   'HOOK',
-   'WEIGHTS',
-] as const;
+export type GearType =
+   | 'ROD'
+   | 'REEL'
+   | 'BAIT'
+   | 'LURE'
+   | 'LINE'
+   | 'HOOK'
+   | 'WEIGHTS';
 
-export function LogGearPage() {
-   const navigate = useNavigate();
-   const [isSaving, setIsSaving] = useState(false);
-   const [images, setImages] = useState<{ storageKey: string; url: string }[]>(
-      []
+export type GearValues = {
+   name: string;
+   brand: string;
+   type: GearType;
+   imageUrl: string | null;
+};
+
+type GearImage = { storageKey: string; url: string };
+
+type GearFieldName = 'name' | 'brand';
+
+const GEAR_KINDS: { value: GearType; word: string }[] = [
+   { value: 'ROD', word: 'Rod' },
+   { value: 'REEL', word: 'Reel' },
+   { value: 'BAIT', word: 'Bait' },
+   { value: 'LURE', word: 'Lure' },
+   { value: 'LINE', word: 'Line' },
+   { value: 'HOOK', word: 'Hook' },
+   { value: 'WEIGHTS', word: 'Weights' },
+];
+
+const TEXT_MAX = 120;
+
+const MESSAGES: Record<GearFieldName, string> = {
+   name: 'The gear needs a name.',
+   brand: 'Say who makes it.',
+};
+
+const EMPTY_GEAR: GearValues = {
+   name: '',
+   brand: '',
+   type: 'ROD',
+   imageUrl: null,
+};
+
+const refusedFields = (
+   error: unknown
+): Partial<Record<GearFieldName, string>> => {
+   if (!axios.isAxiosError(error) || error.response?.status !== 400) {
+      return {};
+   }
+
+   const body = error.response.data as
+      | Record<string, { _errors?: string[] } | undefined>
+      | undefined;
+
+   if (!body) {
+      return {};
+   }
+
+   const refused: Partial<Record<GearFieldName, string>> = {};
+
+   if (body.name?._errors?.length) {
+      refused.name = MESSAGES.name;
+   }
+   if (body.brand?._errors?.length) {
+      refused.brand = MESSAGES.brand;
+   }
+
+   return refused;
+};
+
+function Field({
+   id,
+   label,
+   error,
+   children,
+}: {
+   id: string;
+   label: string;
+   error?: string;
+   children: ReactNode;
+}) {
+   return (
+      <div className="grid gap-2">
+         <label className="lab" htmlFor={id}>
+            {label}
+         </label>
+         {children}
+         {error ? (
+            <p id={`${id}-error`} className="text-[15px] text-destructive">
+               {error}
+            </p>
+         ) : null}
+      </div>
    );
+}
 
-   const submitGear = async (event: FormEvent<HTMLFormElement>) => {
+function Group({ title, children }: { title: string; children: ReactNode }) {
+   const headingId = useId();
+
+   return (
+      <section aria-labelledby={headingId} className="rule-dashed rv pt-6">
+         <h2 id={headingId} className="lab">
+            {title}
+         </h2>
+         <div className="mt-6 grid gap-6">{children}</div>
+      </section>
+   );
+}
+
+/** The skeleton the gear form leaves while the record it edits is loading. */
+export function GearFormSkeleton() {
+   return (
+      <div className="grid gap-10" aria-hidden="true">
+         <div className="grid gap-6">
+            <div className="h-4 w-[7ch] bg-bg-2" />
+            <div className="h-11 w-full bg-bg-2" />
+            <div className="h-11 w-full bg-bg-2" />
+         </div>
+         <div className="flex flex-wrap gap-2">
+            {GEAR_KINDS.map((kind) => (
+               <div key={kind.value} className="h-11 w-[8ch] bg-bg-2" />
+            ))}
+         </div>
+         <div className="aspect-[4/3] w-full max-w-[320px] bg-bg-2" />
+      </div>
+   );
+}
+
+/**
+ * One form for adding gear and for editing it. Editing prefills it and keeps the
+ * photo already on the record unless a new one is chosen.
+ */
+export function GearForm({
+   gearId,
+   initial,
+}: {
+   gearId?: string;
+   initial?: GearValues;
+}) {
+   const isEditing = Boolean(gearId);
+   const navigate = useNavigate();
+   const formRef = useRef<HTMLFormElement | null>(null);
+   const nameRef = useRef<HTMLInputElement | null>(null);
+   const brandRef = useRef<HTMLInputElement | null>(null);
+   const fieldId = useId();
+   useRevealIn(formRef);
+
+   const [values, setValues] = useState<GearValues>(initial ?? EMPTY_GEAR);
+   const [errors, setErrors] = useState<Partial<Record<GearFieldName, string>>>(
+      {}
+   );
+   const [images, setImages] = useState<GearImage[]>([]);
+   const [isSaving, setIsSaving] = useState(false);
+
+   const change = <K extends keyof GearValues>(key: K, value: GearValues[K]) =>
+      setValues((current) => ({ ...current, [key]: value }));
+
+   const clearError = (field: GearFieldName) =>
+      setErrors((current) => ({ ...current, [field]: undefined }));
+
+   const checkText = (field: GearFieldName, value: string) => {
+      const problem = value.trim().length < 1 ? MESSAGES[field] : undefined;
+      setErrors((current) => ({ ...current, [field]: problem }));
+      return !problem;
+   };
+
+   const save = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      const formData = new FormData(event.currentTarget);
 
-      const payload = {
-         name: String(formData.get('name') ?? ''),
-         brand: String(formData.get('brand') ?? ''),
-         type: String(formData.get('type') ?? 'ROD'),
-         image: images[0] ?? null,
+      const nameIsGood = checkText('name', values.name);
+      const brandIsGood = checkText('brand', values.brand);
+
+      if (!nameIsGood) {
+         nameRef.current?.focus();
+         return;
+      }
+
+      if (!brandIsGood) {
+         brandRef.current?.focus();
+         return;
+      }
+
+      const trimmedName = values.name.trim();
+      const payload: {
+         name: string;
+         brand: string;
+         type: GearType;
+         image?: GearImage | null;
+      } = {
+         name: trimmedName,
+         brand: values.brand.trim(),
+         type: values.type,
       };
+
+      if (images[0]) {
+         payload.image = images[0];
+      } else if (!isEditing) {
+         payload.image = null;
+      }
 
       try {
          setIsSaving(true);
-         await axios.post('/api/gear', payload);
-         toast({ title: 'Gear saved', variant: 'success' });
-         navigate('/gear/me');
+
+         if (gearId) {
+            await axios.put(`/api/gear/${gearId}`, payload);
+         } else {
+            await axios.post('/api/gear', payload);
+         }
+
+         toast({
+            title: 'Gear saved.',
+            description: `${trimmedName} is in your gear.`,
+            variant: 'success',
+         });
+         navigate('/gear/me', { replace: true });
       } catch (error) {
          console.error(error);
-         toast({ title: 'Unable to save gear', variant: 'error' });
+         const refused = refusedFields(error);
+
+         if (Object.keys(refused).length) {
+            setErrors(refused);
+            (refused.name ? nameRef : brandRef).current?.focus();
+            return;
+         }
+
+         toast({
+            title: 'Not saved.',
+            description: 'The gear did not reach us. Try again.',
+            variant: 'error',
+         });
       } finally {
          setIsSaving(false);
       }
    };
 
+   const shownPhoto = images[0]?.url ?? values.imageUrl;
+
    return (
-      <div className="min-h-screen">
-         <LandingHeader />
-         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-            <FishingActionBar />
-            <Show when="signed-in">
-               <form
-                  onSubmit={submitGear}
-                  className="grid gap-3 rounded-lg border p-4"
+      <form ref={formRef} onSubmit={save} noValidate className="grid gap-10">
+         <Group title="The gear">
+            <Field id={`${fieldId}-name`} label="Name" error={errors.name}>
+               <input
+                  ref={nameRef}
+                  id={`${fieldId}-name`}
+                  className="input-line text-[16px]"
+                  value={values.name}
+                  maxLength={TEXT_MAX}
+                  autoComplete="off"
+                  aria-invalid={Boolean(errors.name)}
+                  aria-describedby={
+                     errors.name ? `${fieldId}-name-error` : undefined
+                  }
+                  onChange={(event) => {
+                     clearError('name');
+                     change('name', event.target.value);
+                  }}
+                  onBlur={(event) => checkText('name', event.target.value)}
+               />
+            </Field>
+
+            <Field id={`${fieldId}-brand`} label="Brand" error={errors.brand}>
+               <input
+                  ref={brandRef}
+                  id={`${fieldId}-brand`}
+                  className="input-line text-[16px]"
+                  value={values.brand}
+                  maxLength={TEXT_MAX}
+                  autoComplete="off"
+                  aria-invalid={Boolean(errors.brand)}
+                  aria-describedby={
+                     errors.brand ? `${fieldId}-brand-error` : undefined
+                  }
+                  onChange={(event) => {
+                     clearError('brand');
+                     change('brand', event.target.value);
+                  }}
+                  onBlur={(event) => checkText('brand', event.target.value)}
+               />
+            </Field>
+
+            <div className="grid gap-2">
+               <span className="lab" id={`${fieldId}-type`}>
+                  Type
+               </span>
+               <div
+                  className="flex flex-wrap gap-2"
+                  role="group"
+                  aria-labelledby={`${fieldId}-type`}
                >
-                  <h1 className="text-2xl font-semibold">Add gear</h1>
-                  <input
-                     name="name"
-                     placeholder="Gear name"
-                     className="rounded border p-2"
-                     required
-                  />
-                  <input
-                     name="brand"
-                     placeholder="Brand"
-                     className="rounded border p-2"
-                     required
-                  />
-                  <select
-                     name="type"
-                     className="rounded border p-2"
-                     defaultValue="ROD"
-                     required
-                  >
-                     {GEAR_TYPES.map((gearType) => (
-                        <option key={gearType} value={gearType}>
-                           {gearType.charAt(0) +
-                              gearType.slice(1).toLowerCase()}
-                        </option>
-                     ))}
-                  </select>
-                  <R2ImagePicker
-                     scope="gear"
-                     label="Gear image"
-                     value={images}
-                     onChange={setImages}
-                     multiple={false}
-                     maxItems={1}
-                  />
-                  <Button type="submit" disabled={isSaving}>
-                     {isSaving ? 'Saving...' : 'Save gear'}
-                  </Button>
-               </form>
-            </Show>
-            <Show when="signed-out">
-               <div className="rounded-lg border p-4">
-                  <p className="mb-3">Sign in to add gear.</p>
-                  <SignInButton mode="modal">
-                     <Button>Sign in</Button>
-                  </SignInButton>
+                  {GEAR_KINDS.map((kind) => {
+                     const isOn = values.type === kind.value;
+
+                     return (
+                        <button
+                           key={kind.value}
+                           type="button"
+                           aria-pressed={isOn}
+                           onClick={() => change('type', kind.value)}
+                           className={cn(
+                              'g-tracked inline-flex h-11 items-center border px-4 text-[19px] transition-colors duration-150 [transition-timing-function:var(--ease)]',
+                              isOn
+                                 ? 'border-ink bg-ink text-background'
+                                 : 'border-line-2 text-ink hover:bg-bg-2'
+                           )}
+                        >
+                           {kind.word}
+                        </button>
+                     );
+                  })}
                </div>
-            </Show>
-         </main>
-      </div>
+            </div>
+         </Group>
+
+         <Group title="Photo">
+            {/* TODO(api): a photo can be replaced but never cleared, because the
+                update route reads a missing image as "keep the one you have",
+                appendix E item 6. */}
+            {shownPhoto ? (
+               <img
+                  src={shownPhoto}
+                  alt={values.name || 'The gear'}
+                  width={320}
+                  height={240}
+                  loading="lazy"
+                  className="aspect-[4/3] w-full max-w-[320px] border border-line bg-bg-2 object-contain"
+               />
+            ) : null}
+            <R2ImagePicker
+               scope="gear"
+               label={shownPhoto ? 'Replace the photo' : 'One photo'}
+               value={images}
+               onChange={setImages}
+               multiple={false}
+               maxItems={1}
+            />
+         </Group>
+
+         <div className="flex flex-wrap items-center gap-3">
+            <Button type="submit" size="lg" disabled={isSaving}>
+               {isEditing ? 'Save changes' : 'Save gear'}
+            </Button>
+            <Button variant="ghost" size="lg" asChild>
+               <Link to="/gear/me">Cancel</Link>
+            </Button>
+         </div>
+      </form>
+   );
+}
+
+export function LogGearPage() {
+   useDocumentTitle('Add gear');
+
+   return (
+      <RequireSignIn what="your gear">
+         <section className="mx-auto w-[min(720px,100%-32px)] py-10 md:py-14">
+            <h1 className="g text-[44px] md:text-[56px]">Add gear</h1>
+            <p className="mt-3 max-w-[52ch] text-ink-2">
+               Name it, say who makes it and what it is. You can then put it on
+               a catch.
+            </p>
+            <div className="mt-10">
+               <GearForm />
+            </div>
+         </section>
+      </RequireSignIn>
    );
 }
