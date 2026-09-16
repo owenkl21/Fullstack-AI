@@ -40,7 +40,7 @@ model User {
   email        String        @unique
   username     String        @unique
   displayName  String
-  bio          String?
+  bio          String?       @db.Text
   avatarUrl    String?
   catches      Catch[]
   sites        FishingSite[]
@@ -67,11 +67,11 @@ model FishingSite {
   createdById String
   createdBy   User        @relation(fields: [createdById], references: [id])
   name        String
-  description String?
+  description String?     @db.Text
   latitude    Float?
   longitude   Float?
   waterType   WaterType?
-  accessNotes String?
+  accessNotes String?     @db.Text
   likeCount   Int         @default(0)
   reviewCount Int         @default(0)
   catchCount  Int         @default(0)
@@ -124,7 +124,7 @@ model Catch {
   species                                 Species?     @relation(fields: [speciesId], references: [id], onDelete: SetNull)
   gears                                   Gear[]
   title                                   String
-  notes                                   String?
+  notes                                   String?      @db.Text
   caughtAt                                DateTime
   weight                                  Float?
   length                                  Float?
@@ -179,7 +179,7 @@ model Review {
   userId    String
   user      User        @relation(fields: [userId], references: [id])
   rating    Int
-  body      String
+  body      String      @db.Text
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   deletedAt DateTime?
@@ -194,7 +194,7 @@ model Comment {
   catch     Catch     @relation(fields: [catchId], references: [id])
   userId    String
   user      User      @relation(fields: [userId], references: [id])
-  body      String
+  body      String    @db.Text
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -239,8 +239,8 @@ model SiteLike {
 
 model Image {
   id           String       @id @default(cuid())
-  url          String
-  storageKey   String       @unique
+  url          String       @db.VarChar(512)
+  storageKey   String       @unique @db.VarChar(512)
   uploadedById String
   uploadedBy   User         @relation("UploadedImages", fields: [uploadedById], references: [id])
   catchLinks   CatchImage[]
@@ -276,7 +276,7 @@ model FeedPost {
   author       User          @relation(fields: [authorId], references: [id])
   type         FeedPostType
   scope        FeedScope     @default(GLOBAL)
-  content      String?
+  content      String?       @db.Text
   catchId      String?
   catch        Catch?        @relation(fields: [catchId], references: [id], onDelete: SetNull)
   siteId       String?
@@ -313,7 +313,7 @@ model FeedComment {
   post      FeedPost  @relation(fields: [postId], references: [id])
   userId    String
   user      User      @relation(fields: [userId], references: [id])
-  body      String
+  body      String    @db.Text
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?

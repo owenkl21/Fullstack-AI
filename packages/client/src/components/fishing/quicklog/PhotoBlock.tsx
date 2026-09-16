@@ -57,20 +57,20 @@ export function PhotoBlock({
       setIsUploading(true);
       onBusyChange(true);
       try {
-         const { data: signed } = await axios.post<{ storageKey: string }>(
-            '/api/uploads/sign',
-            {
-               scope: 'catch',
-               fileName: file.name,
-               contentType: file.type,
-               sizeBytes: file.size,
-            }
-         );
-         const { data: uploaded } = await axios.put<{
+         const { data: signed } = await axios.post<{
             storageKey: string;
+            uploadUrl: string;
             readUrl: string;
-         }>('/api/uploads/proxy', file, {
-            params: { storageKey: signed.storageKey, contentType: file.type },
+         }>('/api/uploads/sign', {
+            scope: 'catch',
+            fileName: file.name,
+            contentType: file.type,
+            sizeBytes: file.size,
+         });
+         // Straight to R2 on the presigned URL. The bytes never pass through
+         // the API, so the size cap is ours rather than a host's. Needs the
+         // bucket CORS policy to allow PUT from this origin.
+         await axios.put(signed.uploadUrl, file, {
             headers: { 'Content-Type': file.type },
             onUploadProgress: (event) => {
                if (event.total) {
@@ -78,7 +78,7 @@ export function PhotoBlock({
                }
             },
          });
-         onChange({ storageKey: uploaded.storageKey, url: uploaded.readUrl });
+         onChange({ storageKey: signed.storageKey, url: signed.readUrl });
       } catch {
          onChange(null);
          setError(

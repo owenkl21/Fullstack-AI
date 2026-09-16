@@ -16,7 +16,7 @@ Three packages: `packages/client` (React 19, Vite 7, Tailwind v4, react-router 7
 
 ## 2. Where things stand
 
-Work is on branch **`redesign-theme`**, uncommitted. Nothing has been merged to `master`.
+Work is on branch **`redesign-theme`**, committed but never pushed. Nothing has been merged to `master`, and the remote's newest branch is six months old.
 
 **Done.** The entire client has been rebuilt in a new visual language, foundation first and then every surface:
 
@@ -73,7 +73,11 @@ The design language itself is not open for reinterpretation: it is in [00-prompt
 Each item says what "done" means. The order matters: later items are blocked by earlier ones.
 
 ### 5.1 Railway database and deployment wiring
-Create the MySQL service on Railway, put its connection string in `packages/server/.env`, run `bun run prisma:db:push`. Put the Railway API domain into [`packages/client/vercel.json`](../../packages/client/vercel.json), which currently contains a **placeholder that will 404 if deployed as is**. If the Vercel project's root directory is the repo root rather than `packages/client`, move that file up.
+**Written out in full in [09-deploy.md](09-deploy.md). Read that rather than this paragraph.** The repo side is done: `railway.json` exists at the root, `prisma db push` no longer runs on every container boot, `DATABASE_URL` reaches the driver intact, and the four problems a deploy audit confirmed are fixed. What is left is the part that needs a Railway account.
+
+Create the MySQL service on Railway, reference its connection string rather than pasting it, and run `bun run prisma:db:push` once from the laptop. Put the Railway API domain into [`packages/client/vercel.json`](../../packages/client/vercel.json), which still contains a **placeholder that will 404 if deployed as is**.
+
+Two settings decide whether it works at all, both in 09-deploy.md section 5.1: the Vercel root directory must be `packages/client`, and `vercel.json` has to be tracked by git to reach Vercel. The question this paragraph used to leave open, whether to move the file up, is answered: leave it where it is and set the root directory.
 
 Done when: the server starts, `/api/feed` answers, and a deployed frontend reaches the API through the rewrite.
 
@@ -125,10 +129,10 @@ These are in [00-prompt.md](00-prompt.md) but they are the ones agents get wrong
 
 ## 7. Gotchas that will bite
 
-- **No `prisma/migrations` directory.** Both `dev` and `start` run `prisma db push`. That is fine now and dangerous the moment competition standings are real. Introduce migrations before that point.
+- **No `prisma/migrations` directory.** `dev` still runs `prisma db push`; `start` no longer does, so schema changes on a deployed database are applied deliberately rather than on every boot. That is fine now and dangerous the moment competition standings are real. Introduce migrations before that point.
 - **`weather.client.ts` falls back to `GOOGLE_MAPS_API_KEY`.** Removing only `GOOGLE_WEATHER_API_KEY` does not disable it, it silently starts billing the Maps key.
 - **The feed has no author filter**, so seeded posts are visible to every signed-in user, and a deleted or edited catch leaves a stale post because feed rows are snapshots rather than pointers (appendix E A5).
-- **`/api/uploads/proxy` sends image bytes through Express** (both uploaders call it after `/api/uploads/sign`). That is fine on Railway. It would break above 4.5 MB on any serverless host. An unused direct-to-R2 route already exists at `/api/uploads/direct`.
+- **Photos now upload straight to R2.** Both uploaders PUT to the presigned URL that `/api/uploads/sign` already returned, so no image bytes pass through Express. `/api/uploads/proxy` still exists on the server but nothing calls it. The cost of this is a hard dependency: the bucket needs a CORS policy allowing PUT from the site's origin, or every upload fails with an opaque browser error and nothing reaches the server logs. See [09-deploy.md](09-deploy.md) section 4.5.
 - **Editing a catch currently truncates it**: the update path writes nulls over humidity, UV and water temperature, and resets `count`. Fix with the partial-update work in appendix E item A2.3.
 - **The catch time drifts two hours on every save** in Africa/Johannesburg, because the editor prefills a sliced UTC string and parses it back as local.
 - **`Show` from `@clerk/react` gates most pages.** When auth changes, every one of those call sites changes with it.
@@ -144,11 +148,12 @@ These are in [00-prompt.md](00-prompt.md) but they are the ones agents get wrong
 
 ## 8. What needs the owner, not an agent
 
-1. The **Railway MySQL connection string** in `packages/server/.env`.
-2. The **Railway API domain** in `packages/client/vercel.json`.
-3. A **verified sending domain in Resend**, before email verification and password reset can work.
-4. A **Stadia Maps account** if the styled day and night basemaps are wanted; otherwise the keyless OpenStreetMap layer works with no account.
-5. A **product name**. Everything currently says `Name`, deliberately, including the wordmark and the page titles.
+1. The **Railway MySQL connection string** in `packages/server/.env`. Step by step in [09-deploy.md](09-deploy.md) section 4.
+2. The **Railway API domain** in `packages/client/vercel.json`. Step by step in [09-deploy.md](09-deploy.md) section 5.2.
+3. A **CORS policy on the R2 bucket**, now that photos upload straight to R2 rather than through the API. Without it every upload fails with an opaque browser error and nothing reaches the server logs. The policy is in [09-deploy.md](09-deploy.md) section 4.5.
+4. A **verified sending domain in Resend**, before email verification and password reset can work.
+5. A **Stadia Maps account** if the styled day and night basemaps are wanted; otherwise the keyless OpenStreetMap layer works with no account.
+6. A **product name**. Everything currently says `Name`, deliberately, including the wordmark and the page titles.
 
 ---
 

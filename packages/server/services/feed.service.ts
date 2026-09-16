@@ -149,7 +149,7 @@ export const feedService = {
       const scopeWhere =
          input.scope === 'GLOBAL'
             ? { scope: 'GLOBAL' as const }
-            : { scope: { in: ['GLOBAL', 'NEARBY'] as const } };
+            : { scope: { in: ['GLOBAL', 'NEARBY'] as FeedScope[] } };
 
       const posts = await prisma.feedPost.findMany({
          where: {

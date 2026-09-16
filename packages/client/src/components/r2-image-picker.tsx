@@ -46,8 +46,9 @@ const uploadOne = async (
       sizeBytes: file.size,
    });
 
-   const uploadResponse = await axios.put('/api/uploads/proxy', file, {
-      params: { storageKey: signed.storageKey, contentType: file.type },
+   // Straight to R2 on the presigned URL, so the bytes never pass through the
+   // API. Needs the bucket CORS policy to allow PUT from this origin.
+   await axios.put(signed.uploadUrl, file, {
       headers: { 'Content-Type': file.type },
       onUploadProgress: (event) => {
          const total = event.total ?? file.size;
@@ -59,8 +60,8 @@ const uploadOne = async (
    });
 
    return {
-      storageKey: uploadResponse.data.storageKey,
-      url: uploadResponse.data.readUrl,
+      storageKey: signed.storageKey,
+      url: signed.readUrl,
    };
 };
 

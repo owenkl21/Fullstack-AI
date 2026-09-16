@@ -37,13 +37,13 @@ You will need:
 
 1. A Railway account. Hobby is $5/month and includes $5 of usage.
 2. A Vercel account. Hobby is free.
-3. The branch pushed to GitHub. **`redesign-theme` is currently local only and uncommitted.** Neither platform can see a working tree, only a pushed branch.
+3. The branch pushed to GitHub. **`redesign-theme` is committed but has never been pushed**, and the remote's newest branch is six months old. Neither platform can see a local branch, only a pushed one.
 
 ---
 
 ## 3. What was already changed in the repo for this
 
-Three changes were made so that a deploy is possible at all. Each one was a real blocker, not a preference.
+Seven changes were made so that a deploy is possible at all. The first three were hard blockers; 3.4 to 3.7 are the problems the deploy audit confirmed.
 
 ### 3.1 `railway.json` at the repo root (new file)
 
@@ -106,6 +106,32 @@ const adapter = new PrismaMariaDb(databaseUrl);
 
 The adapter accepts a string and rewrites the `mysql://` scheme itself. Typechecking is clean.
 
+### 3.4 The OpenAI client is built on first use
+
+`services/chat.service.ts` constructed its client at module load, and the OpenAI constructor throws when `OPENAI_API_KEY` is absent. That killed the whole process at boot, so a missing key took every route down and left Railway restart-looping, rather than failing the one endpoint that needs it. It now builds on first call, the same shape as `getS3Client` in `uploads.service.ts`.
+
+### 3.5 Text columns are annotated
+
+The schema had no `@db.` annotations at all, so every string column was `VARCHAR(191)`, free text included. Prose fields (`User.bio`, `FishingSite.description`, `FishingSite.accessNotes`, `Catch.notes`, `Review.body`, `Comment.body`, `FeedPost.content`, `FeedComment.body`) are now `@db.Text`.
+
+`Image.url` and `Image.storageKey` are `@db.VarChar(512)` rather than `Text`, deliberately: `storageKey` is `@unique`, and MySQL cannot put a unique index on a `TEXT` column without a prefix length.
+
+This changes the database, so it lands with the first `prisma db push` in step 4.3. Doing it now rather than later is the cheap moment, while the data is all test data.
+
+### 3.6 Photos go straight to R2
+
+Both uploaders called `/api/uploads/sign` and then pushed the file through `/api/uploads/proxy`, so every byte travelled through Express for no benefit. The sign endpoint already returned `uploadUrl` and `readUrl`; the client simply ignored them and typed the response as `{ storageKey }`.
+
+`PhotoBlock.tsx` and `r2-image-picker.tsx` now PUT directly to the presigned URL. Nothing references `/api/uploads/proxy` in the client any more, though the route still exists on the server.
+
+**This one has a prerequisite, and uploads fail without it.** See 4.5.
+
+### 3.7 `feed.service.ts` typechecks
+
+`listFeed` built its scope filter with `['GLOBAL', 'NEARBY'] as const`, a readonly tuple, where Prisma's `EnumFeedScopeFilter.in` wants a mutable `FeedScope[]`. It is now `as FeedScope[]`.
+
+With that, `bunx tsc --noEmit` in `packages/server` reports zero errors, which it never did before. `packages/client` still passes all three of its gates: `tsc -b --noEmit`, `eslint src` and `build`.
+
 ---
 
 ## 4. Railway first
@@ -166,6 +192,30 @@ Expect `{"message":"Hello from the API!"}`. This proves the process is up, the p
 
 ---
 
+### 4.5 Give the R2 bucket a CORS policy
+
+**Do this before testing an upload, or every upload fails.** Since 3.6 the browser PUTs the file straight to R2 rather than through the API, and a cross-origin PUT from a page needs the bucket to allow it. There is no CORS policy on the bucket today.
+
+In the Cloudflare dashboard, on the bucket, under Settings, CORS policy:
+
+```json
+[
+   {
+      "AllowedOrigins": [
+         "https://<your-project>.vercel.app",
+         "http://localhost:5173"
+      ],
+      "AllowedMethods": ["PUT", "GET"],
+      "AllowedHeaders": ["content-type"],
+      "MaxAgeSeconds": 3600
+   }
+]
+```
+
+`localhost:5173` is there so uploads still work in development. Add any custom domain to `AllowedOrigins` when you add one, and remember preview deployments get their own `*.vercel.app` hostnames, which this does not cover.
+
+The failure mode is worth recognising: the upload fails in the browser with an opaque CORS error and nothing appears in the Railway logs at all, because the request never reached the server.
+
 ## 5. Then Vercel
 
 ### 5.1 The two settings that decide whether it works
@@ -207,19 +257,17 @@ If the Maps browser key is set, its HTTP-referrer restrictions need the Vercel o
 
 ---
 
-## 6. Known issues this does not fix
+## 6. What is still outstanding
 
-These were all confirmed against the code and deliberately left alone, because they are beyond deploy wiring. Each is real.
+The four problems the audit confirmed have been fixed, in 3.4 to 3.7. What follows is what genuinely remains, and none of it blocks a first deploy.
 
-**A missing `OPENAI_API_KEY` takes the whole server down, not one route.** The OpenAI client is constructed at module load in `services/chat.service.ts`, and the constructor throws when the key is absent. The process dies at boot and Railway restart-loops. The repo already has the right pattern in `services/uploads.service.ts`, which builds its client lazily. Setting the key, as section 4.2 does, avoids this entirely; it is worth fixing before anyone deploys a variant without it.
+**The client ships as one chunk.** 661 kB raw, 198 kB gzipped, with no code splitting, and the build says so on every run. It is not a deploy blocker, but HANDOFF.md section 7 is right that route-level `React.lazy` wants doing before the maps work, or Leaflet lands in an eager bundle and undoes the reason it was chosen over MapLibre.
 
-**Photo uploads push the bytes through Express.** Both uploaders call `/api/uploads/sign` and then PUT the file to `/api/uploads/proxy`, with a 10 MB client cap. On Railway that works. It puts the whole file through the proxy for no benefit, when an unused direct-to-R2 route already exists. It would also break on any serverless host, which matters if the API ever moves.
+**There are still no migrations.** `prisma/migrations` does not exist, and schema changes are now applied by hand (3.2). That is the correct trade for test data, and the wrong one the moment competition standings are real. HANDOFF.md section 7 already flags the crossover point.
 
-**Every string column is `VARCHAR(191)`.** The schema has no `@db.` annotations anywhere, so free-text fields (`bio`, `description`, `accessNotes`, `notes`, feed post content, comment bodies) all get the same short column. Prose will be truncated or rejected. Fixing it is a schema change, so it wants doing alongside the migrations work HANDOFF.md section 7 already calls for, not on its own.
+**`/api/uploads/proxy` still exists on the server** even though no client calls it. Harmless, and worth keeping until direct uploads have been exercised against a real bucket with the policy from 4.5 in place. Delete it after that, not before.
 
-**`services/feed.service.ts:155` has a pre-existing type error** (a readonly tuple assigned to a mutable `FeedScope[]`). It is unrelated to any of this, it predates these changes, and `bunx tsc --noEmit` in `packages/server` reports it both before and after. The server still runs, since Bun does not typecheck at runtime, but it is the only thing standing between this package and a clean gate.
-
----
+**The Google weather path is still live.** Queue item 5.3 replaces it with Open-Meteo. Until then `weather.client.ts` falls back to `GOOGLE_MAPS_API_KEY`, so removing only the weather key does not disable it, it silently starts billing the Maps key.
 
 ## 7. What still needs you
 
