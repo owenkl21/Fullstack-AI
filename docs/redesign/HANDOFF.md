@@ -43,7 +43,7 @@ Two commits on `redesign-theme`, neither pushed:
 
 | Queue item | State |
 |---|---|
-| 5.0 Off the deprecated Railway config | **Not started, high priority.** Hard deadline 1 December 2026 |
+| 5.0 Off the deprecated Railway config | **Done.** Deploys from `.railway/railway.ts`; `railway.json` deleted |
 | 5.1 Railway and deploy wiring | **Backend live.** Server online, schema pushed, species seeded. Vercel still waiting on the account |
 | 5.2 better-auth replacing Clerk | Not started. Needs a verified Resend domain first |
 | 5.3 Species and Open-Meteo | **Done.** Species wired and seeded, conditions read at the hour of the catch |
@@ -101,26 +101,34 @@ The design language itself is not open for reinterpretation: it is in [00-prompt
 
 Each item says what "done" means. The order matters: later items are blocked by earlier ones.
 
-### 5.0 Migrate off the deprecated Railway config (high priority)
+### 5.0 Off the deprecated Railway config
 
-`railway.json` is Config as Code, which Railway CLI 5.57 deprecates in favour of
-Infrastructure as Code at `.railway/railway.ts`. **Existing files keep working
-only until 1 December 2026.**
+**Done.** The service deploys from [`.railway/railway.ts`](../../.railway/railway.ts)
+and `railway.json` is deleted, ahead of the 1 December 2026 cutoff.
 
-This was deliberately deferred while the first deploy was unproven, on the
-grounds that a first deploy is the wrong moment to introduce a config format
-nothing has validated. That reason has expired: the deploy is green, the server
-is online and the schema is pushed, so there is now a known-good build to
-compare a migrated config against.
+Two things `railway config migrate` got wrong, both of which would have broken the
+deploy, and both of which only showed up because `railway config plan` was run
+before applying anything:
 
-`railway config migrate` translates the current file cleanly; it has been run as
-a dry run and the output is faithful. Run it with `--apply`, rename the generated
-project and service from `Fullstack-AI` to `fishlogger` to match the repo, redeploy,
-and confirm the service comes back Online with `/api/hello` answering before
-deleting `railway.json`.
+- It named the service **`Fullstack-AI`**, after the directory. The live service is
+  `server`, so the generated file pointed at a service that does not exist.
+- It declared **no variables and no source**, and IaC is declarative. The first plan
+  read `0 to add, 3 to change, 8 to destroy`: it would have deleted every
+  environment variable, `DATABASE_URL` and all four R2 keys included, and unset the
+  GitHub repo link.
 
-Done when: a deploy succeeds from `.railway/railway.ts` alone and `railway.json`
-is gone.
+`preserve()` is the fix for the second. It declares that a variable exists and is
+managed outside the file, so Railway leaves the value alone. **No secret is written
+into the repo.** Set or rotate them with `railway variable set` or in the dashboard.
+
+The migration also silently dropped `restartPolicyType` and
+`restartPolicyMaxRetries`, which are restored under `deploy`.
+
+Running the config needs `railway` (the npm package, MIT) as a root dev dependency,
+or `railway config plan` refuses with "The Railway TypeScript SDK is not installed".
+
+**Always run `railway config plan` before `railway config apply`.** The plan is the
+only thing that shows a destructive change before it happens.
 
 ### 5.1 Railway database and deployment wiring
 **Written out in full in [09-deploy.md](09-deploy.md). Read that rather than this paragraph.** The repo side is done: `railway.json` exists at the root, `prisma db push` no longer runs on every container boot, `DATABASE_URL` reaches the driver intact, and the four problems a deploy audit confirmed are fixed. What is left is the part that needs a Railway account.

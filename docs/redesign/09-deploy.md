@@ -45,29 +45,17 @@ You will need:
 
 Seven changes were made so that a deploy is possible at all. The first three were hard blockers; 3.4 to 3.7 are the problems the deploy audit confirmed.
 
-### 3.1 `railway.json` at the repo root (new file)
+### 3.1 `.railway/railway.ts` at the repo root
 
-There was no Railway configuration of any kind, and the root `package.json` has no `start` script, so Railway had nothing to run.
-
-```json
-{
-   "build": {
-      "builder": "NIXPACKS",
-      "buildCommand": "bun install && cd packages/server && bun run prisma:generate"
-   },
-   "deploy": {
-      "startCommand": "cd packages/server && bun run start",
-      "healthcheckPath": "/api/hello"
-   }
-}
-```
+There was no Railway configuration of any kind, and the root `package.json` has no `start` script, so Railway had nothing to run. This began as `railway.json` and is now Infrastructure as Code, since Config as Code stops working on 1 December 2026.
 
 It sits at the **root**, not in `packages/server`, because that is where `bun.lock` and the `workspaces` array live, so that is where `bun install` has to run.
 
-**This format is deprecated.** Railway CLI 5.57 warns that Config as Code (`railway.json`) is superseded by Infrastructure as Code at `.railway/railway.ts`, and that existing files keep working until **1 December 2026**. `railway config migrate` translates this file cleanly; it was run as a dry run and the output is faithful. It has deliberately not been applied yet, because a first deploy is the wrong moment to introduce an untested config format. Migrate once a deploy is known good. **The deploy is now known good, so this is
-scheduled**: see queue item 5.0 in [HANDOFF.md](HANDOFF.md).
-
 `/api/hello` ([routes.ts:47](../../packages/server/routes.ts)) is the health check rather than `/` ([routes.ts:43](../../packages/server/routes.ts)) because it exercises the same `/api` prefix that Vercel proxies. Both are trivial handlers that touch no database, which is what a health check needs.
+
+Secrets are declared with `preserve()`, which says a variable exists and is managed outside the file. **No secret value is in the repo.** Set or rotate them with `railway variable set` or in the dashboard.
+
+Running the config needs the `railway` npm package as a root dev dependency, and **`railway config plan` must be run before `railway config apply`**: the plan is the only thing that shows a destructive change before it happens. See HANDOFF.md item 5.0 for what the automatic migration got wrong.
 
 ### 3.2 `prisma db push` no longer runs on every boot
 
