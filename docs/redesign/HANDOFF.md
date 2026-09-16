@@ -48,7 +48,7 @@ Two commits on `redesign-theme`, neither pushed:
 | 5.3 Species and Open-Meteo | Not started |
 | 5.4 Seed data | Not started |
 | 5.5 The social layer | Not started |
-| 5.6 Leaflet, off Google | **In progress.** leaflet@1.9.4 installed, spec done, code not written |
+| 5.6 Leaflet, off Google | **In progress.** Route splitting done. leaflet@1.9.4 installed, map components not written |
 
 **Railway is provisioned** (16 September 2026): project `fishlogger`, MySQL online, `server` service created from the repo but not deployed, all variables set. Details in [09-deploy.md](09-deploy.md) section 4.0.
 
@@ -163,12 +163,14 @@ These are in [00-prompt.md](00-prompt.md) but they are the ones agents get wrong
 - **The catch time drifts two hours on every save** in Africa/Johannesburg, because the editor prefills a sliced UTC string and parses it back as local.
 - **`Show` from `@clerk/react` gates most pages.** When auth changes, every one of those call sites changes with it.
 - Open-Meteo `past_days` is documented to 92 but was measured to fail above ~60. Route older lookups to the historical-forecast endpoint.
-- **The client ships as a single chunk with no code splitting**, and the build warns about it. On a product whose first rule is mobile first, and having just chosen Leaflet over MapLibre to save 240 KB, adding a map and a charting library to one eager bundle would undo that. Route-level `React.lazy` before the maps work, and load Leaflet only on the routes that draw a map.
+- **The client is now route-split.** Every route except `/` and the catch-all is `React.lazy`, with one `Suspense` boundary around `<Outlet/>` in `AppLayout` so the header and bottom bar stay put while a page loads. `HomePage` stays eager because it is the entry route, and `NotFoundPage` because four pages import it inline for a missing record. Two things follow: any new route should be lazy too, and `AppLayout`'s heading-focus effect now waits for the `h1` with a `MutationObserver`, because on a split route `<main>` holds the fallback at the moment the effect runs.
 
 | Client bundle, 16 September 2026 | Raw | Gzipped |
 |---|---|---|
-| JavaScript | 661.14 kB | 197.80 kB |
-| CSS | 61.96 kB | 12.44 kB |
+| JavaScript, entry chunk | 464.22 kB | 143.68 kB |
+| CSS | 62.05 kB | 12.47 kB |
+
+The entry chunk was 661.14 kB raw and 197.80 kB gzipped before the split, so first load is 54 kB gzipped lighter, a 27 per cent cut, across 21 chunks. The map picker is now its own 9.22 kB chunk, which is the headroom Leaflet was supposed to have.
 
 ---
 
