@@ -1,17 +1,17 @@
-import { Show } from '@clerk/react';
 import { LandingPage } from '@/components/landing/LandingPage';
 import { HomeNowPage } from '@/pages/fishing/HomeNowPage';
+import { SignedIn, SignedOut } from '@/components/shell/Signed';
 
 /** Signed out: the landing page. Signed in: the log, never the marketing page. */
 export function HomePage() {
    return (
       <>
-         <Show when="signed-out">
+         <SignedOut>
             <LandingPage />
-         </Show>
-         <Show when="signed-in">
+         </SignedOut>
+         <SignedIn>
             <HomeNowPage />
-         </Show>
+         </SignedIn>
       </>
    );
 }

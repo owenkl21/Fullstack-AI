@@ -1,10 +1,10 @@
 import axios from 'axios';
-import { useClerk } from '@clerk/react';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import type { ProfileResponse, UserProfile } from '@/components/profile/types';
+import { Link } from 'react-router-dom';
 
 /*
  * The four things an angler can change about themselves. Labels above dashed
@@ -96,7 +96,6 @@ export function ProfileSettingsPanel({
    profile: UserProfile;
    onSaved: (profile: UserProfile) => void;
 }) {
-   const clerk = useClerk();
    const nameId = useId();
    const handleId = useId();
    const bioId = useId();
@@ -309,12 +308,8 @@ export function ProfileSettingsPanel({
             <Button type="submit" size="lg" disabled={isSaving || isUploading}>
                {isSaving ? 'Saving' : 'Save changes'}
             </Button>
-            <Button
-               type="button"
-               variant="ghost"
-               onClick={() => clerk.openUserProfile()}
-            >
-               Manage your account
+            <Button type="button" variant="ghost" asChild>
+               <Link to="/account">Manage your account</Link>
             </Button>
          </div>
 

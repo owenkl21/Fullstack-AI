@@ -1,6 +1,6 @@
-import { NavLink } from 'react-router-dom';
-import { Show, SignInButton } from '@clerk/react';
+import { Link, NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { SignedIn, SignedOut } from '@/components/shell/Signed';
 
 const left = [
    { to: '/feed', label: 'Feed' },
@@ -27,7 +27,7 @@ export function BottomBar() {
          aria-label="App"
          className="fixed inset-x-0 bottom-0 z-30 h-[calc(64px+env(safe-area-inset-bottom))] bg-black-block pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
       >
-         <Show when="signed-in">
+         <SignedIn>
             <div className="relative grid h-16 grid-cols-[1fr_1fr_92px_1fr_1fr]">
                {left.map((s) => (
                   <NavLink
@@ -64,9 +64,9 @@ export function BottomBar() {
                   </NavLink>
                ))}
             </div>
-         </Show>
+         </SignedIn>
 
-         <Show when="signed-out">
+         <SignedOut>
             <div className="grid h-16 grid-cols-2">
                <NavLink
                   to="/feed"
@@ -74,13 +74,11 @@ export function BottomBar() {
                >
                   Feed
                </NavLink>
-               <SignInButton mode="modal">
-                  <button type="button" className={slot}>
-                     Sign in
-                  </button>
-               </SignInButton>
+               <Link to="/sign-in" className={slot}>
+                  Sign in
+               </Link>
             </div>
-         </Show>
+         </SignedOut>
       </nav>
    );
 }

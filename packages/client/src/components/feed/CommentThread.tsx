@@ -1,8 +1,8 @@
 import { useId, type FormEvent } from 'react';
-import { SignInButton } from '@clerk/react';
 
 import { formatStamp, plural } from '@/components/feed/format';
 import type { FeedComment } from '@/components/feed/types';
+import { Link } from 'react-router-dom';
 
 const COMMENT_LIMIT = 1000;
 
@@ -132,14 +132,12 @@ export function CommentThread({
          ) : (
             <p className="flex flex-wrap items-center gap-x-3 text-[15px] text-paper-2">
                Sign in to reply.
-               <SignInButton mode="modal">
-                  <button
-                     type="button"
-                     className="g-tracked inline-flex h-12 items-center text-[19px] text-teal transition-[opacity] duration-150 [transition-timing-function:var(--ease)] hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
-                  >
-                     Sign in
-                  </button>
-               </SignInButton>
+               <Link
+                  to="/sign-in"
+                  className="g-tracked inline-flex h-12 items-center text-[19px] text-teal transition-[opacity] duration-150 [transition-timing-function:var(--ease)] hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+               >
+                  Sign in
+               </Link>
             </p>
          )}
       </div>

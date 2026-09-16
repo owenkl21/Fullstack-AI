@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { SignInButton } from '@clerk/react';
 
 import {
    Carousel,
@@ -229,15 +228,13 @@ export function FeedPostBlock({
                      {post.likedByMe ? 'Liked' : 'Like'}
                   </button>
                ) : (
-                  <SignInButton mode="modal">
-                     <button
-                        type="button"
-                        aria-pressed={false}
-                        className={`${textControl} text-paper-2 hover:text-paper`}
-                     >
-                        Like
-                     </button>
-                  </SignInButton>
+                  <Link
+                     to="/sign-in"
+                     aria-pressed={false}
+                     className={`${textControl} text-paper-2 hover:text-paper`}
+                  >
+                     Like
+                  </Link>
                )}
 
                <button

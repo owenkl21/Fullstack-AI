@@ -1,9 +1,9 @@
 import { useId, useState } from 'react';
-import { SignUpButton } from '@clerk/react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ANCHOR, WRAP } from './layout';
 import { photos } from './photos';
+import { Link } from 'react-router-dom';
 
 /*
  * The one full-bleed teal moment on the page, carrying the black signup box. The
@@ -49,21 +49,15 @@ export function LandingJoin() {
                            className="input-line h-11 text-[16px] text-paper placeholder:text-paper-2"
                         />
                      </div>
-                     <SignUpButton
-                        mode="modal"
-                        initialValues={
-                           email ? { emailAddress: email } : undefined
-                        }
+                     <Button
+                        type="submit"
+                        variant="paper"
+                        size="lg"
+                        className="self-start"
+                        asChild
                      >
-                        <Button
-                           type="submit"
-                           variant="paper"
-                           size="lg"
-                           className="self-start"
-                        >
-                           Start your log
-                        </Button>
-                     </SignUpButton>
+                        <Link to="/sign-up">Start your log</Link>
+                     </Button>
                   </form>
                </div>
             </div>

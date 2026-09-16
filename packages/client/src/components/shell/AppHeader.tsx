@@ -1,9 +1,10 @@
 import { NavLink, Link } from 'react-router-dom';
-import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Wordmark } from '@/components/brand/Wordmark';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { SignedIn, SignedOut } from '@/components/shell/Signed';
+import { AccountMenu } from '@/components/shell/AccountMenu';
 
 const destinations = [
    { to: '/feed', label: 'Feed' },
@@ -21,7 +22,7 @@ export function AppHeader() {
       <header className="sticky top-0 z-30 h-[60px] border-b border-paper/10 bg-black-block text-paper">
          <div className="mx-auto flex h-[60px] w-[min(1200px,100%-32px)] items-center gap-4 md:w-[min(1200px,100%-48px)]">
             <Wordmark />
-            <Show when="signed-in">
+            <SignedIn>
                <nav
                   aria-label="Main"
                   className="hidden items-center gap-6 md:flex"
@@ -42,26 +43,24 @@ export function AppHeader() {
                      </NavLink>
                   ))}
                </nav>
-            </Show>
+            </SignedIn>
             <div className="ml-auto flex items-center gap-3">
                <ThemeToggle />
-               <Show when="signed-out">
-                  <SignInButton mode="modal">
-                     <button
-                        type="button"
-                        className="g-tracked hidden text-[19px] text-paper-2 hover:text-paper sm:inline"
-                     >
-                        Sign in
-                     </button>
-                  </SignInButton>
-                  <SignUpButton mode="modal">
-                     <Button size="default">
+               <SignedOut>
+                  <Link
+                     to="/sign-in"
+                     className="g-tracked hidden text-[19px] text-paper-2 hover:text-paper sm:inline"
+                  >
+                     Sign in
+                  </Link>
+                  <Button size="default" asChild>
+                     <Link to="/sign-up">
                         <span className="hidden sm:inline">Start your log</span>
                         <span className="sm:hidden">Start</span>
-                     </Button>
-                  </SignUpButton>
-               </Show>
-               <Show when="signed-in">
+                     </Link>
+                  </Button>
+               </SignedOut>
+               <SignedIn>
                   <Button
                      asChild
                      size="default"
@@ -69,8 +68,8 @@ export function AppHeader() {
                   >
                      <Link to="/log">Log a catch</Link>
                   </Button>
-                  <UserButton />
-               </Show>
+                  <AccountMenu />
+               </SignedIn>
             </div>
          </div>
       </header>

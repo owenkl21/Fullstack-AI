@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { useAuth } from '@clerk/react';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
@@ -12,6 +11,7 @@ import {
    type GearType,
    type GearValues,
 } from './LogGearPage';
+import { useIsSignedIn } from '@/lib/auth-client';
 
 type LoadState = 'loading' | 'ready' | 'missing' | 'error';
 
@@ -40,7 +40,7 @@ const asText = (value: unknown) => (typeof value === 'string' ? value : '');
 
 export function EditGearPage() {
    const { gearId } = useParams();
-   const { isSignedIn } = useAuth();
+   const { isSignedIn } = useIsSignedIn();
    const [state, setState] = useState<LoadState>('loading');
    const [values, setValues] = useState<GearValues | null>(null);
    const [attempt, setAttempt] = useState(0);

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '@clerk/react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -28,6 +27,7 @@ import {
    weightImperial,
    weightMetric,
 } from '@/components/fishing/record/format';
+import { useIsSignedIn } from '@/lib/auth-client';
 
 type LoadState =
    | { status: 'loading'; data: null }
@@ -99,7 +99,7 @@ function useCatchRecord(catchId: string | undefined) {
 }
 
 function useIsOwner(ownerId: string | null | undefined) {
-   const { isSignedIn } = useAuth();
+   const { isSignedIn } = useIsSignedIn();
    const [profileId, setProfileId] = useState<string | null>(null);
 
    useEffect(() => {

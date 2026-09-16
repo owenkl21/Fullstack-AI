@@ -9,7 +9,6 @@ import {
    useState,
 } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useAuth } from '@clerk/react';
 import { TornEdge } from '@/components/brand/TornEdge';
 import { useRevealIn } from '@/components/brand/Reveal';
 import { Button } from '@/components/ui/button';
@@ -24,6 +23,7 @@ import { toast } from '@/components/ui/use-toast';
 import { useDocumentTitle } from '@/lib/title';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { StaticMap } from '@/components/map/StaticMap';
+import { useIsSignedIn } from '@/lib/auth-client';
 
 /*
  * A spot: the photograph and the name first, then what the place is and how to get
@@ -163,7 +163,7 @@ function useSite(siteId: string | undefined) {
 }
 
 function useIsOwner(ownerId: string | null | undefined) {
-   const { isSignedIn } = useAuth();
+   const { isSignedIn } = useIsSignedIn();
    const [profileId, setProfileId] = useState<string | null>(null);
 
    useEffect(() => {
@@ -209,7 +209,7 @@ function SiteRecord({
    const data = state.data;
    useDocumentTitle(data?.name);
 
-   const { isSignedIn } = useAuth();
+   const { isSignedIn } = useIsSignedIn();
    const isOwner = useIsOwner(data?.createdBy?.id);
    const navigate = useNavigate();
 

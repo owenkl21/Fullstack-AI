@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { Show, useAuth, useUser } from '@clerk/react';
 import {
    useCallback,
    useEffect,
@@ -39,6 +38,8 @@ import type {
    ShowFilter,
 } from '@/components/feed/types';
 import { useDocumentTitle } from '@/lib/title';
+import { SignedIn } from '@/components/shell/Signed';
+import { useIsSignedIn, useSession } from '@/lib/auth-client';
 
 const PAGE_SIZE = 25;
 const SLOW_LOAD_MS = 5000;
@@ -69,8 +70,9 @@ const inlineControl =
 
 export function FeedPage() {
    useDocumentTitle('Feed');
-   const { isSignedIn } = useAuth();
-   const { user } = useUser();
+   const { isSignedIn } = useIsSignedIn();
+   const { data: session } = useSession();
+   const user = session?.user ?? null;
    const pageRef = useRef<HTMLDivElement>(null);
    useRevealIn(pageRef);
 
@@ -397,7 +399,7 @@ export function FeedPage() {
          body,
          createdAt: new Date().toISOString(),
          user: {
-            displayName: user?.fullName ?? user?.username ?? 'You',
+            displayName: user?.name ?? user?.username ?? 'You',
             username: user?.username ?? '',
          },
       };
@@ -587,11 +589,11 @@ export function FeedPage() {
             <p className="max-w-[46ch] text-[17px] text-ink-2">
                What other anglers logged, newest first.
             </p>
-            <Show when="signed-in">
+            <SignedIn>
                <p className="text-[15px] text-ink-3">
                   Your own posts appear here when you log a catch or add a spot.
                </p>
-            </Show>
+            </SignedIn>
          </header>
 
          <div className="rv mt-8" style={{ '--i': 1 } as CSSProperties}>

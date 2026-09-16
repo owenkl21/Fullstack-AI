@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { SignUpButton } from '@clerk/react';
 import { TornEdge } from '@/components/brand/TornEdge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ANCHOR } from './layout';
 import { photos } from './photos';
 import { useParallaxFallback } from './useParallaxFallback';
+import { Link } from 'react-router-dom';
 
 /*
  * One photograph edge to edge, the promise over it, and the single teal action. The
@@ -80,18 +80,17 @@ export function LandingHero() {
                One tap stamps the place, the minute and the weather. The record
                builds itself before the fish goes back.
             </p>
-            <SignUpButton mode="modal">
-               <Button
-                  size="lg"
-                  className={cn(
-                     action.className,
-                     'md:h-[52px] md:px-7 md:text-[26px]'
-                  )}
-                  style={action.style}
-               >
-                  Start your log
-               </Button>
-            </SignUpButton>
+            <Button
+               size="lg"
+               className={cn(
+                  action.className,
+                  'md:h-[52px] md:px-7 md:text-[26px]'
+               )}
+               style={action.style}
+               asChild
+            >
+               <Link to="/sign-up">Start your log</Link>
+            </Button>
          </div>
 
          <TornEdge fill="bg" seed={5} />
