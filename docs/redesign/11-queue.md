@@ -137,14 +137,36 @@ the live deploy.
 - [x] Forecast colour for wind and sky, phone grid scroll fixed; profile and
       insights count-ins and growing bars.
 
+## Done on 17 Sep, the second list (commit 90218a2)
+
+- Forecast: hourly cells carry a tint per band (`forecast/tones.ts`,
+  `.tone-*` in index.css); the loud bands go solid with paper text. Day
+  facts and the hour grid re-land when the day changes.
+- Feed: Global or Local is one switch ahead of the rest. The radius slider
+  (`ui/slider.tsx`) keeps its value while dragging and commits on release.
+- Comments: cards with an initial, a boxed composer with a real send button,
+  Enter sends, replies animate in (`.comment-in`).
+- Spots: `MapLocationPicker` is a fixed pin the map moves under, with wheel
+  zoom, place search (Nominatim), Maps link or typed pair, locate, base
+  switch. The map's Log here goes to `/log?lat&lng` (quick log reads it).
+  A position within 600 m of one of your spots files the catch there
+  (`lib/geo.ts`), with an opt-out on the quick log and an offer on the form.
+- Water is salt or fresh only in both spot forms.
+- Desktop: quick log two columns from `lg`; containers widened (home 1040,
+  form 1120, feed 800, profile and spot 960, competitions 1000).
+- Loaders shimmer (`.shimmer`) on forecast and insights; insights table rows
+  stagger in (`tr.fact`).
+
+Verified live with `audit/verify17.mjs`, `comments2.mjs`, `nearby.mjs`.
+
 ## Next, in order
 
 1. **Switch the readers on**: set `ANTHROPIC_API_KEY` on Railway for the
     competition reader; stand up Fishial on the hub and set `FISHIAL_URL`.
 2. **The pin brief in Claude Design** (docs/redesign/12-design-brief-pins.md):
     once the SVGs come back, swap them into `kindPin` and the cluster disc.
-3. **Verify this batch on the live site** (`audit/verify15.mjs`) and fix what
-    the screenshots show.
+3. **Same water, properly**: the 600 m rule is a proxy. When spots carry a
+    water body name, match on that first and fall back to distance.
 
 ## Standing constraints
 
