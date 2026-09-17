@@ -1,4 +1,4 @@
-import { type CSSProperties, useRef } from 'react';
+import { type CSSProperties, type ReactNode, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { CameraIcon } from '@heroicons/react/24/outline';
 import { FishMark } from '@/components/brand/FishMark';
@@ -22,10 +22,14 @@ import {
 export function ProfileView({
    profile,
    tallies,
+   figures,
    onOpenConnections,
 }: {
    profile: UserProfile;
    tallies: ProfileTallies | null;
+   /* The counted figures, slotted in here so they land above the photographs
+    * rather than after them. An empty shelf should not outrank real numbers. */
+   figures?: ReactNode;
    onOpenConnections: (kind: ConnectionsKind) => void;
 }) {
    const root = useRef<HTMLDivElement>(null);
@@ -127,6 +131,8 @@ export function ProfileView({
             </p>
          </section>
 
+         {figures}
+
          <section className="rv mt-10" style={{ '--i': 2 } as CSSProperties}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
                <h2 className="g text-[30px] md:text-[36px]">Photographs</h2>
@@ -146,18 +152,18 @@ export function ProfileView({
                <div className="mt-5">
                   <ul
                      aria-hidden="true"
-                     className="grid grid-cols-3 gap-2 sm:grid-cols-4"
+                     className="grid max-w-[420px] grid-cols-4 gap-2"
                   >
                      {[0, 1, 2, 3].map((frame) => (
                         <li
                            key={frame}
-                           className="flex aspect-square items-center justify-center border border-dashed border-line"
+                           className="flex h-[72px] items-center justify-center border border-dashed border-line"
                         >
-                           <FishMark className="h-5 w-8 text-ink-3/50" />
+                           <FishMark className="h-6 w-10 text-ink-3/45" />
                         </li>
                      ))}
                   </ul>
-                  <p className="mt-5 max-w-[60ch] text-base text-ink-2">
+                  <p className="mt-4 max-w-[60ch] text-base text-ink-2">
                      Photographs you attach to a catch or a spot collect here.
                   </p>
                   <Link

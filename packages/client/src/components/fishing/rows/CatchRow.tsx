@@ -33,7 +33,12 @@ export function CatchRow({
    marked?: boolean;
 }) {
    const when = formatDateTime(item.caughtAt);
-   const where = item.site?.name ?? 'No spot recorded';
+   /*
+    * No spot is not worth a line. It used to say "No spot recorded", which on a
+    * phone truncated to "No spot recor..." and told the reader nothing they
+    * could not already see. The date alone reads cleanly.
+    */
+   const where = item.site?.name ?? null;
    const fish = item.count > 1 ? plural(item.count, 'fish', 'fish') : null;
    const subline = metaLine(when, where, fish);
 

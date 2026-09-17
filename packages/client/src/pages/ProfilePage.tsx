@@ -180,10 +180,9 @@ function ProfileScreen() {
                <ProfileView
                   profile={profile}
                   tallies={tallies}
+                  figures={<ProfileStatsPanel />}
                   onOpenConnections={openConnections}
                />
-
-               <ProfileStatsPanel />
 
                <div className="mt-12 border-t border-line pt-6">
                   <h2 className="g text-[30px] md:text-[36px]">Settings</h2>
