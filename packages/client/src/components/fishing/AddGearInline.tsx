@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useState } from 'react';
 import type { GearOption } from '@/pages/fishing/LogCatchPage';
 import { Button } from '@/components/ui/button';
+import { ChoiceGroup, FieldStack, TextField } from '@/components/ui/field';
 
 /*
  * Registering a rod without abandoning the catch you were logging.
@@ -99,59 +100,28 @@ export function AddGearInline({
       <div className="border border-line bg-bg-2 p-4">
          <h3 className="g text-[22px]">New gear</h3>
 
-         <div className="mt-3 flex flex-col gap-3">
-            <div>
-               <label htmlFor="new-gear-name" className="lab">
-                  What it is
-               </label>
-               <input
-                  id="new-gear-name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Sensor Surf 14ft"
-                  className="input-line mt-1 text-[16px]"
-               />
-            </div>
+         <FieldStack className="mt-3">
+            <TextField
+               label="What it is"
+               value={name}
+               onChange={(event) => setName(event.target.value)}
+               placeholder="Sensor Surf 14ft"
+            />
 
-            <div>
-               <label htmlFor="new-gear-brand" className="lab">
-                  Make
-               </label>
-               <input
-                  id="new-gear-brand"
-                  value={brand}
-                  onChange={(event) => setBrand(event.target.value)}
-                  placeholder="Daiwa"
-                  className="input-line mt-1 text-[16px]"
-               />
-            </div>
+            <TextField
+               label="Make"
+               value={brand}
+               onChange={(event) => setBrand(event.target.value)}
+               placeholder="Daiwa"
+            />
 
-            <div>
-               <span className="lab">Kind</span>
-               <div
-                  className="mt-1 flex flex-wrap gap-2"
-                  role="radiogroup"
-                  aria-label="Kind of gear"
-               >
-                  {TYPES.map((option) => (
-                     <button
-                        key={option}
-                        type="button"
-                        role="radio"
-                        aria-checked={type === option}
-                        onClick={() => setType(option)}
-                        className={
-                           'g-tracked inline-flex h-11 items-center border px-3.5 text-[16px] transition-colors duration-150 ' +
-                           (type === option
-                              ? 'border-ink bg-ink text-background'
-                              : 'border-line text-ink-2 hover:border-ink hover:text-ink')
-                        }
-                     >
-                        {label(option)}
-                     </button>
-                  ))}
-               </div>
-            </div>
+            <ChoiceGroup
+               label="Kind"
+               value={type}
+               onChange={setType}
+               size="sm"
+               options={TYPES.map((t) => ({ value: t, label: label(t) }))}
+            />
 
             {error ? (
                <p role="alert" className="text-[14px] text-destructive">
@@ -183,7 +153,7 @@ export function AddGearInline({
                   Cancel
                </Button>
             </div>
-         </div>
+         </FieldStack>
       </div>
    );
 }

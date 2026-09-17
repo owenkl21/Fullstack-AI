@@ -1,6 +1,7 @@
 import type { CSSProperties, FormEvent, ReactNode } from 'react';
-import { useId, useRef } from 'react';
+import { useRef } from 'react';
 import { useRevealIn } from '@/components/brand/Reveal';
+import { TextField } from '@/components/ui/field';
 
 /*
  * One column, the same shape on every auth screen, so signing in and resetting
@@ -54,6 +55,14 @@ export function AuthShell({
    );
 }
 
+/*
+ * The auth pages' field, which is now the product's field.
+ *
+ * It had its own spacing, a grid gap of 2 where the rest of the app used a top
+ * margin, so sign in and the profile settings did not line up with each other
+ * even though they sit one click apart. The signature stays, because five pages
+ * call it; only the thing it renders has changed.
+ */
 export function Field({
    label,
    type = 'text',
@@ -71,25 +80,16 @@ export function Field({
    required?: boolean;
    hint?: string;
 }) {
-   const id = useId();
-
    return (
-      <div className="grid gap-2">
-         <label className="lab" htmlFor={id}>
-            {label}
-         </label>
-         <input
-            id={id}
-            type={type}
-            value={value}
-            required={required}
-            autoComplete={autoComplete}
-            onChange={(event) => onChange(event.target.value)}
-            /* 16px so iOS does not zoom the page on focus. */
-            className="input-line text-[16px]"
-         />
-         {hint ? <p className="text-[14px] text-ink-2">{hint}</p> : null}
-      </div>
+      <TextField
+         label={label}
+         type={type}
+         value={value}
+         required={required}
+         autoComplete={autoComplete}
+         hint={hint}
+         onChange={(event) => onChange(event.target.value)}
+      />
    );
 }
 
