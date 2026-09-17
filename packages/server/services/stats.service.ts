@@ -26,6 +26,8 @@ const CATCH_FOR_SCORING = {
    released: true,
    caughtAt: true,
    title: true,
+   /* For a favourite spot. */
+   site: { select: { id: true, name: true } },
    species: {
       select: {
          id: true,
@@ -50,6 +52,7 @@ type RawCatch = {
    released: boolean;
    caughtAt: Date;
    title: string;
+   site: { id: string; name: string } | null;
    species: {
       id: string;
       commonName: string;
@@ -170,6 +173,63 @@ export const statsService = {
          rows.map((r) => r.caughtAt.toISOString().slice(0, 10))
       );
 
+      /*
+       * The three figures an angler would actually mention. Each is counted over
+       * the catches already in hand rather than costing another query, and each
+       * is null unless it happened more than once: one catch does not make a
+       * favourite species, and calling it one would be flattery rather than a
+       * record. Ties go to whichever was seen first, so two identical page loads
+       * never disagree.
+       */
+      const favourite = <T>(
+         items: RawCatch[],
+         key: (row: RawCatch) => T | null | undefined,
+         name: (row: RawCatch) => string
+      ) => {
+         const counts = new Map<T, { count: number; name: string }>();
+
+         for (const row of items) {
+            const k = key(row);
+            if (k === null || k === undefined) {
+               continue;
+            }
+            const seen = counts.get(k);
+            if (seen) {
+               seen.count += 1;
+            } else {
+               counts.set(k, { count: 1, name: name(row) });
+            }
+         }
+
+         let best: { count: number; name: string } | null = null;
+         for (const entry of counts.values()) {
+            if (!best || entry.count > best.count) {
+               best = entry;
+            }
+         }
+
+         return best && best.count > 1 ? best : null;
+      };
+
+      const favouriteSpecies = favourite(
+         withSpecies,
+         (r) => r.speciesId,
+         (r) => r.species?.commonName ?? 'Unknown'
+      );
+
+      const favouriteSpot = favourite(
+         rows,
+         (r) => r.site?.id,
+         (r) => r.site?.name ?? 'Unknown'
+      );
+
+      /* The best day counts fish, not trips. */
+      const bestDay = favourite(
+         rows,
+         (r) => r.caughtAt.toISOString().slice(0, 10),
+         (r) => r.caughtAt.toISOString().slice(0, 10)
+      );
+
       return {
          catches: rows.length,
          /* Null, not zero, when nothing has a species yet. */
@@ -188,6 +248,13 @@ export const statsService = {
           * zero rather than just showing one.
           */
          unscored: scored.filter((e) => !e.qualifies).length,
+         favouriteSpecies: favouriteSpecies
+            ? { name: favouriteSpecies.name, count: favouriteSpecies.count }
+            : null,
+         favouriteSpot: favouriteSpot
+            ? { name: favouriteSpot.name, count: favouriteSpot.count }
+            : null,
+         bestDay: bestDay ? { date: bestDay.name, count: bestDay.count } : null,
       };
    },
 

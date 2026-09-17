@@ -44,6 +44,10 @@ export type ProfileStats = {
    points: number;
    qualifyingCatches: number;
    unscored: number;
+   /* Null until something has happened more than once. */
+   favouriteSpecies: { name: string; count: number } | null;
+   favouriteSpot: { name: string; count: number } | null;
+   bestDay: { date: string; count: number } | null;
 };
 
 export type PersonalBest = {

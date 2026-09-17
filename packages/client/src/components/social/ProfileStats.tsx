@@ -1,3 +1,8 @@
+import {
+   MapPinIcon,
+   SparklesIcon,
+   TrophyIcon,
+} from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchMyStats, type PersonalBest, type ProfileStats } from './api';
@@ -63,6 +68,43 @@ export function ProfileStatsPanel() {
       { label: 'Points', value: String(stats.points), counted: true },
    ];
 
+   const dayName = (iso: string) => {
+      const at = new Date(`${iso}T12:00:00Z`);
+      return Number.isNaN(at.getTime())
+         ? iso
+         : at.toLocaleDateString(undefined, {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+           });
+   };
+
+   const highlights = [
+      stats.favouriteSpecies && {
+         key: 'species',
+         Icon: SparklesIcon,
+         value: stats.favouriteSpecies.name,
+         tail: `is your most caught fish, ${stats.favouriteSpecies.count} of them.`,
+      },
+      stats.favouriteSpot && {
+         key: 'spot',
+         Icon: MapPinIcon,
+         value: stats.favouriteSpot.name,
+         tail: `is where you land most, ${stats.favouriteSpot.count} fish.`,
+      },
+      stats.bestDay && {
+         key: 'day',
+         Icon: TrophyIcon,
+         value: `${stats.bestDay.count} fish`,
+         tail: `was your best day, on ${dayName(stats.bestDay.date)}.`,
+      },
+   ].filter(Boolean) as {
+      key: string;
+      Icon: typeof SparklesIcon;
+      value: string;
+      tail: string;
+   }[];
+
    return (
       <section className="mt-10">
          <h2 className="lab lab-rule">Your log</h2>
@@ -89,6 +131,27 @@ export function ProfileStatsPanel() {
                </div>
             ))}
          </dl>
+
+         {/*
+          * The things worth saying out loud, in words rather than as figures in the
+          * grid: a favourite is a sentence, not a measurement. Each one only
+          * appears once it has happened more than once.
+          */}
+         {highlights.length ? (
+            <ul className="mt-6 flex flex-col gap-2.5">
+               {highlights.map((h) => (
+                  <li key={h.key} className="flex items-center gap-2.5">
+                     <h.Icon
+                        aria-hidden="true"
+                        className="size-[18px] shrink-0 text-ink-3"
+                     />
+                     <span className="text-[15px] text-ink-2">
+                        <span className="text-ink">{h.value}</span> {h.tail}
+                     </span>
+                  </li>
+               ))}
+            </ul>
+         ) : null}
 
          {stats.unscored ? (
             <p className="mt-5 max-w-[56ch] text-[14px] text-ink-3">
