@@ -34,7 +34,16 @@ Work is on branch **`redesign-theme`**, committed but never pushed. Nothing has 
 
 ### Progress marker
 
-Two commits on `redesign-theme`, neither pushed:
+**As of 17 September 2026 the current record is [11-queue.md](11-queue.md)**:
+what Owen asked for in the design pass, what is done and checked on the live
+deploy, and what is next in order. The table below is the state of the
+foundation work from 16 September and has not changed since.
+
+Deploys: Vercel builds `fishlogger` `main` (`git push fishlogger HEAD:main`);
+the server is `railway up --service server --detach`. `git push origin`
+deploys nothing.
+
+Earlier, two commits on `redesign-theme`, neither pushed at the time:
 
 | | |
 |---|---|

@@ -45,30 +45,47 @@ the live deploy.
       favourite spot could not have been worked out before. Each stays null
       until it has happened more than once.
 
+- [x] **A forecast page.** `/forecast`: search a beach, a town or a headland,
+      or use where you are; seven days, hour by hour, wind and gusts with their
+      direction as arrows, rain chance and fall, thunder from convective energy,
+      pressure, swell with direction and period, sea, water, UV, first and last
+      light, the moon. Kept in the address so it can be sent on. Public.
+- [x] **Conditions say where you are.** Nominatim through the server, cached a
+      day per kilometre. "Conditions at Kommetjie, taken 15:42."
+- [x] **Precipitation in millimetres and thunder** on the reading and the grid.
+- [x] **Catches were saving with every weather column null.** Open-Meteo
+      answers the hosted server with 429 because Railway's outbound address is
+      shared with strangers. The server now logs the status, retries, and
+      remembers an hour for ten minutes; the browser reads Open-Meteo itself
+      from its own address when the server cannot, and a save carries the whole
+      reading so the server keeps it. Verified with the server endpoint blocked.
+- [x] **Keeping other anglers' spots and gear.** A Kept page under the account
+      menu; keep buttons on their spot page, in the map popup, and on the gear
+      rows of a catch that is not yours.
+- [x] **Banner behind the name**, on both profile pages, set from settings
+      beside the photograph. Contours stand in until there is one.
+- [x] **A place search on the map** that moves the view.
+- [x] **Spot and gear forms on the shared field set.**
+- [x] **A private spot was public by address.** Not found to everyone but its
+      owner now.
+- [x] **Deploys.** Vercel builds `fishlogger` `main`; `git push origin` deploys
+      nothing. Railway is `railway up --service server --detach`.
+
 ## Next, in order
 
 1. **The rest of the feed card.** Still disorganised: the ordering of heading,
     species, measurement and meta has not been reworked.
-4. **Log everything.** Every condition saved on the catch, water temperature
-    included. Pin visibility a toggle: hidden from other anglers, still in the
-    data for us.
-5. **Back-dated catches.** Drop a pin and a date for a fish logged from home,
-    and pull the weather for that place and time. The historical path already
-    exists in the Open-Meteo client.
-6. **Profile.** Settings panel is the worst-looking screen in the app. Banner
-    image and profile picture. Followers and following as real controls with
-    counts and icons. More figures: favourite spot, best day, favourite species.
-7. **Competitions.** Anglers create their own with their own rules: dates,
-    species, length or weight, and the unit follows the reader's setting.
-8. **This season strip.** Several fish in one day need a better shape than one
+2. **This season strip.** Several fish in one day need a better shape than one
     bar each.
-9. **Component library.** The distance toggle and the filters are home made.
-    Standardise on one maintained set.
-10. **Motion on the torn edges.** A slow flow rather than a static shape.
-11. **Saving other people's spots, gear and lures.**
-12. **Contours on desktop.** Cut off and repetitive, worst on the home page.
-13. **Phone: the Log key** wants an icon and less sharp corners.
-14. **Phone: the filters** still take too much room.
+3. **Contours on desktop.** Cut off and repetitive, worst on the home page.
+4. **Phone: the Log key** wants an icon and less sharp corners.
+5. **Phone: the filters** still take too much room.
+6. **The catch form's last raw inputs** (nine of them) onto the field set.
+7. **Gear picker with categories** on the log, the way FishAngler groups rods,
+    reels, lines and lures.
+8. **Angler Intel chart:** catches by hour and by tide or moon, from the log.
+9. **Pin clustering** at low zoom, and the map modes from the pin brief.
+10. **Species from a photograph.** Needs a model decision first.
 
 ## Standing constraints
 
