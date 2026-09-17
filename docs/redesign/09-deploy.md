@@ -215,27 +215,52 @@ Expect `{"message":"Hello from the API!"}`. This proves the process is up, the p
 
 ### 4.5 Give the R2 bucket a CORS policy
 
-**Do this before testing an upload, or every upload fails.** Since 3.6 the browser PUTs the file straight to R2 rather than through the API, and a cross-origin PUT from a page needs the bucket to allow it. There is no CORS policy on the bucket today.
+**Do this before testing an upload, or every upload fails.** Photos go straight
+from the browser to R2 on a presigned URL, and a cross-origin `PUT` from a page
+needs the bucket to allow it. There is no CORS policy on the bucket today.
 
-In the Cloudflare dashboard, on the bucket, under Settings, CORS policy:
+The bucket is **`fishing-ai`**. The account id is the hex string in your
+Cloudflare dashboard URL; it is also `CLOUDFLARE_ACCOUNT_ID` on the Railway
+service.
+
+Cloudflare dashboard, R2, the `fishing-ai` bucket, Settings, CORS policy, Edit:
 
 ```json
 [
    {
       "AllowedOrigins": [
-         "https://<your-project>.vercel.app",
+         "https://fishlogger-client.vercel.app",
          "http://localhost:5173"
       ],
       "AllowedMethods": ["PUT", "GET"],
       "AllowedHeaders": ["content-type"],
+      "ExposeHeaders": ["ETag"],
       "MaxAgeSeconds": 3600
    }
 ]
 ```
 
-`localhost:5173` is there so uploads still work in development. Add any custom domain to `AllowedOrigins` when you add one, and remember preview deployments get their own `*.vercel.app` hostnames, which this does not cover.
+Why each line is what it is:
 
-The failure mode is worth recognising: the upload fails in the browser with an opaque CORS error and nothing appears in the Railway logs at all, because the request never reached the server.
+- **`AllowedOrigins`** is the page's origin, not the bucket's. `localhost:5173`
+  is there so uploads still work when the client runs locally against this API.
+- **`AllowedMethods`** needs `PUT` because that is what the uploader sends.
+  `GET` is there for any future direct read; an `<img src>` does not need CORS,
+  so reads work without it today.
+- **`AllowedHeaders`** must include `content-type`, because the uploader sends
+  `Content-Type: image/jpeg` and the browser asks permission for that header in
+  its preflight. Omit it and the preflight fails before the upload starts.
+- **`ExposeHeaders: ETag`** is not required today. It costs nothing and is what
+  you would need to confirm an upload or do multipart later.
+
+**Preview deployments are not covered.** Vercel gives every preview its own
+hostname, and this policy names one origin. Uploads will fail on previews until
+that hostname is added, or a wildcard is used.
+
+The failure mode is worth recognising: the upload fails in the browser with an
+opaque CORS error, and nothing appears in the Railway logs at all, because the
+request never reached the server. If you see an upload fail with nothing
+server-side, this is the first thing to check.
 
 ## 5. Then Vercel
 
