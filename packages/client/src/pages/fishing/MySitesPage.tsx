@@ -179,7 +179,7 @@ function MySitesList() {
                </div>
             )}
 
-            {status === 'ready' && items.length > 0 ? (
+            {status === 'ready' ? (
                <div
                   className="mt-6 flex flex-wrap gap-2"
                   role="group"
@@ -212,12 +212,6 @@ function MySitesList() {
                />
             ) : status === 'error' ? (
                <InlineError message={LOAD_FAILED} onRetry={retry} />
-            ) : items.length === 0 ? (
-               <EmptyState
-                  sentence="No spots saved yet, and a spot is what a catch gets logged against."
-                  actionLabel="Add a spot"
-                  to="/sites/new"
-               />
             ) : onMap ? (
                /*
                 * The map is drawn whether or not a spot has a position. It
@@ -239,6 +233,12 @@ function MySitesList() {
                      </p>
                   ) : null}
                </>
+            ) : items.length === 0 ? (
+               <EmptyState
+                  sentence="No spots saved yet, and a spot is what a catch gets logged against."
+                  actionLabel="Add a spot"
+                  to="/sites/new"
+               />
             ) : filtered.length === 0 ? (
                <NoMatchState
                   sentence="No spot matches that search."
