@@ -33,10 +33,22 @@ the live deploy.
       webhooks, so the server had been three hours behind the client. A CI
       workflow now deploys it and fails if the server does not answer.
 
+- [x] **Anglers have a profile other people can open.** New public endpoint and
+      an /anglers/:id route, with follow from it. The public view is its own
+      query, not the owner's with a flag: the owner's selects an email address
+      and every catch regardless of visibility, and only PUBLIC records appear
+      here. Checked on the live payload: no email field, correct keys only.
+- [x] **Followers and following are controls**, with the figure leading and a
+      mark on each, on both profiles.
+- [x] **Favourite species, favourite spot, best day.** Counted over the catches
+      already loaded. The site had never been selected for the stats, so a
+      favourite spot could not have been worked out before. Each stays null
+      until it has happened more than once.
+
 ## Next, in order
 
-1. **The rest of the feed card.** Still no way through to the person who caught
-    it: there is no public profile route or endpoint at all, only your own.
+1. **The rest of the feed card.** Still disorganised: the ordering of heading,
+    species, measurement and meta has not been reworked.
 4. **Log everything.** Every condition saved on the catch, water temperature
     included. Pin visibility a toggle: hidden from other anglers, still in the
     data for us.
