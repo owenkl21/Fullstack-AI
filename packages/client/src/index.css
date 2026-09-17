@@ -1181,10 +1181,20 @@ input[type='search']::-webkit-search-cancel-button:hover {
    }
 }
 
-/* ---- A picker rising as a sheet on a phone ---------------------------------- */
-.picker-sheet {
-   transform: none !important;
+/* ---- A sheet rising from the bottom of a phone ------------------------------ */
+.sheet {
    animation: sheet-up 260ms var(--ease) both;
+}
+.sheet-overlay {
+   animation: fade-in 200ms var(--ease) both;
+}
+@keyframes fade-in {
+   from {
+      opacity: 0;
+   }
+   to {
+      opacity: 1;
+   }
 }
 @keyframes sheet-up {
    from {
@@ -1201,7 +1211,8 @@ select {
    border-radius: 0;
 }
 @media (prefers-reduced-motion: reduce) {
-   .picker-sheet {
+   .sheet,
+   .sheet-overlay {
       animation: none;
    }
 }

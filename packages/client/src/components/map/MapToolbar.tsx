@@ -6,6 +6,7 @@ import {
 } from '@heroicons/react/24/outline';
 import * as Popover from '@radix-ui/react-popover';
 import { usePhone } from '@/lib/media';
+import { Sheet } from '@/components/ui/sheet';
 import { useState } from 'react';
 import { FishMark } from '@/components/brand/FishMark';
 import { Picker } from '@/components/ui/picker';
@@ -71,9 +72,10 @@ export function MapToolbar({
                : 'absolute top-3 left-3 z-[500] flex flex-wrap items-start gap-2 pr-16'
          )}
       >
-         <Popover.Root open={layersOpen} onOpenChange={setLayersOpen}>
-            <Popover.Trigger asChild>
+         {phone ? (
+            <>
                <button
+                  onClick={phone ? () => setLayersOpen(true) : undefined}
                   type="button"
                   className={bar ? barButton : control}
                   aria-label="Map layers"
@@ -89,115 +91,226 @@ export function MapToolbar({
                      </span>
                   )}
                </button>
-            </Popover.Trigger>
-            <Popover.Portal>
-               <Popover.Content
-                  align={phone ? 'center' : 'start'}
-                  side="bottom"
-                  sideOffset={phone ? 0 : 6}
-                  avoidCollisions={!phone}
-                  onOpenAutoFocus={(event) => event.preventDefault()}
-                  collisionPadding={12}
-                  className={cn(
-                     'z-[1000] border border-line bg-background p-3 text-ink shadow-[0_10px_30px_rgba(11,9,9,0.18)]',
-                     phone
-                        ? 'picker-sheet fixed inset-x-0 bottom-0 w-screen border-t-2 border-teal pb-[max(12px,env(safe-area-inset-bottom))]'
-                        : 'w-[min(300px,calc(100vw-24px))]'
-                  )}
+               <Sheet
+                  open={layersOpen}
+                  onOpenChange={setLayersOpen}
+                  title="Map layers"
                >
-                  <span className="lab text-ink-3">Base</span>
-                  <div
-                     role="radiogroup"
-                     className="mt-1.5 grid grid-cols-2 gap-1.5"
-                  >
-                     {BASE_LAYERS.map((option) => (
-                        <button
-                           key={option.value}
-                           type="button"
-                           role="radio"
-                           aria-checked={base === option.value}
-                           onClick={() => onBase(option.value)}
-                           className={cn(
-                              'g-tracked h-10 border text-[15px] transition-colors duration-100',
-                              base === option.value
-                                 ? 'border-ink bg-ink text-background'
-                                 : 'border-line text-ink-2 hover:border-ink hover:text-ink'
-                           )}
-                        >
-                           {option.label}
-                        </button>
-                     ))}
-                  </div>
-                  <span className="lab mt-4 block text-ink-3">Show</span>
-                  <ul className="mt-1.5 flex flex-col">
-                     {(
-                        [
-                           ['others', 'Other anglers’ spots'],
-                           ['marks', 'My private marks'],
-                           ['places', 'Slipways, harbours and shops'],
-                        ] as [keyof Layers, string][]
-                     ).map(([key, text]) => (
-                        <li key={key}>
+                  <div className="thread-scroll min-h-0 overflow-y-auto p-3">
+                     <span className="lab text-ink-3">Base</span>
+                     <div
+                        role="radiogroup"
+                        className="mt-1.5 grid grid-cols-2 gap-1.5"
+                     >
+                        {BASE_LAYERS.map((option) => (
+                           <button
+                              key={option.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={base === option.value}
+                              onClick={() => onBase(option.value)}
+                              className={cn(
+                                 'g-tracked h-10 border text-[15px] transition-colors duration-100',
+                                 base === option.value
+                                    ? 'border-ink bg-ink text-background'
+                                    : 'border-line text-ink-2 hover:border-ink hover:text-ink'
+                              )}
+                           >
+                              {option.label}
+                           </button>
+                        ))}
+                     </div>
+                     <span className="lab mt-4 block text-ink-3">Show</span>
+                     <ul className="mt-1.5 flex flex-col">
+                        {(
+                           [
+                              ['others', 'Other anglers’ spots'],
+                              ['marks', 'My private marks'],
+                              ['places', 'Slipways, harbours and shops'],
+                           ] as [keyof Layers, string][]
+                        ).map(([key, text]) => (
+                           <li key={key}>
+                              <button
+                                 type="button"
+                                 role="checkbox"
+                                 aria-checked={layers[key]}
+                                 onClick={() => onLayer(key)}
+                                 className="flex min-h-11 w-full items-center gap-3 text-left hover:bg-bg-2"
+                              >
+                                 <span
+                                    aria-hidden="true"
+                                    className={cn(
+                                       'grid size-5 shrink-0 place-items-center border',
+                                       layers[key]
+                                          ? 'border-ink bg-ink'
+                                          : 'border-line-2'
+                                    )}
+                                 >
+                                    {layers[key] ? (
+                                       <span className="size-2 bg-background" />
+                                    ) : null}
+                                 </span>
+                                 <span className="g-tracked text-[16px]">
+                                    {text}
+                                 </span>
+                              </button>
+                           </li>
+                        ))}
+                     </ul>
+                     {phone ? (
+                        <>
+                           <span className="lab mt-4 block text-ink-3">
+                              The pins
+                           </span>
+                           <ul className="mt-1.5 flex flex-col gap-1.5">
+                              {LEGEND.map((row) => (
+                                 <li
+                                    key={row.key}
+                                    className="flex items-center gap-3"
+                                 >
+                                    <LegendMark
+                                       fill={row.fill}
+                                       shape={row.shape}
+                                    />
+                                    <span className="text-[14px]">
+                                       {row.label}
+                                    </span>
+                                 </li>
+                              ))}
+                           </ul>
                            <button
                               type="button"
-                              role="checkbox"
-                              aria-checked={layers[key]}
-                              onClick={() => onLayer(key)}
-                              className="flex min-h-11 w-full items-center gap-3 text-left hover:bg-bg-2"
+                              onClick={() => setLayersOpen(false)}
+                              className="g-tracked mt-4 flex h-11 w-full items-center justify-center bg-ink text-[16px] text-background"
                            >
-                              <span
-                                 aria-hidden="true"
-                                 className={cn(
-                                    'grid size-5 shrink-0 place-items-center border',
-                                    layers[key]
-                                       ? 'border-ink bg-ink'
-                                       : 'border-line-2'
-                                 )}
-                              >
-                                 {layers[key] ? (
-                                    <span className="size-2 bg-background" />
-                                 ) : null}
-                              </span>
-                              <span className="g-tracked text-[16px]">
-                                 {text}
-                              </span>
+                              Done
                            </button>
-                        </li>
-                     ))}
-                  </ul>
-                  {phone ? (
-                     <>
-                        <span className="lab mt-4 block text-ink-3">
-                           The pins
+                        </>
+                     ) : null}
+                  </div>
+               </Sheet>
+            </>
+         ) : (
+            <Popover.Root open={layersOpen} onOpenChange={setLayersOpen}>
+               <Popover.Trigger asChild>
+                  <button
+                     type="button"
+                     className={bar ? barButton : control}
+                     aria-label="Map layers"
+                  >
+                     <Squares2X2Icon aria-hidden="true" className="size-5" />
+                     {bar ? (
+                        <span>Layers</span>
+                     ) : (
+                        <span className="g-tracked hidden text-[15px] sm:inline">
+                           {BASE_LAYERS.find((b) => b.value === base)?.label ??
+                              'Layers'}
+                           <span className="ml-1.5 text-ink-3">{shown} on</span>
                         </span>
-                        <ul className="mt-1.5 flex flex-col gap-1.5">
-                           {LEGEND.map((row) => (
-                              <li
-                                 key={row.key}
-                                 className="flex items-center gap-3"
+                     )}
+                  </button>
+               </Popover.Trigger>
+               <Popover.Portal>
+                  <Popover.Content
+                     align="start"
+                     sideOffset={6}
+                     collisionPadding={12}
+                     className="z-[1000] w-[min(300px,calc(100vw-24px))] border border-line bg-background p-3 text-ink shadow-[0_10px_30px_rgba(11,9,9,0.18)]"
+                  >
+                     <span className="lab text-ink-3">Base</span>
+                     <div
+                        role="radiogroup"
+                        className="mt-1.5 grid grid-cols-2 gap-1.5"
+                     >
+                        {BASE_LAYERS.map((option) => (
+                           <button
+                              key={option.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={base === option.value}
+                              onClick={() => onBase(option.value)}
+                              className={cn(
+                                 'g-tracked h-10 border text-[15px] transition-colors duration-100',
+                                 base === option.value
+                                    ? 'border-ink bg-ink text-background'
+                                    : 'border-line text-ink-2 hover:border-ink hover:text-ink'
+                              )}
+                           >
+                              {option.label}
+                           </button>
+                        ))}
+                     </div>
+                     <span className="lab mt-4 block text-ink-3">Show</span>
+                     <ul className="mt-1.5 flex flex-col">
+                        {(
+                           [
+                              ['others', 'Other anglers’ spots'],
+                              ['marks', 'My private marks'],
+                              ['places', 'Slipways, harbours and shops'],
+                           ] as [keyof Layers, string][]
+                        ).map(([key, text]) => (
+                           <li key={key}>
+                              <button
+                                 type="button"
+                                 role="checkbox"
+                                 aria-checked={layers[key]}
+                                 onClick={() => onLayer(key)}
+                                 className="flex min-h-11 w-full items-center gap-3 text-left hover:bg-bg-2"
                               >
-                                 <LegendMark
-                                    fill={row.fill}
-                                    shape={row.shape}
-                                 />
-                                 <span className="text-[14px]">
-                                    {row.label}
+                                 <span
+                                    aria-hidden="true"
+                                    className={cn(
+                                       'grid size-5 shrink-0 place-items-center border',
+                                       layers[key]
+                                          ? 'border-ink bg-ink'
+                                          : 'border-line-2'
+                                    )}
+                                 >
+                                    {layers[key] ? (
+                                       <span className="size-2 bg-background" />
+                                    ) : null}
                                  </span>
-                              </li>
-                           ))}
-                        </ul>
-                        <button
-                           type="button"
-                           onClick={() => setLayersOpen(false)}
-                           className="g-tracked mt-4 flex h-11 w-full items-center justify-center bg-ink text-[16px] text-background"
-                        >
-                           Done
-                        </button>
-                     </>
-                  ) : null}
-               </Popover.Content>
-            </Popover.Portal>
-         </Popover.Root>
+                                 <span className="g-tracked text-[16px]">
+                                    {text}
+                                 </span>
+                              </button>
+                           </li>
+                        ))}
+                     </ul>
+                     {phone ? (
+                        <>
+                           <span className="lab mt-4 block text-ink-3">
+                              The pins
+                           </span>
+                           <ul className="mt-1.5 flex flex-col gap-1.5">
+                              {LEGEND.map((row) => (
+                                 <li
+                                    key={row.key}
+                                    className="flex items-center gap-3"
+                                 >
+                                    <LegendMark
+                                       fill={row.fill}
+                                       shape={row.shape}
+                                    />
+                                    <span className="text-[14px]">
+                                       {row.label}
+                                    </span>
+                                 </li>
+                              ))}
+                           </ul>
+                           <button
+                              type="button"
+                              onClick={() => setLayersOpen(false)}
+                              className="g-tracked mt-4 flex h-11 w-full items-center justify-center bg-ink text-[16px] text-background"
+                           >
+                              Done
+                           </button>
+                        </>
+                     ) : null}
+                  </Popover.Content>
+               </Popover.Portal>
+            </Popover.Root>
+         )}
 
          {speciesOptions.length ? (
             <Picker

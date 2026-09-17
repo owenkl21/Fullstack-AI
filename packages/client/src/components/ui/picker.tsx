@@ -7,6 +7,7 @@ import {
 import { useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { usePhone } from '@/lib/media';
+import { Sheet } from '@/components/ui/sheet';
 
 /*
  * A filter you open, in the house style.
@@ -87,7 +88,7 @@ export function Picker({
          role={multiple ? 'group' : 'listbox'}
          aria-label={label}
          className={cn(
-            'thread-scroll overflow-y-auto',
+            'thread-scroll min-h-0 overflow-y-auto',
             phone ? 'max-h-[min(60vh,480px)]' : 'max-h-[min(60vh,360px)]'
          )}
       >
@@ -188,78 +189,76 @@ export function Picker({
       </div>
    );
 
-   return (
-      <Popover.Root open={open} onOpenChange={setOpen}>
-         <Popover.Trigger asChild>
-            <button
-               type="button"
-               aria-haspopup="listbox"
-               aria-expanded={open}
+   const trigger = (
+      <button
+         type="button"
+         aria-haspopup="listbox"
+         aria-expanded={open}
+         onClick={phone ? () => setOpen(true) : undefined}
+         className={cn(
+            'inline-flex w-full items-center gap-2 border bg-background text-left transition-colors duration-150 [transition-timing-function:var(--ease)] hover:border-ink-3',
+            size === 'sm' ? 'min-h-11 px-3' : 'min-h-12 px-3.5',
+            open
+               ? 'border-ink shadow-[inset_0_-2px_0_var(--teal)]'
+               : chosen.length > 0 && (multiple || chosen[0])
+                 ? 'border-ink'
+                 : 'border-line',
+            className
+         )}
+      >
+         {icon ? <span className="shrink-0 text-ink-2">{icon}</span> : null}
+         <span className="flex min-w-0 flex-1 flex-col leading-none">
+            <span className="lab text-[10px] text-ink-3">{label}</span>
+            <span
                className={cn(
-                  'inline-flex w-full items-center gap-2 border bg-background text-left transition-colors duration-150 [transition-timing-function:var(--ease)] hover:border-ink-3',
-                  size === 'sm' ? 'min-h-11 px-3' : 'min-h-12 px-3.5',
-                  open
-                     ? 'border-ink shadow-[inset_0_-2px_0_var(--teal)]'
-                     : chosen.length > 0 && (multiple || chosen[0])
-                       ? 'border-ink'
-                       : 'border-line',
-                  className
+                  'g-tracked mt-0.5 truncate',
+                  size === 'sm' ? 'text-[15px]' : 'text-[16px]',
+                  multiple && chosen.length === 0 && 'text-ink-2'
                )}
             >
-               {icon ? (
-                  <span className="shrink-0 text-ink-2">{icon}</span>
-               ) : null}
-               <span className="flex min-w-0 flex-1 flex-col leading-none">
-                  <span className="lab text-[10px] text-ink-3">{label}</span>
-                  <span
-                     className={cn(
-                        'g-tracked mt-0.5 truncate',
-                        size === 'sm' ? 'text-[15px]' : 'text-[16px]',
-                        multiple && chosen.length === 0 && 'text-ink-2'
-                     )}
-                  >
-                     {summary}
-                  </span>
-               </span>
-               {multiple && chosen.length > 0 ? (
-                  <span className="num grid size-6 shrink-0 place-items-center bg-ink text-[12px] text-background">
-                     {chosen.length}
-                  </span>
-               ) : null}
-               <ChevronDownIcon
-                  aria-hidden="true"
-                  className={cn(
-                     'size-4 shrink-0 text-ink-3 transition-transform duration-150',
-                     open && 'rotate-180 text-ink'
-                  )}
-               />
-            </button>
-         </Popover.Trigger>
-         <Popover.Portal>
-            {phone ? (
-               <Popover.Content
-                  side="bottom"
-                  align="center"
-                  sideOffset={0}
-                  avoidCollisions={false}
-                  onOpenAutoFocus={(event) => event.preventDefault()}
-                  className="picker-sheet fixed inset-x-0 bottom-0 z-[1000] w-screen border-t-2 border-teal bg-background text-ink shadow-[0_-10px_30px_rgba(11,9,9,0.25)]"
-               >
-                  {head}
-                  {list}
-                  <div className="h-[env(safe-area-inset-bottom)]" />
-               </Popover.Content>
-            ) : (
-               <Popover.Content
-                  align={align}
-                  sideOffset={6}
-                  collisionPadding={12}
-                  className="blk-plain z-[1000] w-[min(360px,calc(100vw-24px))] border border-line bg-background text-ink shadow-[0_10px_30px_rgba(11,9,9,0.18)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1"
-               >
-                  {head}
-                  {list}
-               </Popover.Content>
+               {summary}
+            </span>
+         </span>
+         {multiple && chosen.length > 0 ? (
+            <span className="num grid size-6 shrink-0 place-items-center bg-ink text-[12px] text-background">
+               {chosen.length}
+            </span>
+         ) : null}
+         <ChevronDownIcon
+            aria-hidden="true"
+            className={cn(
+               'size-4 shrink-0 text-ink-3 transition-transform duration-150',
+               open && 'rotate-180 text-ink'
             )}
+         />
+      </button>
+   );
+
+   if (phone) {
+      return (
+         <>
+            {trigger}
+            <Sheet open={open} onOpenChange={setOpen} title={label}>
+               {head}
+               {list}
+            </Sheet>
+         </>
+      );
+   }
+
+   return (
+      <Popover.Root open={open} onOpenChange={setOpen}>
+         <Popover.Trigger asChild>{trigger}</Popover.Trigger>
+         <Popover.Portal>
+            <Popover.Content
+               align={align}
+               sideOffset={6}
+               collisionPadding={12}
+               className="blk-plain z-[1000] w-[min(360px,calc(100vw-24px))] border border-line bg-background text-ink shadow-[0_10px_30px_rgba(11,9,9,0.18)] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1"
+            >
+               {head}
+               {list}
+            </Popover.Content>
          </Popover.Portal>
       </Popover.Root>
    );
