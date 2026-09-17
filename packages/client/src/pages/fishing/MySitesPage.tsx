@@ -1,3 +1,4 @@
+import { useLoadOnScroll } from '@/lib/load-on-scroll';
 import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -127,6 +128,10 @@ function MySitesList() {
    const total = plural(items.length, 'spot');
    const countLine = query.trim() ? `${filtered.length} of ${total}` : total;
    const visible = filtered.slice(0, shown);
+   const moreSentinel = useLoadOnScroll(
+      () => showMore(),
+      filtered.length > visible.length
+   );
    /* The map shows every saved spot, not just the page of rows on screen. */
    const pins = useMemo(
       () =>
@@ -256,19 +261,11 @@ function MySitesList() {
                      ))}
                   </RowList>
 
+                  <div ref={moreSentinel} aria-hidden="true" className="h-px" />
                   {filtered.length > visible.length ? (
-                     <div className="mt-6 flex flex-wrap items-center gap-5 border-t border-line pt-6">
-                        <Button
-                           type="button"
-                           variant="outline"
-                           onClick={showMore}
-                        >
-                           Show more
-                        </Button>
-                        <p className="lab num">
-                           Showing {visible.length} of {filtered.length} spots
-                        </p>
-                     </div>
+                     <p className="lab num mt-4 border-t border-line pt-4">
+                        Showing {visible.length} of {filtered.length} spots
+                     </p>
                   ) : null}
                </>
             )}

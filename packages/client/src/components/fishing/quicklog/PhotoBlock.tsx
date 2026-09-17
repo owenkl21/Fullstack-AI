@@ -7,7 +7,14 @@ import { cn } from '@/lib/utils';
  * the same upload the other forms use; the shutter flashes, the picture fades in and
  * settles, and a photo still going up is the one thing that holds the save.
  */
-export type UploadedPhoto = { storageKey: string; url: string };
+export type UploadedPhoto = {
+   storageKey: string;
+   url: string;
+   /* Where the eye lands when the feed crops it to its frame: fractions
+      across and down. */
+   focusX?: number | null;
+   focusY?: number | null;
+};
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -34,6 +41,72 @@ export function PhotoBlock({
    const [progress, setProgress] = useState(0);
    const [isUploading, setIsUploading] = useState(false);
    const [error, setError] = useState<string | null>(null);
+   /*
+    * The feed shows every photograph in a four by three frame. This is that
+    * frame, with the picture inside it, and dragging the picture moves what
+    * the frame keeps. The point is kept with the photo, as fractions.
+    */
+   const [focus, setFocus] = useState<{ x: number; y: number }>({
+      x: initial?.focusX ?? 0.5,
+      y: initial?.focusY ?? 0.5,
+   });
+   const [ratio, setRatio] = useState<number | null>(null);
+   const uploadedRef = useRef<UploadedPhoto | null>(initial);
+   const frameRef = useRef<HTMLDivElement>(null);
+   const dragRef = useRef<{
+      x: number;
+      y: number;
+      fx: number;
+      fy: number;
+   } | null>(null);
+   const FRAME = 4 / 3;
+
+   const commitFocus = (next: { x: number; y: number }) => {
+      setFocus(next);
+      const photo = uploadedRef.current;
+      if (photo) {
+         const stamped = { ...photo, focusX: next.x, focusY: next.y };
+         uploadedRef.current = stamped;
+         onChange(stamped);
+      }
+   };
+
+   const onFramePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+      dragRef.current = {
+         x: event.clientX,
+         y: event.clientY,
+         fx: focus.x,
+         fy: focus.y,
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+   };
+   const onFramePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+      const drag = dragRef.current;
+      const frame = frameRef.current;
+      if (!drag || !frame || ratio === null) return;
+      const box = frame.getBoundingClientRect();
+      /* How much of the picture the frame cannot hold, on the axis that
+         overflows; a drag across the whole frame moves the focus by that. */
+      const wider = ratio > FRAME;
+      const spare = wider
+         ? box.width * (ratio / FRAME) - box.width
+         : box.height * (FRAME / ratio) - box.height;
+      if (spare <= 0) return;
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      const clamp = (v: number) => Math.min(1, Math.max(0, v));
+      setFocus(
+         wider
+            ? { x: clamp(drag.fx - dx / spare), y: 0.5 }
+            : { x: 0.5, y: clamp(drag.fy - dy / spare) }
+      );
+   };
+   const onFramePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+      if (!dragRef.current) return;
+      dragRef.current = null;
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      commitFocus(focus);
+   };
 
    useEffect(() => {
       return () => {
@@ -85,7 +158,14 @@ export function PhotoBlock({
                }
             },
          });
-         onChange({ storageKey: signed.storageKey, url: signed.readUrl });
+         const uploaded = {
+            storageKey: signed.storageKey,
+            url: signed.readUrl,
+            focusX: focus.x,
+            focusY: focus.y,
+         };
+         uploadedRef.current = uploaded;
+         onChange(uploaded);
       } catch {
          onChange(null);
          setError(
@@ -125,6 +205,9 @@ export function PhotoBlock({
       setPreview(null);
       setProgress(0);
       setError(null);
+      setRatio(null);
+      setFocus({ x: 0.5, y: 0.5 });
+      uploadedRef.current = null;
       onChange(null);
       if (inputRef.current) {
          inputRef.current.value = '';
@@ -203,6 +286,44 @@ export function PhotoBlock({
                />
             ) : null}
          </div>
+         {preview ? (
+            <div className="flex flex-col gap-2">
+               <div className="flex items-baseline justify-between gap-4">
+                  <span className="lab">How the feed shows it</span>
+                  {ratio !== null && Math.abs(ratio - FRAME) > 0.02 ? (
+                     <span className="text-[13px] text-ink-3">
+                        Drag the picture to choose what stays in the frame.
+                     </span>
+                  ) : null}
+               </div>
+               <div
+                  ref={frameRef}
+                  role="img"
+                  aria-label="The photograph as the feed will crop it"
+                  onPointerDown={onFramePointerDown}
+                  onPointerMove={onFramePointerMove}
+                  onPointerUp={onFramePointerUp}
+                  onPointerCancel={onFramePointerUp}
+                  className="relative aspect-[4/3] w-full max-w-[420px] cursor-grab touch-none overflow-hidden border border-line bg-black-block select-none active:cursor-grabbing"
+               >
+                  <img
+                     src={preview}
+                     alt=""
+                     draggable={false}
+                     onLoad={(event) =>
+                        setRatio(
+                           event.currentTarget.naturalWidth /
+                              Math.max(1, event.currentTarget.naturalHeight)
+                        )
+                     }
+                     style={{
+                        objectPosition: `${Math.round(focus.x * 100)}% ${Math.round(focus.y * 100)}%`,
+                     }}
+                     className="pointer-events-none h-full w-full object-cover"
+                  />
+               </div>
+            </div>
+         ) : null}
          {preview ? (
             <div className="flex flex-wrap items-center gap-4">
                <button

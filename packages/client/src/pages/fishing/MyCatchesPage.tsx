@@ -1,3 +1,4 @@
+import { useLoadOnScroll } from '@/lib/load-on-scroll';
 import { PageHead } from '@/components/brand/PageHead';
 import { ContourField } from '@/components/brand/ContourField';
 import { removeDraft, useDrafts } from '@/lib/drafts';
@@ -19,7 +20,6 @@ import { ListSkeleton } from '@/components/states/ListSkeleton';
 import { NoMatchState } from '@/components/states/NoMatchState';
 import { useShowMore } from '@/components/states/useShowMore';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
-import { Button } from '@/components/ui/button';
 import { useDocumentTitle } from '@/lib/title';
 import { SearchField } from '@/components/fishing/rows/SearchField';
 
@@ -170,6 +170,10 @@ function MyCatchesList() {
    const total = plural(items.length, 'catch', 'catches');
    const countLine = narrowed ? `${filtered.length} of ${total}` : total;
    const visible = filtered.slice(0, shown);
+   const moreSentinel = useLoadOnScroll(
+      () => showMore(),
+      filtered.length > visible.length
+   );
 
    return (
       <section
@@ -269,19 +273,11 @@ function MyCatchesList() {
                      ))}
                   </RowList>
 
+                  <div ref={moreSentinel} aria-hidden="true" className="h-px" />
                   {filtered.length > visible.length ? (
-                     <div className="mt-6 flex flex-wrap items-center gap-5 border-t border-line pt-6">
-                        <Button
-                           type="button"
-                           variant="outline"
-                           onClick={showMore}
-                        >
-                           Show more
-                        </Button>
-                        <p className="lab num">
-                           Showing {visible.length} of {filtered.length} catches
-                        </p>
-                     </div>
+                     <p className="lab num mt-4 border-t border-line pt-4">
+                        Showing {visible.length} of {filtered.length} catches
+                     </p>
                   ) : null}
                </>
             )}

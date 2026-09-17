@@ -26,6 +26,9 @@ const optionalTrimmedString = z
 const imageInputSchema = z.object({
    storageKey: z.string().trim().min(1).max(512),
    url: z.string().trim().url(),
+   /* The focal point, as fractions across and down; absent means the middle. */
+   focusX: z.coerce.number().min(0).max(1).optional().nullable(),
+   focusY: z.coerce.number().min(0).max(1).optional().nullable(),
 });
 
 /* A figure that may be absent either way: missing, or present and null. */

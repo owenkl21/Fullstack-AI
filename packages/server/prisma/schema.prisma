@@ -463,6 +463,10 @@ model Image {
   id           String       @id @default(cuid())
   url          String       @db.VarChar(512)
   storageKey   String       @unique @db.VarChar(512)
+  /* Where the eye should land when the picture is cropped to a frame, as
+     fractions across and down. Null means the middle. */
+  focusX       Float?
+  focusY       Float?
   uploadedById String
   uploadedBy   User         @relation("UploadedImages", fields: [uploadedById], references: [id])
   catchLinks   CatchImage[]

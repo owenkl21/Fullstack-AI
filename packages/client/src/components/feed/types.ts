@@ -7,7 +7,14 @@
 export type FeedScope = 'GLOBAL' | 'NEARBY';
 export type FeedType = 'CATCH' | 'SITE';
 
-export type FeedImage = { image: { id: string; url: string } };
+export type FeedImage = {
+   image: {
+      id: string;
+      url: string;
+      focusX?: number | null;
+      focusY?: number | null;
+   };
+};
 
 export type FeedComment = {
    id: string;

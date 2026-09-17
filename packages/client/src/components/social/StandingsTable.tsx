@@ -1,3 +1,4 @@
+import { useLoadOnScroll } from '@/lib/load-on-scroll';
 import { useState } from 'react';
 import type { RivalStanding, Standing } from './api';
 import { formatLength, formatMass, readUnitSystem } from '@/lib/units';
@@ -50,6 +51,10 @@ export function StandingsTable({
    const rankBy = rankByProp ?? ownRankBy;
    const [units] = useState(() => readUnitSystem());
    const [page, setPage] = useState(0);
+   const moreSentinel = useLoadOnScroll(
+      () => setPage((p) => p + 1),
+      (page + 1) * pageSize < standings.length
+   );
 
    if (!standings.length) {
       return <p className="text-[15px] text-ink-2">{emptyLine}</p>;
@@ -108,14 +113,13 @@ export function StandingsTable({
 
    const pages = Math.max(1, Math.ceil(ordered.length / pageSize));
    const current = Math.min(page, pages - 1);
-   const shown = ordered.slice(current * pageSize, (current + 1) * pageSize);
+   /* The top ten first, the rest joining them ten at a time as you scroll. */
+   const shown = ordered.slice(0, (current + 1) * pageSize);
    const youIndex = ordered.findIndex(
       (s) =>
          ('isYou' in s && s.isYou) || (youId !== null && s.anglerId === youId)
    );
-   const youOffPage =
-      youIndex >= 0 &&
-      (youIndex < current * pageSize || youIndex >= (current + 1) * pageSize);
+   const youOffPage = youIndex >= 0 && youIndex >= (current + 1) * pageSize;
 
    return (
       <div className="w-full min-w-0">
@@ -207,30 +211,11 @@ export function StandingsTable({
             </p>
          ) : null}
 
-         {pages > 1 ? (
-            <div className="mt-3 flex items-center justify-between gap-4">
-               <button
-                  type="button"
-                  disabled={current === 0}
-                  onClick={() => setPage(current - 1)}
-                  className="g-tracked inline-flex h-10 items-center text-[15px] text-ink-2 disabled:opacity-40 hover:text-ink"
-               >
-                  Previous ten
-               </button>
-               <span className="num text-[13px] text-ink-3">
-                  {current * pageSize + 1} to{' '}
-                  {Math.min(ordered.length, (current + 1) * pageSize)} of{' '}
-                  {ordered.length}
-               </span>
-               <button
-                  type="button"
-                  disabled={current >= pages - 1}
-                  onClick={() => setPage(current + 1)}
-                  className="g-tracked inline-flex h-10 items-center text-[15px] text-ink-2 disabled:opacity-40 hover:text-ink"
-               >
-                  Next ten
-               </button>
-            </div>
+         <div ref={moreSentinel} aria-hidden="true" className="h-px" />
+         {shown.length < ordered.length ? (
+            <p className="num mt-3 text-[13px] text-ink-3">
+               {shown.length} of {ordered.length}
+            </p>
          ) : null}
       </div>
    );

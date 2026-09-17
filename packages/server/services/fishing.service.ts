@@ -15,6 +15,8 @@ import { userService } from './user.service';
 type CreateImageInput = {
    storageKey: string;
    url: string;
+   focusX?: number | null;
+   focusY?: number | null;
 };
 
 const stripSignedUrlParams = (url: string) => {
@@ -217,7 +219,15 @@ const catchDetailInclude = {
    },
    images: {
       include: {
-         image: { select: { id: true, url: true, storageKey: true } },
+         image: {
+            select: {
+               id: true,
+               url: true,
+               storageKey: true,
+               focusX: true,
+               focusY: true,
+            },
+         },
       },
       orderBy: { position: 'asc' as const },
    },
@@ -227,7 +237,15 @@ const siteDetailInclude = {
    createdBy: { select: { id: true, displayName: true, username: true } },
    images: {
       include: {
-         image: { select: { id: true, url: true, storageKey: true } },
+         image: {
+            select: {
+               id: true,
+               url: true,
+               storageKey: true,
+               focusX: true,
+               focusY: true,
+            },
+         },
       },
       orderBy: { position: 'asc' as const },
    },
@@ -241,7 +259,15 @@ const siteDetailInclude = {
             take: 1,
             orderBy: { position: 'asc' as const },
             include: {
-               image: { select: { id: true, url: true, storageKey: true } },
+               image: {
+                  select: {
+                     id: true,
+                     url: true,
+                     storageKey: true,
+                     focusX: true,
+                     focusY: true,
+                  },
+               },
             },
          },
          species: { select: { commonName: true } },
@@ -836,15 +862,22 @@ export const fishingService = {
          for (const [position, image] of input.images.entries()) {
             try {
                const normalizedUrl = stripSignedUrlParams(image.url);
+               const focus =
+                  typeof image.focusX === 'number' &&
+                  typeof image.focusY === 'number'
+                     ? { focusX: image.focusX, focusY: image.focusY }
+                     : {};
                const createdImage = await tx.image.upsert({
                   where: { storageKey: image.storageKey },
                   create: {
                      uploadedById: user.id,
                      storageKey: image.storageKey,
                      url: normalizedUrl,
+                     ...focus,
                   },
                   update: {
                      url: normalizedUrl,
+                     ...focus,
                   },
                });
 
@@ -1007,7 +1040,15 @@ export const fishingService = {
                take: 1,
                orderBy: { position: 'asc' },
                include: {
-                  image: { select: { id: true, url: true, storageKey: true } },
+                  image: {
+                     select: {
+                        id: true,
+                        url: true,
+                        storageKey: true,
+                        focusX: true,
+                        focusY: true,
+                     },
+                  },
                },
             },
          },
@@ -1264,7 +1305,15 @@ export const fishingService = {
                take: 1,
                orderBy: { position: 'asc' },
                include: {
-                  image: { select: { id: true, url: true, storageKey: true } },
+                  image: {
+                     select: {
+                        id: true,
+                        url: true,
+                        storageKey: true,
+                        focusX: true,
+                        focusY: true,
+                     },
+                  },
                },
             },
          },

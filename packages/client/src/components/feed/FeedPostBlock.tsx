@@ -10,10 +10,8 @@ import {
    HeartIcon as HeartSolid,
    BookmarkIcon as BookmarkSolid,
 } from '@heroicons/react/24/solid';
-import { useState } from 'react';
 import { FishMark } from '@/components/brand/FishMark';
 import { Link } from 'react-router-dom';
-import { cn } from '@/lib/utils';
 
 import {
    Carousel,
@@ -114,10 +112,6 @@ export function FeedPostBlock({
    isReadingAllComments: boolean;
    hasReadAllComments: boolean;
 }) {
-   /* Which photographs came back taller than they are wide. Filled in on
-    * load, because the feed payload does not carry image dimensions. */
-   const [portrait, setPortrait] = useState<Record<string, boolean>>({});
-
    const counts = countSentence(post.likeCount, post.commentCount);
 
    const images =
@@ -216,14 +210,7 @@ export function FeedPostBlock({
                             * those, which is reliably the half without the tail
                             * or the angler's face in it.
                             */}
-                           <div
-                              className={cn(
-                                 'w-full bg-black-block-2',
-                                 portrait[entry.image.id]
-                                    ? 'aspect-[4/5] max-h-[560px]'
-                                    : 'aspect-[4/3]'
-                              )}
-                           >
+                           <div className="relative aspect-[4/3] w-full overflow-hidden bg-black-block-2">
                               <img
                                  src={entry.image.url}
                                  alt={
@@ -232,18 +219,8 @@ export function FeedPostBlock({
                                        : `Photo ${index + 1} of ${images.length}`
                                  }
                                  loading="lazy"
-                                 onLoad={(event) => {
-                                    const img = event.currentTarget;
-                                    if (img.naturalHeight > img.naturalWidth) {
-                                       setPortrait((was) =>
-                                          was[entry.image.id]
-                                             ? was
-                                             : {
-                                                  ...was,
-                                                  [entry.image.id]: true,
-                                               }
-                                       );
-                                    }
+                                 style={{
+                                    objectPosition: `${Math.round((entry.image.focusX ?? 0.5) * 100)}% ${Math.round((entry.image.focusY ?? 0.5) * 100)}%`,
                                  }}
                                  className="h-full w-full object-cover"
                               />
@@ -272,7 +249,7 @@ export function FeedPostBlock({
             </div>
          )}
 
-         <div className="flex flex-1 flex-col gap-3 overflow-hidden px-4 pt-5 pb-6 md:h-[292px]">
+         <div className="flex flex-col gap-3 overflow-hidden px-4 pt-5 pb-6 md:h-[292px]">
             {heading ? (
                <h2 id={`post-${post.id}`} className="g text-[30px] text-paper">
                   {heading}
@@ -340,10 +317,10 @@ export function FeedPostBlock({
                      ) : (
                         <HeartIcon aria-hidden="true" className="size-5" />
                      )}
-                     {post.likedByMe ? 'Liked' : 'Like'}
-                     {post.likeCount > 0 ? (
-                        <span className="num">{post.likeCount}</span>
-                     ) : null}
+                     <span className="hidden sm:inline">
+                        {post.likedByMe ? 'Liked' : 'Like'}
+                     </span>
+                     <span className="num">{post.likeCount}</span>
                   </button>
                ) : (
                   <Link
@@ -352,7 +329,7 @@ export function FeedPostBlock({
                      className={`${textControl} gap-2 text-paper-2 hover:text-paper`}
                   >
                      <HeartIcon aria-hidden="true" className="size-5" />
-                     Like
+                     <span className="hidden sm:inline">Like</span>
                   </Link>
                )}
 
@@ -368,10 +345,8 @@ export function FeedPostBlock({
                      aria-hidden="true"
                      className="size-5"
                   />
-                  Comment
-                  {post.commentCount > 0 ? (
-                     <span className="num">{post.commentCount}</span>
-                  ) : null}
+                  <span className="hidden sm:inline">Comment</span>
+                  <span className="num">{post.commentCount}</span>
                </button>
 
                {isSignedIn ? (
@@ -386,7 +361,9 @@ export function FeedPostBlock({
                      ) : (
                         <BookmarkIcon aria-hidden="true" className="size-5" />
                      )}
-                     {post.savedByMe ? 'Kept' : 'Keep'}
+                     <span className="hidden sm:inline">
+                        {post.savedByMe ? 'Kept' : 'Keep'}
+                     </span>
                   </button>
                ) : null}
 

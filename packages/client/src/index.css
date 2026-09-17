@@ -62,7 +62,7 @@
    --ink-3: #8a8580;
    --line: rgba(11, 9, 9, 0.14);
    --line-2: rgba(11, 9, 9, 0.28);
-   --contour: rgba(11, 9, 9, 0.22);
+   --contour: rgba(11, 9, 9, 0.18);
    --teal: #34adbd;
    --teal-ink: #062a2f;
    --teal-text: #17727f;
@@ -105,7 +105,7 @@
    --ink-3: #7e7873;
    --line: rgba(244, 241, 236, 0.14);
    --line-2: rgba(244, 241, 236, 0.3);
-   --contour: rgba(244, 241, 236, 0.18);
+   --contour: rgba(244, 241, 236, 0.15);
    --teal-text: #5fc6d3;
    --success: #6fc79a;
    --destructive: #f0716a;

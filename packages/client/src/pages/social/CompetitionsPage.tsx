@@ -1,3 +1,4 @@
+import { useLoadOnScroll } from '@/lib/load-on-scroll';
 import { NoData } from '@/components/states/NoData';
 import { PageHead } from '@/components/brand/PageHead';
 import { ContourField } from '@/components/brand/ContourField';
@@ -67,12 +68,26 @@ function CompetitionsScreen() {
    const [starting, setStarting] = useState(false);
    const [open, setOpen] = useState<string | null>(null);
    const [units] = useState<UnitSystem>(() => readUnitSystem());
+   const moreSentinel = useLoadOnScroll(
+      () => setPage((p) => p + 1),
+      status === 'ready' && items.length < total && page * size < total
+   );
 
    useEffect(() => {
       const controller = new AbortController();
       fetchCompetitions(controller.signal, page)
          .then((result) => {
-            setItems(result.items);
+            /* Each page joins the one before it; the first replaces. */
+            setItems((was) =>
+               page === 1
+                  ? result.items
+                  : [
+                       ...was,
+                       ...result.items.filter(
+                          (c) => !was.some((w) => w.id === c.id)
+                       ),
+                    ]
+            );
             setTotal(result.total);
             setSize(result.size);
             setStatus('ready');
@@ -256,29 +271,11 @@ function CompetitionsScreen() {
                </ul>
             )}
 
-            {total > size ? (
-               <div className="mt-4 flex items-center justify-between gap-4">
-                  <button
-                     type="button"
-                     disabled={page <= 1}
-                     onClick={() => setPage((p) => p - 1)}
-                     className="g-tracked inline-flex h-10 items-center text-[15px] text-ink-2 disabled:opacity-40 hover:text-ink"
-                  >
-                     Newer
-                  </button>
-                  <span className="num text-[13px] text-ink-3">
-                     {(page - 1) * size + 1} to {Math.min(total, page * size)}{' '}
-                     of {total}
-                  </span>
-                  <button
-                     type="button"
-                     disabled={page * size >= total}
-                     onClick={() => setPage((p) => p + 1)}
-                     className="g-tracked inline-flex h-10 items-center text-[15px] text-ink-2 disabled:opacity-40 hover:text-ink"
-                  >
-                     Older
-                  </button>
-               </div>
+            <div ref={moreSentinel} aria-hidden="true" className="h-px" />
+            {items.length < total ? (
+               <p className="lab num mt-4 text-ink-3">
+                  {items.length} of {total}
+               </p>
             ) : null}
          </div>
       </section>

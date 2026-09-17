@@ -1,3 +1,4 @@
+import { useLoadOnScroll } from '@/lib/load-on-scroll';
 import { PageHead } from '@/components/brand/PageHead';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -85,6 +86,10 @@ function Inbox() {
       'loading'
    );
    const [attempt, setAttempt] = useState(0);
+   const moreSentinel = useLoadOnScroll(
+      () => setPage((p) => p + 1),
+      status === 'ready' && rows.length < total
+   );
    /* What was unread when the page opened stays marked so it can be seen. */
    const [fresh, setFresh] = useState<Set<string>>(() => new Set());
 
@@ -208,15 +213,9 @@ function Inbox() {
             </ul>
          )}
 
-         {rows.length < total ? (
-            <button
-               type="button"
-               disabled={status === 'loading'}
-               onClick={() => setPage((p) => p + 1)}
-               className="g-tracked mt-6 inline-flex min-h-11 items-center border border-line px-4 text-[15px] transition-colors duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2 disabled:opacity-50"
-            >
-               {status === 'loading' ? 'Reading' : 'Older'}
-            </button>
+         <div ref={moreSentinel} aria-hidden="true" className="h-px" />
+         {rows.length < total && status === 'loading' ? (
+            <p className="lab mt-6 text-ink-3">Reading older ones</p>
          ) : null}
       </section>
    );

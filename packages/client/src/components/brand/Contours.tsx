@@ -21,8 +21,8 @@ function buildPaths(W: number, H: number, seedIn: number) {
     * size on a phone and a wide screen: broad sweeps about 900 px across,
     * tight rings about 350 px.
     */
-   const sx = (W / 1000) * Math.PI * 2;
-   const sy = (H / 1000) * Math.PI * 2;
+   const sx = (W / 1400) * Math.PI * 2;
+   const sy = (H / 1400) * Math.PI * 2;
    const broad = (x: number, y: number) =>
       Math.sin(x * sx * 1.1 + seed) * 0.55 +
       Math.sin(y * sy * 0.9 + seed * 1.7) * 0.5 +
@@ -52,8 +52,8 @@ function buildPaths(W: number, H: number, seedIn: number) {
    const px = (i: number) => (i * W) / nx;
    const py = (j: number) => (j * H) / ny;
    const paths: string[] = [];
-   for (let k = 0; k < 18; k++) {
-      const lv = -1.45 + k * 0.17;
+   for (let k = 0; k < 7; k++) {
+      const lv = -1.2 + k * 0.4;
       const segs: number[][][] = [];
       const lerp = (a: number, b: number, va: number, vb: number) =>
          a + (b - a) * ((lv - va) / (vb - va));

@@ -27,7 +27,15 @@ const feedInclude = {
          images: {
             orderBy: { position: 'asc' as const },
             select: {
-               image: { select: { id: true, url: true, storageKey: true } },
+               image: {
+                  select: {
+                     id: true,
+                     url: true,
+                     storageKey: true,
+                     focusX: true,
+                     focusY: true,
+                  },
+               },
             },
          },
       },
@@ -39,7 +47,15 @@ const feedInclude = {
          images: {
             orderBy: { position: 'asc' as const },
             select: {
-               image: { select: { id: true, url: true, storageKey: true } },
+               image: {
+                  select: {
+                     id: true,
+                     url: true,
+                     storageKey: true,
+                     focusX: true,
+                     focusY: true,
+                  },
+               },
             },
          },
       },

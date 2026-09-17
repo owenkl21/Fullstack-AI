@@ -1,3 +1,4 @@
+import { useLoadOnScroll } from '@/lib/load-on-scroll';
 import axios from 'axios';
 import {
    type CSSProperties,
@@ -231,9 +232,12 @@ function SiteRecord({
    const catches = useMemo(() => data?.catches ?? [], [data]);
    const totalPages = Math.max(1, Math.ceil(catches.length / CATCHES_PER_PAGE));
    const shown = useMemo(
-      () =>
-         catches.slice((page - 1) * CATCHES_PER_PAGE, page * CATCHES_PER_PAGE),
+      () => catches.slice(0, page * CATCHES_PER_PAGE),
       [catches, page]
+   );
+   const moreSentinel = useLoadOnScroll(
+      () => setPage((n) => n + 1),
+      page < totalPages
    );
 
    useEffect(() => {
@@ -416,28 +420,15 @@ function SiteRecord({
                         ))}
                      </ul>
 
-                     {totalPages > 1 ? (
-                        <div className="mt-6 flex flex-wrap items-center gap-4 border-t border-line pt-6">
-                           <Button
-                              type="button"
-                              variant="outline"
-                              disabled={page === 1}
-                              onClick={() => setPage((n) => n - 1)}
-                           >
-                              Previous
-                           </Button>
-                           <Button
-                              type="button"
-                              variant="outline"
-                              disabled={page === totalPages}
-                              onClick={() => setPage((n) => n + 1)}
-                           >
-                              Next
-                           </Button>
-                           <p className="lab num" aria-live="polite">
-                              Page {page} of {totalPages}
-                           </p>
-                        </div>
+                     <div
+                        ref={moreSentinel}
+                        aria-hidden="true"
+                        className="h-px"
+                     />
+                     {shown.length < catches.length ? (
+                        <p className="lab num mt-4" aria-live="polite">
+                           {shown.length} of {catches.length}
+                        </p>
                      ) : null}
                   </>
                )}

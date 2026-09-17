@@ -11,7 +11,14 @@ import {
  * that directory is free.
  */
 
-export type CatchImage = { image: { id: string; url: string } };
+export type CatchImage = {
+   image: {
+      id: string;
+      url: string;
+      focusX?: number | null;
+      focusY?: number | null;
+   };
+};
 
 export type CatchSummary = {
    id: string;
