@@ -1,7 +1,7 @@
 import {
    MapPinIcon,
    NewspaperIcon,
-   WrenchScrewdriverIcon,
+   TrophyIcon,
 } from '@heroicons/react/24/outline';
 import type { ComponentType, SVGProps } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
@@ -23,9 +23,14 @@ const left: Slot[] = [
    { to: '/catches/me', label: 'Catches', Icon: FishMark },
 ];
 
+/*
+ * Five destinations, four slots. Boards takes one and gear moves into the
+ * account menu: gear is set up once, boards is checked every time somebody
+ * else lands a fish. Boards had no way in at all on a phone before this.
+ */
 const right: Slot[] = [
    { to: '/sites/me', label: 'Spots', Icon: MapPinIcon },
-   { to: '/gear/me', label: 'Gear', Icon: WrenchScrewdriverIcon },
+   { to: '/boards', label: 'Boards', Icon: TrophyIcon },
 ];
 
 /*

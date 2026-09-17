@@ -14,6 +14,12 @@ import {
    conditionLines,
    type WeatherSnapshot,
 } from '@/lib/weather';
+import {
+   fetchSpecies,
+   matchSpecies,
+   speciesChoices,
+   type Species,
+} from '@/components/fishing/quicklog/species';
 
 type SiteOption = {
    id: string;
@@ -181,6 +187,7 @@ export function CatchForm({
 
    const [species, setSpecies] = useState(initial?.title ?? '');
    const [recentSpecies, setRecentSpecies] = useState<string[]>([]);
+   const [speciesList, setSpeciesList] = useState<Species[]>([]);
 
    const [lengthValue, setLengthValue] = useState(
       initial?.length != null ? String(initial.length) : ''
@@ -293,12 +300,20 @@ export function CatchForm({
       }
 
       if (catchResult.status === 'fulfilled') {
-         const titles: string[] = (catchResult.value.data.catches ?? [])
-            .map((entry: { title?: string }) => entry.title?.trim())
-            .filter((title: string | undefined): title is string =>
-               Boolean(title)
+         /*
+          * Real species, not the titles of previous catches. A title is whatever
+          * somebody typed; offering those as species meant a catch saved from
+          * this form carried no species and could never be scored.
+          */
+         try {
+            const all = await fetchSpecies();
+            setSpeciesList(all);
+            setRecentSpecies(
+               speciesChoices(catchResult.value.data.catches ?? [], all, 6)
             );
-         setRecentSpecies([...new Set(titles)].slice(0, 6));
+         } catch {
+            setRecentSpecies([]);
+         }
       }
    }, [initial?.gears]);
 
@@ -660,6 +675,9 @@ export function CatchForm({
          caughtAt: parsedCaughtAt ? parsedCaughtAt.toISOString() : '',
          notes: trimmedNotes ? trimmedNotes.slice(0, NOTES_LIMIT) : null,
          siteId,
+         /* Null where the name is not one we publish figures for. The catch
+          * still saves; it just cannot be ranked, and the profile says so. */
+         speciesId: matchSpecies(species, speciesList)?.id ?? null,
          weather: sky ? sky.slice(0, 280) : null,
          weatherSnapshot: snapshot,
          length: length === null || Number.isNaN(length) ? null : length,
