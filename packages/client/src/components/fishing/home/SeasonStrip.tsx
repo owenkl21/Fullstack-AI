@@ -5,6 +5,7 @@ import {
    plural,
 } from '@/components/fishing/record/format';
 import type { SeasonItem } from './summary';
+import { cn } from '@/lib/utils';
 
 /*
  * The year so far, oldest first: a photo tile per catch whose height is its length,
@@ -42,9 +43,21 @@ export function SeasonStrip({
                         to={`/catches/${item.entry.id}`}
                         className="flex flex-col gap-1.5"
                      >
+                        {/*
+                         * With a photo this is a photo tile. Without one it has
+                         * to read as a deliberate bar, because an empty box
+                         * sized by the length of the fish looks exactly like an
+                         * image that failed to load, and most catches have no
+                         * photograph.
+                         */}
                         <span
                            style={{ height: `${item.height}px` }}
-                           className="flex w-[88px] overflow-hidden bg-bg-2"
+                           className={cn(
+                              'flex w-[88px] overflow-hidden',
+                              item.entry.images[0]?.image.url
+                                 ? 'bg-bg-2'
+                                 : 'items-end bg-ink/85'
+                           )}
                         >
                            {item.entry.images[0]?.image.url ? (
                               <img
@@ -53,7 +66,12 @@ export function SeasonStrip({
                                  loading="lazy"
                                  className="h-full w-full object-cover transition-transform duration-[600ms] [transition-timing-function:var(--ease)] hover:scale-[1.04]"
                               />
-                           ) : null}
+                           ) : (
+                              <span
+                                 aria-hidden="true"
+                                 className="block h-1.5 w-full bg-teal"
+                              />
+                           )}
                         </span>
                         <span className="g num text-[20px]">
                            {lengthMetric(item.entry.length) ?? (

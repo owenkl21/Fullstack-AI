@@ -153,6 +153,15 @@
       line-height: 1;
    }
    /* Tracked uppercase label: the only small type in the product */
+   /*
+    * As a form label it has to be block. Inline, it baseline-aligns with the
+    * field that follows, which drops the label to the BOTTOM of a tall
+    * textarea and leaves it sitting inside the box. It stays inline elsewhere,
+    * where it is used as an eyebrow beside other text.
+    */
+   label.lab {
+      display: block;
+   }
    .lab {
       font-size: 12px;
       line-height: 16px;

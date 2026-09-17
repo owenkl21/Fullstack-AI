@@ -195,7 +195,7 @@ export function ProfileSettingsPanel({
    };
 
    return (
-      <form className="mt-6" onSubmit={save} noValidate>
+      <form className="mt-6 max-w-[680px]" onSubmit={save} noValidate>
          <div className="grid gap-8 sm:grid-cols-2">
             <div>
                <label htmlFor={nameId} className="lab">
