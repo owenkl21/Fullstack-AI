@@ -3,9 +3,19 @@ import { TornEdge } from '@/components/brand/TornEdge';
 import { cn } from '@/lib/utils';
 
 /*
- * Where you last fished, as a photograph with the name over it. The picture drifts
- * from 106% to 100% once on load, the one slow move in the product, and the painted
- * edge hands the page back to the paper underneath.
+ * Where you last fished: the photograph, then a solid plate carrying the name.
+ *
+ * The words used to sit on the picture over a gradient, which measured 1.01:1
+ * against open water. Teal and sunlit sea are the same brightness, so the
+ * overline was invisible, and no scrim fixes that without painting the
+ * photograph out: to carry small text over a bright sky a scrim has to reach
+ * about 0.93, at which point there is no photograph left to look at.
+ *
+ * So the picture stays a picture and the words get their own ground. Contrast
+ * is then a property of the design rather than of whatever the sky was doing.
+ *
+ * The picture still drifts from 106% to 100% once on load, the one slow move in
+ * the product, and the painted edge hands the page back to the paper underneath.
  */
 export function SpotHeader({
    photoUrl,
@@ -26,47 +36,44 @@ export function SpotHeader({
    }, []);
 
    return (
-      <header className="relative h-[300px] overflow-hidden bg-black-block text-paper md:h-[380px]">
-         <img
-            src={photoUrl}
-            alt=""
-            fetchPriority="high"
-            className={cn(
-               'absolute inset-0 h-full w-full object-cover transition-transform duration-[12000ms] ease-linear',
-               settled ? 'scale-100' : 'scale-[1.06]'
-            )}
-         />
-         <div
-            className="pointer-events-none absolute inset-0 scrim-photo"
-            aria-hidden="true"
-         />
-         <div className="absolute inset-x-0 top-4 z-[2]">
-            <div className="mx-auto w-full max-w-[860px] px-4 md:px-8">
-               <span className="lab text-paper-2">{today}</span>
-            </div>
+      <header className="relative bg-black-block text-paper">
+         <div className="relative h-[190px] overflow-hidden md:h-[260px]">
+            <img
+               src={photoUrl}
+               alt=""
+               fetchPriority="high"
+               className={cn(
+                  'absolute inset-0 h-full w-full object-cover transition-transform duration-[12000ms] ease-linear',
+                  settled ? 'scale-100' : 'scale-[1.06]'
+               )}
+            />
+            {/*
+             * A light wash only, to seat the photograph against the plate under
+             * it. Nothing is read through this any more, so it no longer has to
+             * fight the sky.
+             */}
+            <div
+               className="pointer-events-none absolute inset-0 scrim-photo"
+               aria-hidden="true"
+            />
          </div>
-         {/*
-          * The eyebrow sat 2px off the headline, which put a small teal line
-          * hard against a 72px display face and made both harder to read. It
-          * also ran to the viewport edge while every section below sits in an
-          * 860px column, so the page had two different left margins.
-          */}
-         {/*
-          * Clear of the torn edge, which is 56px on a phone and 90px above that
-          * and paints the next section's paper at a higher layer. The headline
-          * used to sit inside that band, so its feet were washed out by the
-          * very shape that was meant to sit under it.
-          */}
-         <div className="absolute inset-x-0 bottom-[68px] z-[2] md:bottom-[104px]">
+
+         <div className="relative z-[2] pt-5 pb-11 md:pt-7 md:pb-16">
             <div className="mx-auto flex w-full max-w-[860px] flex-col gap-2.5 px-4 md:px-8">
-               {lastFished ? (
-                  <span className="lab text-teal">{lastFished}</span>
-               ) : null}
+               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  {lastFished ? (
+                     <span className="lab text-teal">{lastFished}</span>
+                  ) : (
+                     <span />
+                  )}
+                  <span className="lab text-paper-2">{today}</span>
+               </div>
                <h1 className="g text-[52px] text-paper md:text-[72px]">
                   {spotName}
                </h1>
             </div>
          </div>
+
          <TornEdge fill="bg" />
       </header>
    );
