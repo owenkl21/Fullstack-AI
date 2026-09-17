@@ -732,8 +732,10 @@ export function FeedPage() {
                      Unfollow {pendingUnfollow?.displayName}
                   </DialogTitle>
                   <DialogDescription className="text-[15px] text-paper-2">
-                     @{pendingUnfollow?.username} stays in the feed. You just
-                     stop following.
+                     {pendingUnfollow?.username
+                        ? `@${pendingUnfollow.username}`
+                        : pendingUnfollow?.displayName}{' '}
+                     stays in the feed. You just stop following.
                   </DialogDescription>
                </DialogHeader>
                <DialogFooter className="mt-6 flex-col gap-3 sm:flex-row">

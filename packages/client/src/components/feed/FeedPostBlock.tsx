@@ -139,9 +139,16 @@ export function FeedPostBlock({
                <span className="block truncate font-semibold text-paper">
                   {post.author.displayName}
                </span>
-               <span className="block truncate text-[14px] text-paper-2">
-                  @{post.author.username}
-               </span>
+               {/*
+                * A username is optional now: better-auth creates an account
+                * before the angler has picked one. Rendering it unconditionally
+                * printed a bare "@" with nothing after it.
+                */}
+               {post.author.username ? (
+                  <span className="block truncate text-[14px] text-paper-2">
+                     @{post.author.username}
+                  </span>
+               ) : null}
             </span>
          </header>
 
