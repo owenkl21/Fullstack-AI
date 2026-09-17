@@ -1,5 +1,5 @@
 import {
-   MapPinIcon,
+   MapIcon,
    PlusIcon,
    NewspaperIcon,
    TrophyIcon,
@@ -29,8 +29,13 @@ const left: Slot[] = [
  * account menu: gear is set up once, boards is checked every time somebody
  * else lands a fish. Boards had no way in at all on a phone before this.
  */
+/*
+ * The map takes the slot rather than the spot list. The list is a filing
+ * cabinet; the map is where anyone decides where to fish, and it carries the
+ * spots anyway. Spots and gear are in the account menu.
+ */
 const right: Slot[] = [
-   { to: '/sites/me', label: 'Spots', Icon: MapPinIcon },
+   { to: '/map', label: 'Map', Icon: MapIcon },
    { to: '/boards', label: 'Boards', Icon: TrophyIcon },
 ];
 

@@ -36,6 +36,20 @@ export const updateProfileSchema = z
          )
          .nullable()
          .optional(),
+      /* The photograph across the top of a profile. Same rules as the avatar:
+       * a URL or one of our own storage keys, never anything else. */
+      bannerUrl: z
+         .string()
+         .trim()
+         .min(1, 'Banner value must not be empty.')
+         .max(512, 'Banner value must be 512 characters or fewer.')
+         .refine(
+            (value) =>
+               /^https?:\/\//i.test(value) || value.startsWith('users/'),
+            'Banner value must be a valid URL or storage key.'
+         )
+         .nullable()
+         .optional(),
    })
    .refine((data) => Object.keys(data).length > 0, {
       message: 'At least one profile field must be provided.',

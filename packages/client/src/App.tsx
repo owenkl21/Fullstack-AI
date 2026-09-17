@@ -104,6 +104,9 @@ const VerifyEmailPage = lazyRoute(() =>
 const AnglerPage = lazyRoute(() =>
    import('@/pages/AnglerPage').then((m) => ({ default: m.AnglerPage }))
 );
+const MapPage = lazyRoute(() =>
+   import('@/pages/fishing/MapPage').then((m) => ({ default: m.MapPage }))
+);
 const CompetitionsPage = lazyRoute(() =>
    import('@/pages/social/CompetitionsPage').then((m) => ({
       default: m.CompetitionsPage,
@@ -142,6 +145,7 @@ function App() {
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/account" element={<AccountPage />} />
             <Route path="/anglers/:userId" element={<AnglerPage />} />
+            <Route path="/map" element={<MapPage />} />
             <Route path="/boards" element={<BoardsPage />} />
             <Route path="/competitions" element={<CompetitionsPage />} />
             <Route path="*" element={<NotFoundPage />} />

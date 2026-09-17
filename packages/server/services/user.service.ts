@@ -6,6 +6,7 @@ type UserProfileInput = {
    bio?: string | null;
    username?: string;
    avatarUrl?: string | null;
+   bannerUrl?: string | null;
 };
 
 type ProfileShape = {
@@ -16,6 +17,7 @@ type ProfileShape = {
    displayName: string;
    bio: string | null;
    avatarUrl: string | null;
+   bannerUrl: string | null;
    createdAt: Date;
    updatedAt: Date;
 };
@@ -149,6 +151,7 @@ const buildProfileView = async (userId: string) => {
          displayName: true,
          bio: true,
          avatarUrl: true,
+         bannerUrl: true,
          createdAt: true,
          updatedAt: true,
          _count: {
@@ -237,6 +240,7 @@ const buildProfileView = async (userId: string) => {
       displayName: profile.displayName,
       bio: profile.bio,
       avatarUrl: profile.avatarUrl,
+      bannerUrl: profile.bannerUrl,
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
    });
@@ -272,6 +276,7 @@ const buildPublicProfileView = async (
          displayName: true,
          bio: true,
          avatarUrl: true,
+         bannerUrl: true,
          createdAt: true,
          /* No email. This page is public. */
          _count: { select: { followers: true, following: true } },
@@ -367,6 +372,7 @@ const buildPublicProfileView = async (
       displayName: profile.displayName,
       bio: profile.bio,
       avatarUrl: await maybeResolveAvatarReadUrl(profile.avatarUrl),
+      bannerUrl: await maybeResolveAvatarReadUrl(profile.bannerUrl),
       createdAt: profile.createdAt,
       followersCount: profile._count.followers,
       followingCount: profile._count.following,
@@ -416,6 +422,7 @@ export const userService = {
             bio: input.bio,
             username: requestedUsername,
             avatarUrl: input.avatarUrl,
+            bannerUrl: input.bannerUrl,
          },
          select: { id: true },
       });

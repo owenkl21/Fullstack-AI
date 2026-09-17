@@ -133,6 +133,9 @@ model User {
   avatarUrl    String?
   /* Figures are shown in this: kilograms and centimetres, or pounds and inches. */
   unitSystem   UnitSystem    @default(METRIC)
+  /* The photograph across the top of a profile, behind the name. Separate from
+   * the avatar: one is who you are, the other is where you fish. */
+  bannerUrl    String?
   catches      Catch[]
   sites        FishingSite[]
   reviews      Review[]
@@ -153,6 +156,8 @@ model User {
   competitionsCreated Competition[] @relation("CompetitionsCreated")
   competitionEntries  CompetitionEntrant[]
   waypoints           Waypoint[]
+  savedSpots          SavedSpot[] @relation("SavedSpots")
+  savedGear           SavedGear[] @relation("SavedGear")
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
@@ -180,6 +185,7 @@ model FishingSite {
   likes       SiteLike[]
   images      SiteImage[]
   feedPosts   FeedPost[]
+  savedBy     SavedSpot[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   deletedAt   DateTime?
@@ -196,6 +202,7 @@ model Gear {
   type        GearType
   imageUrl    String?
   catches     Catch[]
+  savedBy     SavedGear[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -605,6 +612,41 @@ model Competition {
  * closely held thing an angler has, and the promise the interface makes is that
  * these are only ever yours.
  */
+/*
+ * Somebody else's spot or piece of gear, kept.
+ *
+ * A reference rather than a copy. Copying would freeze a name and a position
+ * that the owner can still change, and would quietly turn a spot somebody later
+ * made private into one you still hold. Holding the id means the moment they
+ * withdraw it, it stops resolving, which is the behaviour anyone would expect.
+ */
+model SavedSpot {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation("SavedSpots", fields: [userId], references: [id], onDelete: Cascade)
+  siteId    String
+  site      FishingSite  @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  note      String?      @db.VarChar(500)
+  createdAt DateTime     @default(now())
+
+  @@unique([userId, siteId])
+  @@index([userId])
+  @@map("saved_spots")
+}
+
+model SavedGear {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("SavedGear", fields: [userId], references: [id], onDelete: Cascade)
+  gearId    String
+  gear      Gear     @relation(fields: [gearId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, gearId])
+  @@index([userId])
+  @@map("saved_gear")
+}
+
 model Waypoint {
   id        String       @id @default(cuid())
   userId    String

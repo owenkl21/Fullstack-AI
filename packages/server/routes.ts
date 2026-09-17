@@ -7,6 +7,7 @@ import { fishingController } from './controllers/fishing.controller';
 import { userController } from './controllers/user.controller';
 import { uploadsController } from './controllers/uploads.controller';
 import { competitionsController } from './controllers/competitions.controller';
+import { savedController } from './controllers/saved.controller';
 import { waypointsController } from './controllers/waypoints.controller';
 import { gearController } from './controllers/gear.controller';
 import { feedController } from './controllers/feed.controller';
@@ -96,6 +97,31 @@ router.get('/api/species', fishingController.searchSpecies);
 router.get('/api/stats/me', requireApiAuth, statsController.myStats);
 router.get('/api/stats/rivals', requireApiAuth, statsController.rivals);
 router.get('/api/competitions/species', statsController.speciesBoards);
+
+/* Keeping somebody else's spot or gear. A reference, never a copy, so what the
+ * owner does with it afterwards still applies. */
+router.get('/api/saved/spots', requireApiAuth, savedController.listSpots);
+router.post(
+   '/api/saved/spots/:siteId',
+   requireApiAuth,
+   savedController.saveSpot
+);
+router.delete(
+   '/api/saved/spots/:siteId',
+   requireApiAuth,
+   savedController.removeSpot
+);
+router.get('/api/saved/gear', requireApiAuth, savedController.listGear);
+router.post(
+   '/api/saved/gear/:gearId',
+   requireApiAuth,
+   savedController.saveGear
+);
+router.delete(
+   '/api/saved/gear/:gearId',
+   requireApiAuth,
+   savedController.removeGear
+);
 
 /* Private marks on the map. Never listed for anyone but their owner. */
 router.get('/api/waypoints', requireApiAuth, waypointsController.listMine);

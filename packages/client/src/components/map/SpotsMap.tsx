@@ -53,7 +53,10 @@ const SINGLE_PIN_ZOOM = 12;
  * something. At zoom 10 you are looking at a stretch of coast rather than a
  * country.
  */
-const POI_MIN_ZOOM = 10;
+/* Eight is the zoom the map opens at when it fits a handful of spots along a
+ * coast. Ten, the old value, meant the places never appeared until somebody
+ * zoomed in, and so were never seen. */
+const POI_MIN_ZOOM = 8;
 
 /*
  * The map as a place to read rather than a picture of pins.

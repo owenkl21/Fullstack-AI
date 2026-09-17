@@ -813,6 +813,285 @@
 /*
  * The pin vocabulary.
  *
+ * Shape first, colour second. Six kinds of thing on the map and, before this,
+ * one silhouette in six ring colours, which nobody could tell apart at a glance.
+ * A spot is a disc, a private mark is a pennant, a slipway or a shop is a square
+ * plate. Every one carries a light ring on a dark or saturated body, because the
+ * base is a photograph and a photograph can be any colour underneath.
+ */
+.map-pin-kind {
+   position: relative;
+}
+.map-pin-kind .map-pin-stem {
+   position: absolute;
+   left: 50%;
+   transform: translateX(-50%);
+   width: 0;
+   height: 0;
+   border-left: 7px solid transparent;
+   border-right: 7px solid transparent;
+   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+}
+.map-pin-g {
+   width: 20px;
+   height: 20px;
+}
+
+/* ---- Spots: a disc ------------------------------------------------------ */
+.map-pin-kind .map-pin-disc {
+   position: absolute;
+   top: 0;
+   left: 50%;
+   transform: translateX(-50%);
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 40px;
+   height: 40px;
+   border-radius: 999px;
+   border: 3px solid var(--paper);
+   box-shadow:
+      0 3px 10px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(0, 0, 0, 0.35);
+   transition: transform 140ms var(--ease);
+}
+.map-pin-kind:hover .map-pin-disc {
+   transform: translateX(-50%) scale(1.1);
+}
+.map-pin-spot .map-pin-stem,
+.map-pin-other .map-pin-stem {
+   top: 35px;
+   border-top: 15px solid;
+}
+.map-pin-n {
+   font-family: var(--font-display), sans-serif;
+   font-size: 21px;
+   line-height: 1;
+   letter-spacing: 0.02em;
+   font-variant-numeric: tabular-nums;
+   padding-top: 2px;
+}
+/* Yours: teal, the loudest thing on your own map. */
+.map-pin-spot .map-pin-disc {
+   background: var(--teal);
+   color: #06232a;
+}
+.map-pin-spot .map-pin-stem {
+   border-top-color: var(--teal);
+}
+/* Somebody else's: dark, so yours stand out from theirs. */
+.map-pin-other .map-pin-disc {
+   background: #14110f;
+   color: var(--paper);
+}
+.map-pin-other .map-pin-stem {
+   border-top-color: #14110f;
+}
+
+/* ---- Private marks: a pennant on a pole ---------------------------------- */
+.map-pin-waypoint .map-pin-pole {
+   position: absolute;
+   left: 2px;
+   top: 0;
+   width: 4px;
+   height: 44px;
+   background: var(--paper);
+   box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.6);
+}
+.map-pin-waypoint .map-pin-flag {
+   position: absolute;
+   left: 6px;
+   top: 2px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 28px;
+   height: 22px;
+   background: var(--paper);
+   color: #14110f;
+   /* The trailing edge cut like a pennant, so it cannot be mistaken for a plate. */
+   clip-path: polygon(0 0, 100% 0, 82% 50%, 100% 100%, 0 100%);
+   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+}
+.map-pin-waypoint .map-pin-flag .map-pin-g {
+   width: 15px;
+   height: 15px;
+   margin-right: 4px;
+}
+
+/* ---- Places: a square plate, coloured by what it is ---------------------- */
+.map-pin-poi .map-pin-plate {
+   position: absolute;
+   top: 0;
+   left: 50%;
+   transform: translateX(-50%);
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 32px;
+   height: 32px;
+   border: 2.5px solid var(--paper);
+   color: var(--paper);
+   box-shadow:
+      0 3px 8px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.map-pin-poi .map-pin-stem {
+   top: 30px;
+   border-left-width: 6px;
+   border-right-width: 6px;
+   border-top: 11px solid;
+}
+.map-pin-poi .map-pin-g {
+   width: 19px;
+   height: 19px;
+}
+.map-pin-ramp .map-pin-plate {
+   background: #1f6fb2;
+}
+.map-pin-ramp .map-pin-stem {
+   border-top-color: #1f6fb2;
+}
+.map-pin-marina .map-pin-plate {
+   background: #1d3557;
+}
+.map-pin-marina .map-pin-stem {
+   border-top-color: #1d3557;
+}
+.map-pin-tackle .map-pin-plate {
+   background: #c97b1c;
+}
+.map-pin-tackle .map-pin-stem {
+   border-top-color: #c97b1c;
+}
+.map-pin-parking .map-pin-plate {
+   background: #4a4542;
+}
+.map-pin-parking .map-pin-stem {
+   border-top-color: #4a4542;
+}
+
+.map-pin-icon {
+   display: block;
+   color: var(--teal);
+}
+
+/*
+ * The pin vocabulary.
+ *
+ * Dark body, light ring, on every kind. This is not a style choice: the base is
+ * a photograph now, and a photograph can be any colour, so a pin coloured to
+ * match the brand disappears the moment it lands on water the same green as the
+ * brand. A near black disc inside a paper ring is the one combination that
+ * reads over sea, veld, sand and rock alike, which is why every mapping product
+ * that draws over imagery arrives at it.
+ *
+ * Colour still carries meaning, moved to the ring and the number where it has
+ * a constant dark backing to sit on rather than competing with the imagery.
+ */
+.map-pin-kind {
+   position: relative;
+}
+.map-pin-kind .map-pin-disc {
+   position: absolute;
+   top: 0;
+   left: 50%;
+   transform: translateX(-50%);
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 40px;
+   height: 40px;
+   border-radius: 999px;
+   /* The ring is what separates the pin from the picture under it. */
+   border: 3px solid var(--paper);
+   background: #14110f;
+   color: var(--paper);
+   box-shadow:
+      0 3px 10px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(0, 0, 0, 0.35);
+   transition: transform 140ms var(--ease);
+}
+.map-pin-kind:hover .map-pin-disc {
+   transform: translateX(-50%) scale(1.1);
+}
+.map-pin-kind .map-pin-stem {
+   position: absolute;
+   top: 35px;
+   left: 50%;
+   transform: translateX(-50%);
+   width: 0;
+   height: 0;
+   border-left: 7px solid transparent;
+   border-right: 7px solid transparent;
+   border-top: 15px solid #14110f;
+   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+}
+.map-pin-n {
+   font-family: var(--font-display), sans-serif;
+   font-size: 20px;
+   line-height: 1;
+   letter-spacing: 0.02em;
+   font-variant-numeric: tabular-nums;
+   padding-top: 2px;
+}
+.map-pin-g {
+   width: 20px;
+   height: 20px;
+}
+
+/* Yours: a teal ring and a teal number, on the same dark body. */
+.map-pin-spot .map-pin-disc {
+   border-color: var(--teal);
+   color: var(--teal);
+}
+.map-pin-spot .map-pin-stem {
+   border-top-color: var(--teal);
+}
+
+/* Somebody else's public spot: the paper ring, so yours stay the loud ones. */
+.map-pin-other .map-pin-disc {
+   border-color: var(--paper);
+   color: var(--paper);
+}
+
+/* A private mark: paper body, dark mark. Inverted, because it is not a place
+ * anyone else can see and it should not read like one. */
+.map-pin-waypoint .map-pin-disc {
+   background: var(--paper);
+   border-color: #14110f;
+   color: #14110f;
+}
+.map-pin-waypoint .map-pin-stem {
+   border-top-color: var(--paper);
+}
+
+/* Somebody else's facts about the world sit back: smaller and quieter. */
+.map-pin-poi .map-pin-disc {
+   width: 30px;
+   height: 30px;
+   border-width: 2px;
+   border-color: rgba(244, 241, 236, 0.85);
+   background: #3c3733;
+}
+.map-pin-poi .map-pin-stem {
+   top: 26px;
+   border-top-width: 11px;
+   border-top-color: #3c3733;
+}
+.map-pin-poi .map-pin-g {
+   width: 15px;
+   height: 15px;
+}
+
+.map-pin-icon {
+   display: block;
+   color: var(--teal);
+}
+
+/*
+ * The pin vocabulary.
+ *
  * A disc on a short stem. Shape carries the kind and colour reinforces it,
  * never the other way round, so the map still reads for anyone who cannot
  * separate teal from grey. Where a spot has produced fish the count sits inside

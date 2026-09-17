@@ -140,35 +140,62 @@ const TONE: Record<PinKind, string> = {
 };
 
 /**
- * A pin.
+ * A pin, of a shape that says what it is.
  *
- * The first version was a teardrop with a small glyph in it and the count stuck
- * on the corner in a separate black circle, which is the shape of a notification
- * badge rather than a map marker and looked bolted on.
+ * Six kinds and, before this, one silhouette with different ring colours,
+ * which nobody could tell apart at a glance. Shape is the thing the eye reads
+ * first, so each kind has its own:
  *
- * This is a disc on a short stem. Where a spot has produced fish the number sits
- * inside the disc in the display face, because the count is the most useful
- * thing about a spot and it belongs in the pin rather than beside it. Where
- * there is no number the mark goes in instead. One shape, two contents.
+ *   spot      a round disc, teal, the count inside      "fish come out of here"
+ *   other     a round disc, dark, the count inside      "somebody else's spot"
+ *   waypoint  a pennant on a pole                       "a note to myself"
+ *   ramp      a square, blue, a slipway drawn in it     "put a boat in"
+ *   marina    a square, navy, an anchor                 "a harbour"
+ *   tackle    a square, amber, a hook                   "buy bait"
+ *   parking   a square, grey, a P
  *
- * Drawn as DOM rather than an image so it takes the theme's own colours and
- * stays crisp at any density.
+ * All of them carry a light ring on a dark or saturated body, because the base
+ * is a photograph and a photograph can be any colour underneath.
  */
 export const kindPin = (kind: PinKind, count?: number | null): L.DivIcon => {
    const n = typeof count === 'number' && count > 0 ? count : null;
-   const face = n
-      ? `<span class="map-pin-n">${n > 99 ? '99+' : n}</span>`
-      : `<svg viewBox="0 0 24 24" class="map-pin-g" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[kind]}</svg>`;
+   const glyph = `<svg viewBox="0 0 24 24" class="map-pin-g" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[kind]}</svg>`;
 
+   if (kind === 'waypoint') {
+      /* A pennant: a pole with a flag. The point of the pole is the position. */
+      return L.divIcon({
+         html:
+            `<span class="map-pin-pole"></span>` +
+            `<span class="map-pin-flag">${glyph}</span>`,
+         className: `map-pin map-pin-kind map-pin-waypoint`,
+         iconSize: [34, 44],
+         iconAnchor: [4, 43],
+         popupAnchor: [10, -40],
+      });
+   }
+
+   if (kind === 'spot' || kind === 'other') {
+      const face = n
+         ? `<span class="map-pin-n">${n > 99 ? '99+' : n}</span>`
+         : glyph;
+      return L.divIcon({
+         html:
+            `<span class="map-pin-disc">${face}</span>` +
+            `<span class="map-pin-stem"></span>`,
+         className: `map-pin map-pin-kind ${TONE[kind]}`,
+         iconSize: [40, 50],
+         iconAnchor: [20, 49],
+         popupAnchor: [0, -46],
+      });
+   }
+
+   /* Points of interest: a square plate, coloured by what it is. */
    return L.divIcon({
-      html:
-         `<span class="map-pin-disc">${face}</span>` +
-         `<span class="map-pin-stem"></span>`,
-      className: `map-pin map-pin-kind ${TONE[kind]}`,
-      iconSize: [38, 46],
-      /* The tip of the stem is what sits on the coordinate, not the disc. */
-      iconAnchor: [19, 45],
-      popupAnchor: [0, -42],
+      html: `<span class="map-pin-plate">${glyph}</span><span class="map-pin-stem"></span>`,
+      className: `map-pin map-pin-kind map-pin-poi map-pin-${kind}`,
+      iconSize: [32, 42],
+      iconAnchor: [16, 41],
+      popupAnchor: [0, -38],
    });
 };
 
