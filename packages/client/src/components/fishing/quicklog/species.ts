@@ -1,37 +1,92 @@
+import axios from 'axios';
 import type { CatchSummary } from '@/components/fishing/record/api';
 
 /*
- * A catch has no species field yet, so the fish is named by the record's title.
- * The chips are the names this angler has actually used, most recent first.
+ * Naming the fish in the fast log.
+ *
+ * This used to offer the titles of previous catches as if they were species,
+ * and saved whatever was chosen as a title and nothing else. A catch logged
+ * that way carried no species, so it could never be scored: the boards, the
+ * personal bests and the species count on a profile all read from the species
+ * on a catch, and the fast path is how most catches get logged.
+ *
+ * So the chips are real species now, resolved to a real id before saving.
  */
-// TODO(api): appendix E, no species on a catch; the species chosen in the fast log
-// is saved as the title until the field exists.
+
+export type Species = {
+   id: string;
+   commonName: string;
+   scientificName: string;
+   aliases: string[];
+};
 
 export const NOT_SURE = 'Not sure';
 
 /** The fallback title when the angler could not name the fish. */
 export const UNNAMED_TITLE = 'Catch';
 
-export function recentSpecies(catches: CatchSummary[], limit = 5) {
+/*
+ * What a South African shore angler is most likely to be holding, for someone
+ * whose log is still empty. Every name here is matched against the species the
+ * server actually returned, so a name that has not been seeded is never offered.
+ */
+const STARTERS = ['Elf', 'Galjoen', 'Dusky kob', 'Blacktail', 'Bronze bream'];
+
+export async function fetchSpecies(signal?: AbortSignal): Promise<Species[]> {
+   const { data } = await axios.get<Species[]>('/api/species', { signal });
+   return Array.isArray(data) ? data : [];
+}
+
+const key = (name: string) => name.trim().toLowerCase();
+
+/** Find the species an angler means, by common name first and then by alias. */
+export function matchSpecies(name: string, species: Species[]): Species | null {
+   const k = key(name);
+   if (!k) {
+      return null;
+   }
+
+   return (
+      species.find((s) => key(s.commonName) === k) ??
+      species.find((s) => key(s.scientificName) === k) ??
+      species.find((s) => (s.aliases ?? []).some((a) => key(a) === k)) ??
+      null
+   );
+}
+
+/**
+ * The chips: the species this angler has logged, most recent first, topped up
+ * with common shore fish so the row is never empty on a first catch.
+ */
+export function speciesChoices(
+   catches: CatchSummary[],
+   species: Species[],
+   limit = 5
+): string[] {
    const seen = new Set<string>();
    const names: string[] = [];
+
+   const take = (name: string | undefined | null) => {
+      if (!name || names.length >= limit) {
+         return;
+      }
+      const k = key(name);
+      if (!k || seen.has(k)) {
+         return;
+      }
+      seen.add(k);
+      names.push(name);
+   };
 
    [...catches]
       .sort(
          (a, b) =>
             new Date(b.caughtAt).getTime() - new Date(a.caughtAt).getTime()
       )
-      .forEach((entry) => {
-         const name = entry.title.trim();
-         const key = name.toLowerCase();
-         if (!name || key === UNNAMED_TITLE.toLowerCase() || seen.has(key)) {
-            return;
-         }
-         seen.add(key);
-         if (names.length < limit) {
-            names.push(name);
-         }
-      });
+      .forEach((entry) => take(entry.species?.commonName));
+
+   /* Only starters the server actually knows about. */
+   STARTERS.forEach((name) => take(matchSpecies(name, species)?.commonName));
 
    return names;
 }

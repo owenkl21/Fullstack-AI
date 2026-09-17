@@ -606,6 +606,9 @@ export const fishingService = {
             length: true,
             weight: true,
             site: { select: { id: true, name: true } },
+            /* The fast log offers the species this angler actually logs, so the
+             * list has to carry them. */
+            species: { select: { id: true, commonName: true } },
             images: {
                take: 1,
                orderBy: { position: 'asc' },

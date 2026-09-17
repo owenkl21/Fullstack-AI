@@ -21,6 +21,7 @@ export type CatchSummary = {
    length: number | null;
    weight: number | null;
    site: { id: string; name: string } | null;
+   species: { id: string; commonName: string } | null;
    images: CatchImage[];
 };
 

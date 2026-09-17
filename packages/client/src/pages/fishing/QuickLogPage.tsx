@@ -37,7 +37,10 @@ import {
 import {
    NOT_SURE,
    UNNAMED_TITLE,
-   recentSpecies,
+   fetchSpecies,
+   matchSpecies,
+   speciesChoices,
+   type Species,
 } from '@/components/fishing/quicklog/species';
 import { usePositionFix } from '@/components/fishing/quicklog/useFix';
 
@@ -68,6 +71,7 @@ function QuickLog() {
    const [conditionsFailed, setConditionsFailed] = useState(false);
 
    const [options, setOptions] = useState<string[]>([]);
+   const [species, setSpecies] = useState<Species[]>([]);
    const [chosen, setChosen] = useState<string | null>(null);
    const [typed, setTyped] = useState('');
    const [speciesError, setSpeciesError] = useState<string | null>(null);
@@ -96,8 +100,17 @@ function QuickLog() {
       const controller = new AbortController();
       const load = async () => {
          try {
-            const catches = await fetchMyCatches(controller.signal);
-            setOptions(recentSpecies(catches));
+            /*
+             * Both together: the chips are this angler's own species, and the
+             * full list is what a typed name gets resolved against before the
+             * catch is saved.
+             */
+            const [catches, all] = await Promise.all([
+               fetchMyCatches(controller.signal),
+               fetchSpecies(controller.signal),
+            ]);
+            setSpecies(all);
+            setOptions(speciesChoices(catches, all));
          } catch {
             setOptions([]);
          }
@@ -185,8 +198,14 @@ function QuickLog() {
          return;
       }
 
-      const title =
-         other || (chosen && chosen !== NOT_SURE ? chosen : UNNAMED_TITLE);
+      const named = other || (chosen && chosen !== NOT_SURE ? chosen : null);
+      const title = named ?? UNNAMED_TITLE;
+      /*
+       * Resolve to a real species wherever the name is one we know. Without
+       * this the catch cannot be scored, which is most of what the product
+       * does with a catch. An unrecognised name still saves, as a title only.
+       */
+      const matched = named ? matchSpecies(named, species) : null;
       const lengthCm = toMetricValue(length, lengthUnit);
       const weightKg = toMetricValue(weight, weightUnit);
 
@@ -197,6 +216,7 @@ function QuickLog() {
          caughtAt: stampedAt.toISOString(),
          notes: null,
          siteId: null,
+         speciesId: matched?.id ?? null,
          weather: snapshot?.weatherCondition?.description?.text ?? null,
          weatherSnapshot: toSavableSnapshot(snapshot),
          length: lengthCm,
