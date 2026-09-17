@@ -1,0 +1,7 @@
+{
+  "name": "fishlogger-audit",
+  "private": true,
+  "type": "module",
+  "description": "Playwright checks against the live site. Run a script with `node audit/<name>.mjs` after `npm i` in this folder.",
+  "dependencies": { "playwright": "^1.58.0", "pngjs": "^7.0.0" }
+}

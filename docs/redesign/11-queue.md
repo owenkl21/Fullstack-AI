@@ -112,13 +112,39 @@ the live deploy.
 - [x] **Deploys.** Vercel builds `fishlogger` `main`; `git push origin` deploys
       nothing. Railway is `railway up --service server --detach`.
 
+## Done, 17 September evening
+
+- [x] **Fast log reads the photograph**: shutter time and GPS from EXIF, a
+      pin to drop, "take a photo" and "choose one", conditions re-read for the
+      place and hour, who sees it, spot shown or hidden, save as a public or
+      private spot, by-eye/tape/scale as a real switch, kept on the record.
+- [x] **Home plate** names where you are, last spot under it; conditions as
+      tiles three across that stagger in; season strip is photo and date with
+      black month breaks.
+- [x] **Feed**: pickers on a phone, no sideways scroll; radius is a Radix
+      slider drawn as the fishing line.
+- [x] **Map**: filters over the map (layers panel, species picker, drop a mark,
+      log here, legend).
+- [x] **Boards**: one filter bar, species multi-select, order by, top ten
+      paged with your own row pinned.
+- [x] **Competitions**: invitation only with follower invites (a week to
+      accept), time left, results with the winner, paging; a catch can be
+      entered and the figure is read off a photo by Claude Haiku 4.5
+      (`ANTHROPIC_API_KEY` on the server switches it on).
+- [x] **Fish namer**: both log forms offer the hub's two best guesses after a
+      photo; needs `FISHIAL_URL` (+ `FISHIAL_TOKEN`) on the server. Hub side in
+      [13-fishial-on-the-hub.md](13-fishial-on-the-hub.md).
+- [x] Forecast colour for wind and sky, phone grid scroll fixed; profile and
+      insights count-ins and growing bars.
+
 ## Next, in order
 
-1. **Species from a photograph.** Needs a model decision first: a vision
-    call per photo costs money and needs a key, so it is Owen's call which
-    provider and whether at all.
+1. **Switch the readers on**: set `ANTHROPIC_API_KEY` on Railway for the
+    competition reader; stand up Fishial on the hub and set `FISHIAL_URL`.
 2. **The pin brief in Claude Design** (docs/redesign/12-design-brief-pins.md):
     once the SVGs come back, swap them into `kindPin` and the cluster disc.
+3. **Verify this batch on the live site** (`audit/verify15.mjs`) and fix what
+    the screenshots show.
 
 ## Standing constraints
 
