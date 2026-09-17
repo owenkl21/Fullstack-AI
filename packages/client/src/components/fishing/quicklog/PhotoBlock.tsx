@@ -219,17 +219,43 @@ export function PhotoBlock({
       <div className="flex flex-col gap-2">
          <div
             id="quicklog-photo-zone"
+            ref={preview ? frameRef : undefined}
+            role={preview ? 'img' : undefined}
+            aria-label={
+               preview ? 'The photograph as the feed will show it' : undefined
+            }
+            onPointerDown={preview ? onFramePointerDown : undefined}
+            onPointerMove={preview ? onFramePointerMove : undefined}
+            onPointerUp={preview ? onFramePointerUp : undefined}
+            onPointerCancel={preview ? onFramePointerUp : undefined}
             className={cn(
                'relative flex items-center gap-4 overflow-hidden bg-black-block p-5 text-paper',
-               preview ? 'min-h-[210px]' : 'min-h-[145px]'
+               preview
+                  ? 'aspect-[4/3] cursor-grab touch-none p-0 select-none active:cursor-grabbing'
+                  : 'min-h-[145px]'
             )}
          >
             {preview ? (
+               /*
+                * The feed's own frame, four by three, with the picture inside
+                * it. Dragging the picture chooses what the frame keeps; the
+                * point travels with the photo and the feed crops to it.
+                */
                <img
                   src={preview}
                   alt="The catch you just photographed"
+                  draggable={false}
+                  onLoad={(event) =>
+                     setRatio(
+                        event.currentTarget.naturalWidth /
+                           Math.max(1, event.currentTarget.naturalHeight)
+                     )
+                  }
+                  style={{
+                     objectPosition: `${Math.round(focus.x * 100)}% ${Math.round(focus.y * 100)}%`,
+                  }}
                   className={cn(
-                     'absolute inset-0 h-full w-full object-cover [transition:opacity_700ms_var(--ease),transform_1400ms_var(--ease)]',
+                     'pointer-events-none absolute inset-0 h-full w-full object-cover [transition:opacity_700ms_var(--ease),transform_1400ms_var(--ease)]',
                      settled
                         ? 'scale-100 opacity-100'
                         : 'scale-[1.04] opacity-0'
@@ -298,22 +324,32 @@ export function PhotoBlock({
                   </div>
                </>
             ) : (
-               <div className="absolute right-2.5 bottom-2.5 z-[1] flex items-center gap-3 bg-ink px-2.5">
-                  <button
-                     type="button"
-                     className="g-tracked inline-flex h-10 items-center text-[15px] text-paper hover:text-teal"
-                     onClick={() => pickRef.current?.click()}
+               <>
+                  <span className="pointer-events-none absolute top-2.5 left-2.5 z-[1] bg-ink/80 px-2 py-1 text-[11px] tracking-[0.12em] text-paper uppercase">
+                     {ratio !== null && Math.abs(ratio - FRAME) > 0.02
+                        ? 'As the feed shows it. Drag to place.'
+                        : 'As the feed shows it'}
+                  </span>
+                  <div
+                     className="absolute right-2.5 bottom-2.5 z-[1] flex items-center gap-3 bg-ink px-2.5"
+                     onPointerDown={(event) => event.stopPropagation()}
                   >
-                     Change
-                  </button>
-                  <button
-                     type="button"
-                     className="g-tracked inline-flex h-10 items-center text-[15px] text-paper hover:text-teal"
-                     onClick={clear}
-                  >
-                     Remove photo
-                  </button>
-               </div>
+                     <button
+                        type="button"
+                        className="g-tracked inline-flex h-10 items-center text-[15px] text-paper hover:text-teal"
+                        onClick={() => pickRef.current?.click()}
+                     >
+                        Change
+                     </button>
+                     <button
+                        type="button"
+                        className="g-tracked inline-flex h-10 items-center text-[15px] text-paper hover:text-teal"
+                        onClick={clear}
+                     >
+                        Remove
+                     </button>
+                  </div>
+               </>
             )}
             {isUploading ? (
                <span
@@ -323,44 +359,6 @@ export function PhotoBlock({
                />
             ) : null}
          </div>
-         {preview ? (
-            <div className="flex flex-col gap-2">
-               <div className="flex items-baseline justify-between gap-4">
-                  <span className="lab">How the feed shows it</span>
-                  {ratio !== null && Math.abs(ratio - FRAME) > 0.02 ? (
-                     <span className="text-[12px] text-ink-3">
-                        Drag the picture to choose what stays in the frame.
-                     </span>
-                  ) : null}
-               </div>
-               <div
-                  ref={frameRef}
-                  role="img"
-                  aria-label="The photograph as the feed will crop it"
-                  onPointerDown={onFramePointerDown}
-                  onPointerMove={onFramePointerMove}
-                  onPointerUp={onFramePointerUp}
-                  onPointerCancel={onFramePointerUp}
-                  className="relative aspect-[4/3] w-full max-w-[420px] cursor-grab touch-none overflow-hidden border border-line bg-black-block select-none active:cursor-grabbing"
-               >
-                  <img
-                     src={preview}
-                     alt=""
-                     draggable={false}
-                     onLoad={(event) =>
-                        setRatio(
-                           event.currentTarget.naturalWidth /
-                              Math.max(1, event.currentTarget.naturalHeight)
-                        )
-                     }
-                     style={{
-                        objectPosition: `${Math.round(focus.x * 100)}% ${Math.round(focus.y * 100)}%`,
-                     }}
-                     className="pointer-events-none h-full w-full object-cover"
-                  />
-               </div>
-            </div>
-         ) : null}
          {isUploading ? (
             <p className="text-[12px] text-ink-3" aria-live="polite">
                Sending the photo, {progress}%.

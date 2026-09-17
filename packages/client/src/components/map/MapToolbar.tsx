@@ -5,6 +5,7 @@ import {
    Squares2X2Icon,
 } from '@heroicons/react/24/outline';
 import * as Popover from '@radix-ui/react-popover';
+import { usePhone } from '@/lib/media';
 import { useState } from 'react';
 import { FishMark } from '@/components/brand/FishMark';
 import { Picker } from '@/components/ui/picker';
@@ -36,6 +37,7 @@ export function MapToolbar({
    dropping,
    onDrop,
    onLogHere,
+   placement = 'overlay',
 }: {
    base: BaseLayer;
    onBase: (next: BaseLayer) => void;
@@ -47,33 +49,61 @@ export function MapToolbar({
    dropping: boolean;
    onDrop: () => void;
    onLogHere: () => void;
+   /*
+    * Where it sits. Over the map on a desktop; under the map on a phone,
+    * as a bar of four, so the map itself is clear for fingers and every
+    * panel rises from the bottom of the screen.
+    */
+   placement?: 'overlay' | 'bar';
 }) {
    const [layersOpen, setLayersOpen] = useState(false);
    const shown = Object.values(layers).filter(Boolean).length;
+   const phone = usePhone();
+   const bar = placement === 'bar';
+   const barButton =
+      'flex min-h-12 flex-col items-center justify-center gap-0.5 bg-background px-1 text-[11px] tracking-[0.08em] text-ink uppercase transition-colors duration-100 hover:bg-bg-2';
 
    return (
-      <div className="absolute top-3 left-3 z-[500] flex flex-wrap items-start gap-2 pr-16">
+      <div
+         className={cn(
+            bar
+               ? 'grid grid-cols-4 gap-px border border-line bg-line'
+               : 'absolute top-3 left-3 z-[500] flex flex-wrap items-start gap-2 pr-16'
+         )}
+      >
          <Popover.Root open={layersOpen} onOpenChange={setLayersOpen}>
             <Popover.Trigger asChild>
                <button
                   type="button"
-                  className={control}
+                  className={bar ? barButton : control}
                   aria-label="Map layers"
                >
                   <Squares2X2Icon aria-hidden="true" className="size-5" />
-                  <span className="g-tracked hidden text-[15px] sm:inline">
-                     {BASE_LAYERS.find((b) => b.value === base)?.label ??
-                        'Layers'}
-                     <span className="ml-1.5 text-ink-3">{shown} on</span>
-                  </span>
+                  {bar ? (
+                     <span>Layers</span>
+                  ) : (
+                     <span className="g-tracked hidden text-[15px] sm:inline">
+                        {BASE_LAYERS.find((b) => b.value === base)?.label ??
+                           'Layers'}
+                        <span className="ml-1.5 text-ink-3">{shown} on</span>
+                     </span>
+                  )}
                </button>
             </Popover.Trigger>
             <Popover.Portal>
                <Popover.Content
-                  align="start"
-                  sideOffset={6}
+                  align={phone ? 'center' : 'start'}
+                  side="bottom"
+                  sideOffset={phone ? 0 : 6}
+                  avoidCollisions={!phone}
+                  onOpenAutoFocus={(event) => event.preventDefault()}
                   collisionPadding={12}
-                  className="z-[1000] w-[min(300px,calc(100vw-24px))] border border-line bg-background p-3 text-ink shadow-[0_10px_30px_rgba(11,9,9,0.18)]"
+                  className={cn(
+                     'z-[1000] border border-line bg-background p-3 text-ink shadow-[0_10px_30px_rgba(11,9,9,0.18)]',
+                     phone
+                        ? 'picker-sheet fixed inset-x-0 bottom-0 w-screen border-t-2 border-teal pb-[max(12px,env(safe-area-inset-bottom))]'
+                        : 'w-[min(300px,calc(100vw-24px))]'
+                  )}
                >
                   <span className="lab text-ink-3">Base</span>
                   <div
@@ -135,22 +165,61 @@ export function MapToolbar({
                         </li>
                      ))}
                   </ul>
+                  {phone ? (
+                     <>
+                        <span className="lab mt-4 block text-ink-3">
+                           The pins
+                        </span>
+                        <ul className="mt-1.5 flex flex-col gap-1.5">
+                           {LEGEND.map((row) => (
+                              <li
+                                 key={row.key}
+                                 className="flex items-center gap-3"
+                              >
+                                 <LegendMark
+                                    fill={row.fill}
+                                    shape={row.shape}
+                                 />
+                                 <span className="text-[14px]">
+                                    {row.label}
+                                 </span>
+                              </li>
+                           ))}
+                        </ul>
+                        <button
+                           type="button"
+                           onClick={() => setLayersOpen(false)}
+                           className="g-tracked mt-4 flex h-11 w-full items-center justify-center bg-ink text-[16px] text-background"
+                        >
+                           Done
+                        </button>
+                     </>
+                  ) : null}
                </Popover.Content>
             </Popover.Portal>
          </Popover.Root>
 
          {speciesOptions.length ? (
             <Picker
-               size="md"
+               size={bar ? 'sm' : 'md'}
                multiple
                label="Fish"
                allLabel="Any"
                value={species}
                onChange={(next) => onSpecies(next as string[])}
                options={speciesOptions}
-               icon={<FishMark className="h-4 w-6" />}
-               className="max-w-[200px] shadow-[0_2px_8px_rgba(11,9,9,0.25)]"
+               icon={bar ? undefined : <FishMark className="h-4 w-6" />}
+               className={
+                  bar
+                     ? 'min-h-12 border-0 px-2'
+                     : 'max-w-[200px] shadow-[0_2px_8px_rgba(11,9,9,0.25)]'
+               }
             />
+         ) : bar ? (
+            <span className={cn(barButton, 'text-ink-3')}>
+               <FishMark className="h-4 w-6" />
+               <span>Fish</span>
+            </span>
          ) : null}
 
          <button
@@ -158,27 +227,38 @@ export function MapToolbar({
             aria-pressed={dropping}
             onClick={onDrop}
             className={cn(
-               control,
-               dropping && 'border-teal bg-teal text-teal-ink'
+               bar ? barButton : control,
+               dropping &&
+                  (bar
+                     ? 'bg-teal text-teal-ink'
+                     : 'border-teal bg-teal text-teal-ink')
             )}
             title="Drop a private mark"
          >
             <MapPinIcon aria-hidden="true" className="size-5" />
-            <span className="g-tracked hidden text-[15px] sm:inline">
-               {dropping ? 'Tap the map' : 'Drop a mark'}
-            </span>
+            {bar ? (
+               <span>{dropping ? 'Tap map' : 'Mark'}</span>
+            ) : (
+               <span className="g-tracked hidden text-[15px] sm:inline">
+                  {dropping ? 'Tap the map' : 'Drop a mark'}
+               </span>
+            )}
          </button>
 
          <button
             type="button"
             onClick={onLogHere}
-            className={control}
+            className={bar ? barButton : control}
             title="Log a catch at the centre of the map"
          >
             <PlusIcon aria-hidden="true" className="size-5" />
-            <span className="g-tracked hidden text-[15px] sm:inline">
-               Log here
-            </span>
+            {bar ? (
+               <span>Log here</span>
+            ) : (
+               <span className="g-tracked hidden text-[15px] sm:inline">
+                  Log here
+               </span>
+            )}
          </button>
       </div>
    );

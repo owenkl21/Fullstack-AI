@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePhone } from '@/lib/media';
 import type { LeafletMouseEvent, Map as LeafletMap, Marker } from 'leaflet';
 import { ViewfinderCircleIcon } from '@heroicons/react/24/outline';
 import {
@@ -138,6 +139,7 @@ export function SpotsMap({
    const [showOthers, setShowOthers] = useState(true);
    const [species, setSpecies] = useState<string[]>([]);
    const navigate = useNavigate();
+   const phone = usePhone();
    const [base, setBase] = useState<BaseLayer>('satellite');
    /*
     * Bumped when the map is built. Every layer's draw effect depends on it,
@@ -632,7 +634,71 @@ export function SpotsMap({
                className="map-surface h-[62vh] min-h-[380px] w-full border border-line"
             />
 
+            {!phone ? <MapLegend /> : null}
+            {!phone ? (
+               <MapToolbar
+                  placement="overlay"
+                  base={base}
+                  onBase={(next) => {
+                     setBase(next);
+                     if (map.current) setBaseLayer(map.current, next);
+                  }}
+                  species={species}
+                  onSpecies={setSpecies}
+                  speciesOptions={speciesOptions.map((s) => ({
+                     value: s.id,
+                     label: s.name,
+                  }))}
+                  layers={{
+                     others: showOthers,
+                     marks: showWaypoints,
+                     places: showPois,
+                  }}
+                  onLayer={(key) => {
+                     if (key === 'others') setShowOthers((was) => !was);
+                     if (key === 'marks') setShowWaypoints((was) => !was);
+                     if (key === 'places') setShowPois((was) => !was);
+                  }}
+                  dropping={armed}
+                  onDrop={() => setArmed((was) => !was)}
+                  onLogHere={() => {
+                     /*
+                      * The quick log, with the pin already where the map is
+                      * looking. The full form was the wrong landing: a long page
+                      * that did not even read the pin.
+                      */
+                     const centre = map.current?.getCenter();
+                     if (centre)
+                        navigate(
+                           `/log?lat=${centre.lat.toFixed(5)}&lng=${centre.lng.toFixed(5)}`
+                        );
+                  }}
+               />
+            ) : null}
+
+            {/* Over the map, where a locate control belongs. */}
+            <button
+               type="button"
+               onClick={() => {
+                  void requestPosition().then((next) => {
+                     if (next && map.current) {
+                        map.current.setView(
+                           [next.latitude, next.longitude],
+                           13
+                        );
+                     }
+                  });
+               }}
+               aria-label="Go to where I am"
+               className="absolute right-3 bottom-8 z-[500] grid size-11 place-items-center border border-line bg-background text-ink shadow-[0_2px_8px_rgba(11,9,9,0.25)] transition-transform duration-150 active:scale-[0.96]"
+            >
+               <ViewfinderCircleIcon aria-hidden="true" className="size-6" />
+            </button>
+         </div>
+
+         {phone ? (
             <MapToolbar
+               placement="bar"
                base={base}
                onBase={(next) => {
                   setBase(next);
@@ -669,27 +735,7 @@ export function SpotsMap({
                      );
                }}
             />
-            <MapLegend />
-
-            {/* Over the map, where a locate control belongs. */}
-            <button
-               type="button"
-               onClick={() => {
-                  void requestPosition().then((next) => {
-                     if (next && map.current) {
-                        map.current.setView(
-                           [next.latitude, next.longitude],
-                           13
-                        );
-                     }
-                  });
-               }}
-               aria-label="Go to where I am"
-               className="absolute right-3 bottom-8 z-[500] grid size-11 place-items-center border border-line bg-background text-ink shadow-[0_2px_8px_rgba(11,9,9,0.25)] transition-transform duration-150 active:scale-[0.96]"
-            >
-               <ViewfinderCircleIcon aria-hidden="true" className="size-6" />
-            </button>
-         </div>
+         ) : null}
 
          <p className="mt-2 text-[14px] text-ink-3">
             {showPois && zoomLevel > 0 && zoomLevel < POI_MIN_ZOOM

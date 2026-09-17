@@ -30,13 +30,20 @@ export function PageHead({
 }) {
    return (
       <header
-         className="relative left-1/2 z-[1] mb-[132px] w-screen -translate-x-1/2 overflow-hidden bg-black-block text-paper md:mb-[180px]"
+         className="relative left-1/2 z-[1] mb-[132px] w-screen -translate-x-1/2 bg-black-block text-paper md:mb-[180px]"
          style={
             { '--contour': 'rgba(244, 241, 236, 0.16)' } as React.CSSProperties
          }
       >
-         {/* The survey lines live on the plate, edge to edge, drawn once. */}
-         <Contours seed={17} className="inset-0 h-full w-full" />
+         {/* The survey lines live on the plate, edge to edge, drawn once.
+             Clipped by their own box, never by the header, which has the
+             water hanging under it. */}
+         <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 overflow-hidden"
+         >
+            <Contours seed={17} className="inset-0 h-full w-full" />
+         </div>
          <div
             className={cn(
                'relative mx-auto pt-7 pb-5 md:pt-10 md:pb-7',

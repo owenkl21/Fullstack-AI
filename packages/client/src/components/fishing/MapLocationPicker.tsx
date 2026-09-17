@@ -19,6 +19,7 @@ import {
    type MapPosition,
 } from '@/lib/maps';
 import { cn } from '@/lib/utils';
+import { usePhone } from '@/lib/media';
 
 type MapLocationPickerProps = {
    latitude: string;
@@ -99,6 +100,7 @@ export function MapLocationPicker({
    mapClassName,
 }: MapLocationPickerProps) {
    const fieldId = useId();
+   const phone = usePhone();
    const mapContainerRef = useRef<HTMLDivElement | null>(null);
    const mapRef = useRef<LeafletMap | null>(null);
    const lastSentRef = useRef<MapPosition | null>(null);
@@ -335,6 +337,83 @@ export function MapLocationPicker({
    const control =
       'grid h-11 place-items-center border border-line bg-background text-ink shadow-[0_1px_0_var(--line)] transition-[transform,background-color] duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2 active:scale-[0.96] disabled:opacity-50';
 
+   /* The search. Enter asks; a link or a typed pair goes straight there. */
+   const form = (
+      <form
+         role="search"
+         className={cn(
+            'z-[400]',
+            phone ? 'relative mb-2' : 'absolute top-3 right-3 left-3'
+         )}
+         onSubmit={(event) => {
+            event.preventDefault();
+            void runSearch(query);
+         }}
+      >
+         <div className="flex h-11 items-center border border-line bg-background shadow-[0_1px_0_var(--line)] focus-within:border-ink">
+            <MagnifyingGlassIcon
+               aria-hidden="true"
+               className="ml-3 size-5 shrink-0 text-ink-3"
+            />
+            <input
+               id={`${fieldId}-search`}
+               type="search"
+               value={query}
+               onChange={(event) => {
+                  setQuery(event.target.value);
+                  setFound(null);
+               }}
+               onPaste={(event) => {
+                  const pasted = event.clipboardData.getData('text');
+                  if (
+                     pasted &&
+                     (parseGoogleMapsCoordinates(pasted) || readPair(pasted))
+                  ) {
+                     event.preventDefault();
+                     void runSearch(pasted);
+                  }
+               }}
+               autoComplete="off"
+               aria-label="Search a place, or paste a link from Maps"
+               placeholder="Search a place, or paste a Maps link"
+               className="h-full min-w-0 flex-1 bg-transparent px-3 text-[16px] text-ink outline-none placeholder:text-ink-3"
+            />
+            <button
+               type="submit"
+               disabled={searching || !query.trim()}
+               className="g-tracked h-full shrink-0 px-3 text-[16px] text-ink-2 hover:text-ink disabled:opacity-40"
+            >
+               {searching ? 'Looking' : 'Go'}
+            </button>
+         </div>
+         {found ? (
+            <ul
+               role="listbox"
+               aria-label="Places found"
+               className="thread-scroll absolute right-0 left-0 z-[401] mt-1 max-h-[220px] overflow-auto border border-line bg-background shadow-[0_8px_24px_rgba(11,9,9,0.18)]"
+            >
+               {found.map((place) => (
+                  <li key={`${place.lat},${place.lng}`}>
+                     <button
+                        type="button"
+                        role="option"
+                        aria-selected={false}
+                        onClick={() => {
+                           goTo(place);
+                           setFound(null);
+                           setQuery('');
+                        }}
+                        className="block w-full truncate border-t border-line px-3 py-2.5 text-left text-[15px] text-ink first:border-t-0 hover:bg-bg-2"
+                     >
+                        {place.label}
+                     </button>
+                  </li>
+               ))}
+            </ul>
+         ) : null}
+      </form>
+   );
+
    return (
       <div className={cn('grid gap-3', className)}>
          {mapFailed ? (
@@ -342,122 +421,56 @@ export function MapLocationPicker({
                The map cannot be drawn here. Type the position or use your own.
             </p>
          ) : (
-            <div
-               className={cn(
-                  'map-surface relative h-[340px] overflow-hidden border border-line sm:h-[440px]',
-                  mapClassName
-               )}
-            >
-               <div ref={mapContainerRef} className="absolute inset-0" />
-
-               {/* Search across the top. Enter asks; a link or a pair goes straight there. */}
-               <form
-                  role="search"
-                  className="absolute top-3 right-3 left-3 z-[400]"
-                  onSubmit={(event) => {
-                     event.preventDefault();
-                     void runSearch(query);
-                  }}
-               >
-                  <div className="flex h-11 items-center border border-line bg-background shadow-[0_1px_0_var(--line)] focus-within:border-ink">
-                     <MagnifyingGlassIcon
-                        aria-hidden="true"
-                        className="ml-3 size-5 shrink-0 text-ink-3"
-                     />
-                     <input
-                        id={`${fieldId}-search`}
-                        type="search"
-                        value={query}
-                        onChange={(event) => {
-                           setQuery(event.target.value);
-                           setFound(null);
-                        }}
-                        onPaste={(event) => {
-                           const pasted = event.clipboardData.getData('text');
-                           if (
-                              pasted &&
-                              (parseGoogleMapsCoordinates(pasted) ||
-                                 readPair(pasted))
-                           ) {
-                              event.preventDefault();
-                              void runSearch(pasted);
-                           }
-                        }}
-                        autoComplete="off"
-                        aria-label="Search a place, or paste a link from Maps"
-                        placeholder="Search a place, or paste a Maps link"
-                        className="h-full min-w-0 flex-1 bg-transparent px-3 text-[16px] text-ink outline-none placeholder:text-ink-3"
-                     />
-                     <button
-                        type="submit"
-                        disabled={searching || !query.trim()}
-                        className="g-tracked h-full shrink-0 px-3 text-[16px] text-ink-2 hover:text-ink disabled:opacity-40"
-                     >
-                        {searching ? 'Looking' : 'Go'}
-                     </button>
-                  </div>
-                  {found ? (
-                     <ul
-                        role="listbox"
-                        aria-label="Places found"
-                        className="mt-1 max-h-[180px] overflow-auto border border-line bg-background shadow-[0_1px_0_var(--line)]"
-                     >
-                        {found.map((place) => (
-                           <li key={`${place.lat},${place.lng}`}>
-                              <button
-                                 type="button"
-                                 role="option"
-                                 aria-selected={false}
-                                 onClick={() => {
-                                    goTo(place);
-                                    setFound(null);
-                                    setQuery('');
-                                 }}
-                                 className="block w-full truncate border-t border-line px-3 py-2 text-left text-[15px] text-ink first:border-t-0 hover:bg-bg-2"
-                              >
-                                 {place.label}
-                              </button>
-                           </li>
-                        ))}
-                     </ul>
-                  ) : null}
-               </form>
-
-               {/* The pin. Fixed at the centre; the map moves under it. */}
+            <div className={cn(phone && 'flex flex-col')}>
+               {phone ? form : null}
                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-1/2 left-1/2 z-[400]"
+                  className={cn(
+                     'map-surface relative h-[340px] overflow-hidden border border-line sm:h-[440px]',
+                     mapClassName
+                  )}
                >
-                  <span
-                     className={cn(
-                        'absolute top-0 left-0 block size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/45 blur-[1.5px] transition-transform duration-200 [transition-timing-function:var(--ease)]',
-                        moving ? 'scale-[1.6]' : 'scale-100'
-                     )}
-                  />
-                  <svg
-                     width="36"
-                     height="46"
-                     viewBox="0 0 36 46"
-                     className={cn(
-                        'absolute top-0 left-0 -translate-x-1/2 -translate-y-full transition-transform duration-200 [transition-timing-function:var(--ease)] drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]',
-                        moving && '-translate-y-[calc(100%+10px)]'
-                     )}
-                  >
-                     <path
-                        d="M18 45C18 45 3.5 28.6 3.5 18a14.5 14.5 0 1 1 29 0C32.5 28.6 18 45 18 45Z"
-                        fill="var(--teal)"
-                        stroke="#f4f1ec"
-                        strokeWidth="2.5"
-                        strokeLinejoin="round"
-                     />
-                     <circle cx="18" cy="18" r="4" fill="#06232a" />
-                  </svg>
-                  <span className="absolute top-0 left-0 block h-px w-10 -translate-x-1/2 bg-white/70 mix-blend-difference" />
-                  <span className="absolute top-0 left-0 block h-10 w-px -translate-y-1/2 bg-white/70 mix-blend-difference" />
-               </div>
+                  <div ref={mapContainerRef} className="absolute inset-0" />
+                  {!phone ? form : null}
 
-               {/* Locate and the base, bottom left, out of the attribution's way. */}
-               <div className="absolute bottom-3 left-3 z-[400] flex gap-2">
+                  {/* The pin. Fixed at the centre; the map moves under it. */}
+                  <div
+                     aria-hidden="true"
+                     className="pointer-events-none absolute top-1/2 left-1/2 z-[400]"
+                  >
+                     <span
+                        className={cn(
+                           'absolute top-0 left-0 block size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/45 blur-[1.5px] transition-transform duration-200 [transition-timing-function:var(--ease)]',
+                           moving ? 'scale-[1.6]' : 'scale-100'
+                        )}
+                     />
+                     <svg
+                        width="36"
+                        height="46"
+                        viewBox="0 0 36 46"
+                        className={cn(
+                           'absolute top-0 left-0 -translate-x-1/2 -translate-y-full transition-transform duration-200 [transition-timing-function:var(--ease)] drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]',
+                           moving && '-translate-y-[calc(100%+10px)]'
+                        )}
+                     >
+                        <path
+                           d="M18 45C18 45 3.5 28.6 3.5 18a14.5 14.5 0 1 1 29 0C32.5 28.6 18 45 18 45Z"
+                           fill="var(--teal)"
+                           stroke="#f4f1ec"
+                           strokeWidth="2.5"
+                           strokeLinejoin="round"
+                        />
+                        <circle cx="18" cy="18" r="4" fill="#06232a" />
+                     </svg>
+                     <span className="absolute top-0 left-0 block h-px w-10 -translate-x-1/2 bg-white/70 mix-blend-difference" />
+                     <span className="absolute top-0 left-0 block h-10 w-px -translate-y-1/2 bg-white/70 mix-blend-difference" />
+                  </div>
+               </div>
+               <div
+                  className={cn(
+                     'z-[400] flex gap-2',
+                     phone ? 'mt-2' : 'absolute bottom-3 left-3'
+                  )}
+               >
                   <button
                      type="button"
                      onClick={useMyPosition}

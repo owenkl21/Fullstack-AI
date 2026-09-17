@@ -35,6 +35,7 @@ import {
 import { MapLocationPicker } from '@/components/fishing/MapLocationPicker';
 import { TextArea } from '@/components/ui/field';
 import { Fold } from '@/components/ui/fold';
+import { usePhone } from '@/lib/media';
 import { Segment } from '@/components/fishing/quicklog/Segment';
 import { CaughtAt } from '@/components/fishing/quicklog/CaughtAt';
 import {
@@ -141,6 +142,9 @@ function QuickLog() {
    const [hideLocation, setHideLocation] = useState(false);
    const [spotName, setSpotName] = useState('');
    const [savingSpot, setSavingSpot] = useState(false);
+   /* Which of the three phone screens is up. */
+   const [step, setStep] = useState(1);
+   const phone = usePhone();
    const [notes, setNotes] = useState('');
    const [spotPublic, setSpotPublic] = useState(false);
 
@@ -519,6 +523,409 @@ function QuickLog() {
       </div>
    );
 
+   /* ---- The blocks, each drawn once, placed by the screen ---------------- */
+
+   const speciesBlock = (
+      <div>
+         <div className="mb-2 flex items-baseline justify-between gap-2">
+            <span className="lab">Species</span>
+            <span className="text-[12px] text-ink-2">Required</span>
+         </div>
+         <SpeciesCombobox
+            label=""
+            value={chosen ?? typed}
+            species={species}
+            recent={options}
+            error={speciesError}
+            inputRef={speciesInput}
+            onChange={(name) => {
+               setChosen(name);
+               setTyped('');
+               setSpeciesError(null);
+            }}
+            onCreated={(made) => setSpecies((list) => [...list, made])}
+         />
+         <p className="mt-2 text-[12px] text-ink-2">
+            Not sure?{' '}
+            <button
+               type="button"
+               onClick={() => {
+                  setChosen(NOT_SURE);
+                  setTyped('');
+                  setSpeciesError(null);
+               }}
+               className="text-teal-text underline underline-offset-[3px] hover:text-ink"
+            >
+               Log it as unidentified
+            </button>
+         </p>
+         <SpeciesGuess
+            imageUrl={photo?.url ?? null}
+            current={typed || chosen || ''}
+            onPick={(candidate) => {
+               if (!candidate) {
+                  speciesInput.current?.focus();
+                  return;
+               }
+               setTyped(candidate.commonName);
+               setChosen(null);
+               setSpeciesError(null);
+            }}
+         />
+      </div>
+   );
+
+   const photoBlock = (
+      <PhotoBlock
+         initial={photo}
+         onChange={setPhoto}
+         onBusyChange={setPhotoBusy}
+         onFile={onPhotoFile}
+      />
+   );
+
+   const measureBlock = (
+      <div>
+         <div className="mb-2 flex items-baseline justify-between gap-2">
+            <span className="lab">Measurements</span>
+            <span className="text-[12px] text-ink-2">Optional</span>
+         </div>
+         <div className="grid grid-cols-2 gap-3 md:gap-4">
+            <MeasureField
+               id="length"
+               label="Length"
+               units={['cm', 'in']}
+               unit={lengthUnit}
+               value={length}
+               onChange={setLength}
+               onUnitChange={setLengthUnit}
+               sources={[
+                  { value: 'EYE', label: 'By eye' },
+                  { value: 'TAPE', label: 'On a tape' },
+               ]}
+               source={lengthSource}
+               onSourceChange={(next) =>
+                  setLengthSource(next as 'EYE' | 'TAPE')
+               }
+               placeholder="0"
+            />
+            <MeasureField
+               id="weight"
+               label="Weight"
+               units={['kg', 'lb']}
+               unit={weightUnit}
+               value={weight}
+               onChange={setWeight}
+               onUnitChange={setWeightUnit}
+               sources={[
+                  { value: 'EYE', label: 'By eye' },
+                  { value: 'SCALE', label: 'On a scale' },
+               ]}
+               source={weightSource}
+               onSourceChange={(next) =>
+                  setWeightSource(next as 'EYE' | 'SCALE')
+               }
+               placeholder="0"
+            />
+         </div>
+      </div>
+   );
+
+   const fishBlock = (
+      <div className="flex flex-wrap items-center justify-between gap-3">
+         <div className="flex items-baseline gap-2">
+            <span className="lab">The fish</span>
+            <span className="text-[12px] text-ink-2">Optional</span>
+         </div>
+         <Segment
+            label="Kept or released"
+            value={released}
+            onChange={setReleased}
+            className="w-full sm:w-auto sm:min-w-[215px]"
+            options={[
+               {
+                  value: 'RELEASED',
+                  label: 'Released',
+                  Icon: ArrowUturnLeftIcon,
+               },
+               { value: 'KEPT', label: 'Kept', Icon: ArchiveBoxIcon },
+            ]}
+         />
+      </div>
+   );
+
+   const gearInner = (
+      <div className="flex flex-col gap-4">
+         <div className="grid gap-3 sm:grid-cols-2">
+            <Picker
+               multiple
+               size="sm"
+               label="Gear"
+               allLabel="None chosen"
+               value={gearIds.filter((id) =>
+                  gearOptions.some((o) => o.value === id)
+               )}
+               options={gearOptions}
+               onChange={(next) =>
+                  setGearIds((was) => [
+                     ...was.filter((id) =>
+                        baitOptions.some((o) => o.value === id)
+                     ),
+                     ...(next as string[]),
+                  ])
+               }
+            />
+            <Picker
+               multiple
+               size="sm"
+               label="Bait or lure"
+               allLabel="None chosen"
+               value={gearIds.filter((id) =>
+                  baitOptions.some((o) => o.value === id)
+               )}
+               options={baitOptions}
+               onChange={(next) =>
+                  setGearIds((was) => [
+                     ...was.filter((id) =>
+                        gearOptions.some((o) => o.value === id)
+                     ),
+                     ...(next as string[]),
+                  ])
+               }
+            />
+         </div>
+         <AddGearInline
+            onAdded={(entry) => {
+               setGear((list) => [...list, entry]);
+               setGearIds((was) => [...was, entry.id]);
+            }}
+         />
+         <TextArea
+            label="Notes"
+            value={notes}
+            maxLength={2000}
+            rows={3}
+            placeholder="A detail to remember: the bait, the tide, the take."
+            onChange={(event) => setNotes(event.target.value)}
+         />
+      </div>
+   );
+
+   const gearFold = (
+      <div className="border-t border-b border-line">
+         <Fold
+            title="Gear, bait & notes"
+            headingClassName="text-[18px] md:text-[18px]"
+            aside={gearIds.length ? `${gearIds.length} chosen` : 'Optional'}
+         >
+            <div className="pb-5">{gearInner}</div>
+         </Fold>
+      </div>
+   );
+
+   const sessionLink = (
+      <button
+         type="button"
+         onClick={nothingCaught}
+         className="inline-flex min-h-9 items-center text-[12px] underline underline-offset-[3px] hover:text-teal-text"
+      >
+         Nothing caught? Log a session instead
+      </button>
+   );
+
+   const whenWhereBlock = (
+      <div className="border-t-2 border-teal bg-bg-2 p-4 md:p-5">
+         <CaughtAt
+            at={stampedAt}
+            timeSource={timeSource}
+            onTime={(next) => {
+               setStampedAt(next);
+               setTimeSource('typed');
+            }}
+         />
+
+         <div className="mt-4">
+            <MapLocationPicker
+               mapClassName="h-[240px] sm:h-[260px]"
+               latitude={where ? String(where.latitude) : ''}
+               longitude={where ? String(where.longitude) : ''}
+               onChange={(latitude, longitude) =>
+                  setWhere({ latitude, longitude, source: 'pin' })
+               }
+            />
+         </div>
+
+         <div className="mt-3 flex items-center gap-2 text-[13px]">
+            <WhereMark
+               aria-hidden="true"
+               className={cn(
+                  'size-4 shrink-0',
+                  where ? 'text-teal-text' : 'text-ink-3'
+               )}
+            />
+            <span className={where ? 'text-ink' : 'text-ink-3'}>
+               {whereLine}
+            </span>
+         </div>
+
+         {near ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border border-line bg-background px-3 py-2 text-[13px]">
+               <span>
+                  {filedUnder ? (
+                     <>
+                        <span className="g-tracked text-[17px]">
+                           {near.spot.name}
+                        </span>
+                        <span className="ml-2 text-ink-3">
+                           {formatMetres(near.metres)} away. Filed there.
+                        </span>
+                     </>
+                  ) : (
+                     <span className="text-ink-2">
+                        Not filed under {near.spot.name}.
+                     </span>
+                  )}
+               </span>
+               <button
+                  type="button"
+                  onClick={() =>
+                     setNotThatSpot(filedUnder ? near.spot.id : null)
+                  }
+                  className="g-tracked text-[15px] text-teal-text hover:opacity-80"
+               >
+                  {filedUnder ? 'Not this spot' : 'File it there'}
+               </button>
+            </div>
+         ) : null}
+
+         {where && !filedUnder ? (
+            <div className="mt-3">
+               <label className="flex min-h-9 cursor-pointer items-center gap-2 text-[13px]">
+                  <input
+                     type="checkbox"
+                     className="size-4 accent-ink"
+                     checked={savingSpot}
+                     onChange={(event) => setSavingSpot(event.target.checked)}
+                  />
+                  Save to my fishing spots
+               </label>
+               {savingSpot ? (
+                  <div className="mt-2 flex flex-col gap-2">
+                     <input
+                        type="text"
+                        value={spotName}
+                        maxLength={120}
+                        autoComplete="off"
+                        placeholder="Give this spot a name"
+                        aria-label="Fishing spot name"
+                        onChange={(event) => setSpotName(event.target.value)}
+                        className="h-11 w-full border border-line-2 bg-background px-3 text-[15px] text-ink outline-none focus:border-ink"
+                     />
+                     <Segment
+                        label="The spot is"
+                        value={spotPublic ? 'PUBLIC' : 'PRIVATE'}
+                        onChange={(next) => setSpotPublic(next === 'PUBLIC')}
+                        options={[
+                           {
+                              value: 'PRIVATE',
+                              label: 'Private spot',
+                              Icon: LockClosedIcon,
+                           },
+                           {
+                              value: 'PUBLIC',
+                              label: 'Public spot',
+                              Icon: GlobeAltIcon,
+                           },
+                        ]}
+                     />
+                  </div>
+               ) : null}
+            </div>
+         ) : null}
+
+         <div className="mt-4 border-t border-line pt-3">
+            <Conditions
+               phase={phase}
+               lines={lines}
+               takenAt={conditions?.at ?? null}
+            />
+         </div>
+      </div>
+   );
+
+   const sharingBlock = (
+      <div className="flex flex-col gap-4">
+         <div>
+            <span className="lab mb-2 block">Who can see this catch?</span>
+            <Segment
+               label="Who can see this catch"
+               value={visibility}
+               onChange={setVisibility}
+               options={[
+                  { value: 'PUBLIC', label: 'Everyone', Icon: GlobeAltIcon },
+                  { value: 'PRIVATE', label: 'Only me', Icon: LockClosedIcon },
+               ]}
+            />
+         </div>
+         {visibility === 'PUBLIC' && where ? (
+            <div>
+               <span className="lab mb-2 block">Exact location</span>
+               <Segment
+                  label="Exact location"
+                  value={hideLocation ? 'HIDDEN' : 'SHOWN'}
+                  onChange={(next) => setHideLocation(next === 'HIDDEN')}
+                  options={[
+                     { value: 'HIDDEN', label: 'Hidden', Icon: EyeSlashIcon },
+                     { value: 'SHOWN', label: 'Shown', Icon: EyeIcon },
+                  ]}
+               />
+            </div>
+         ) : null}
+         <p
+            aria-live="polite"
+            className="flex items-start gap-2 bg-teal/10 p-2.5 text-[12px] text-teal-text"
+         >
+            <ShieldCheckIcon
+               aria-hidden="true"
+               className="mt-px size-4 shrink-0"
+            />
+            {privacyLine}
+         </p>
+      </div>
+   );
+
+   const saveButton = (
+      <button
+         type="button"
+         onClick={() => void save()}
+         disabled={photoBusy || isSaving}
+         className="g-tracked flex min-h-[52px] w-full items-center justify-center gap-5 bg-teal px-7 text-[22px] text-teal-ink transition-[filter] duration-150 hover:brightness-95 disabled:opacity-60 md:w-auto md:min-w-[222px]"
+      >
+         {isSaving ? 'Saving' : photoBusy ? 'Sending the photo' : 'Save catch'}
+         <ArrowRightIcon aria-hidden="true" className="size-5" />
+      </button>
+   );
+
+   /*
+    * On a phone the form is three steps, one screen each, in the order the
+    * fish comes in: the fish and where it came out, then its size and gear,
+    * then who sees it. On a desktop everything is on the one card.
+    */
+   const STEPS = [
+      { title: 'The catch', hint: 'Photo, species, when and where' },
+      { title: 'Size and gear', hint: 'Measurements, kept or released, gear' },
+      { title: 'Sharing', hint: 'Who sees it, then save' },
+   ] as const;
+   const current = STEPS[step - 1] ?? STEPS[0];
+   const nextStep = () => {
+      setStep((n) => Math.min(3, n + 1));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+   };
+   const prevStep = () => {
+      setStep((n) => Math.max(1, n - 1));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+   };
+
    return (
       <section
          className={cn(
@@ -532,8 +939,27 @@ function QuickLog() {
                   Log a catch
                </h1>
                <p className="mt-1.5 max-w-[36ch] text-[13px] text-ink-2">
-                  Start with the species. Everything else is optional.
+                  {phone
+                     ? `Step ${step} of 3. ${current.hint}.`
+                     : 'Start with the species. Everything else is optional.'}
                </p>
+               {phone ? (
+                  <ol
+                     aria-label="Steps"
+                     className="mt-3 flex items-center gap-1.5"
+                  >
+                     {STEPS.map((s, i) => (
+                        <li
+                           key={s.title}
+                           aria-current={i + 1 === step ? 'step' : undefined}
+                           className={cn(
+                              'h-[3px] flex-1 transition-colors duration-200',
+                              i + 1 <= step ? 'bg-teal' : 'bg-line'
+                           )}
+                        />
+                     ))}
+                  </ol>
+               ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-3 md:gap-4">
                <button
@@ -554,419 +980,100 @@ function QuickLog() {
             </div>
          </header>
 
-         <div className="grid gap-7 px-4 py-6 md:grid-cols-[minmax(0,1.62fr)_minmax(0,1fr)] md:gap-9 md:px-7 xl:gap-12 xl:px-9">
-            {/* ---------------- 01 The catch ---------------- */}
-            <div className="min-w-0">
-               {heading('01', 'The catch')}
-
-               <div className="mb-2 flex items-baseline justify-between gap-2">
-                  <span className="lab">Species</span>
-                  <span className="text-[12px] text-ink-2">Required</span>
-               </div>
-               <SpeciesCombobox
-                  label=""
-                  value={chosen ?? typed}
-                  species={species}
-                  recent={options}
-                  error={speciesError}
-                  inputRef={speciesInput}
-                  onChange={(name) => {
-                     setChosen(name);
-                     setTyped('');
-                     setSpeciesError(null);
-                  }}
-                  onCreated={(made) => setSpecies((list) => [...list, made])}
-               />
-               <p className="mt-2 text-[12px] text-ink-2">
-                  Not sure?{' '}
-                  <button
-                     type="button"
-                     onClick={() => {
-                        setChosen(NOT_SURE);
-                        setTyped('');
-                        setSpeciesError(null);
-                     }}
-                     className="text-teal-text underline underline-offset-[3px] hover:text-ink"
-                  >
-                     Log it as unidentified
-                  </button>
-               </p>
-
-               <div className="mt-5">
-                  <PhotoBlock
-                     initial={photo}
-                     onChange={setPhoto}
-                     onBusyChange={setPhotoBusy}
-                     onFile={onPhotoFile}
-                  />
-               </div>
-
-               <SpeciesGuess
-                  imageUrl={photo?.url ?? null}
-                  current={typed || chosen || ''}
-                  onPick={(candidate) => {
-                     if (!candidate) {
-                        speciesInput.current?.focus();
-                        return;
-                     }
-                     setTyped(candidate.commonName);
-                     setChosen(null);
-                     setSpeciesError(null);
-                  }}
-               />
-
-               <div className="mt-6">
-                  <div className="mb-2 flex items-baseline justify-between gap-2">
-                     <span className="lab">Measurements</span>
-                     <span className="text-[12px] text-ink-2">Optional</span>
+         {phone ? (
+            <div className="px-4 py-6">
+               {step === 1 ? (
+                  <div className="flex flex-col gap-6">
+                     {heading('01', current.title)}
+                     {photoBlock}
+                     {speciesBlock}
+                     {whenWhereBlock}
                   </div>
-                  <div className="grid grid-cols-2 gap-3 md:gap-4">
-                     <MeasureField
-                        id="length"
-                        label="Length"
-                        units={['cm', 'in']}
-                        unit={lengthUnit}
-                        value={length}
-                        onChange={setLength}
-                        onUnitChange={setLengthUnit}
-                        sources={[
-                           { value: 'EYE', label: 'By eye' },
-                           { value: 'TAPE', label: 'On a tape' },
-                        ]}
-                        source={lengthSource}
-                        onSourceChange={(next) =>
-                           setLengthSource(next as 'EYE' | 'TAPE')
-                        }
-                        placeholder="0"
-                     />
-                     <MeasureField
-                        id="weight"
-                        label="Weight"
-                        units={['kg', 'lb']}
-                        unit={weightUnit}
-                        value={weight}
-                        onChange={setWeight}
-                        onUnitChange={setWeightUnit}
-                        sources={[
-                           { value: 'EYE', label: 'By eye' },
-                           { value: 'SCALE', label: 'On a scale' },
-                        ]}
-                        source={weightSource}
-                        onSourceChange={(next) =>
-                           setWeightSource(next as 'EYE' | 'SCALE')
-                        }
-                        placeholder="0"
-                     />
-                  </div>
-               </div>
-
-               <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-baseline gap-2">
-                     <span className="lab">The fish</span>
-                     <span className="text-[12px] text-ink-2">Optional</span>
-                  </div>
-                  <Segment
-                     label="Kept or released"
-                     value={released}
-                     onChange={setReleased}
-                     className="w-full sm:w-auto sm:min-w-[215px]"
-                     options={[
-                        {
-                           value: 'RELEASED',
-                           label: 'Released',
-                           Icon: ArrowUturnLeftIcon,
-                        },
-                        { value: 'KEPT', label: 'Kept', Icon: ArchiveBoxIcon },
-                     ]}
-                  />
-               </div>
-
-               <div className="mt-6 border-t border-b border-line">
-                  <Fold
-                     title="Gear, bait & notes"
-                     headingClassName="text-[18px] md:text-[18px]"
-                     aside={
-                        gearIds.length ? `${gearIds.length} chosen` : 'Optional'
-                     }
-                  >
-                     <div className="flex flex-col gap-4 pb-5">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                           <Picker
-                              multiple
-                              size="sm"
-                              label="Gear"
-                              allLabel="None chosen"
-                              value={gearIds.filter((id) =>
-                                 gearOptions.some((o) => o.value === id)
-                              )}
-                              options={gearOptions}
-                              onChange={(next) =>
-                                 setGearIds((was) => [
-                                    ...was.filter((id) =>
-                                       baitOptions.some((o) => o.value === id)
-                                    ),
-                                    ...(next as string[]),
-                                 ])
-                              }
-                           />
-                           <Picker
-                              multiple
-                              size="sm"
-                              label="Bait or lure"
-                              allLabel="None chosen"
-                              value={gearIds.filter((id) =>
-                                 baitOptions.some((o) => o.value === id)
-                              )}
-                              options={baitOptions}
-                              onChange={(next) =>
-                                 setGearIds((was) => [
-                                    ...was.filter((id) =>
-                                       gearOptions.some((o) => o.value === id)
-                                    ),
-                                    ...(next as string[]),
-                                 ])
-                              }
-                           />
-                        </div>
-                        <AddGearInline
-                           onAdded={(entry) => {
-                              setGear((list) => [...list, entry]);
-                              setGearIds((was) => [...was, entry.id]);
-                           }}
-                        />
-                        <TextArea
-                           label="Notes"
-                           value={notes}
-                           maxLength={2000}
-                           rows={3}
-                           placeholder="A detail to remember: the bait, the tide, the take."
-                           onChange={(event) => setNotes(event.target.value)}
-                        />
-                     </div>
-                  </Fold>
-               </div>
-
-               <button
-                  type="button"
-                  onClick={nothingCaught}
-                  className="mt-3 inline-flex min-h-9 items-center text-[12px] underline underline-offset-[3px] hover:text-teal-text"
-               >
-                  Nothing caught? Log a session instead
-               </button>
-            </div>
-
-            {/* ---------------- 02 When and where ---------------- */}
-            <aside className="min-w-0" aria-label="When, where and who sees it">
-               {heading('02', 'When & where')}
-               <div className="border-t-2 border-teal bg-bg-2 p-4 md:p-5">
-                  <CaughtAt
-                     at={stampedAt}
-                     timeSource={timeSource}
-                     onTime={(next) => {
-                        setStampedAt(next);
-                        setTimeSource('typed');
-                     }}
-                  />
-
-                  <div className="mt-4">
-                     <MapLocationPicker
-                        mapClassName="h-[220px] sm:h-[260px]"
-                        latitude={where ? String(where.latitude) : ''}
-                        longitude={where ? String(where.longitude) : ''}
-                        onChange={(latitude, longitude) =>
-                           setWhere({ latitude, longitude, source: 'pin' })
-                        }
-                     />
-                  </div>
-
-                  <div className="mt-3 flex items-center gap-2 text-[13px]">
-                     <WhereMark
-                        aria-hidden="true"
-                        className={cn(
-                           'size-4 shrink-0',
-                           where ? 'text-teal-text' : 'text-ink-3'
-                        )}
-                     />
-                     <span className={where ? 'text-ink' : 'text-ink-3'}>
-                        {whereLine}
-                     </span>
-                  </div>
-
-                  {near ? (
-                     <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border border-line bg-background px-3 py-2 text-[13px]">
-                        <span>
-                           {filedUnder ? (
-                              <>
-                                 <span className="g-tracked text-[17px]">
-                                    {near.spot.name}
-                                 </span>
-                                 <span className="ml-2 text-ink-3">
-                                    {formatMetres(near.metres)} away. Filed
-                                    there.
-                                 </span>
-                              </>
-                           ) : (
-                              <span className="text-ink-2">
-                                 Not filed under {near.spot.name}.
-                              </span>
-                           )}
-                        </span>
-                        <button
-                           type="button"
-                           onClick={() =>
-                              setNotThatSpot(filedUnder ? near.spot.id : null)
-                           }
-                           className="g-tracked text-[15px] text-teal-text hover:opacity-80"
-                        >
-                           {filedUnder ? 'Not this spot' : 'File it there'}
-                        </button>
-                     </div>
-                  ) : null}
-
-                  {where && !filedUnder ? (
-                     <div className="mt-3">
-                        <label className="flex min-h-9 cursor-pointer items-center gap-2 text-[13px]">
-                           <input
-                              type="checkbox"
-                              className="size-4 accent-ink"
-                              checked={savingSpot}
-                              onChange={(event) =>
-                                 setSavingSpot(event.target.checked)
-                              }
-                           />
-                           Save to my fishing spots
-                        </label>
-                        {savingSpot ? (
-                           <div className="mt-2 flex flex-col gap-2">
-                              <input
-                                 type="text"
-                                 value={spotName}
-                                 maxLength={120}
-                                 autoComplete="off"
-                                 placeholder="Give this spot a name"
-                                 aria-label="Fishing spot name"
-                                 onChange={(event) =>
-                                    setSpotName(event.target.value)
-                                 }
-                                 className="h-11 w-full border border-line-2 bg-background px-3 text-[15px] text-ink outline-none focus:border-ink"
-                              />
-                              <Segment
-                                 label="The spot is"
-                                 value={spotPublic ? 'PUBLIC' : 'PRIVATE'}
-                                 onChange={(next) =>
-                                    setSpotPublic(next === 'PUBLIC')
-                                 }
-                                 options={[
-                                    {
-                                       value: 'PRIVATE',
-                                       label: 'Private spot',
-                                       Icon: LockClosedIcon,
-                                    },
-                                    {
-                                       value: 'PUBLIC',
-                                       label: 'Public spot',
-                                       Icon: GlobeAltIcon,
-                                    },
-                                 ]}
-                              />
-                           </div>
-                        ) : null}
-                     </div>
-                  ) : null}
-
-                  <div className="mt-4 border-t border-line pt-3">
-                     <Conditions
-                        phase={phase}
-                        lines={lines}
-                        takenAt={conditions?.at ?? null}
-                     />
-                  </div>
-               </div>
-
-               <div className="mt-6">
-                  {heading('03', 'Sharing')}
-                  <div className="flex flex-col gap-4">
+               ) : step === 2 ? (
+                  <div className="flex flex-col gap-6">
+                     {heading('02', current.title)}
+                     {measureBlock}
+                     {fishBlock}
                      <div>
-                        <span className="lab mb-2 block">
-                           Who can see this catch?
+                        <span className="lab mb-3 block">
+                           Gear, bait & notes
                         </span>
-                        <Segment
-                           label="Who can see this catch"
-                           value={visibility}
-                           onChange={setVisibility}
-                           options={[
-                              {
-                                 value: 'PUBLIC',
-                                 label: 'Everyone',
-                                 Icon: GlobeAltIcon,
-                              },
-                              {
-                                 value: 'PRIVATE',
-                                 label: 'Only me',
-                                 Icon: LockClosedIcon,
-                              },
-                           ]}
-                        />
+                        {gearInner}
                      </div>
-                     {visibility === 'PUBLIC' && where ? (
-                        <div>
-                           <span className="lab mb-2 block">
-                              Exact location
-                           </span>
-                           <Segment
-                              label="Exact location"
-                              value={hideLocation ? 'HIDDEN' : 'SHOWN'}
-                              onChange={(next) =>
-                                 setHideLocation(next === 'HIDDEN')
-                              }
-                              options={[
-                                 {
-                                    value: 'HIDDEN',
-                                    label: 'Hidden',
-                                    Icon: EyeSlashIcon,
-                                 },
-                                 {
-                                    value: 'SHOWN',
-                                    label: 'Shown',
-                                    Icon: EyeIcon,
-                                 },
-                              ]}
-                           />
-                        </div>
-                     ) : null}
-                     <p
-                        aria-live="polite"
-                        className="flex items-start gap-2 bg-teal/10 p-2.5 text-[12px] text-teal-text"
-                     >
-                        <ShieldCheckIcon
-                           aria-hidden="true"
-                           className="mt-px size-4 shrink-0"
-                        />
-                        {privacyLine}
-                     </p>
                   </div>
+               ) : (
+                  <div className="flex flex-col gap-6">
+                     {heading('03', current.title)}
+                     {sharingBlock}
+                     {sessionLink}
+                  </div>
+               )}
+            </div>
+         ) : (
+            <div className="grid gap-7 px-4 py-6 md:grid-cols-[minmax(0,1.62fr)_minmax(0,1fr)] md:gap-9 md:px-7 xl:gap-12 xl:px-9">
+               <div className="min-w-0">
+                  {heading('01', 'The catch')}
+                  {speciesBlock}
+                  <div className="mt-5">{photoBlock}</div>
+                  <div className="mt-6">{measureBlock}</div>
+                  <div className="mt-5">{fishBlock}</div>
+                  <div className="mt-6">{gearFold}</div>
+                  <div className="mt-3">{sessionLink}</div>
                </div>
-            </aside>
-         </div>
+               <aside
+                  className="min-w-0"
+                  aria-label="When, where and who sees it"
+               >
+                  {heading('02', 'When & where')}
+                  {whenWhereBlock}
+                  <div className="mt-6">
+                     {heading('03', 'Sharing')}
+                     {sharingBlock}
+                  </div>
+               </aside>
+            </div>
+         )}
 
-         <footer className="sticky bottom-0 z-10 flex flex-col-reverse gap-3 border-t border-line bg-background px-4 py-4 md:flex-row md:items-center md:justify-between md:px-7">
-            <p className="flex items-center justify-center gap-1.5 text-[12px] text-ink-2 md:justify-start">
-               <ShieldCheckIcon aria-hidden="true" className="size-4" />
-               {footerLine}
-            </p>
-            <button
-               type="button"
-               onClick={() => void save()}
-               disabled={photoBusy || isSaving}
-               className="g-tracked flex min-h-[52px] w-full items-center justify-center gap-5 bg-teal px-7 text-[22px] text-teal-ink transition-[filter] duration-150 hover:brightness-95 disabled:opacity-60 md:w-auto md:min-w-[222px]"
-            >
-               {isSaving
-                  ? 'Saving'
-                  : photoBusy
-                    ? 'Sending the photo'
-                    : 'Save catch'}
-               <ArrowRightIcon aria-hidden="true" className="size-5" />
-            </button>
+         <footer className="sticky bottom-0 z-10 border-t border-line bg-background px-4 py-3 md:px-7 md:py-4">
+            {phone ? (
+               <div className="flex items-center gap-3">
+                  {step > 1 ? (
+                     <button
+                        type="button"
+                        onClick={prevStep}
+                        className="g-tracked inline-flex min-h-[52px] items-center border border-line px-4 text-[17px]"
+                     >
+                        Back
+                     </button>
+                  ) : null}
+                  {step < 3 ? (
+                     <button
+                        type="button"
+                        onClick={nextStep}
+                        className="g-tracked flex min-h-[52px] flex-1 items-center justify-center gap-4 bg-ink px-6 text-[20px] text-background"
+                     >
+                        Next
+                        <ArrowRightIcon aria-hidden="true" className="size-5" />
+                     </button>
+                  ) : (
+                     <div className="flex-1">{saveButton}</div>
+                  )}
+               </div>
+            ) : (
+               <div className="flex items-center justify-between gap-5">
+                  <p className="flex items-center gap-1.5 text-[12px] text-ink-2">
+                     <ShieldCheckIcon aria-hidden="true" className="size-4" />
+                     {footerLine}
+                  </p>
+                  {saveButton}
+               </div>
+            )}
+            {phone && step === 3 ? (
+               <p className="mt-2 flex items-center justify-center gap-1.5 text-[12px] text-ink-2">
+                  <ShieldCheckIcon aria-hidden="true" className="size-4" />
+                  {footerLine}
+               </p>
+            ) : null}
          </footer>
       </section>
    );
