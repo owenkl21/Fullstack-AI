@@ -134,42 +134,48 @@ export function FeedPostBlock({
    return (
       <article className="blk" aria-labelledby={`post-${post.id}`}>
          <header className="flex items-center gap-3 px-4 pt-5 pr-12 pb-3">
-            {post.author.avatarUrl ? (
-               <img
-                  src={post.author.avatarUrl}
-                  alt=""
-                  width={40}
-                  height={40}
-                  loading="lazy"
-                  className="size-10 shrink-0 rounded-full object-cover"
-               />
-            ) : (
-               <span
-                  aria-hidden="true"
-                  className="g flex size-10 shrink-0 items-center justify-center rounded-full bg-black-block-2 text-[20px] text-paper-2"
-               >
-                  {post.author.displayName.slice(0, 1)}
-               </span>
-            )}
-            <span className="min-w-0">
-               {/* The name is the way through to the angler who caught it. */}
-               <Link
-                  to={`/anglers/${post.author.id}`}
-                  className="block truncate font-semibold text-paper underline-offset-4 hover:underline"
-               >
-                  {post.author.displayName}
-               </Link>
-               {/*
-                * A username is optional now: better-auth creates an account
-                * before the angler has picked one. Rendering it unconditionally
-                * printed a bare "@" with nothing after it.
-                */}
-               {post.author.username ? (
-                  <span className="block truncate text-[14px] text-paper-2">
-                     @{post.author.username}
+            {/*
+             * The photograph and the name are one link. Making only the name
+             * clickable left a 26px target, which is under the minimum and
+             * fiddly next to a 40px photograph that looked just as pressable.
+             */}
+            <Link
+               to={`/anglers/${post.author.id}`}
+               className="group flex min-h-11 min-w-0 items-center gap-3"
+            >
+               {post.author.avatarUrl ? (
+                  <img
+                     src={post.author.avatarUrl}
+                     alt=""
+                     width={40}
+                     height={40}
+                     loading="lazy"
+                     className="size-10 shrink-0 rounded-full object-cover"
+                  />
+               ) : (
+                  <span
+                     aria-hidden="true"
+                     className="g flex size-10 shrink-0 items-center justify-center rounded-full bg-black-block-2 text-[20px] text-paper-2"
+                  >
+                     {post.author.displayName.slice(0, 1)}
                   </span>
-               ) : null}
-            </span>
+               )}
+               <span className="min-w-0">
+                  <span className="block truncate font-semibold text-paper underline-offset-4 group-hover:underline">
+                     {post.author.displayName}
+                  </span>
+                  {/*
+                   * A username is optional now: better-auth creates an account
+                   * before the angler has picked one. Rendering it unconditionally
+                   * printed a bare "@" with nothing after it.
+                   */}
+                  {post.author.username ? (
+                     <span className="block truncate text-[14px] text-paper-2">
+                        @{post.author.username}
+                     </span>
+                  ) : null}
+               </span>
+            </Link>
          </header>
 
          <p className="px-4 pb-4 text-[15px] text-paper-2">
