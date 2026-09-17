@@ -102,7 +102,7 @@ export function AnglerIntel() {
    return (
       <section aria-labelledby="intel-heading" className="mt-10">
          <div className="flex items-baseline justify-between gap-4">
-            <h2 id="intel-heading" className="lab-rule text-ink-3">
+            <h2 id="intel-heading" className="lab lab-rule text-ink-3">
                When you catch
             </h2>
          </div>

@@ -4,6 +4,7 @@ import { ViewfinderCircleIcon } from '@heroicons/react/24/outline';
 import {
    BASE_LAYERS,
    L,
+   clusterGroup,
    createMap,
    kindPin,
    refreshSize,
@@ -229,10 +230,12 @@ export function SpotsMap({
       const created = createMap(node, { ...opening, base, wheelZoom });
       map.current = created;
 
-      spotLayer.current = L.layerGroup().addTo(created);
+      /* Spots cluster at low zoom; marks and places do not, there are never
+         enough of them in one view to need it. */
+      spotLayer.current = clusterGroup('spot').addTo(created);
       waypointLayer.current = L.layerGroup().addTo(created);
       poiLayer.current = L.layerGroup().addTo(created);
-      othersLayer.current = L.layerGroup().addTo(created);
+      othersLayer.current = clusterGroup('other').addTo(created);
       setMapReady((n) => n + 1);
 
       const markers: Marker[] = spots.map((spot) => {

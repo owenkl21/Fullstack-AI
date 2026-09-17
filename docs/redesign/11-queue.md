@@ -72,20 +72,26 @@ the live deploy.
       list under its kinds (rod, reel, line, hook, weights, lure, bait) with a
       kind filter once there is enough gear to need one.
 - [x] **Phone: the Log key** has its plus and rounded corners.
+- [x] **The feed card reads fish first.** Species as the heading, its size
+      straight under, then where and when as a caption, then the angler's own
+      title when it says more, then notes. The meta line no longer sits between
+      the name and the photograph.
+- [x] **Phone: the filters** share one row that scrolls sideways; the first
+      post moved up from 337px to 246px on a 390 screen.
+- [x] **Contours on desktop** run the width of the screen behind the column
+      instead of stopping at its edge.
+- [x] **This season strip** is one tile a day with the count of fish on it.
+- [x] **When you catch:** two charts on the profile, fish by hour and by moon
+      phase, counted from the log in the browser.
+- [x] **A catch with a dropped pin shows its map.** Hidden-location catches
+      have the pin withheld by the server from everyone but the angler.
 - [x] **Deploys.** Vercel builds `fishlogger` `main`; `git push origin` deploys
       nothing. Railway is `railway up --service server --detach`.
 
 ## Next, in order
 
-1. **The rest of the feed card.** Still disorganised: the ordering of heading,
-    species, measurement and meta has not been reworked.
-2. **This season strip.** Several fish in one day need a better shape than one
-    bar each.
-3. **Contours on desktop.** Cut off and repetitive, worst on the home page.
-4. **Phone: the filters** still take too much room.
-5. **Angler Intel chart:** catches by hour and by tide or moon, from the log.
-6. **Pin clustering** at low zoom, and the map modes from the pin brief.
-7. **Species from a photograph.** Needs a model decision first.
+1. **Pin clustering** at low zoom, and the map modes from the pin brief.
+2. **Species from a photograph.** Needs a model decision first.
 
 ## Standing constraints
 

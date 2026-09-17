@@ -901,6 +901,37 @@
    border-top-color: #14110f;
 }
 
+/* ---- Several spots at once: a doubled disc -------------------------------- */
+.map-pin-cluster .map-pin-disc {
+   top: 3px;
+   left: calc(50% + 3px);
+   width: 40px;
+   height: 40px;
+   cursor: pointer;
+}
+/* The second disc behind and up-left, which is what says "more than one". */
+.map-pin-cluster .map-pin-disc-back {
+   top: -3px;
+   left: calc(50% - 3px);
+   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+   opacity: 0.9;
+}
+.map-pin-cluster:hover .map-pin-disc {
+   transform: translateX(-50%) scale(1.06);
+}
+.map-pin-cluster-spot .map-pin-disc {
+   background: var(--teal);
+   color: #06232a;
+}
+.map-pin-cluster-other .map-pin-disc {
+   background: #14110f;
+   color: var(--paper);
+}
+/* The plugin's own animation classes; the discs carry their own look. */
+.marker-cluster {
+   background: none;
+}
+
 /* ---- Private marks: a pennant on a pole ---------------------------------- */
 .map-pin-waypoint .map-pin-pole {
    position: absolute;
