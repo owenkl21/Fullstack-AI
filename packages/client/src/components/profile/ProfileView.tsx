@@ -145,14 +145,14 @@ export function ProfileView({
                   <div className="mt-5">
                      <ul
                         aria-hidden="true"
-                        className="grid max-w-[420px] grid-cols-4 gap-2"
+                        className="grid grid-cols-2 gap-3 sm:grid-cols-4"
                      >
                         {[0, 1, 2, 3].map((frame) => (
                            <li
                               key={frame}
-                              className="flex h-[72px] items-center justify-center border border-dashed border-line"
+                              className="flex aspect-[4/3] items-center justify-center border border-dashed border-line"
                            >
-                              <FishMark className="h-6 w-10 text-ink-3/45" />
+                              <FishMark className="h-10 w-16 text-ink-3/45" />
                            </li>
                         ))}
                      </ul>
@@ -172,7 +172,7 @@ export function ProfileView({
                      </Link>
                   </div>
                ) : (
-                  <ul className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                      {profile.galleryImages.map((entry) => (
                         <li
                            key={`${entry.sourceType}-${entry.sourceId}-${entry.id}`}

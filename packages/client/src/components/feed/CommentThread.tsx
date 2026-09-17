@@ -6,6 +6,7 @@ import {
    type KeyboardEvent,
 } from 'react';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
+import { ChatBubbleOvalLeftIcon } from '@heroicons/react/24/outline';
 
 import { formatStamp, plural } from '@/components/feed/format';
 import type { FeedComment } from '@/components/feed/types';
@@ -146,6 +147,17 @@ export function CommentThread({
          {shown.length > 0 ? (
             <ul
                ref={list}
+               onScroll={(event) => {
+                  /* Near the bottom, the next page comes on its own. */
+                  const el = event.currentTarget;
+                  if (
+                     left > 0 &&
+                     !isReadingAll &&
+                     el.scrollTop + el.clientHeight >= el.scrollHeight - 24
+                  ) {
+                     loadMore();
+                  }
+               }}
                className="thread-scroll flex max-h-[312px] flex-col gap-3 overflow-y-auto pr-2"
             >
                {shown.map((comment, i) => {
@@ -186,8 +198,12 @@ export function CommentThread({
                })}
             </ul>
          ) : (
-            <p className="text-[15px] text-paper-2">
-               Nobody has said anything yet.
+            <p className="flex items-center gap-2 text-[15px] text-paper-2">
+               <ChatBubbleOvalLeftIcon
+                  aria-hidden="true"
+                  className="size-5 text-paper-2"
+               />
+               No comments yet. Be the first.
             </p>
          )}
 

@@ -181,3 +181,7 @@ export const speciesSearchSchema = z.object({
    q: z.string().trim().max(120).optional(),
    limit: z.coerce.number().int().positive().max(50).optional().default(20),
 });
+
+export const createSpeciesSchema = z.object({
+   name: z.string().trim().min(2).max(80),
+});

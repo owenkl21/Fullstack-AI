@@ -125,12 +125,14 @@ export function Contours({
    width,
    height,
    className,
+   style,
 }: {
    seed?: number;
    /** Fixed dimensions. Leave both out and the art matches the box it sits in. */
    width?: number;
    height?: number;
    className?: string;
+   style?: React.CSSProperties;
 }) {
    const ref = useRef<SVGSVGElement>(null);
 
@@ -199,6 +201,7 @@ export function Contours({
    return (
       <svg
          ref={ref}
+         style={style}
          className={cn('contour', className)}
          viewBox={box ? `0 0 ${box.w} ${box.h}` : undefined}
          preserveAspectRatio="none"

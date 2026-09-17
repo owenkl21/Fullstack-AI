@@ -73,10 +73,16 @@ const below = (ys: number[]) =>
 const above = (ys: number[]) =>
    `${lineOf(ys)} L${WIDTH} ${-PAST} L0 ${-PAST} Z`;
 
-/* The region between two lines: a wet strip under the plate. */
+/*
+ * The region between two lines: a wet strip under the plate. The second
+ * line is walked back right to left, each y with its own x. It used to pair
+ * the ys with mirrored xs, which drew one long straight edge across the
+ * whole width under the crest: the line people saw cutting through the
+ * waves.
+ */
 const between = (top: number[], bottom: number[]) =>
    `${lineOf(top)} ${bottom
-      .map((y, i) => `L${xAt(bottom.length - 1 - i)} ${y.toFixed(1)}`)
+      .map((y, i) => `L${xAt(i)} ${y.toFixed(1)}`)
       .reverse()
       .join('')} Z`;
 

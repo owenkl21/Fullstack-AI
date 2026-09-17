@@ -16,9 +16,9 @@ import { lazyRoute } from '@/lib/lazy-route';
 const ProfilePage = lazyRoute(() =>
    import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage }))
 );
-const HomeNowPage = lazyRoute(() =>
-   import('@/pages/fishing/HomeNowPage').then((m) => ({
-      default: m.HomeNowPage,
+const NotificationsPage = lazyRoute(() =>
+   import('@/pages/NotificationsPage').then((m) => ({
+      default: m.NotificationsPage,
    }))
 );
 const QuickLogPage = lazyRoute(() =>
@@ -140,8 +140,8 @@ function App() {
       <Routes>
          <Route element={<AppLayout />}>
             <Route path="/" element={<HomePage />} />
-            <Route path="/now" element={<HomeNowPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/log" element={<QuickLogPage />} />
             <Route path="/catches/new" element={<LogCatchPage />} />
             <Route path="/catches/me" element={<MyCatchesPage />} />

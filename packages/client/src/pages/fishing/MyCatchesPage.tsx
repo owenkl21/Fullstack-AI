@@ -1,7 +1,10 @@
-import { Contours } from '@/components/brand/Contours';
+import { PageHead } from '@/components/brand/PageHead';
+import { ContourField } from '@/components/brand/ContourField';
+import { removeDraft, useDrafts } from '@/lib/drafts';
+import { formatStamp } from '@/components/fishing/record/format';
 import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useRevealIn } from '@/components/brand/Reveal';
 import {
    CatchRow,
@@ -171,16 +174,20 @@ function MyCatchesList() {
    return (
       <section
          ref={root}
-         className="relative mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14"
+         className="relative mx-auto w-[min(1680px,100%-32px)] pb-10 md:pb-14"
       >
-         <Contours seed={21} className="inset-x-0 top-0 h-[380px] w-full" />
+         <ContourField seed={21} />
+         <PageHead
+            kicker="Your log"
+            title="My catches"
+            aside={
+               status === 'ready' ? (
+                  <span className="lab num text-paper-2">{countLine}</span>
+               ) : null
+            }
+         />
          <header className="rv">
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-               <h1 className="g text-[44px] md:text-[56px]">My catches</h1>
-               {status === 'ready' ? (
-                  <p className="lab num">{countLine}</p>
-               ) : null}
-            </div>
+            <Drafts />
 
             {status === 'ready' && items.length > 0 ? (
                <div className="mt-8">
@@ -279,6 +286,61 @@ function MyCatchesList() {
                </>
             )}
          </div>
+      </section>
+   );
+}
+
+/*
+ * Catches half written, kept in this browser. Each opens the form it was
+ * started in with everything still filled.
+ */
+function Drafts() {
+   const drafts = useDrafts();
+   if (drafts.length === 0) return null;
+   return (
+      <section
+         aria-labelledby="drafts-heading"
+         className="mt-8 border-l-[3px] border-teal bg-bg-2 px-4 py-3"
+      >
+         <div className="flex items-baseline justify-between gap-4">
+            <h2 id="drafts-heading" className="lab">
+               Drafts
+            </h2>
+            <span className="lab num text-ink-3">{drafts.length}</span>
+         </div>
+         <ul className="mt-2 flex flex-col">
+            {drafts.map((draft) => (
+               <li
+                  key={draft.id}
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line/60 py-2 first:border-t-0"
+               >
+                  <span className="flex min-w-0 flex-col">
+                     <span className="g-tracked text-[19px]">
+                        {draft.title}
+                     </span>
+                     <span className="text-[13px] text-ink-3">
+                        {draft.kind === 'quick' ? 'Quick log' : 'Full form'} ·
+                        saved {formatStamp(draft.savedAt)}
+                     </span>
+                  </span>
+                  <span className="flex items-center gap-4">
+                     <Link
+                        to={`${draft.kind === 'quick' ? '/log' : '/catches/new'}?draft=${draft.id}`}
+                        className="g-tracked text-[17px] text-teal-text hover:opacity-80"
+                     >
+                        Continue
+                     </Link>
+                     <button
+                        type="button"
+                        onClick={() => removeDraft(draft.id)}
+                        className="g-tracked text-[15px] text-ink-3 hover:text-ink"
+                     >
+                        Discard
+                     </button>
+                  </span>
+               </li>
+            ))}
+         </ul>
       </section>
    );
 }

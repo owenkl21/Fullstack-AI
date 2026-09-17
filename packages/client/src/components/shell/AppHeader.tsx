@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SignedIn, SignedOut } from '@/components/shell/Signed';
 import { AccountMenu } from '@/components/shell/AccountMenu';
+import { NotificationBell } from '@/components/shell/NotificationBell';
 
 const destinations = [
    { to: '/', label: 'Feed', end: true },
-   { to: '/now', label: 'Now' },
    { to: '/catches/me', label: 'Catches' },
    { to: '/map', label: 'Map' },
    { to: '/forecast', label: 'Forecast' },
@@ -81,6 +81,7 @@ export function AppHeader() {
                   >
                      <Link to="/log">Log a catch</Link>
                   </Button>
+                  <NotificationBell />
                   <AccountMenu />
                </SignedIn>
             </div>

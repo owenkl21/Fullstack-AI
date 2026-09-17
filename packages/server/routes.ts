@@ -11,6 +11,7 @@ import { placesController } from './controllers/places.controller';
 import { forecastController } from './controllers/forecast.controller';
 import { visionController } from './controllers/vision.controller';
 import { savedController } from './controllers/saved.controller';
+import { notificationsController } from './controllers/notifications.controller';
 import { waypointsController } from './controllers/waypoints.controller';
 import { gearController } from './controllers/gear.controller';
 import { feedController } from './controllers/feed.controller';
@@ -121,6 +122,9 @@ router.get('/api/sites', fishingController.listFishingSites);
 
 /* A reference table, not anyone's data, so no sign-in needed to name a fish. */
 router.get('/api/species', fishingController.searchSpecies);
+/* A name the table does not have yet. Deduped against what it has, however
+ * it is spelt or capitalised, so one fish never becomes two rows. */
+router.post('/api/species', requireApiAuth, fishingController.createSpecies);
 
 /* The social layer. Boards are public; your own numbers are not. */
 router.get('/api/stats/me', requireApiAuth, statsController.myStats);
@@ -159,6 +163,31 @@ router.delete(
    requireApiAuth,
    savedController.removeSpot
 );
+router.get('/api/saved/posts', requireApiAuth, savedController.listPosts);
+router.post(
+   '/api/saved/posts/:postId',
+   requireApiAuth,
+   savedController.savePost
+);
+router.delete(
+   '/api/saved/posts/:postId',
+   requireApiAuth,
+   savedController.removePost
+);
+
+/* What happened to you. Polled, never pushed. */
+router.get('/api/notifications', requireApiAuth, notificationsController.list);
+router.get(
+   '/api/notifications/unread',
+   requireApiAuth,
+   notificationsController.unread
+);
+router.post(
+   '/api/notifications/read',
+   requireApiAuth,
+   notificationsController.markRead
+);
+
 router.get('/api/saved/gear', requireApiAuth, savedController.listGear);
 router.post(
    '/api/saved/gear/:gearId',

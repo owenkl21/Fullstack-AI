@@ -12,6 +12,7 @@ import {
    type BaseLayer,
 } from '@/lib/leaflet';
 import { MapLegend, MapToolbar } from '@/components/map/MapToolbar';
+import { popupCard } from '@/components/map/popup';
 import { fetchPois, type Poi } from '@/lib/overpass';
 import { requestPosition, usePosition } from '@/lib/position';
 import {
@@ -255,26 +256,49 @@ export function SpotsMap({
             title: spot.name,
          }).addTo(spotLayer.current!);
 
-         /*
-          * Built as DOM rather than an HTML string, so a spot named with a
-          * bracket or an ampersand cannot break out of the popup.
-          */
-         const popup = document.createElement('div');
-         const title = document.createElement('p');
-         title.className = 'lab';
-         title.textContent = spot.name;
-         const count = document.createElement('p');
-         count.className = 'num text-[15px]';
-         count.textContent =
-            spot.catchCount === 1 ? '1 catch' : `${spot.catchCount} catches`;
-         const open = document.createElement('button');
-         open.type = 'button';
-         open.className = 'g-tracked mt-1 text-[15px] text-teal-text';
-         open.textContent = 'Open the spot';
-         open.addEventListener('click', () => onOpenRef.current(spot.id));
-         popup.append(title, count, open);
-
-         marker.bindPopup(popup);
+         const card = popupCard({
+            kicker: 'Your spot',
+            title: spot.name,
+            accent: 'var(--teal)',
+            facts: [
+               {
+                  mark: 'fish',
+                  value:
+                     spot.catchCount === 0
+                        ? 'No catches logged here yet'
+                        : spot.catchCount === 1
+                          ? '1 catch logged here'
+                          : `${spot.catchCount} catches logged here`,
+               },
+               {
+                  mark: 'pin',
+                  value: `${spot.latitude.toFixed(4)}, ${spot.longitude.toFixed(4)}`,
+                  quiet: true,
+               },
+            ],
+            actions: [
+               {
+                  label: 'Open the spot',
+                  tone: 'primary',
+                  onClick: () => onOpenRef.current(spot.id),
+               },
+               {
+                  label: 'Log here',
+                  onClick: () =>
+                     navigate(
+                        `/log?lat=${spot.latitude.toFixed(5)}&lng=${spot.longitude.toFixed(5)}`
+                     ),
+               },
+               {
+                  label: 'Forecast',
+                  onClick: () =>
+                     navigate(
+                        `/forecast?lat=${spot.latitude.toFixed(4)}&lng=${spot.longitude.toFixed(4)}&name=${encodeURIComponent(spot.name)}`
+                     ),
+               },
+            ],
+         });
+         marker.bindPopup(card, { maxWidth: 320, minWidth: 240 });
          return marker;
       });
 
@@ -411,62 +435,59 @@ export function SpotsMap({
          }).addTo(layer);
          othersMarkers.current.push(marker);
 
-         const popup = document.createElement('div');
-         const title = document.createElement('p');
-         title.className = 'lab';
-         title.textContent = spot.name;
-
-         const who = document.createElement('p');
-         who.className = 'text-[14px] text-ink-2';
-         who.textContent = spot.createdByName
-            ? `Saved by ${spot.createdByName}`
-            : 'Saved by another angler';
-
-         const fish = document.createElement('p');
-         fish.className = 'num text-[15px]';
-         /* What it is known for, which is the reason to go. */
-         const top = spot.species.slice(0, 3).map((s) => s.name);
-         fish.textContent = spot.catchCount
-            ? `${spot.catchCount} public ${spot.catchCount === 1 ? 'catch' : 'catches'}${top.length ? `: ${top.join(', ')}` : ''}`
-            : 'No public catches yet';
-
-         const open = document.createElement('button');
-         open.type = 'button';
-         open.className = 'g-tracked text-[15px] text-teal-text';
-         open.textContent = 'Open the spot';
-         open.addEventListener('click', () => onOpenRef.current(spot.id));
-
-         /* Keep it from here, without leaving the map. The button reads
-          * the shared set each time, so it agrees with the spot page. */
-         const keep = document.createElement('button');
-         keep.type = 'button';
-         keep.className = 'g-tracked text-[15px] text-teal-text';
-         const paint = () => {
-            keep.textContent = keptRef.current.has(spot.id)
-               ? 'Kept'
-               : 'Keep this spot';
-         };
-         paint();
-         keep.addEventListener('click', () => {
-            const was = keptRef.current.has(spot.id);
-            keep.disabled = true;
-            (was ? removeSpot(spot.id) : saveSpot(spot.id))
-               .then(() => {
-                  markKept('spot', spot.id, !was);
-                  paint();
-               })
-               .catch(() => undefined)
-               .finally(() => {
-                  keep.disabled = false;
-               });
+         const top = spot.species.slice(0, 4).map((s) => s.name);
+         const card = popupCard({
+            kicker: "Another angler's spot",
+            title: spot.name,
+            accent: '#14110f',
+            facts: [
+               {
+                  mark: 'user',
+                  value: spot.createdByName
+                     ? `Saved by ${spot.createdByName}`
+                     : 'Saved by another angler',
+                  quiet: true,
+               },
+               {
+                  mark: 'fish',
+                  value: spot.catchCount
+                     ? `${spot.catchCount} public ${spot.catchCount === 1 ? 'catch' : 'catches'}`
+                     : 'No public catches yet',
+               },
+            ],
+            tags: top,
+            actions: [
+               {
+                  label: 'Open the spot',
+                  tone: 'primary',
+                  onClick: () => onOpenRef.current(spot.id),
+               },
+               {
+                  label: keptRef.current.has(spot.id) ? 'Kept' : 'Keep',
+                  onClick: (button) => {
+                     const was = keptRef.current.has(spot.id);
+                     button.disabled = true;
+                     (was ? removeSpot(spot.id) : saveSpot(spot.id))
+                        .then(() => {
+                           markKept('spot', spot.id, !was);
+                           button.textContent = was ? 'Keep' : 'Kept';
+                        })
+                        .catch(() => undefined)
+                        .finally(() => {
+                           button.disabled = false;
+                        });
+                  },
+               },
+               {
+                  label: 'Forecast',
+                  onClick: () =>
+                     navigate(
+                        `/forecast?lat=${spot.latitude!.toFixed(4)}&lng=${spot.longitude!.toFixed(4)}&name=${encodeURIComponent(spot.name)}`
+                     ),
+               },
+            ],
          });
-
-         const actions = document.createElement('div');
-         actions.className = 'mt-1 flex flex-wrap gap-x-4';
-         actions.append(open, keep);
-
-         popup.append(title, who, fish, actions);
-         marker.bindPopup(popup);
+         marker.bindPopup(card, { maxWidth: 320, minWidth: 240 });
       }
    }, [discovered, showOthers, species, spots, mapReady]);
 
@@ -484,26 +505,38 @@ export function SpotsMap({
             title: point.name,
          }).addTo(layer);
 
-         const popup = document.createElement('div');
-         const title = document.createElement('p');
-         title.className = 'lab';
-         title.textContent = point.name;
-         const note = document.createElement('p');
-         note.className = 'text-[15px]';
-         note.textContent = point.note ?? 'Private to you.';
-         const remove = document.createElement('button');
-         remove.type = 'button';
-         remove.className = 'g-tracked mt-1 text-[15px] text-destructive';
-         remove.textContent = 'Remove';
-         remove.addEventListener('click', () => {
-            void deleteWaypoint(point.id).then(() =>
-               setWaypoints((current) =>
-                  current.filter((w) => w.id !== point.id)
-               )
-            );
+         const card = popupCard({
+            kicker: 'Your mark',
+            title: point.name,
+            accent: '#f4f1ec',
+            facts: [
+               point.note
+                  ? { mark: 'note', value: point.note }
+                  : { mark: 'flag', value: 'Private to you', quiet: true },
+            ],
+            actions: [
+               {
+                  label: 'Log here',
+                  tone: 'primary',
+                  onClick: () =>
+                     navigate(
+                        `/log?lat=${point.latitude.toFixed(5)}&lng=${point.longitude.toFixed(5)}`
+                     ),
+               },
+               {
+                  label: 'Remove',
+                  tone: 'danger',
+                  onClick: () => {
+                     void deleteWaypoint(point.id).then(() =>
+                        setWaypoints((current) =>
+                           current.filter((w) => w.id !== point.id)
+                        )
+                     );
+                  },
+               },
+            ],
          });
-         popup.append(title, note, remove);
-         marker.bindPopup(popup);
+         marker.bindPopup(card, { maxWidth: 320, minWidth: 240 });
       }
    }, [waypoints, showWaypoints, mapReady]);
 
@@ -520,13 +553,7 @@ export function SpotsMap({
             title: poi.name,
          }).addTo(layer);
 
-         const popup = document.createElement('div');
-         const title = document.createElement('p');
-         title.className = 'lab';
-         title.textContent = poi.name;
-         const kind = document.createElement('p');
-         kind.className = 'text-[15px] text-ink-2';
-         kind.textContent =
+         const word =
             poi.kind === 'ramp'
                ? 'Slipway'
                : poi.kind === 'marina'
@@ -534,8 +561,42 @@ export function SpotsMap({
                  : poi.kind === 'tackle'
                    ? 'Tackle shop'
                    : 'Parking';
-         popup.append(title, kind);
-         marker.bindPopup(popup);
+         const card = popupCard({
+            kicker: word,
+            title: poi.name,
+            accent:
+               poi.kind === 'ramp'
+                  ? '#1f6fb2'
+                  : poi.kind === 'marina'
+                    ? '#1d3557'
+                    : poi.kind === 'tackle'
+                      ? '#c97b1c'
+                      : '#4a4542',
+            facts: [
+               {
+                  mark:
+                     poi.kind === 'ramp'
+                        ? 'ramp'
+                        : poi.kind === 'marina'
+                          ? 'anchor'
+                          : poi.kind === 'tackle'
+                            ? 'hook'
+                            : 'parking',
+                  value: 'From OpenStreetMap',
+                  quiet: true,
+               },
+            ],
+            actions: [
+               {
+                  label: 'Forecast',
+                  onClick: () =>
+                     navigate(
+                        `/forecast?lat=${poi.latitude.toFixed(4)}&lng=${poi.longitude.toFixed(4)}&name=${encodeURIComponent(poi.name)}`
+                     ),
+               },
+            ],
+         });
+         marker.bindPopup(card, { maxWidth: 320, minWidth: 240 });
       }
    }, [pois, mapReady]);
 

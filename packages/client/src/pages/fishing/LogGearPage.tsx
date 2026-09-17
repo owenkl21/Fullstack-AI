@@ -17,7 +17,8 @@ export type GearType =
    | 'LURE'
    | 'LINE'
    | 'HOOK'
-   | 'WEIGHTS';
+   | 'WEIGHTS'
+   | 'RIG';
 
 export type GearValues = {
    name: string;
@@ -38,6 +39,7 @@ const GEAR_KINDS: { value: GearType; word: string }[] = [
    { value: 'LINE', word: 'Line' },
    { value: 'HOOK', word: 'Hook' },
    { value: 'WEIGHTS', word: 'Weights' },
+   { value: 'RIG', word: 'Rig' },
 ];
 
 const TEXT_MAX = 120;

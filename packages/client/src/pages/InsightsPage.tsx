@@ -1,4 +1,6 @@
-import { Contours } from '@/components/brand/Contours';
+import { NoData } from '@/components/states/NoData';
+import { PageHead } from '@/components/brand/PageHead';
+import { ContourField } from '@/components/brand/ContourField';
 import { SeasonStrip } from '@/components/insights/SeasonStrip';
 import axios from 'axios';
 import {
@@ -382,21 +384,19 @@ function Insights() {
    const bestWind = charts.wind.reduce((a, b) => (b.count > a.count ? b : a));
 
    return (
-      <section className="relative mx-auto w-[min(1680px,100%-32px)] py-8 md:py-12">
-         <Contours seed={7} className="inset-x-0 top-0 h-[420px] w-full" />
-         <div className="relative flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
-            <div>
-               <p className="lab text-ink-3">Your log, counted</p>
-               <h1 className="g mt-1 text-[44px] leading-none md:text-[56px]">
-                  Insights
-               </h1>
-            </div>
-            <p className="num text-[15px] text-ink-2">
-               {plural(f.catches, 'log', 'logs')},{' '}
-               {plural(f.fish, 'fish', 'fish')}, since{' '}
-               {formatDay(catches[catches.length - 1]?.caughtAt ?? '')}
-            </p>
-         </div>
+      <section className="relative mx-auto w-[min(1680px,100%-32px)] pb-8 md:pb-12">
+         <ContourField seed={7} />
+         <PageHead
+            kicker="Your log, counted"
+            title="Insights"
+            aside={
+               <span className="num">
+                  {plural(f.catches, 'log', 'logs')},{' '}
+                  {plural(f.fish, 'fish', 'fish')}, since{' '}
+                  {formatDay(catches[catches.length - 1]?.caughtAt ?? '')}
+               </span>
+            }
+         />
 
          {/* ---- The rank ---- */}
          <Section title="Your rank" first>
@@ -704,7 +704,9 @@ function Table({
       <div className="min-w-0">
          <h3 className="lab text-ink-3">{title}</h3>
          {rows.length === 0 ? (
-            <p className="mt-2 text-[14px] text-ink-3">Nothing recorded yet.</p>
+            <NoData compact className="mt-2" title="No data yet">
+               Nothing recorded under this yet.
+            </NoData>
          ) : (
             <table className="mt-2 w-full border-collapse text-[14px]">
                <thead>

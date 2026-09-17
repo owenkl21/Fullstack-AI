@@ -2,7 +2,15 @@ import { prisma } from '../lib/prisma';
 import { uploadsService } from './uploads.service';
 import { userService } from './user.service';
 
-type GearType = 'ROD' | 'REEL' | 'BAIT' | 'LURE' | 'LINE' | 'HOOK' | 'WEIGHTS';
+type GearType =
+   | 'ROD'
+   | 'REEL'
+   | 'BAIT'
+   | 'LURE'
+   | 'LINE'
+   | 'HOOK'
+   | 'WEIGHTS'
+   | 'RIG';
 
 type GearImageInput = {
    storageKey: string;

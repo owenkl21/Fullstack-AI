@@ -31,6 +31,7 @@ const GEAR_VALUES: GearType[] = [
    'LINE',
    'HOOK',
    'WEIGHTS',
+   'RIG',
 ];
 
 const asGearType = (value: unknown): GearType =>

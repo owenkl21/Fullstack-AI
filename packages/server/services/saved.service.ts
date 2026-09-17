@@ -14,6 +14,84 @@ import { prisma } from '../lib/prisma';
  */
 
 export const savedService = {
+   /* ---- Posts kept from the feed ------------------------------------- */
+
+   async listPosts(userId: string) {
+      const rows = await prisma.savedPost.findMany({
+         where: { userId },
+         orderBy: { createdAt: 'desc' },
+         select: {
+            id: true,
+            createdAt: true,
+            post: {
+               select: {
+                  id: true,
+                  type: true,
+                  visibility: true,
+                  deletedAt: true,
+                  content: true,
+                  createdAt: true,
+                  author: {
+                     select: { id: true, displayName: true, username: true },
+                  },
+                  catch: {
+                     select: {
+                        id: true,
+                        title: true,
+                        caughtAt: true,
+                        length: true,
+                        weight: true,
+                        species: { select: { commonName: true } },
+                        site: { select: { id: true, name: true } },
+                     },
+                  },
+                  site: { select: { id: true, name: true } },
+               },
+            },
+         },
+      });
+
+      return rows
+         .filter(
+            (row) =>
+               row.post &&
+               !row.post.deletedAt &&
+               row.post.visibility !== 'PRIVATE'
+         )
+         .map((row) => ({
+            id: row.id,
+            savedAt: row.createdAt,
+            post: {
+               id: row.post.id,
+               type: row.post.type,
+               content: row.post.content,
+               createdAt: row.post.createdAt,
+               author: row.post.author,
+               catch: row.post.catch,
+               site: row.post.site,
+            },
+         }));
+   },
+
+   async savePost(userId: string, postId: string) {
+      const post = await prisma.feedPost.findFirst({
+         where: { id: postId, deletedAt: null, visibility: { not: 'PRIVATE' } },
+         select: { id: true },
+      });
+      if (!post) return null;
+      await prisma.savedPost.upsert({
+         where: { userId_postId: { userId, postId } },
+         update: {},
+         create: { userId, postId },
+      });
+      return { saved: true };
+   },
+
+   async removePost(userId: string, postId: string) {
+      await prisma.savedPost.deleteMany({ where: { userId, postId } });
+      return { removed: true };
+   },
+
    async listSpots(userId: string) {
       const rows = await prisma.savedSpot.findMany({
          where: { userId },

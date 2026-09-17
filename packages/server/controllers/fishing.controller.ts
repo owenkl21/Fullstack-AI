@@ -5,6 +5,7 @@ import {
    createFishingSiteSchema,
    fishingRequestSchema,
    speciesSearchSchema,
+   createSpeciesSchema,
    updateCatchSchema,
    updateFishingSiteSchema,
    weatherLookupSchema,
@@ -235,6 +236,23 @@ export const fishingController = {
          return res.status(500).json({
             code: 'failed_to_create_site',
             message: 'Unable to save your fishing site right now.',
+         });
+      }
+   },
+
+   async createSpecies(req: Request, res: Response) {
+      const parsed = createSpeciesSchema.safeParse(req.body);
+      if (!parsed.success) {
+         return res.status(400).json(parsed.error.format());
+      }
+      try {
+         const result = await fishingService.createSpecies(parsed.data.name);
+         return res.status(result.created ? 201 : 200).json(result);
+      } catch (error) {
+         console.error('[species:create] failed', error);
+         return res.status(500).json({
+            code: 'failed_to_create_species',
+            message: 'Unable to add that species.',
          });
       }
    },

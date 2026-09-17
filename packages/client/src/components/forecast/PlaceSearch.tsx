@@ -18,6 +18,7 @@ export function PlaceSearch({
    onUseMine,
    locating = false,
    showMine = true,
+   near = null,
    className,
 }: {
    onPick: (place: PlaceHit) => void;
@@ -25,6 +26,8 @@ export function PlaceSearch({
    locating?: boolean;
    /** Off where the page already has its own way of going to the angler. */
    showMine?: boolean;
+   /* Where the reader is, or is looking: of two Kommetjies, the near one first. */
+   near?: { latitude: number; longitude: number } | null;
    className?: string;
 }) {
    const id = useId();
@@ -48,7 +51,18 @@ export function PlaceSearch({
       const timer = window.setTimeout(() => {
          searchPlaces(q, controller.signal)
             .then((found) => {
-               setHits(found);
+               const sorted = near
+                  ? [...found].sort((a, b) => {
+                       const d = (p: PlaceHit) =>
+                          Math.hypot(
+                             p.latitude - near.latitude,
+                             (p.longitude - near.longitude) *
+                                Math.cos((near.latitude * Math.PI) / 180)
+                          );
+                       return d(a) - d(b);
+                    })
+                  : found;
+               setHits(sorted);
                setActive(0);
                setOpen(true);
             })
@@ -62,7 +76,7 @@ export function PlaceSearch({
          window.clearTimeout(timer);
          controller.abort();
       };
-   }, [query]);
+   }, [query, near]);
 
    /* A click anywhere else closes the list. */
    useEffect(() => {
@@ -143,6 +157,10 @@ export function PlaceSearch({
                         aria-selected={index === active}
                         onMouseEnter={() => setActive(index)}
                         onMouseDown={(event) => {
+                           event.preventDefault();
+                           choose(hit);
+                        }}
+                        onTouchEnd={(event) => {
                            event.preventDefault();
                            choose(hit);
                         }}

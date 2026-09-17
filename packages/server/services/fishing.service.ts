@@ -1,3 +1,7 @@
+import {
+   getWeatherKitCurrent,
+   weatherKitAvailable,
+} from '../clients/weatherkit.client';
 import { prisma } from '../lib/prisma';
 import { getCoordinates } from '../clients/geocoding.client';
 import {
@@ -615,12 +619,89 @@ export const fishingService = {
       longitude: number,
       at?: Date
    ) {
-      const conditions = await getConditionsAt(
-         latitude,
-         longitude,
-         at ?? new Date()
-      );
+      const when = at ?? new Date();
+      const conditions = await getConditionsAt(latitude, longitude, when);
+      /*
+       * For the reading of the moment, the phone's own weather service when
+       * the keys for it are set. Open-Meteo still supplies the sea, the sun
+       * and the moon, which WeatherKit does not carry. A reading in the past
+       * stays with Open-Meteo, which has the archive.
+       */
+      const nearNow = Math.abs(Date.now() - when.getTime()) < 90 * 60 * 1000;
+      if (nearNow && weatherKitAvailable()) {
+         const apple = await getWeatherKitCurrent(latitude, longitude);
+         if (apple) {
+            const merged = { ...conditions };
+            for (const [key, value] of Object.entries(apple)) {
+               if (value !== null && value !== undefined) {
+                  (merged as Record<string, unknown>)[key] = value;
+               }
+            }
+            return toWeatherSnapshot(merged);
+         }
+      }
       return toWeatherSnapshot(conditions);
+   },
+
+   /*
+    * A species by name, made once. The table is small enough to read whole,
+    * and the match ignores case, spaces and punctuation and forgives a letter
+    * or two, so "Dusky Kob", "duskykob" and "dusky cob" are one fish.
+    */
+   async createSpecies(name: string) {
+      const norm = (value: string) =>
+         value.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const wanted = norm(name);
+      const all = await prisma.species.findMany({
+         select: {
+            id: true,
+            commonName: true,
+            scientificName: true,
+            aliases: true,
+         },
+      });
+      const distance = (a: string, b: string) => {
+         const rows = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+         for (let j = 1; j <= b.length; j++) rows[0]![j] = j;
+         for (let i = 1; i <= a.length; i++) {
+            for (let j = 1; j <= b.length; j++) {
+               rows[i]![j] = Math.min(
+                  rows[i - 1]![j]! + 1,
+                  rows[i]![j - 1]! + 1,
+                  rows[i - 1]![j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1)
+               );
+            }
+         }
+         return rows[a.length]![b.length]!;
+      };
+      const namesOf = (row: (typeof all)[number]) => [
+         row.commonName,
+         row.scientificName ?? '',
+         ...(Array.isArray(row.aliases) ? (row.aliases as string[]) : []),
+      ];
+      const exact = all.find((row) =>
+         namesOf(row).some((n) => n && norm(n) === wanted)
+      );
+      if (exact) return { species: exact, created: false };
+      const allowance = wanted.length > 6 ? 2 : wanted.length > 3 ? 1 : 0;
+      const close = all.find((row) =>
+         namesOf(row).some((n) => n && distance(norm(n), wanted) <= allowance)
+      );
+      if (close) return { species: close, created: false };
+      const commonName = name
+         .trim()
+         .replace(/\s+/g, ' ')
+         .replace(/^./, (c) => c.toUpperCase());
+      const made = await prisma.species.create({
+         data: { commonName },
+         select: {
+            id: true,
+            commonName: true,
+            scientificName: true,
+            aliases: true,
+         },
+      });
+      return { species: made, created: true };
    },
 
    async createCatch(userId: string, input: CreateCatchInput) {

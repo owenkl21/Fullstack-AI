@@ -89,6 +89,14 @@ export function AccountMenu() {
                   </Link>
                   <Link
                      role="menuitem"
+                     to="/notifications"
+                     onClick={() => setOpen(false)}
+                     className="g-tracked block px-2 py-2 text-[17px] hover:bg-bg-2"
+                  >
+                     Notifications
+                  </Link>
+                  <Link
+                     role="menuitem"
                      to="/insights"
                      onClick={() => setOpen(false)}
                      className="g-tracked block px-2 py-2 text-[17px] hover:bg-bg-2"
@@ -101,7 +109,7 @@ export function AccountMenu() {
                      onClick={() => setOpen(false)}
                      className="g-tracked block px-2 py-2 text-[17px] hover:bg-bg-2"
                   >
-                     Kept spots and gear
+                     Kept posts, spots and gear
                   </Link>
                   {/* Gear lost its phone tab slot to Boards, so it lives here. */}
                   <Link

@@ -32,6 +32,7 @@ export type FeedPost = {
    likeCount: number;
    commentCount: number;
    likedByMe: boolean;
+   savedByMe?: boolean;
    latitude?: number | null;
    longitude?: number | null;
    catch: {

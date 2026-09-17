@@ -22,6 +22,10 @@ export type Species = {
 
 export const NOT_SURE = 'Not sure';
 
+/* Case, spaces and punctuation do not make a different fish. */
+export const speciesKey = (name: string) =>
+   name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
 /** The fallback title when the angler could not name the fish. */
 export const UNNAMED_TITLE = 'Catch';
 

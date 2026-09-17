@@ -25,6 +25,7 @@ const TYPES = [
    'LINE',
    'HOOK',
    'WEIGHTS',
+   'RIG',
 ] as const;
 
 type GearType = (typeof TYPES)[number];

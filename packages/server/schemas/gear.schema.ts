@@ -8,6 +8,7 @@ const gearTypes = [
    'LINE',
    'HOOK',
    'WEIGHTS',
+   'RIG',
 ] as const;
 
 const imageInputSchema = z.object({

@@ -111,6 +111,7 @@ const GEAR_TYPE_WORDS: Record<string, { one: string; many: string }> = {
    LINE: { one: 'Line', many: 'Line' },
    HOOK: { one: 'Hook', many: 'Hooks' },
    WEIGHTS: { one: 'Weight', many: 'Weights' },
+   RIG: { one: 'Rig', many: 'Rigs' },
 };
 
 const OTHER_GEAR = { one: 'Other gear', many: 'Other gear' };
@@ -154,4 +155,5 @@ export const GEAR_TYPE_ORDER = [
    'BAIT',
    'HOOK',
    'WEIGHTS',
+   'RIG',
 ];

@@ -36,6 +36,41 @@ export type SavedGear = {
    };
 };
 
+export type SavedPostRow = {
+   id: string;
+   savedAt: string;
+   post: {
+      id: string;
+      type: 'CATCH' | 'SITE' | string;
+      content: string | null;
+      createdAt: string;
+      author: { id: string; displayName: string; username: string };
+      catch: {
+         id: string;
+         title: string;
+         caughtAt: string;
+         length: number | null;
+         weight: number | null;
+         species: { commonName: string } | null;
+         site: { id: string; name: string } | null;
+      } | null;
+      site: { id: string; name: string } | null;
+   };
+};
+
+export async function listSavedPosts(signal?: AbortSignal) {
+   const { data } = await axios.get<{ posts: SavedPostRow[] }>(
+      '/api/saved/posts',
+      { signal }
+   );
+   return data.posts ?? [];
+}
+
+export const savePost = (postId: string) =>
+   axios.post(`/api/saved/posts/${postId}`, {});
+export const removePost = (postId: string) =>
+   axios.delete(`/api/saved/posts/${postId}`);
+
 export async function listSavedSpots(signal?: AbortSignal) {
    const { data } = await axios.get<{ spots: SavedSpot[] }>(
       '/api/saved/spots',

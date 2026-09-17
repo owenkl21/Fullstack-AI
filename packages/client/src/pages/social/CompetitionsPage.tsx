@@ -1,4 +1,6 @@
-import { Contours } from '@/components/brand/Contours';
+import { NoData } from '@/components/states/NoData';
+import { PageHead } from '@/components/brand/PageHead';
+import { ContourField } from '@/components/brand/ContourField';
 import { PlusIcon, TrophyIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useState } from 'react';
 import { Picker } from '@/components/ui/picker';
@@ -136,22 +138,22 @@ function CompetitionsScreen() {
    }, []);
 
    return (
-      <section className="relative mx-auto w-[min(1320px,100%-32px)] py-10 md:py-14">
-         <Contours seed={17} className="inset-x-0 top-0 h-[380px] w-full" />
-         <div className="flex flex-wrap items-baseline justify-between gap-4">
-            <h1 className="g text-[44px] md:text-[56px]">Competitions</h1>
-            {!starting ? (
-               <Button type="button" onClick={() => setStarting(true)}>
-                  <PlusIcon aria-hidden="true" className="mr-2 size-5" />
-                  Start one
-               </Button>
-            ) : null}
-         </div>
-
-         <p className="mt-3 max-w-[58ch] text-[17px] text-ink-2">
-            Run your own, with your own dates, your own species and your own
-            rule. Standings are counted from the catches themselves.
-         </p>
+      <section className="relative mx-auto w-[min(1320px,100%-32px)] pb-10 md:pb-14">
+         <ContourField seed={17} />
+         <PageHead
+            column="w-[min(1320px,100%-32px)]"
+            kicker="Anglers running their own"
+            title="Competitions"
+            lede="Run your own, with your own dates, your own species and your own rule. Standings are counted from the catches themselves."
+            aside={
+               !starting ? (
+                  <Button type="button" onClick={() => setStarting(true)}>
+                     <PlusIcon aria-hidden="true" className="mr-2 size-5" />
+                     Start one
+                  </Button>
+               ) : null
+            }
+         />
 
          {starting ? (
             <div className="mt-8">
@@ -231,9 +233,9 @@ function CompetitionsScreen() {
                      aria-hidden="true"
                      className="mt-0.5 size-5 shrink-0 text-ink-3"
                   />
-                  <p className="max-w-[54ch] text-base text-ink-2">
-                     None yet. Start one and anyone can enter it.
-                  </p>
+                  <NoData icon={TrophyIcon} title="No competitions yet">
+                     Start one and anyone can enter it.
+                  </NoData>
                </div>
             ) : (
                <ul className="flex flex-col">

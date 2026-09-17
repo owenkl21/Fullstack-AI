@@ -129,6 +129,7 @@ enum GearType {
   LINE
   HOOK
   WEIGHTS
+  RIG
 }
 
 enum FeedPostType {
@@ -139,6 +140,14 @@ enum FeedPostType {
 enum FeedScope {
   GLOBAL
   NEARBY
+}
+
+enum NotificationKind {
+  FOLLOW
+  COMMENT
+  LIKE
+  INVITE
+  INVITE_ANSWER
 }
 
 model User {
@@ -184,6 +193,9 @@ model User {
   waypoints                  Waypoint[]
   savedSpots                 SavedSpot[]          @relation("SavedSpots")
   savedGear                  SavedGear[]          @relation("SavedGear")
+  savedPosts                 SavedPost[]          @relation("SavedPosts")
+  notifications              Notification[]       @relation("Notifications")
+  notificationsSent          Notification[]       @relation("NotificationsSent")
   createdAt                  DateTime             @default(now())
   updatedAt                  DateTime             @updatedAt
   deletedAt                  DateTime?
@@ -500,6 +512,7 @@ model FeedPost {
   commentCount Int           @default(0)
   likes        FeedLike[]
   comments     FeedComment[]
+  saves        SavedPost[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
@@ -699,6 +712,43 @@ model SavedSpot {
   @@unique([userId, siteId])
   @@index([userId])
   @@map("saved_spots")
+}
+
+/* A post kept from the feed. A reference: the post's own visibility still rules. */
+model SavedPost {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("SavedPosts", fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@map("saved_posts")
+}
+
+/*
+ * Something that happened to you: a follow, a reply, a like, an invitation.
+ * Read by polling; nothing here is pushed. The actor is optional so a
+ * notification survives the actor's account going.
+ */
+model Notification {
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation("Notifications", fields: [userId], references: [id], onDelete: Cascade)
+  actorId       String?
+  actor         User?            @relation("NotificationsSent", fields: [actorId], references: [id], onDelete: SetNull)
+  kind          NotificationKind
+  postId        String?
+  competitionId String?
+  body          String?          @db.VarChar(300)
+  readAt        DateTime?
+  createdAt     DateTime         @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@map("notifications")
 }
 
 model SavedGear {

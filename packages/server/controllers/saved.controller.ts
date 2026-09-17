@@ -21,6 +21,30 @@ const notSavable = {
 };
 
 export const savedController = {
+   async listPosts(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      return res.json({ posts: await savedService.listPosts(auth.userId) });
+   },
+
+   async savePost(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const postId = asSingleParam(req.params.postId);
+      if (!postId) return res.status(400).json(notSavable);
+      const result = await savedService.savePost(auth.userId, postId);
+      if (!result) return res.status(404).json(notSavable);
+      return res.status(201).json(result);
+   },
+
+   async removePost(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const postId = asSingleParam(req.params.postId);
+      if (!postId) return res.status(400).json(notSavable);
+      return res.json(await savedService.removePost(auth.userId, postId));
+   },
+
    async listSpots(req: Request, res: Response) {
       const auth = getAuth(req);
       if (!auth.userId) return res.status(401).json(unauthorized);

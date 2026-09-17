@@ -1,5 +1,7 @@
-import { Contours } from '@/components/brand/Contours';
+import { PageHead } from '@/components/brand/PageHead';
+import { ContourField } from '@/components/brand/ContourField';
 import axios from 'axios';
+import { removePost, savePost } from '@/components/saved/saved-api';
 import {
    useCallback,
    useEffect,
@@ -355,6 +357,21 @@ export function FeedPage() {
       []
    );
 
+   const toggleSave = async (post: FeedPostInView) => {
+      const keeping = !post.savedByMe;
+      setActionErrors((previous) => ({ ...previous, [post.id]: null }));
+      patchPost(post.id, (current) => ({ ...current, savedByMe: keeping }));
+      try {
+         await (keeping ? savePost(post.id) : removePost(post.id));
+      } catch {
+         patchPost(post.id, (current) => ({ ...current, savedByMe: !keeping }));
+         setActionErrors((previous) => ({
+            ...previous,
+            [post.id]: 'Could not keep that post. Try again.',
+         }));
+      }
+   };
+
    const toggleLike = async (post: FeedPostInView) => {
       const liking = !post.likedByMe;
       setActionErrors((previous) => ({ ...previous, [post.id]: null }));
@@ -582,15 +599,14 @@ export function FeedPage() {
    return (
       <div
          ref={pageRef}
-         className="relative mx-auto w-[min(1320px,100%-32px)] py-8 md:py-12"
+         className="relative mx-auto w-[min(1320px,100%-32px)] pb-8 md:pb-12"
       >
-         <Contours seed={5} className="inset-x-0 top-0 h-[380px] w-full" />
-         <header className="rv flex flex-col gap-3">
-            <h1 className="g text-[44px] md:text-[56px]">Feed</h1>
-            <p className="hidden sm:block max-w-[46ch] text-[17px] text-ink-2">
-               What other anglers logged, newest first.
-            </p>
-         </header>
+         <ContourField seed={5} />
+         <PageHead
+            column="w-[min(1320px,100%-32px)]"
+            kicker="What other anglers logged, newest first"
+            title="Feed"
+         />
 
          <div className="rv mt-8" style={{ '--i': 1 } as CSSProperties}>
             <FeedFilters
@@ -655,7 +671,7 @@ export function FeedPage() {
                : null}
 
             {status === 'ready' && showList && visiblePosts.length > 0 ? (
-               <div className="grid gap-8 xl:grid-cols-2 xl:items-start">
+               <div className="grid gap-8 xl:grid-cols-2 xl:items-stretch">
                   {visiblePosts.map((post) => (
                      <FeedPostBlock
                         key={post.id}
@@ -670,6 +686,7 @@ export function FeedPage() {
                            }))
                         }
                         onLike={() => void toggleLike(post)}
+                        onSave={() => void toggleSave(post)}
                         onFollow={() => void follow(post)}
                         onUnfollow={() => setPendingUnfollow(post.author)}
                         actionError={actionErrors[post.id] ?? null}

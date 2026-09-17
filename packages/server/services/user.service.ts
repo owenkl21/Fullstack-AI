@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { notificationsService } from './notifications.service';
 import { uploadsService } from './uploads.service';
 
 type UserProfileInput = {
@@ -468,6 +469,12 @@ export const userService = {
             followingId: targetUserId,
          },
          update: {},
+      });
+
+      await notificationsService.notify({
+         userId: targetUserId,
+         actorId: actor.id,
+         kind: 'FOLLOW',
       });
 
       return { following: true } as const;

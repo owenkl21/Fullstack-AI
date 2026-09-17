@@ -60,7 +60,7 @@ export async function getCoordinates(
 /** Up to `count` places matching a typed name, best first. */
 export async function searchPlaces(
    query: string,
-   count = 6
+   count = 10
 ): Promise<PlaceHit[]> {
    const { data } = await axios.get<{ results?: GeocodeRow[] }>(
       'https://geocoding-api.open-meteo.com/v1/search',

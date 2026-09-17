@@ -194,8 +194,18 @@ export const kindPin = (kind: PinKind, count?: number | null): L.DivIcon => {
    const cy = small ? 14 : 18;
    const glyphSize = small ? 14 : 18;
 
+   /*
+    * A spot with fish on it shows the fish and the number, side by side in
+    * the head: the mark says what the count is of, the count says how much.
+    * Past two digits the number takes the whole head on its own.
+    */
+   const label = n ? (n > 99 ? '99+' : String(n)) : '';
+   const wide = n !== null && (n > 99 || n >= 10);
    const face = n
-      ? `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-family="var(--font-display), 'League Gothic', sans-serif" font-size="${n > 99 ? 13 : 17}" letter-spacing="0.02em" fill="${body.ink}">${n > 99 ? '99+' : n}</text>`
+      ? wide
+         ? `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-family="var(--font-display), 'League Gothic', sans-serif" font-size="${n > 99 ? 12 : 15}" letter-spacing="0.02em" fill="${body.ink}">${label}</text>`
+         : `<svg x="${cx - 12}" y="${cy - 6}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${body.ink}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[kind]}</svg>` +
+           `<text x="${cx + 1}" y="${cy}" text-anchor="start" dominant-baseline="central" font-family="var(--font-display), 'League Gothic', sans-serif" font-size="16" letter-spacing="0.02em" fill="${body.ink}">${label}</text>`
       : `<svg x="${cx - glyphSize / 2}" y="${cy - glyphSize / 2}" width="${glyphSize}" height="${glyphSize}" viewBox="0 0 24 24" fill="none" stroke="${body.ink}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[kind]}</svg>`;
 
    const html =

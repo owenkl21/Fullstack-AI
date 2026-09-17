@@ -76,7 +76,7 @@ export function AppLayout() {
          <main
             id="main"
             className={cn(
-               'flex-1 md:pb-0',
+               'flex-1 overflow-x-clip md:pb-0',
                isTaskRoute(pathname)
                   ? 'pb-0'
                   : 'pb-[calc(64px+env(safe-area-inset-bottom))]'

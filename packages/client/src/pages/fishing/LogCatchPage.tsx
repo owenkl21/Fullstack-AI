@@ -24,6 +24,9 @@ import { AddGearInline } from '@/components/fishing/AddGearInline';
 import { readTakenAt } from '@/lib/exif';
 import { formatMetres, nearestSpot } from '@/lib/geo';
 import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
+import { SpeciesCombobox } from '@/components/fishing/SpeciesCombobox';
+import { readDraft, removeDraft, saveDraft } from '@/lib/drafts';
+import { useSearchParams } from 'react-router-dom';
 import {
    CompetitionEntry,
    type Reading,
@@ -66,6 +69,7 @@ export type CatchFormInitial = {
    gearIds: string[];
    gears: GearOption[];
    images: UploadedImage[];
+   released?: boolean;
    snapshot: WeatherSnapshot | null;
    weather: string | null;
 };
@@ -82,7 +86,15 @@ const NOTES_LIMIT = 2000;
  * goes on the end. A list of twenty items in the order they were added is a
  * list nobody can scan; the same list under seven headings is.
  */
-type GearKind = 'ROD' | 'REEL' | 'LINE' | 'HOOK' | 'WEIGHTS' | 'LURE' | 'BAIT';
+type GearKind =
+   | 'ROD'
+   | 'REEL'
+   | 'LINE'
+   | 'HOOK'
+   | 'WEIGHTS'
+   | 'RIG'
+   | 'LURE'
+   | 'BAIT';
 
 const GEAR_KINDS: { value: GearKind; word: string; plural: string }[] = [
    { value: 'ROD', word: 'Rod', plural: 'Rods' },
@@ -90,6 +102,7 @@ const GEAR_KINDS: { value: GearKind; word: string; plural: string }[] = [
    { value: 'LINE', word: 'Line', plural: 'Line' },
    { value: 'HOOK', word: 'Hook', plural: 'Hooks' },
    { value: 'WEIGHTS', word: 'Weights', plural: 'Weights' },
+   { value: 'RIG', word: 'Rig', plural: 'Rigs' },
    { value: 'LURE', word: 'Lure', plural: 'Lures' },
    { value: 'BAIT', word: 'Bait', plural: 'Bait' },
 ];
@@ -312,44 +325,19 @@ function FieldError({ id, message }: { id: string; message?: string }) {
    );
 }
 
-function Chip({
-   children,
-   pressed,
-   onClick,
-   small = false,
-}: {
-   children: string;
-   pressed: boolean;
-   onClick: () => void;
-   small?: boolean;
-}) {
-   return (
-      <button
-         type="button"
-         aria-pressed={pressed}
-         onClick={onClick}
-         className={cn(
-            'g-tracked inline-flex items-center border border-ink px-3 transition-[background-color,color] duration-150 [transition-timing-function:var(--ease)]',
-            /* 44px even when small: the brief's minimum is not negotiable. */
-            small ? 'h-11 text-[16px]' : 'h-11 text-[19px]',
-            pressed ? 'bg-ink text-background' : 'text-ink hover:bg-bg-2'
-         )}
-      >
-         {children}
-      </button>
-   );
-}
-
 /* ------------------------------------------------------------------ */
 
 export function CatchForm({
    mode,
    catchId,
    initial,
+   draftId = null,
 }: {
    mode: 'create' | 'edit';
    catchId?: string;
    initial?: CatchFormInitial;
+   /* The draft this form was opened from, forgotten once the catch saves. */
+   draftId?: string | null;
 }) {
    const navigate = useNavigate();
    const isEdit = mode === 'edit';
@@ -435,6 +423,9 @@ export function CatchForm({
    const [lengthSource, setLengthSource] = useState<'EYE' | 'TAPE'>('EYE');
    const [weightSource, setWeightSource] = useState<'EYE' | 'SCALE'>('EYE');
    const [competitionId, setCompetitionId] = useState<string | null>(null);
+   const [released, setReleased] = useState<'KEPT' | 'RELEASED'>(
+      initial?.released ? 'RELEASED' : 'KEPT'
+   );
    const [reading, setReading] = useState<Reading | null>(null);
    const [photoTimes, setPhotoTimes] = useState<Date[]>([]);
    const caughtAtEdited = useRef(isEdit);
@@ -988,7 +979,47 @@ export function CatchForm({
          waterTemp:
             waterTemp === null || Number.isNaN(waterTemp) ? null : waterTemp,
          gearIds: selectedGearIds,
+         released: released === 'RELEASED',
       };
+   };
+
+   const saveAsDraft = () => {
+      saveDraft(
+         'full',
+         species.trim() || 'Catch',
+         {
+            title: species,
+            notes,
+            caughtAt,
+            siteId: spotMode === 'saved' ? savedSiteId || null : null,
+            latitude:
+               spotMode === 'here'
+                  ? (herePosition?.latitude ?? null)
+                  : spotMode === 'new'
+                    ? numberOrNull(newLatitude)
+                    : null,
+            longitude:
+               spotMode === 'here'
+                  ? (herePosition?.longitude ?? null)
+                  : spotMode === 'new'
+                    ? numberOrNull(newLongitude)
+                    : null,
+            length: lengthInCm(),
+            weight: weightInKg(),
+            count: numberOrNull(countValue),
+            depth: numberOrNull(depthValue),
+            waterTemp: numberOrNull(waterTempValue),
+            visibility,
+            hideLocation,
+            gearIds: selectedGearIds,
+            gears: gear.filter((entry) => selectedGearIds.includes(entry.id)),
+            images,
+            released: released === 'RELEASED',
+         },
+         draftId
+      );
+      toast({ title: 'Draft kept', description: 'Find it under My catches.' });
+      navigate('/catches/me');
    };
 
    const successSentence = (payload: ReturnType<typeof buildPayload>) => {
@@ -1077,6 +1108,7 @@ export function CatchForm({
                description: successSentence(payload),
                variant: 'success',
             });
+            if (draftId) removeDraft(draftId);
             navigate(`/catches/${catchId}`, { replace: true });
             return;
          }
@@ -1201,53 +1233,23 @@ export function CatchForm({
                   }}
                />
 
-               <div>
-                  <TextField
-                     label="Species"
-                     data-field="species"
+               <div data-field="species">
+                  <SpeciesCombobox
                      value={species}
-                     maxLength={TITLE_LIMIT}
-                     autoComplete="off"
+                     species={speciesList}
+                     recent={recentSpecies}
                      error={errors.species}
-                     onChange={(event) => setSpecies(event.target.value)}
-                     onBlur={() => markTouched('species')}
-                     placeholder="Kob"
+                     onChange={(name) => {
+                        setSpecies(name);
+                        setErrors((current) => ({
+                           ...current,
+                           species: undefined,
+                        }));
+                     }}
+                     onCreated={(made) =>
+                        setSpeciesList((list) => [...list, made])
+                     }
                   />
-                  {recentSpecies.length > 0 ? (
-                     <div className="mt-3 flex flex-wrap gap-2">
-                        {recentSpecies.map((name) => (
-                           <Chip
-                              key={name}
-                              small
-                              pressed={species.trim() === name}
-                              onClick={() => {
-                                 setSpecies(name);
-                                 setErrors((current) => ({
-                                    ...current,
-                                    species: undefined,
-                                 }));
-                              }}
-                           >
-                              {name}
-                           </Chip>
-                        ))}
-                        <Chip
-                           small
-                           pressed={species.trim() === 'Not sure'}
-                           onClick={() => {
-                              setSpecies('Not sure');
-                              setErrors((current) => ({
-                                 ...current,
-                                 species: undefined,
-                              }));
-                           }}
-                        >
-                           Not sure
-                        </Chip>
-                     </div>
-                  ) : null}
-                  {/* TODO(api): appendix E item 2. There is no species route yet, so the
-                   name typed here is what the record carries. */}
                </div>
 
                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -1347,6 +1349,18 @@ export function CatchForm({
                         }));
                      }
                   }}
+               />
+
+               <ChoiceGroup
+                  inline
+                  size="sm"
+                  label="The fish"
+                  value={released}
+                  onChange={setReleased}
+                  options={[
+                     { value: 'KEPT', label: 'Kept' },
+                     { value: 'RELEASED', label: 'Released' },
+                  ]}
                />
 
                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -1455,10 +1469,13 @@ export function CatchForm({
                         <p className="text-ink-2">Getting a fix.</p>
                      ) : null}
                      {hereState === 'ready' && herePosition ? (
-                        <p className="num text-ink-2">
-                           {herePosition.latitude.toFixed(4)},{' '}
-                           {herePosition.longitude.toFixed(4)}
-                        </p>
+                        <MapLocationPicker
+                           latitude={String(herePosition.latitude)}
+                           longitude={String(herePosition.longitude)}
+                           onChange={(latitude, longitude) =>
+                              setHerePosition({ latitude, longitude })
+                           }
+                        />
                      ) : null}
                      {hereState === 'refused' ? (
                         <div className="flex flex-col items-start gap-3">
@@ -1952,6 +1969,16 @@ export function CatchForm({
                <Button type="submit" size="xl" disabled={isBusy}>
                   {isEdit ? 'Save changes' : 'Save catch'}
                </Button>
+               {!isEdit ? (
+                  <Button
+                     type="button"
+                     variant="outline"
+                     size="lg"
+                     onClick={saveAsDraft}
+                  >
+                     Save as draft
+                  </Button>
+               ) : null}
                <Button
                   type="button"
                   variant="ghost"
@@ -1997,6 +2024,20 @@ export function CatchForm({
 
 export function LogCatchPage() {
    useDocumentTitle('Log a catch');
+   const [params] = useSearchParams();
+   const draftId = params.get('draft');
+   const draft = draftId ? readDraft(draftId) : null;
+   const initial =
+      draft && draft.kind === 'full'
+         ? ({
+              snapshot: null,
+              weather: null,
+              gearIds: [],
+              gears: [],
+              images: [],
+              ...(draft.state as Record<string, unknown>),
+           } as unknown as CatchFormInitial)
+         : undefined;
 
    return (
       <RequireSignIn what="your log">
@@ -2006,7 +2047,12 @@ export function LogCatchPage() {
                Everything here is optional except the fish and the time.
             </p>
             <div className="mt-10">
-               <CatchForm mode="create" />
+               <CatchForm
+                  key={draftId ?? 'new'}
+                  mode="create"
+                  initial={initial}
+                  draftId={draftId}
+               />
             </div>
          </section>
       </RequireSignIn>

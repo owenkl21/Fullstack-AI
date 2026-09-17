@@ -38,7 +38,11 @@ import { ChoiceGroup, TextField } from '@/components/ui/field';
 import { readPhotoMeta } from '@/lib/exif';
 import { formatMetres, nearestSpot, type SpotLike } from '@/lib/geo';
 import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
-import { SpeciesField } from '@/components/fishing/quicklog/SpeciesField';
+import { SpeciesCombobox } from '@/components/fishing/SpeciesCombobox';
+import { Picker } from '@/components/ui/picker';
+import { AddGearInline } from '@/components/fishing/AddGearInline';
+import type { GearOption } from '@/pages/fishing/LogCatchPage';
+import { readDraft, removeDraft, saveDraft } from '@/lib/drafts';
 import {
    toMetricValue,
    type MeasureUnit,
@@ -86,7 +90,8 @@ function QuickLog() {
          ? { latitude: lat, longitude: lng, source: 'pin' }
          : null;
    });
-   const [pinOpen, setPinOpen] = useState(false);
+   /* The map is open from the start: the pin is the point. */
+   const [pinOpen, setPinOpen] = useState(true);
 
    /*
     * The spots you already have. A position within a few hundred metres of
@@ -163,9 +168,103 @@ function QuickLog() {
    const [weight, setWeight] = useState('');
    const [weightUnit, setWeightUnit] = useState<MeasureUnit>('kg');
    const [weightSource, setWeightSource] = useState<'EYE' | 'SCALE'>('EYE');
-
    const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
    const [photoBusy, setPhotoBusy] = useState(false);
+   const [released, setReleased] = useState<'KEPT' | 'RELEASED'>('KEPT');
+
+   /* Gear and bait, optional like everything. Your own list, split by kind. */
+   const [gear, setGear] = useState<GearOption[]>([]);
+   const [gearIds, setGearIds] = useState<string[]>([]);
+   useEffect(() => {
+      const controller = new AbortController();
+      axios
+         .get<{ gear?: GearOption[] }>('/api/gear/me', {
+            signal: controller.signal,
+         })
+         .then(({ data }) => setGear(data.gear ?? []))
+         .catch(() => undefined);
+      return () => controller.abort();
+   }, []);
+   const isBait = (entry: GearOption) =>
+      entry.type === 'BAIT' || entry.type === 'LURE';
+   const gearOptions = gear
+      .filter((entry) => !isBait(entry))
+      .map((entry) => ({
+         value: entry.id,
+         label: entry.name,
+         hint: [entry.brand, entry.type.toLowerCase()]
+            .filter(Boolean)
+            .join(' · '),
+      }));
+   const baitOptions = gear.filter(isBait).map((entry) => ({
+      value: entry.id,
+      label: entry.name,
+      hint: [entry.brand, entry.type.toLowerCase()].filter(Boolean).join(' · '),
+   }));
+
+   /*
+    * A draft reopened. Everything that was typed comes back; the photo too,
+    * since it was sent up when it was chosen.
+    */
+   const draftId = params.get('draft');
+   useEffect(() => {
+      if (!draftId) return;
+      const draft = readDraft(draftId);
+      if (!draft || draft.kind !== 'quick') return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = draft.state as Record<string, any>;
+      if (d.stampedAt) {
+         setStampedAt(new Date(d.stampedAt));
+         setTimeSource('typed');
+      }
+      if (d.where) setWhere(d.where);
+      if (d.visibility) setVisibility(d.visibility);
+      if (typeof d.hideLocation === 'boolean') setHideLocation(d.hideLocation);
+      if (typeof d.spotName === 'string') setSpotName(d.spotName);
+      if (typeof d.spotPublic === 'boolean') setSpotPublic(d.spotPublic);
+      if (typeof d.chosen === 'string') setChosen(d.chosen);
+      if (typeof d.typed === 'string') setTyped(d.typed);
+      if (typeof d.length === 'string') setLength(d.length);
+      if (d.lengthUnit) setLengthUnit(d.lengthUnit);
+      if (d.lengthSource) setLengthSource(d.lengthSource);
+      if (typeof d.weight === 'string') setWeight(d.weight);
+      if (d.weightUnit) setWeightUnit(d.weightUnit);
+      if (d.weightSource) setWeightSource(d.weightSource);
+      if (d.released) setReleased(d.released);
+      if (Array.isArray(d.gearIds)) setGearIds(d.gearIds);
+      if (d.photo) setPhoto(d.photo);
+   }, [draftId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+   const saveAsDraft = () => {
+      const title = chosen && chosen !== NOT_SURE ? chosen : typed || 'Catch';
+      saveDraft(
+         'quick',
+         title,
+         {
+            stampedAt: stampedAt.toISOString(),
+            where,
+            visibility,
+            hideLocation,
+            spotName,
+            spotPublic,
+            chosen,
+            typed,
+            length,
+            lengthUnit,
+            lengthSource,
+            weight,
+            weightUnit,
+            weightSource,
+            released,
+            gearIds,
+            photo,
+         },
+         draftId
+      );
+      toast({ title: 'Draft kept', description: 'Find it under My catches.' });
+      navigate('/catches/me');
+   };
+
    const [isSaving, setIsSaving] = useState(false);
 
    const conditionsRequest = useRef<AbortController | null>(null);
@@ -331,7 +430,8 @@ function QuickLog() {
             lengthSource,
             weightSource,
             images: photo ? [photo] : [],
-            gearIds: [],
+            gearIds,
+            released: released === 'RELEASED',
          };
 
          const { data } = await axios.post<{ catch: { id: string } }>(
@@ -348,6 +448,7 @@ function QuickLog() {
                .join(', ')}.`,
             variant: 'success',
          });
+         if (draftId) removeDraft(draftId);
          navigate(`/catches/${data.catch.id}`, { replace: true });
       } catch (error) {
          setIsSaving(false);
@@ -380,6 +481,13 @@ function QuickLog() {
                   onClick={nothingCaught}
                >
                   Nothing caught?
+               </button>
+               <button
+                  type="button"
+                  className={textControl}
+                  onClick={saveAsDraft}
+               >
+                  Save as draft
                </button>
                <button type="button" className={textControl} onClick={close}>
                   Close
@@ -452,6 +560,7 @@ function QuickLog() {
 
             <div className="flex min-w-0 flex-col gap-4">
                <PhotoBlock
+                  initial={photo}
                   onChange={setPhoto}
                   onBusyChange={setPhotoBusy}
                   onFile={onPhotoFile}
@@ -471,22 +580,18 @@ function QuickLog() {
                   }}
                />
 
-               <SpeciesField
-                  options={options}
-                  chosen={chosen}
-                  typed={typed}
+               <SpeciesCombobox
+                  value={chosen ?? typed}
+                  species={species}
+                  recent={options}
                   error={speciesError}
                   inputRef={speciesInput}
-                  onChoose={(species) => {
-                     setChosen(species);
+                  onChange={(name) => {
+                     setChosen(name);
                      setTyped('');
                      setSpeciesError(null);
                   }}
-                  onType={(value) => {
-                     setTyped(value);
-                     setChosen(null);
-                     setSpeciesError(null);
-                  }}
+                  onCreated={(made) => setSpecies((list) => [...list, made])}
                />
 
                <div className="grid grid-cols-2 gap-3">
@@ -525,6 +630,66 @@ function QuickLog() {
                         setWeightSource(next as 'EYE' | 'SCALE')
                      }
                      placeholder="0"
+                  />
+               </div>
+
+               <ChoiceGroup
+                  inline
+                  size="sm"
+                  label="The fish"
+                  value={released}
+                  onChange={setReleased}
+                  options={[
+                     { value: 'KEPT', label: 'Kept' },
+                     { value: 'RELEASED', label: 'Released' },
+                  ]}
+               />
+
+               {/* What it was caught on. Optional, like everything. */}
+               <div className="flex flex-col gap-3 border-t border-line pt-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                     <Picker
+                        multiple
+                        size="sm"
+                        label="Gear"
+                        allLabel="None chosen"
+                        value={gearIds.filter((id) =>
+                           gearOptions.some((o) => o.value === id)
+                        )}
+                        options={gearOptions}
+                        onChange={(next) =>
+                           setGearIds((was) => [
+                              ...was.filter((id) =>
+                                 baitOptions.some((o) => o.value === id)
+                              ),
+                              ...(next as string[]),
+                           ])
+                        }
+                     />
+                     <Picker
+                        multiple
+                        size="sm"
+                        label="Bait or lure"
+                        allLabel="None chosen"
+                        value={gearIds.filter((id) =>
+                           baitOptions.some((o) => o.value === id)
+                        )}
+                        options={baitOptions}
+                        onChange={(next) =>
+                           setGearIds((was) => [
+                              ...was.filter((id) =>
+                                 gearOptions.some((o) => o.value === id)
+                              ),
+                              ...(next as string[]),
+                           ])
+                        }
+                     />
+                  </div>
+                  <AddGearInline
+                     onAdded={(entry) => {
+                        setGear((list) => [...list, entry]);
+                        setGearIds((was) => [...was, entry.id]);
+                     }}
                   />
                </div>
 

@@ -1,3 +1,4 @@
+import { NoData } from '@/components/states/NoData';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDayMonth, plural } from '@/components/fishing/record/format';
@@ -58,9 +59,9 @@ export function SeasonStrip({ catches }: { catches: CatchSummary[] }) {
          </div>
 
          {months.length === 0 ? (
-            <p className="mt-6 text-[15px] text-ink-3">
+            <NoData className="mt-6" title="No data yet">
                Nothing logged in {year}.
-            </p>
+            </NoData>
          ) : (
             <ul
                key={year}

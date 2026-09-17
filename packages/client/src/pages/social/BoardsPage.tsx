@@ -1,4 +1,6 @@
-import { Contours } from '@/components/brand/Contours';
+import { NoData } from '@/components/states/NoData';
+import { PageHead } from '@/components/brand/PageHead';
+import { ContourField } from '@/components/brand/ContourField';
 import { useEffect, useRef, useState } from 'react';
 import { useRevealIn } from '@/components/brand/Reveal';
 import { InlineError } from '@/components/states/InlineError';
@@ -91,22 +93,15 @@ export function BoardsPage() {
    return (
       <section
          ref={root}
-         className="relative mx-auto w-full max-w-[1320px] px-4 py-10 md:px-8"
+         className="relative mx-auto w-full max-w-[1320px] px-4 pb-10 md:px-8"
       >
-         <Contours seed={13} className="inset-x-0 top-0 h-[380px] w-full" />
-         <h1
-            className="g rv text-[40px] md:text-[56px]"
-            style={{ '--i': 1 } as React.CSSProperties}
-         >
-            Who is catching what
-         </h1>
-         <p
-            className="rv mt-3 max-w-[56ch] text-[17px] text-ink-2"
-            style={{ '--i': 2 } as React.CSSProperties}
-         >
-            Length becomes mass with published figures, and points are awarded
-            per kilogram. The fish never has to be weighed, or kept.
-         </p>
+         <ContourField seed={13} />
+         <PageHead
+            column="w-[min(1320px,100%-32px)]"
+            kicker="Boards"
+            title="Who is catching what"
+            lede="Length becomes mass with published figures, and points are awarded per kilogram. The fish never has to be weighed, or kept."
+         />
 
          {/*
           * The phone bar has four slots and they are all spoken for, so this is
@@ -233,11 +228,11 @@ function RivalsView({
 
    if (!standings?.length || mutualCount === 0) {
       return (
-         <p className="max-w-[52ch] text-[17px] text-ink-2">
+         <NoData icon={TrophyIcon} title="No rivals yet">
             Your board fills up when you and another angler follow each other.
             Following someone on its own does not put either of you on the
-            other&apos;s board.
-         </p>
+            other\u2019s board.
+         </NoData>
       );
    }
 
@@ -269,16 +264,16 @@ function SpeciesView({
 }) {
    if (none) {
       return (
-         <p className="max-w-[52ch] text-[17px] text-ink-2">
+         <NoData icon={TrophyIcon} title="No data yet">
             No catch has a species on it yet, so there is nothing to rank.
-         </p>
+         </NoData>
       );
    }
    if (!boards.length) {
       return (
-         <p className="max-w-[52ch] text-[17px] text-ink-2">
-            Pick one or more species above to see who is catching them.
-         </p>
+         <NoData icon={TrophyIcon} title="Pick a species">
+            Choose one or more species above to see who is catching them.
+         </NoData>
       );
    }
 

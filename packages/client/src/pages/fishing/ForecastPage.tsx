@@ -1,4 +1,5 @@
-import { Contours } from '@/components/brand/Contours';
+import { PageHead } from '@/components/brand/PageHead';
+import { ContourField } from '@/components/brand/ContourField';
 import axios from 'axios';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -24,6 +25,11 @@ import {
 import { formatClock } from '@/components/fishing/record/format';
 import { Button } from '@/components/ui/button';
 import { usePosition } from '@/lib/position';
+import { useIsSignedIn } from '@/lib/auth-client';
+import {
+   fetchConditions,
+   type WeatherSnapshot,
+} from '@/components/fishing/record/api';
 import { useDocumentTitle } from '@/lib/title';
 import { readUnitSystem, speedIn, tempIn, unitOf } from '@/lib/units';
 
@@ -68,6 +74,24 @@ export function ForecastPage() {
 
    const [status, setStatus] = useState<Status>(target ? 'loading' : 'idle');
    const [forecast, setForecast] = useState<Forecast | null>(null);
+
+   /*
+    * The reading of the moment at the place, beside the week ahead. This is
+    * the same reading the quick log stamps on a catch, and where the
+    * WeatherKit keys are set on the server it is the phone's own weather.
+    */
+   const { isSignedIn } = useIsSignedIn();
+   const [now, setNow] = useState<WeatherSnapshot | null>(null);
+   useEffect(() => {
+      if (!isSignedIn || !target) return;
+      const controller = new AbortController();
+      fetchConditions(target.latitude, target.longitude, controller.signal)
+         .then((snapshot) => {
+            if (!controller.signal.aborted) setNow(snapshot ?? null);
+         })
+         .catch(() => undefined);
+      return () => controller.abort();
+   }, [isSignedIn, target?.latitude, target?.longitude]); // eslint-disable-line react-hooks/exhaustive-deps
    const [placeName, setPlaceName] = useState<string | null>(null);
    const [selected, setSelected] = useState<string | null>(null);
    const [attempt, setAttempt] = useState(0);
@@ -150,25 +174,26 @@ export function ForecastPage() {
    );
 
    return (
-      <section className="relative mx-auto w-[min(1680px,100%-32px)] py-8 md:py-12">
-         <Contours seed={9} className="inset-x-0 top-0 h-[380px] w-full" />
+      <section className="relative mx-auto w-[min(1680px,100%-32px)] pb-8 md:pb-12">
+         <ContourField seed={9} />
+         <PageHead
+            kicker="Forecast"
+            title={
+               placeName ??
+               (target
+                  ? status === 'ready'
+                     ? 'Where you are'
+                     : 'Reading the week'
+                  : 'Pick a place')
+            }
+         />
          <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
-            <div className="min-w-0">
-               <p className="lab text-ink-3">Forecast</p>
-               <h1 className="g mt-1 text-[44px] leading-none md:text-[56px]">
-                  {placeName ??
-                     (target
-                        ? status === 'ready'
-                           ? 'Where you are'
-                           : 'Reading the week'
-                        : 'Pick a place')}
-               </h1>
-            </div>
             <PlaceSearch
                onPick={pick}
                onUseMine={useMine}
                locating={positionState === 'asking'}
-               className="w-full md:w-auto"
+               near={target}
+               className="w-full"
             />
          </div>
 
@@ -195,6 +220,11 @@ export function ForecastPage() {
             <ForecastSkeleton />
          ) : (
             <>
+               {now ? (
+                  <div className="mt-8">
+                     <NowFacts snapshot={now} system={system} />
+                  </div>
+               ) : null}
                <div className="mt-8">
                   <DayStrip
                      days={forecast.days}
@@ -370,5 +400,135 @@ function ForecastSkeleton() {
             ))}
          </div>
       </div>
+   );
+}
+
+/*
+ * Right now at the place: the figures an angler checks before leaving the
+ * car, in one ruled row. Water and swell only where the sea is near enough
+ * to have been read.
+ */
+function NowFacts({
+   snapshot,
+   system,
+}: {
+   snapshot: WeatherSnapshot;
+   system: ReturnType<typeof readUnitSystem>;
+}) {
+   const t = (c: number | null | undefined) =>
+      typeof c === 'number'
+         ? `${Math.round(tempIn(c, system) ?? c)}${unitOf('temp', system)}`
+         : null;
+   const w = (kph: number | null | undefined) =>
+      typeof kph === 'number'
+         ? `${Math.round(speedIn(kph, system) ?? kph)} ${unitOf('speed', system)}`
+         : null;
+   const facts: { key: string; label: string; value: string | null }[] = [
+      {
+         key: 'sky',
+         label: 'Sky',
+         value: snapshot.weatherCondition?.description?.text ?? null,
+      },
+      { key: 'air', label: 'Air', value: t(snapshot.temperature?.degrees) },
+      {
+         key: 'feels',
+         label: 'Feels like',
+         value: t(snapshot.feelsLike?.degrees),
+      },
+      {
+         key: 'wind',
+         label: 'Wind',
+         value:
+            snapshot.wind?.speed?.value != null
+               ? `${snapshot.wind.direction?.cardinal ?? ''} ${w(snapshot.wind.speed.value)}${snapshot.wind.gust?.value != null ? `, gusting ${w(snapshot.wind.gust.value)}` : ''}`.trim()
+               : null,
+      },
+      {
+         key: 'pressure',
+         label: 'Pressure',
+         value:
+            snapshot.airPressure?.meanSeaLevelMillibars != null
+               ? `${Math.round(snapshot.airPressure.meanSeaLevelMillibars)} hPa`
+               : null,
+      },
+      {
+         key: 'humidity',
+         label: 'Humidity',
+         value:
+            snapshot.relativeHumidity != null
+               ? `${Math.round(snapshot.relativeHumidity)}%`
+               : null,
+      },
+      {
+         key: 'cloud',
+         label: 'Cloud',
+         value:
+            snapshot.cloudCover != null
+               ? `${Math.round(snapshot.cloudCover)}%`
+               : null,
+      },
+      {
+         key: 'uv',
+         label: 'UV',
+         value:
+            snapshot.uvIndex != null
+               ? String(Math.round(snapshot.uvIndex))
+               : null,
+      },
+      {
+         key: 'visibility',
+         label: 'Visibility',
+         value:
+            snapshot.visibilityM != null
+               ? `${Math.round(snapshot.visibilityM / 1000)} km`
+               : null,
+      },
+      {
+         key: 'water',
+         label: 'Water',
+         value: t(snapshot.sea?.surfaceTemperatureC),
+      },
+      {
+         key: 'swell',
+         label: 'Swell',
+         value:
+            snapshot.sea?.swellHeightM != null
+               ? `${snapshot.sea.swellHeightM.toFixed(1)} m${snapshot.sea.swellPeriodS != null ? ` at ${Math.round(snapshot.sea.swellPeriodS)} s` : ''}`
+               : null,
+      },
+      {
+         key: 'sea',
+         label: 'Sea',
+         value:
+            snapshot.sea?.waveHeightM != null
+               ? `${snapshot.sea.waveHeightM.toFixed(1)} m`
+               : null,
+      },
+   ];
+   const shown = facts.filter((f) => f.value);
+   if (shown.length === 0) return null;
+   return (
+      <section aria-label="Right now" className="border-t-2 border-ink pt-4">
+         <div className="flex items-baseline justify-between gap-4">
+            <h2 className="g text-[26px]">Right now</h2>
+            <span className="lab text-ink-3">
+               {snapshot.observedAt
+                  ? `Read ${formatClock(snapshot.observedAt)}`
+                  : 'The reading of the moment'}
+            </span>
+         </div>
+         <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-6">
+            {shown.map((fact, index) => (
+               <div
+                  key={fact.key}
+                  className="fact min-w-0"
+                  style={{ '--i': index } as CSSProperties}
+               >
+                  <dt className="lab text-ink-3">{fact.label}</dt>
+                  <dd className="mt-0.5 text-[17px] text-ink">{fact.value}</dd>
+               </div>
+            ))}
+         </dl>
+      </section>
    );
 }

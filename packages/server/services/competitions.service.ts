@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { notificationsService } from './notifications.service';
 import { massKgFor, type ScoringSpecies } from './scoring';
 
 /*
@@ -183,7 +184,7 @@ export const competitionsService = {
    async invite(userId: string, competitionId: string, userIds: string[]) {
       const competition = await prisma.competition.findFirst({
          where: { id: competitionId, deletedAt: null, createdById: userId },
-         select: { id: true, scope: true },
+         select: { id: true, scope: true, name: true },
       });
       if (!competition || competition.scope !== 'PRIVATE') return null;
 
@@ -208,6 +209,13 @@ export const competitionsService = {
                invitedById: userId,
                expiresAt,
             },
+         });
+         await notificationsService.notify({
+            userId: inviteeId,
+            actorId: userId,
+            kind: 'INVITE',
+            competitionId,
+            body: competition.name,
          });
          sent += 1;
       }
@@ -243,7 +251,13 @@ export const competitionsService = {
    async answerInvite(userId: string, inviteId: string, accept: boolean) {
       const invite = await prisma.competitionInvite.findFirst({
          where: { id: inviteId, userId, state: 'PENDING' },
-         select: { id: true, competitionId: true, expiresAt: true },
+         select: {
+            id: true,
+            competitionId: true,
+            expiresAt: true,
+            invitedById: true,
+            competition: { select: { name: true } },
+         },
       });
       if (!invite) return null;
       if (invite.expiresAt < new Date()) {
@@ -268,6 +282,13 @@ export const competitionsService = {
             create: { competitionId: invite.competitionId, userId },
          });
       }
+      await notificationsService.notify({
+         userId: invite.invitedById,
+         actorId: userId,
+         kind: 'INVITE_ANSWER',
+         competitionId: invite.competitionId,
+         body: `${accept ? 'accepted' : 'declined'}|${invite.competition?.name ?? ''}`,
+      });
       return { state: accept ? ('ACCEPTED' as const) : ('DECLINED' as const) };
    },
 

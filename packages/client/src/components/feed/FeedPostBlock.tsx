@@ -4,8 +4,12 @@ import {
    HeartIcon,
    UserMinusIcon,
    UserPlusIcon,
+   BookmarkIcon,
 } from '@heroicons/react/24/outline';
-import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid';
+import {
+   HeartIcon as HeartSolid,
+   BookmarkIcon as BookmarkSolid,
+} from '@heroicons/react/24/solid';
 import { useState } from 'react';
 import { FishMark } from '@/components/brand/FishMark';
 import { Link } from 'react-router-dom';
@@ -78,6 +82,7 @@ export function FeedPostBlock({
    commentsOpen,
    onToggleComments,
    onLike,
+   onSave,
    onFollow,
    onUnfollow,
    actionError,
@@ -96,6 +101,7 @@ export function FeedPostBlock({
    commentsOpen: boolean;
    onToggleComments: () => void;
    onLike: () => void;
+   onSave: () => void;
    onFollow: () => void;
    onUnfollow: () => void;
    actionError: string | null;
@@ -148,7 +154,10 @@ export function FeedPostBlock({
    const canFollow = isSignedIn && post.authorIsMe !== true;
 
    return (
-      <article className="blk" aria-labelledby={`post-${post.id}`}>
+      <article
+         className="blk flex h-full flex-col"
+         aria-labelledby={`post-${post.id}`}
+      >
          <header className="flex items-center gap-3 px-4 pt-5 pr-12 pb-4">
             {/*
              * The photograph and the name are one link. Making only the name
@@ -263,7 +272,7 @@ export function FeedPostBlock({
             </div>
          )}
 
-         <div className="flex flex-col gap-3 px-4 pt-5 pb-6">
+         <div className="flex flex-1 flex-col gap-3 px-4 pt-5 pb-6">
             {heading ? (
                <h2 id={`post-${post.id}`} className="g text-[30px] text-paper">
                   {heading}
@@ -318,7 +327,7 @@ export function FeedPostBlock({
                </Link>
             ) : null}
 
-            <div className="rule-dashed flex flex-wrap items-center gap-x-6 pt-2">
+            <div className="rule-dashed mt-auto flex flex-wrap items-center gap-x-6 pt-2">
                {isSignedIn ? (
                   <button
                      type="button"
@@ -364,6 +373,22 @@ export function FeedPostBlock({
                      <span className="num">{post.commentCount}</span>
                   ) : null}
                </button>
+
+               {isSignedIn ? (
+                  <button
+                     type="button"
+                     aria-pressed={post.savedByMe === true}
+                     onClick={onSave}
+                     className={`${textControl} gap-2 ${post.savedByMe ? 'text-teal' : 'text-paper-2 hover:text-paper'}`}
+                  >
+                     {post.savedByMe ? (
+                        <BookmarkSolid aria-hidden="true" className="size-5" />
+                     ) : (
+                        <BookmarkIcon aria-hidden="true" className="size-5" />
+                     )}
+                     {post.savedByMe ? 'Kept' : 'Keep'}
+                  </button>
+               ) : null}
 
                {canFollow ? (
                   <button

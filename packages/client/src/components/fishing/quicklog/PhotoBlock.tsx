@@ -16,17 +16,20 @@ export function PhotoBlock({
    onChange,
    onBusyChange,
    onFile,
+   initial = null,
 }: {
    onChange: (photo: UploadedPhoto | null) => void;
    onBusyChange: (busy: boolean) => void;
    /* The file as picked, before the upload, for what the camera wrote in it. */
    onFile?: (file: File) => void;
+   /* A photo already sent up, when a draft is reopened. */
+   initial?: UploadedPhoto | null;
 }) {
    const inputRef = useRef<HTMLInputElement>(null);
    const pickRef = useRef<HTMLInputElement>(null);
    const previewRef = useRef<string | null>(null);
-   const [preview, setPreview] = useState<string | null>(null);
-   const [settled, setSettled] = useState(false);
+   const [preview, setPreview] = useState<string | null>(initial?.url ?? null);
+   const [settled, setSettled] = useState(Boolean(initial));
    const [flash, setFlash] = useState(false);
    const [progress, setProgress] = useState(0);
    const [isUploading, setIsUploading] = useState(false);

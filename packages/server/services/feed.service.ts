@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { notificationsService } from './notifications.service';
 import { uploadsService } from './uploads.service';
 import { userService } from './user.service';
 
@@ -197,6 +198,7 @@ export const feedService = {
          return postsWithResolvedImageUrls.map((post: any) => ({
             ...post,
             likedByMe: false,
+            savedByMe: false,
             authorFollowedByMe: false,
             authorIsMe: false,
          }));
@@ -212,6 +214,15 @@ export const feedService = {
          select: { postId: true },
       });
       const likedSet = new Set(likes.map((l: any) => l.postId));
+
+      const saves = await prisma.savedPost.findMany({
+         where: {
+            userId: viewerUserId,
+            postId: { in: postsWithResolvedImageUrls.map((p: any) => p.id) },
+         },
+         select: { postId: true },
+      });
+      const savedSet = new Set(saves.map((row: any) => row.postId));
 
       const follows = await prisma.follow.findMany({
          where: {
@@ -231,6 +242,7 @@ export const feedService = {
       return postsWithResolvedImageUrls.map((post: any) => ({
          ...post,
          likedByMe: likedSet.has(post.id),
+         savedByMe: savedSet.has(post.id),
          authorFollowedByMe: followingSet.has(post.author.id),
          authorIsMe: post.author.id === viewerUserId,
       }));
@@ -310,14 +322,14 @@ export const feedService = {
       await getUserId(userId); // throws if the user is gone
       const post = await prisma.feedPost.findFirst({
          where: { id: postId, deletedAt: null },
-         select: { id: true },
+         select: { id: true, authorId: true },
       });
 
       if (!post) {
          return null;
       }
 
-      return prisma.$transaction(async (tx: any) => {
+      const result = await prisma.$transaction(async (tx: any) => {
          const existing = await tx.feedLike.findUnique({
             where: { postId_userId: { postId, userId } },
             select: { id: true },
@@ -340,6 +352,16 @@ export const feedService = {
 
          return { liked: true };
       });
+
+      if (result.liked) {
+         await notificationsService.notify({
+            userId: post.authorId,
+            actorId: userId,
+            kind: 'LIKE',
+            postId,
+         });
+      }
+      return result;
    },
 
    async listComments(postId: string) {
@@ -356,14 +378,14 @@ export const feedService = {
       await getUserId(userId); // throws if the user is gone
       const post = await prisma.feedPost.findFirst({
          where: { id: postId, deletedAt: null },
-         select: { id: true },
+         select: { id: true, authorId: true },
       });
 
       if (!post) {
          return null;
       }
 
-      return prisma.$transaction(async (tx: any) => {
+      const comment = await prisma.$transaction(async (tx: any) => {
          const comment = await tx.feedComment.create({
             data: {
                postId,
@@ -384,6 +406,15 @@ export const feedService = {
 
          return comment;
       });
+
+      await notificationsService.notify({
+         userId: post.authorId,
+         actorId: userId,
+         kind: 'COMMENT',
+         postId,
+         body,
+      });
+      return comment;
    },
 
    async deleteComment(userId: string, commentId: string) {
