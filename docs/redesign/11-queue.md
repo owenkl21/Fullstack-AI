@@ -19,15 +19,24 @@ the live deploy.
       with a spring-tide flag, since no weather API publishes a phase and that is
       what a shore angler plans around.
 
+- [x] **Show all of it, with icons.** Water, swell, sea state, moon with the lit
+      fraction drawn from the real phase, first and last light, humidity, sky.
+      Pressure had been fetched and then dropped on the way to the screen, so
+      its readout always said "Not reported"; it reads 1035 hPa now.
+- [x] **Gear on a log without leaving it.** Three fields, saves, joins the list
+      and ticks itself. Checked live: 201, and the piece comes back ticked.
+- [x] **Back goes where you came from**, rather than always to My catches.
+- [x] **Marks on the feed controls**, with the counts on the controls they
+      belong to, and a card that keeps its shape when there is no photograph.
+- [x] **Railway was never auto-deploying.** Every deployment in the project's
+      history was triggered by hand from a laptop and the repository has no
+      webhooks, so the server had been three hours behind the client. A CI
+      workflow now deploys it and fails if the server does not answer.
+
 ## Next, in order
 
-1. **Show all of it, with icons.** The readout strip prints three figures out of
-    twenty. Condition icons, moon, sun times, sea state.
-2. **Feed card rebuild.** Disorganised, no icons on like/comment/follow, no
-    placeholder when there is no photograph, no way back to the feed from a
-    catch, no way through to the person.
-3. **Gear on a log**, chosen from your own gear, with a way to add a new piece
-    without leaving the form.
+1. **The rest of the feed card.** Still no way through to the person who caught
+    it: there is no public profile route or endpoint at all, only your own.
 4. **Log everything.** Every condition saved on the catch, water temperature
     included. Pin visibility a toggle: hidden from other anglers, still in the
     data for us.
