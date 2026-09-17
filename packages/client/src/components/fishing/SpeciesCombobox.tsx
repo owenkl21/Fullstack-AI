@@ -123,9 +123,15 @@ export function SpeciesCombobox({
 
    return (
       <div ref={box} className="relative flex flex-col gap-2">
-         <label htmlFor={id} className="lab">
-            {label}
-         </label>
+         {label ? (
+            <label htmlFor={id} className="lab">
+               {label}
+            </label>
+         ) : (
+            <label htmlFor={id} className="sr-only">
+               Species
+            </label>
+         )}
          {value && !open ? (
             <div className="flex items-center justify-between gap-3 border border-ink px-3 py-2">
                <span className="g-tracked text-[21px]">{value}</span>

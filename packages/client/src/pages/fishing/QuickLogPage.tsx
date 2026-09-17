@@ -29,12 +29,28 @@ import {
    type UploadedPhoto,
 } from '@/components/fishing/quicklog/PhotoBlock';
 import {
-   Receipt,
    type TimeSource,
    type Where,
 } from '@/components/fishing/quicklog/Receipt';
 import { MapLocationPicker } from '@/components/fishing/MapLocationPicker';
-import { ChoiceGroup, TextField } from '@/components/ui/field';
+import { TextArea } from '@/components/ui/field';
+import { Fold } from '@/components/ui/fold';
+import { Segment } from '@/components/fishing/quicklog/Segment';
+import { CaughtAt } from '@/components/fishing/quicklog/CaughtAt';
+import {
+   ArchiveBoxIcon,
+   ArrowRightIcon,
+   ArrowUturnLeftIcon,
+   CameraIcon,
+   EyeIcon,
+   EyeSlashIcon,
+   GlobeAltIcon,
+   LockClosedIcon,
+   MapPinIcon,
+   ShieldCheckIcon,
+   SignalIcon,
+   XMarkIcon,
+} from '@heroicons/react/24/outline';
 import { readPhotoMeta } from '@/lib/exif';
 import { formatMetres, nearestSpot, type SpotLike } from '@/lib/geo';
 import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
@@ -90,8 +106,6 @@ function QuickLog() {
          ? { latitude: lat, longitude: lng, source: 'pin' }
          : null;
    });
-   /* The map is open from the start: the pin is the point. */
-   const [pinOpen, setPinOpen] = useState(true);
 
    /*
     * The spots you already have. A position within a few hundred metres of
@@ -126,6 +140,8 @@ function QuickLog() {
    const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
    const [hideLocation, setHideLocation] = useState(false);
    const [spotName, setSpotName] = useState('');
+   const [savingSpot, setSavingSpot] = useState(false);
+   const [notes, setNotes] = useState('');
    const [spotPublic, setSpotPublic] = useState(false);
 
    const onPhotoFile = (file: File) => {
@@ -231,6 +247,8 @@ function QuickLog() {
       if (d.released) setReleased(d.released);
       if (Array.isArray(d.gearIds)) setGearIds(d.gearIds);
       if (d.photo) setPhoto(d.photo);
+      if (typeof d.notes === 'string') setNotes(d.notes);
+      if (typeof d.savingSpot === 'boolean') setSavingSpot(d.savingSpot);
    }, [draftId]); // eslint-disable-line react-hooks/exhaustive-deps
 
    const saveAsDraft = () => {
@@ -256,6 +274,8 @@ function QuickLog() {
             released,
             gearIds,
             photo,
+            notes,
+            savingSpot,
          },
          draftId
       );
@@ -397,7 +417,7 @@ function QuickLog() {
           * catch keeps the pin on its own.
           */
          let siteId: string | null = filedUnder?.id ?? null;
-         if (!siteId && spotName.trim() && where) {
+         if (!siteId && savingSpot && spotName.trim() && where) {
             const { data: made } = await axios.post<{
                site?: { id: string };
                id?: string;
@@ -414,7 +434,7 @@ function QuickLog() {
          const payload = {
             title,
             caughtAt: stampedAt.toISOString(),
-            notes: null,
+            notes: notes.trim() || null,
             siteId,
             speciesId: matched?.id ?? null,
             latitude: where?.latitude ?? null,
@@ -459,110 +479,127 @@ function QuickLog() {
       }
    };
 
-   const textControl =
-      'g-tracked inline-flex h-11 items-center px-2 text-[18px] text-ink-2 transition-colors duration-150 hover:text-ink';
+   const whereLine = where
+      ? where.source === 'photo'
+         ? 'From the photograph'
+         : where.source === 'pin'
+           ? 'Pinned by you'
+           : `Phone fix${where.accuracy ? `, within ${Math.round(where.accuracy)} m` : ''}`
+      : fixStatus === 'denied'
+        ? 'No position. Location is off for this site.'
+        : fixStatus === 'unsupported'
+          ? 'No position from this browser.'
+          : 'Getting a fix';
+   const WhereMark =
+      where?.source === 'photo'
+         ? CameraIcon
+         : where?.source === 'pin'
+           ? MapPinIcon
+           : SignalIcon;
+   const privacyLine =
+      visibility === 'PRIVATE'
+         ? 'Only you see this catch.'
+         : hideLocation
+           ? 'Your catch is public. Your exact spot stays private.'
+           : 'Your catch is public, spot included.';
+   const footerLine =
+      visibility === 'PRIVATE'
+         ? 'Private catch'
+         : hideLocation
+           ? 'Public catch · Exact spot hidden'
+           : 'Public catch · Spot shown';
+
+   const heading = (index: string, title: string, note?: string | null) => (
+      <div className="mb-5 flex items-center gap-2.5">
+         <span className="g-tracked text-[19px] text-teal-text">{index}</span>
+         <h2 className="g text-[22px] leading-none">{title}</h2>
+         {note ? (
+            <span className="ml-auto text-[12px] text-ink-2">{note}</span>
+         ) : null}
+      </div>
+   );
 
    return (
       <section
          className={cn(
-            'mx-auto flex min-h-[calc(100dvh-124px)] w-full max-w-[560px] flex-col lg:max-w-[1400px] transition-[transform,opacity] duration-[460ms] [transition-timing-function:cubic-bezier(0.2,0,0,1)] md:my-10 md:min-h-0 md:border md:border-line',
+            'mx-auto w-full max-w-[1160px] border border-line border-t-[3px] border-t-teal bg-background transition-[transform,opacity] duration-[460ms] [transition-timing-function:cubic-bezier(0.2,0,0,1)] md:my-8',
             entered ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'
          )}
       >
-         <div className="h-[3px] w-full shrink-0 bg-teal" aria-hidden="true" />
-         <div className="flex flex-wrap items-center justify-between gap-x-2 border-b border-line py-1.5 pr-1 pl-4">
-            <h1 className="g text-[26px]">Log a catch</h1>
-            <div className="flex items-center">
+         <header className="flex items-start justify-between gap-4 border-b border-line px-4 py-5 md:items-center md:px-7">
+            <div className="min-w-0">
+               <h1 className="g text-[30px] leading-none md:text-[34px]">
+                  Log a catch
+               </h1>
+               <p className="mt-1.5 max-w-[36ch] text-[13px] text-ink-2">
+                  Start with the species. Everything else is optional.
+               </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-3 md:gap-4">
                <button
                   type="button"
-                  className={textControl}
-                  onClick={nothingCaught}
-               >
-                  Nothing caught?
-               </button>
-               <button
-                  type="button"
-                  className={textControl}
                   onClick={saveAsDraft}
+                  className="g-tracked inline-flex min-h-11 items-center text-[15px] whitespace-nowrap hover:text-teal-text md:text-[16px]"
                >
-                  Save as draft
+                  Save draft
                </button>
-               <button type="button" className={textControl} onClick={close}>
-                  Close
+               <button
+                  type="button"
+                  onClick={close}
+                  aria-label="Close the catch form"
+                  className="grid size-11 place-items-center border border-line hover:bg-bg-2"
+               >
+                  <XMarkIcon aria-hidden="true" className="size-5" />
                </button>
             </div>
-         </div>
+         </header>
 
-         <div className="flex flex-1 flex-col gap-4 px-4 py-4 lg:grid lg:grid-cols-2 lg:gap-x-10 lg:px-8 lg:py-6">
-            <div className="flex min-w-0 flex-col gap-4">
-               <Receipt
-                  at={stampedAt}
-                  timeSource={timeSource}
-                  onTime={(next) => {
-                     setStampedAt(next);
-                     setTimeSource('typed');
+         <div className="grid gap-7 px-4 py-6 md:grid-cols-[minmax(0,1.62fr)_minmax(0,1fr)] md:gap-9 md:px-7 xl:gap-12 xl:px-9">
+            {/* ---------------- 01 The catch ---------------- */}
+            <div className="min-w-0">
+               {heading('01', 'The catch')}
+
+               <div className="mb-2 flex items-baseline justify-between gap-2">
+                  <span className="lab">Species</span>
+                  <span className="text-[12px] text-ink-2">Required</span>
+               </div>
+               <SpeciesCombobox
+                  label=""
+                  value={chosen ?? typed}
+                  species={species}
+                  recent={options}
+                  error={speciesError}
+                  inputRef={speciesInput}
+                  onChange={(name) => {
+                     setChosen(name);
+                     setTyped('');
+                     setSpeciesError(null);
                   }}
-                  where={where}
-                  fixStatus={fixStatus}
-                  pinOpen={pinOpen}
-                  onTogglePin={() => setPinOpen((open) => !open)}
-               >
-                  <MapLocationPicker
-                     mapClassName="-mx-3.5 sm:mx-0"
-                     latitude={where ? String(where.latitude) : ''}
-                     longitude={where ? String(where.longitude) : ''}
-                     onChange={(latitude, longitude) =>
-                        setWhere({ latitude, longitude, source: 'pin' })
-                     }
+                  onCreated={(made) => setSpecies((list) => [...list, made])}
+               />
+               <p className="mt-2 text-[12px] text-ink-2">
+                  Not sure?{' '}
+                  <button
+                     type="button"
+                     onClick={() => {
+                        setChosen(NOT_SURE);
+                        setTyped('');
+                        setSpeciesError(null);
+                     }}
+                     className="text-teal-text underline underline-offset-[3px] hover:text-ink"
+                  >
+                     Log it as unidentified
+                  </button>
+               </p>
+
+               <div className="mt-5">
+                  <PhotoBlock
+                     initial={photo}
+                     onChange={setPhoto}
+                     onBusyChange={setPhotoBusy}
+                     onFile={onPhotoFile}
                   />
-               </Receipt>
-
-               {near ? (
-                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border border-line px-4 py-3">
-                     <p className="text-[15px]">
-                        {filedUnder ? (
-                           <>
-                              <span className="lab mr-2 text-ink-3">Spot</span>
-                              <span className="g-tracked text-[19px]">
-                                 {near.spot.name}
-                              </span>
-                              <span className="ml-2 text-ink-3">
-                                 {formatMetres(near.metres)} away, you have
-                                 fished here before
-                              </span>
-                           </>
-                        ) : (
-                           <span className="text-ink-2">
-                              Not filed under {near.spot.name}.
-                           </span>
-                        )}
-                     </p>
-                     <button
-                        type="button"
-                        onClick={() =>
-                           setNotThatSpot(filedUnder ? near.spot.id : null)
-                        }
-                        className="g-tracked text-[17px] text-teal-text hover:opacity-80"
-                     >
-                        {filedUnder ? 'Not this spot' : 'File it there'}
-                     </button>
-                  </div>
-               ) : null}
-
-               <Conditions
-                  phase={phase}
-                  lines={lines}
-                  takenAt={conditions?.at ?? null}
-               />
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-4">
-               <PhotoBlock
-                  initial={photo}
-                  onChange={setPhoto}
-                  onBusyChange={setPhotoBusy}
-                  onFile={onPhotoFile}
-               />
+               </div>
 
                <SpeciesGuess
                   imageUrl={photo?.url ?? null}
@@ -578,192 +615,359 @@ function QuickLog() {
                   }}
                />
 
-               <SpeciesCombobox
-                  value={chosen ?? typed}
-                  species={species}
-                  recent={options}
-                  error={speciesError}
-                  inputRef={speciesInput}
-                  onChange={(name) => {
-                     setChosen(name);
-                     setTyped('');
-                     setSpeciesError(null);
-                  }}
-                  onCreated={(made) => setSpecies((list) => [...list, made])}
-               />
+               <div className="mt-6">
+                  <div className="mb-2 flex items-baseline justify-between gap-2">
+                     <span className="lab">Measurements</span>
+                     <span className="text-[12px] text-ink-2">Optional</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                     <MeasureField
+                        id="length"
+                        label="Length"
+                        units={['cm', 'in']}
+                        unit={lengthUnit}
+                        value={length}
+                        onChange={setLength}
+                        onUnitChange={setLengthUnit}
+                        sources={[
+                           { value: 'EYE', label: 'By eye' },
+                           { value: 'TAPE', label: 'On a tape' },
+                        ]}
+                        source={lengthSource}
+                        onSourceChange={(next) =>
+                           setLengthSource(next as 'EYE' | 'TAPE')
+                        }
+                        placeholder="0"
+                     />
+                     <MeasureField
+                        id="weight"
+                        label="Weight"
+                        units={['kg', 'lb']}
+                        unit={weightUnit}
+                        value={weight}
+                        onChange={setWeight}
+                        onUnitChange={setWeightUnit}
+                        sources={[
+                           { value: 'EYE', label: 'By eye' },
+                           { value: 'SCALE', label: 'On a scale' },
+                        ]}
+                        source={weightSource}
+                        onSourceChange={(next) =>
+                           setWeightSource(next as 'EYE' | 'SCALE')
+                        }
+                        placeholder="0"
+                     />
+                  </div>
+               </div>
 
-               <div className="grid grid-cols-2 gap-3">
-                  <MeasureField
-                     id="length"
-                     label="Length"
-                     units={['cm', 'in']}
-                     unit={lengthUnit}
-                     value={length}
-                     onChange={setLength}
-                     onUnitChange={setLengthUnit}
-                     sources={[
-                        { value: 'EYE', label: 'By eye' },
-                        { value: 'TAPE', label: 'On a tape' },
+               <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-baseline gap-2">
+                     <span className="lab">The fish</span>
+                     <span className="text-[12px] text-ink-2">Optional</span>
+                  </div>
+                  <Segment
+                     label="Kept or released"
+                     value={released}
+                     onChange={setReleased}
+                     className="w-full sm:w-auto sm:min-w-[215px]"
+                     options={[
+                        {
+                           value: 'RELEASED',
+                           label: 'Released',
+                           Icon: ArrowUturnLeftIcon,
+                        },
+                        { value: 'KEPT', label: 'Kept', Icon: ArchiveBoxIcon },
                      ]}
-                     source={lengthSource}
-                     onSourceChange={(next) =>
-                        setLengthSource(next as 'EYE' | 'TAPE')
-                     }
-                     placeholder="0"
-                  />
-                  <MeasureField
-                     id="weight"
-                     label="Weight"
-                     units={['kg', 'lb']}
-                     unit={weightUnit}
-                     value={weight}
-                     onChange={setWeight}
-                     onUnitChange={setWeightUnit}
-                     sources={[
-                        { value: 'EYE', label: 'By eye' },
-                        { value: 'SCALE', label: 'On a scale' },
-                     ]}
-                     source={weightSource}
-                     onSourceChange={(next) =>
-                        setWeightSource(next as 'EYE' | 'SCALE')
-                     }
-                     placeholder="0"
                   />
                </div>
 
-               <ChoiceGroup
-                  inline
-                  size="sm"
-                  label="The fish"
-                  value={released}
-                  onChange={setReleased}
-                  options={[
-                     { value: 'KEPT', label: 'Kept' },
-                     { value: 'RELEASED', label: 'Released' },
-                  ]}
-               />
-
-               {/* What it was caught on. Optional, like everything. */}
-               <div className="flex flex-col gap-3 border-t border-line pt-4">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                     <Picker
-                        multiple
-                        size="sm"
-                        label="Gear"
-                        allLabel="None chosen"
-                        value={gearIds.filter((id) =>
-                           gearOptions.some((o) => o.value === id)
-                        )}
-                        options={gearOptions}
-                        onChange={(next) =>
-                           setGearIds((was) => [
-                              ...was.filter((id) =>
-                                 baitOptions.some((o) => o.value === id)
-                              ),
-                              ...(next as string[]),
-                           ])
-                        }
-                     />
-                     <Picker
-                        multiple
-                        size="sm"
-                        label="Bait or lure"
-                        allLabel="None chosen"
-                        value={gearIds.filter((id) =>
-                           baitOptions.some((o) => o.value === id)
-                        )}
-                        options={baitOptions}
-                        onChange={(next) =>
-                           setGearIds((was) => [
-                              ...was.filter((id) =>
+               <div className="mt-6 border-t border-b border-line">
+                  <Fold
+                     title="Gear, bait & notes"
+                     headingClassName="text-[18px] md:text-[18px]"
+                     aside={
+                        gearIds.length ? `${gearIds.length} chosen` : 'Optional'
+                     }
+                  >
+                     <div className="flex flex-col gap-4 pb-5">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                           <Picker
+                              multiple
+                              size="sm"
+                              label="Gear"
+                              allLabel="None chosen"
+                              value={gearIds.filter((id) =>
                                  gearOptions.some((o) => o.value === id)
-                              ),
-                              ...(next as string[]),
-                           ])
+                              )}
+                              options={gearOptions}
+                              onChange={(next) =>
+                                 setGearIds((was) => [
+                                    ...was.filter((id) =>
+                                       baitOptions.some((o) => o.value === id)
+                                    ),
+                                    ...(next as string[]),
+                                 ])
+                              }
+                           />
+                           <Picker
+                              multiple
+                              size="sm"
+                              label="Bait or lure"
+                              allLabel="None chosen"
+                              value={gearIds.filter((id) =>
+                                 baitOptions.some((o) => o.value === id)
+                              )}
+                              options={baitOptions}
+                              onChange={(next) =>
+                                 setGearIds((was) => [
+                                    ...was.filter((id) =>
+                                       gearOptions.some((o) => o.value === id)
+                                    ),
+                                    ...(next as string[]),
+                                 ])
+                              }
+                           />
+                        </div>
+                        <AddGearInline
+                           onAdded={(entry) => {
+                              setGear((list) => [...list, entry]);
+                              setGearIds((was) => [...was, entry.id]);
+                           }}
+                        />
+                        <TextArea
+                           label="Notes"
+                           value={notes}
+                           maxLength={2000}
+                           rows={3}
+                           placeholder="A detail to remember: the bait, the tide, the take."
+                           onChange={(event) => setNotes(event.target.value)}
+                        />
+                     </div>
+                  </Fold>
+               </div>
+
+               <button
+                  type="button"
+                  onClick={nothingCaught}
+                  className="mt-3 inline-flex min-h-9 items-center text-[12px] underline underline-offset-[3px] hover:text-teal-text"
+               >
+                  Nothing caught? Log a session instead
+               </button>
+            </div>
+
+            {/* ---------------- 02 When and where ---------------- */}
+            <aside className="min-w-0" aria-label="When, where and who sees it">
+               {heading('02', 'When & where')}
+               <div className="border-t-2 border-teal bg-bg-2 p-4 md:p-5">
+                  <CaughtAt
+                     at={stampedAt}
+                     timeSource={timeSource}
+                     onTime={(next) => {
+                        setStampedAt(next);
+                        setTimeSource('typed');
+                     }}
+                  />
+
+                  <div className="mt-4">
+                     <MapLocationPicker
+                        mapClassName="h-[220px] sm:h-[260px]"
+                        latitude={where ? String(where.latitude) : ''}
+                        longitude={where ? String(where.longitude) : ''}
+                        onChange={(latitude, longitude) =>
+                           setWhere({ latitude, longitude, source: 'pin' })
                         }
                      />
                   </div>
-                  <AddGearInline
-                     onAdded={(entry) => {
-                        setGear((list) => [...list, entry]);
-                        setGearIds((was) => [...was, entry.id]);
-                     }}
-                  />
-               </div>
 
-               {/* Who sees it, and whether the place travels with it. */}
-               <div className="flex flex-col gap-4 border-t border-line pt-4">
-                  <ChoiceGroup
-                     inline
-                     size="sm"
-                     label="Who sees it"
-                     value={visibility}
-                     onChange={setVisibility}
-                     options={[
-                        { value: 'PUBLIC', label: 'Everyone' },
-                        { value: 'PRIVATE', label: 'Only me' },
-                     ]}
-                  />
-                  {visibility === 'PUBLIC' && where ? (
-                     <ChoiceGroup
-                        inline
-                        size="sm"
-                        label="The spot"
-                        value={hideLocation ? 'HIDE' : 'SHOW'}
-                        onChange={(next) => setHideLocation(next === 'HIDE')}
-                        options={[
-                           { value: 'SHOW', label: 'Show it' },
-                           { value: 'HIDE', label: 'Keep it to myself' },
-                        ]}
-                        hint={
-                           hideLocation
-                              ? 'The fish shows on the feed, the pin does not.'
-                              : 'Other anglers see where this came from.'
-                        }
+                  <div className="mt-3 flex items-center gap-2 text-[13px]">
+                     <WhereMark
+                        aria-hidden="true"
+                        className={cn(
+                           'size-4 shrink-0',
+                           where ? 'text-teal-text' : 'text-ink-3'
+                        )}
                      />
+                     <span className={where ? 'text-ink' : 'text-ink-3'}>
+                        {whereLine}
+                     </span>
+                  </div>
+
+                  {near ? (
+                     <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border border-line bg-background px-3 py-2 text-[13px]">
+                        <span>
+                           {filedUnder ? (
+                              <>
+                                 <span className="g-tracked text-[17px]">
+                                    {near.spot.name}
+                                 </span>
+                                 <span className="ml-2 text-ink-3">
+                                    {formatMetres(near.metres)} away. Filed
+                                    there.
+                                 </span>
+                              </>
+                           ) : (
+                              <span className="text-ink-2">
+                                 Not filed under {near.spot.name}.
+                              </span>
+                           )}
+                        </span>
+                        <button
+                           type="button"
+                           onClick={() =>
+                              setNotThatSpot(filedUnder ? near.spot.id : null)
+                           }
+                           className="g-tracked text-[15px] text-teal-text hover:opacity-80"
+                        >
+                           {filedUnder ? 'Not this spot' : 'File it there'}
+                        </button>
+                     </div>
                   ) : null}
+
                   {where && !filedUnder ? (
-                     <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                        <TextField
-                           label="Save this place as a spot"
-                           value={spotName}
-                           maxLength={120}
-                           autoComplete="off"
-                           placeholder="Leave blank to keep only the pin"
-                           onChange={(event) => setSpotName(event.target.value)}
-                        />
-                        {spotName.trim() ? (
-                           <ChoiceGroup
-                              size="sm"
-                              label="The spot is"
-                              value={spotPublic ? 'PUBLIC' : 'PRIVATE'}
-                              onChange={(next) =>
-                                 setSpotPublic(next === 'PUBLIC')
+                     <div className="mt-3">
+                        <label className="flex min-h-9 cursor-pointer items-center gap-2 text-[13px]">
+                           <input
+                              type="checkbox"
+                              className="size-4 accent-ink"
+                              checked={savingSpot}
+                              onChange={(event) =>
+                                 setSavingSpot(event.target.checked)
                               }
-                              options={[
-                                 { value: 'PRIVATE', label: 'Private' },
-                                 { value: 'PUBLIC', label: 'Public' },
-                              ]}
                            />
+                           Save to my fishing spots
+                        </label>
+                        {savingSpot ? (
+                           <div className="mt-2 flex flex-col gap-2">
+                              <input
+                                 type="text"
+                                 value={spotName}
+                                 maxLength={120}
+                                 autoComplete="off"
+                                 placeholder="Give this spot a name"
+                                 aria-label="Fishing spot name"
+                                 onChange={(event) =>
+                                    setSpotName(event.target.value)
+                                 }
+                                 className="h-11 w-full border border-line-2 bg-background px-3 text-[15px] text-ink outline-none focus:border-ink"
+                              />
+                              <Segment
+                                 label="The spot is"
+                                 value={spotPublic ? 'PUBLIC' : 'PRIVATE'}
+                                 onChange={(next) =>
+                                    setSpotPublic(next === 'PUBLIC')
+                                 }
+                                 options={[
+                                    {
+                                       value: 'PRIVATE',
+                                       label: 'Private spot',
+                                       Icon: LockClosedIcon,
+                                    },
+                                    {
+                                       value: 'PUBLIC',
+                                       label: 'Public spot',
+                                       Icon: GlobeAltIcon,
+                                    },
+                                 ]}
+                              />
+                           </div>
                         ) : null}
                      </div>
                   ) : null}
+
+                  <div className="mt-4 border-t border-line pt-3">
+                     <Conditions
+                        phase={phase}
+                        lines={lines}
+                        takenAt={conditions?.at ?? null}
+                     />
+                  </div>
                </div>
-            </div>
+
+               <div className="mt-6">
+                  {heading('03', 'Sharing')}
+                  <div className="flex flex-col gap-4">
+                     <div>
+                        <span className="lab mb-2 block">
+                           Who can see this catch?
+                        </span>
+                        <Segment
+                           label="Who can see this catch"
+                           value={visibility}
+                           onChange={setVisibility}
+                           options={[
+                              {
+                                 value: 'PUBLIC',
+                                 label: 'Everyone',
+                                 Icon: GlobeAltIcon,
+                              },
+                              {
+                                 value: 'PRIVATE',
+                                 label: 'Only me',
+                                 Icon: LockClosedIcon,
+                              },
+                           ]}
+                        />
+                     </div>
+                     {visibility === 'PUBLIC' && where ? (
+                        <div>
+                           <span className="lab mb-2 block">
+                              Exact location
+                           </span>
+                           <Segment
+                              label="Exact location"
+                              value={hideLocation ? 'HIDDEN' : 'SHOWN'}
+                              onChange={(next) =>
+                                 setHideLocation(next === 'HIDDEN')
+                              }
+                              options={[
+                                 {
+                                    value: 'HIDDEN',
+                                    label: 'Hidden',
+                                    Icon: EyeSlashIcon,
+                                 },
+                                 {
+                                    value: 'SHOWN',
+                                    label: 'Shown',
+                                    Icon: EyeIcon,
+                                 },
+                              ]}
+                           />
+                        </div>
+                     ) : null}
+                     <p
+                        aria-live="polite"
+                        className="flex items-start gap-2 bg-teal/10 p-2.5 text-[12px] text-teal-text"
+                     >
+                        <ShieldCheckIcon
+                           aria-hidden="true"
+                           className="mt-px size-4 shrink-0"
+                        />
+                        {privacyLine}
+                     </p>
+                  </div>
+               </div>
+            </aside>
          </div>
 
-         <button
-            type="button"
-            onClick={() => void save()}
-            disabled={photoBusy || isSaving}
-            className="g-tracked sticky bottom-0 z-10 flex h-14 w-full shrink-0 items-center justify-center bg-teal text-[26px] text-teal-ink transition-[filter] duration-150 active:brightness-95 disabled:opacity-60 md:bottom-0"
-         >
-            {isSaving
-               ? 'Saving'
-               : photoBusy
-                 ? 'Sending the photo'
-                 : 'Save catch'}
-         </button>
+         <footer className="sticky bottom-0 z-10 flex flex-col-reverse gap-3 border-t border-line bg-background px-4 py-4 md:flex-row md:items-center md:justify-between md:px-7">
+            <p className="flex items-center justify-center gap-1.5 text-[12px] text-ink-2 md:justify-start">
+               <ShieldCheckIcon aria-hidden="true" className="size-4" />
+               {footerLine}
+            </p>
+            <button
+               type="button"
+               onClick={() => void save()}
+               disabled={photoBusy || isSaving}
+               className="g-tracked flex min-h-[52px] w-full items-center justify-center gap-5 bg-teal px-7 text-[22px] text-teal-ink transition-[filter] duration-150 hover:brightness-95 disabled:opacity-60 md:w-auto md:min-w-[222px]"
+            >
+               {isSaving
+                  ? 'Saving'
+                  : photoBusy
+                    ? 'Sending the photo'
+                    : 'Save catch'}
+               <ArrowRightIcon aria-hidden="true" className="size-5" />
+            </button>
+         </footer>
       </section>
    );
 }

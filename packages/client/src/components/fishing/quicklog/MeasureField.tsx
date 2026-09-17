@@ -1,12 +1,11 @@
-import { cn } from '@/lib/utils';
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import { convertTyped, type MeasureUnit } from './measure';
 
 /*
- * A measurement on the fast log: the figure in a box with its unit fixed to
- * the right, and under it a two-way switch for how it was taken. The switch
- * is a real segmented control at the full width of the field, because "by
- * eye" versus "on a tape" is the difference between a fish and a fish story,
- * and a thumb has to be able to hit it on a rock in the wind.
+ * A measurement on the fast log: the figure in a box with its unit as a
+ * dropdown fixed to the right, and under it a line for how it was taken.
+ * "By eye" against "on a tape" is the difference between a fish and a fish
+ * story, so it is never hidden, but it is quiet: a muted line, not a switch.
  */
 export function MeasureField({
    id,
@@ -45,10 +44,10 @@ export function MeasureField({
 
    return (
       <div className="flex min-w-0 flex-col">
-         <label className="lab" htmlFor={id}>
+         <label className="lab text-ink-2" htmlFor={id}>
             {label}
          </label>
-         <div className="mt-1.5 flex items-stretch">
+         <div className="mt-1.5 flex items-stretch border border-line-2 bg-bg-2 transition-colors duration-150 [transition-timing-function:var(--ease)] focus-within:border-ink hover:border-ink-3">
             <input
                id={id}
                name={id}
@@ -58,56 +57,50 @@ export function MeasureField({
                value={value}
                placeholder={placeholder}
                onChange={(event) => onChange(event.target.value)}
-               className="input-line g num min-w-0 flex-1 text-[30px]"
+               className="g num h-[52px] min-w-0 flex-1 bg-transparent px-3 text-[26px] text-ink outline-none placeholder:text-ink-3"
             />
-            <div
-               role="group"
-               aria-label={`${label} unit`}
-               className="flex shrink-0 border border-l-0 border-line border-b-2 border-b-line-2"
-            >
-               {units.map((option) => (
-                  <button
-                     key={option}
-                     type="button"
-                     aria-pressed={unit === option}
-                     onClick={() => switchUnit(option)}
-                     className={cn(
-                        'g-tracked min-w-11 px-2.5 text-[16px] transition-colors duration-150 [transition-timing-function:var(--ease)]',
-                        unit === option
-                           ? 'bg-ink text-background'
-                           : 'text-ink-2 hover:text-ink'
-                     )}
-                  >
-                     {option}
-                  </button>
-               ))}
+            {/* The unit: a real dropdown, with the chevron given its own room
+                rather than jammed against the edge. */}
+            <div className="relative flex shrink-0 border-l border-line-2 bg-background">
+               <select
+                  aria-label={`${label} unit`}
+                  value={unit}
+                  onChange={(event) =>
+                     switchUnit(event.target.value as MeasureUnit)
+                  }
+                  className="g-tracked h-full w-[68px] cursor-pointer appearance-none bg-transparent pr-7 pl-3 text-[16px] text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-teal"
+               >
+                  {units.map((option) => (
+                     <option key={option} value={option}>
+                        {option}
+                     </option>
+                  ))}
+               </select>
+               <ChevronDownIcon
+                  aria-hidden="true"
+                  strokeWidth={2}
+                  className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-ink-2"
+               />
             </div>
          </div>
-         <div
-            role="radiogroup"
-            aria-label={`How the ${label.toLowerCase()} was taken`}
-            className="mt-2 grid grid-cols-2 border border-line"
-         >
-            {sources.map((option) => {
-               const on = source === option.value;
-               return (
-                  <button
-                     key={option.value}
-                     type="button"
-                     role="radio"
-                     aria-checked={on}
-                     onClick={() => onSourceChange(option.value)}
-                     className={cn(
-                        'g-tracked h-11 text-[16px] transition-colors duration-150 [transition-timing-function:var(--ease)]',
-                        on
-                           ? 'bg-ink text-background'
-                           : 'text-ink-2 hover:text-ink'
-                     )}
-                  >
+         <div className="relative">
+            <select
+               aria-label={`How the ${label.toLowerCase()} was taken`}
+               value={source}
+               onChange={(event) => onSourceChange(event.target.value)}
+               className="h-10 w-full cursor-pointer appearance-none border-b border-line bg-transparent pr-7 text-[13px] text-ink-2 outline-none focus-visible:text-ink"
+            >
+               {sources.map((option) => (
+                  <option key={option.value} value={option.value}>
                      {option.label}
-                  </button>
-               );
-            })}
+                  </option>
+               ))}
+            </select>
+            <ChevronDownIcon
+               aria-hidden="true"
+               strokeWidth={2}
+               className="pointer-events-none absolute top-1/2 right-1 size-3.5 -translate-y-1/2 text-ink-3"
+            />
          </div>
       </div>
    );

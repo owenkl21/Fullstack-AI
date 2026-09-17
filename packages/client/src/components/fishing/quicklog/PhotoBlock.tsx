@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { cn } from '@/lib/utils';
+import { CameraIcon, PhotoIcon } from '@heroicons/react/24/outline';
 
 /*
  * The photo, taken and sent while the rest of the catch is being filled in. It uses
@@ -214,15 +215,15 @@ export function PhotoBlock({
       }
    };
 
-   const control =
-      'g-tracked relative z-[1] inline-flex h-11 items-center border border-paper/50 bg-black-block/45 px-5 text-[20px] text-paper transition-[background-color,transform] duration-150 [transition-timing-function:var(--ease)] active:scale-[0.98]';
-
    return (
       <div className="flex flex-col gap-2">
-         <label className="lab" htmlFor="quicklog-photo">
-            Photo
-         </label>
-         <div className="relative flex h-[200px] items-center justify-center overflow-hidden bg-black-block">
+         <div
+            id="quicklog-photo-zone"
+            className={cn(
+               'relative flex items-center gap-4 overflow-hidden bg-black-block p-5 text-paper',
+               preview ? 'min-h-[210px]' : 'min-h-[145px]'
+            )}
+         >
             {preview ? (
                <img
                   src={preview}
@@ -248,6 +249,7 @@ export function PhotoBlock({
                accept={ACCEPTED.join(',')}
                capture="environment"
                className="sr-only"
+               aria-label="Take a photo"
                onChange={(event) => onSelect(event.target.files?.[0])}
             />
             {/* The same picker without `capture`: the camera roll, for a
@@ -261,23 +263,58 @@ export function PhotoBlock({
                onChange={(event) => onSelect(event.target.files?.[0])}
             />
             {!preview ? (
-               <div className="relative z-[1] flex flex-wrap items-center justify-center gap-3">
-                  <button
-                     type="button"
-                     className={control}
-                     onClick={() => inputRef.current?.click()}
+               <>
+                  <span
+                     aria-hidden="true"
+                     className="hidden size-[52px] shrink-0 place-items-center border border-paper/30 text-teal sm:grid"
                   >
-                     Take a photo
-                  </button>
+                     <CameraIcon className="size-6" strokeWidth={1.6} />
+                  </span>
+                  <div className="relative z-[1] min-w-0">
+                     <h3 className="g text-[22px] leading-none">
+                        Add a catch photo
+                     </h3>
+                     <p className="mt-1 text-[12px] text-paper-2">
+                        Optional. You can add one later.
+                     </p>
+                     <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <button
+                           type="button"
+                           className="g-tracked inline-flex min-h-10 items-center gap-2 border border-paper bg-paper px-3 text-[15px] text-ink transition-[filter] duration-150 hover:brightness-95"
+                           onClick={() => pickRef.current?.click()}
+                        >
+                           <PhotoIcon aria-hidden="true" className="size-4" />
+                           Choose photo
+                        </button>
+                        <button
+                           type="button"
+                           className="g-tracked inline-flex min-h-10 items-center gap-2 border border-paper/50 px-3 text-[15px] text-paper transition-colors duration-150 hover:border-teal"
+                           onClick={() => inputRef.current?.click()}
+                        >
+                           <CameraIcon aria-hidden="true" className="size-4" />
+                           Take photo
+                        </button>
+                     </div>
+                  </div>
+               </>
+            ) : (
+               <div className="absolute right-2.5 bottom-2.5 z-[1] flex items-center gap-3 bg-ink px-2.5">
                   <button
                      type="button"
-                     className={cn(control, 'border-paper/30 bg-transparent')}
+                     className="g-tracked inline-flex h-10 items-center text-[15px] text-paper hover:text-teal"
                      onClick={() => pickRef.current?.click()}
                   >
-                     Choose one
+                     Change
+                  </button>
+                  <button
+                     type="button"
+                     className="g-tracked inline-flex h-10 items-center text-[15px] text-paper hover:text-teal"
+                     onClick={clear}
+                  >
+                     Remove photo
                   </button>
                </div>
-            ) : null}
+            )}
             {isUploading ? (
                <span
                   style={{ width: `${progress}%` }}
@@ -291,7 +328,7 @@ export function PhotoBlock({
                <div className="flex items-baseline justify-between gap-4">
                   <span className="lab">How the feed shows it</span>
                   {ratio !== null && Math.abs(ratio - FRAME) > 0.02 ? (
-                     <span className="text-[13px] text-ink-3">
+                     <span className="text-[12px] text-ink-3">
                         Drag the picture to choose what stays in the frame.
                      </span>
                   ) : null}
@@ -324,41 +361,13 @@ export function PhotoBlock({
                </div>
             </div>
          ) : null}
-         {preview ? (
-            <div className="flex flex-wrap items-center gap-4">
-               <button
-                  type="button"
-                  className="g-tracked inline-flex h-11 items-center text-[18px] text-ink-2 hover:text-ink"
-                  onClick={() => inputRef.current?.click()}
-               >
-                  Take another
-               </button>
-               <button
-                  type="button"
-                  className="g-tracked inline-flex h-11 items-center text-[18px] text-ink-2 hover:text-ink"
-                  onClick={() => pickRef.current?.click()}
-               >
-                  Choose one
-               </button>
-               <button
-                  type="button"
-                  className="g-tracked inline-flex h-11 items-center text-[18px] text-ink-2 hover:text-ink"
-                  onClick={clear}
-               >
-                  Remove
-               </button>
-               {isUploading ? (
-                  <span
-                     className="num text-[14px] text-ink-3"
-                     aria-live="polite"
-                  >
-                     Sending the photo, {progress}%
-                  </span>
-               ) : null}
-            </div>
+         {isUploading ? (
+            <p className="text-[12px] text-ink-3" aria-live="polite">
+               Sending the photo, {progress}%.
+            </p>
          ) : null}
          {error ? (
-            <p className="text-[14px] text-destructive" role="alert">
+            <p className="text-[13px] text-destructive" role="alert">
                {error}
             </p>
          ) : null}
