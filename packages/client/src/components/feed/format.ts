@@ -89,8 +89,14 @@ export function plural(count: number, one: string, many: string): string {
    return `${count} ${count === 1 ? one : many}`;
 }
 
-/** The counts as one sentence under the controls. */
-export function countSentence(likes: number, comments: number): string {
+/**
+ * The counts as one sentence under the controls, or nothing at all.
+ *
+ * Null when there is neither, because "No likes or comments yet." printed under
+ * every card in a fresh feed is twenty five identical sentences saying nothing.
+ * An absence does not need announcing.
+ */
+export function countSentence(likes: number, comments: number): string | null {
    const likeText = likes > 0 ? plural(likes, 'like', 'likes') : null;
    const commentText =
       comments > 0 ? plural(comments, 'comment', 'comments') : null;
@@ -98,7 +104,7 @@ export function countSentence(likes: number, comments: number): string {
    if (likeText && commentText) return `${likeText} and ${commentText}.`;
    if (likeText) return `${likeText}.`;
    if (commentText) return `${commentText}.`;
-   return 'No likes or comments yet.';
+   return null;
 }
 
 /** The water type as a plain word. A value we do not recognise prints nothing. */

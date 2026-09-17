@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
 import {
    Carousel,
@@ -97,6 +99,12 @@ export function FeedPostBlock({
    isReadingAllComments: boolean;
    hasReadAllComments: boolean;
 }) {
+   /* Which photographs came back taller than they are wide. Filled in on
+    * load, because the feed payload does not carry image dimensions. */
+   const [portrait, setPortrait] = useState<Record<string, boolean>>({});
+
+   const counts = countSentence(post.likeCount, post.commentCount);
+
    const images =
       post.type === 'CATCH'
          ? (post.catch?.images ?? [])
@@ -162,7 +170,21 @@ export function FeedPostBlock({
                   <CarouselContent>
                      {images.map((entry, index) => (
                         <CarouselItem key={entry.image.id}>
-                           <div className="aspect-[4/3] w-full bg-black-block-2">
+                           {/*
+                            * The window follows the photograph. Catch photos are
+                            * mostly held up to the camera and come out portrait,
+                            * and a 4:3 centre crop kept only the middle half of
+                            * those, which is reliably the half without the tail
+                            * or the angler's face in it.
+                            */}
+                           <div
+                              className={cn(
+                                 'w-full bg-black-block-2',
+                                 portrait[entry.image.id]
+                                    ? 'aspect-[4/5] max-h-[560px]'
+                                    : 'aspect-[4/3]'
+                              )}
+                           >
                               <img
                                  src={entry.image.url}
                                  alt={
@@ -171,6 +193,19 @@ export function FeedPostBlock({
                                        : `Photo ${index + 1} of ${images.length}`
                                  }
                                  loading="lazy"
+                                 onLoad={(event) => {
+                                    const img = event.currentTarget;
+                                    if (img.naturalHeight > img.naturalWidth) {
+                                       setPortrait((was) =>
+                                          was[entry.image.id]
+                                             ? was
+                                             : {
+                                                  ...was,
+                                                  [entry.image.id]: true,
+                                               }
+                                       );
+                                    }
+                                 }}
                                  className="h-full w-full object-cover"
                               />
                            </div>
@@ -267,9 +302,9 @@ export function FeedPostBlock({
                ) : null}
             </div>
 
-            <p className="num text-[14px] text-paper-2">
-               {countSentence(post.likeCount, post.commentCount)}
-            </p>
+            {counts ? (
+               <p className="num text-[14px] text-paper-2">{counts}</p>
+            ) : null}
 
             {actionError ? (
                <p className="text-[15px] text-paper">{actionError}</p>

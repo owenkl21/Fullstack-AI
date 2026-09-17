@@ -180,22 +180,46 @@ function MySitesList() {
                </div>
             )}
 
-            <div
-               className="mt-6 flex flex-wrap gap-2"
-               role="group"
-               aria-label="How to show your spots"
-            >
-               <Chip pressed={!onMap} onClick={() => setParam('view', '')}>
-                  List
-               </Chip>
-               <Chip pressed={onMap} onClick={() => setParam('view', 'map')}>
-                  Map
-               </Chip>
-            </div>
+            {status === 'ready' && items.length > 0 ? (
+               <div
+                  className="mt-6 flex flex-wrap gap-2"
+                  role="group"
+                  aria-label="How to show your spots"
+               >
+                  <Chip pressed={!onMap} onClick={() => setParam('view', '')}>
+                     List
+                  </Chip>
+                  <Chip pressed={onMap} onClick={() => setParam('view', 'map')}>
+                     Map
+                  </Chip>
+               </div>
+            ) : null}
          </header>
 
          <div className="mt-8">
-            {onMap ? (
+            {/*
+             * Status first, view second. Checking the view first made the map
+             * tab unable to show loading or error at all: a slow fetch showed
+             * the "nothing to map" sentence for its whole duration, and a
+             * failed one showed it instead of the error. An empty log also got
+             * told to edit a spot it did not have.
+             */}
+            {status === 'loading' ? (
+               <ListSkeleton
+                  key={attempt}
+                  label="Loading your spots"
+                  errorMessage={LOAD_FAILED}
+                  onRetry={retry}
+               />
+            ) : status === 'error' ? (
+               <InlineError message={LOAD_FAILED} onRetry={retry} />
+            ) : items.length === 0 ? (
+               <EmptyState
+                  sentence="No spots saved yet, and a spot is what a catch gets logged against."
+                  actionLabel="Add a spot"
+                  to="/sites/new"
+               />
+            ) : onMap ? (
                pins.length > 0 ? (
                   <>
                      <SpotsMap
@@ -221,21 +245,6 @@ function MySitesList() {
                      </Button>
                   </PlainState>
                )
-            ) : status === 'loading' ? (
-               <ListSkeleton
-                  key={attempt}
-                  label="Loading your spots"
-                  errorMessage={LOAD_FAILED}
-                  onRetry={retry}
-               />
-            ) : status === 'error' ? (
-               <InlineError message={LOAD_FAILED} onRetry={retry} />
-            ) : items.length === 0 ? (
-               <EmptyState
-                  sentence="No spots saved yet, and a spot is what a catch gets logged against."
-                  actionLabel="Add a spot"
-                  to="/sites/new"
-               />
             ) : filtered.length === 0 ? (
                <NoMatchState
                   sentence="No spot matches that search."

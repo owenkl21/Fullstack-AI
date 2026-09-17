@@ -93,12 +93,16 @@ function AccountPanel() {
                </div>
             </section>
 
+            {/*
+             * No heading here. The section holds one button that already says
+             * what it does, and a 30px heading reading Sign out directly above
+             * a button reading Sign out scans as a copy mistake.
+             */}
             <section>
-               <h2 className="g text-[30px] md:text-[36px]">Sign out</h2>
                <Button
                   type="button"
                   variant="outline"
-                  className="mt-4 justify-self-start"
+                  className="justify-self-start"
                   onClick={async () => {
                      await signOut();
                      navigate('/');
