@@ -311,11 +311,13 @@ export { L };
 /*
  * Several spots in one place, at a zoom where they would sit on top of each
  * other. A disc like a spot's, but doubled, so it reads as "several" and not
- * as one spot with a big count, and in the family's colour so a cluster of
- * yours and a cluster of theirs stay apart. Tapping one zooms in until they
- * separate, which the plugin does on its own.
+ * as one spot with a big count. Yours and other anglers' spots share the one
+ * cluster, because two clusters that do not know about each other still land
+ * on top of each other; the disc goes teal the moment one of yours is inside,
+ * so "there is something of mine here" survives the zoom out. Tapping one
+ * zooms in until they separate, which the plugin does on its own.
  */
-export const clusterGroup = (family: 'spot' | 'other'): L.MarkerClusterGroup =>
+export const clusterGroup = (): L.MarkerClusterGroup =>
    L.markerClusterGroup({
       maxClusterRadius: 44,
       showCoverageOnHover: false,
@@ -327,8 +329,16 @@ export const clusterGroup = (family: 'spot' | 'other'): L.MarkerClusterGroup =>
       iconCreateFunction: (cluster) => {
          const count = cluster.getChildCount();
          const text = count > 99 ? '99+' : String(count);
+         const mine = cluster
+            .getAllChildMarkers()
+            .some((marker) =>
+               String(
+                  (marker.options.icon as L.DivIcon | undefined)?.options
+                     .className ?? ''
+               ).includes('map-pin-spot')
+            );
          return L.divIcon({
-            className: `map-pin map-pin-kind map-pin-cluster map-pin-cluster-${family}`,
+            className: `map-pin map-pin-kind map-pin-cluster map-pin-cluster-${mine ? 'spot' : 'other'}`,
             html: `<span class="map-pin-disc map-pin-disc-back" aria-hidden="true"></span><span class="map-pin-disc"><span class="map-pin-n">${text}</span></span>`,
             iconSize: [46, 46],
             iconAnchor: [23, 23],

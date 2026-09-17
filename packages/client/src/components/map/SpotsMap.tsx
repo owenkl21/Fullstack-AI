@@ -118,10 +118,13 @@ export function SpotsMap({
    const keptRef = useRef(kept.spots);
    keptRef.current = kept.spots;
 
-   const spotLayer = useRef<L.LayerGroup | null>(null);
+   const spotLayer = useRef<L.MarkerClusterGroup | null>(null);
    const waypointLayer = useRef<L.LayerGroup | null>(null);
    const poiLayer = useRef<L.LayerGroup | null>(null);
-   const othersLayer = useRef<L.LayerGroup | null>(null);
+   /* The same cluster group as your own spots, so the two families cluster
+    * together; these are the markers this component put in it for others. */
+   const othersLayer = useRef<L.MarkerClusterGroup | null>(null);
+   const othersMarkers = useRef<Marker[]>([]);
 
    /* Only to decide where to open, never to ask for a position: the map is
     * not a reason to put a permission prompt in front of somebody. */
@@ -232,10 +235,12 @@ export function SpotsMap({
 
       /* Spots cluster at low zoom; marks and places do not, there are never
          enough of them in one view to need it. */
-      spotLayer.current = clusterGroup('spot').addTo(created);
+      const clusters = clusterGroup().addTo(created);
+      spotLayer.current = clusters;
       waypointLayer.current = L.layerGroup().addTo(created);
       poiLayer.current = L.layerGroup().addTo(created);
-      othersLayer.current = clusterGroup('other').addTo(created);
+      othersLayer.current = clusters;
+      othersMarkers.current = [];
       setMapReady((n) => n + 1);
 
       const markers: Marker[] = spots.map((spot) => {
@@ -371,7 +376,9 @@ export function SpotsMap({
       const layer = othersLayer.current;
       if (!layer) return;
 
-      layer.clearLayers();
+      /* Only this component's markers for others come out; yours stay. */
+      layer.removeLayers(othersMarkers.current);
+      othersMarkers.current = [];
       if (!showOthers) return;
 
       const mine = new Set(spots.map((s) => s.id));
@@ -385,6 +392,7 @@ export function SpotsMap({
             icon: kindPin('other', spot.catchCount),
             title: spot.name,
          }).addTo(layer);
+         othersMarkers.current.push(marker);
 
          const popup = document.createElement('div');
          const title = document.createElement('p');
