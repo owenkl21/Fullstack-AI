@@ -48,7 +48,7 @@ Two commits on `redesign-theme`, neither pushed:
 | 5.2 better-auth replacing Clerk | Not started. Needs a verified Resend domain first |
 | 5.3 Species and Open-Meteo | **Done.** Species wired and seeded, conditions read at the hour of the catch |
 | 5.4 Seed data | Not started |
-| 5.5 The social layer | Not started |
+| 5.5 The social layer | **Done.** Scoring, per-species boards, rivalry board, profile stats, groups, privacy switch |
 | 5.6 Leaflet, off Google | **Done.** Picker, both record maps and the all-spots map. No iframes left |
 
 **Railway is provisioned** (16 September 2026): project `fishlogger`, MySQL online, `server` service created from the repo but not deployed, all variables set. Details in [09-deploy.md](09-deploy.md) section 4.0.
