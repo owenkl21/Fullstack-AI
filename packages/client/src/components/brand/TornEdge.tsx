@@ -6,61 +6,70 @@ import { cn } from '@/lib/utils';
 /*
  * The waterline between a photograph and the section under it.
  *
- * Three bands of water, redrawn every frame.
+ * Water, redrawn every frame by GSAP. Each line is a sum of three sine waves
+ * at unrelated wavelengths whose phases advance at different rates, so the
+ * crests drift in and out of alignment and the surface never repeats; a
+ * second, much slower tween breathes the amplitude so the sea has a swell
+ * under the chop rather than a fixed height.
  *
- * The first version slid a fixed shape sideways, and sliding a fixed shape is
- * exactly what water does not do: the silhouette never changed, so it read as a
- * printed wave on a conveyor belt. A wave is a travelling disturbance, so the
- * curve itself has to change shape as it goes.
- *
- * Each band is a sum of three sine waves at unrelated wavelengths, whose phases
- * advance at different rates. Because the rates do not divide into each other
- * the crests drift in and out of alignment and the surface never repeats, which
- * is what stops it looking mechanical. GSAP drives it from a single ticker, so
- * three bands on a page cost one callback a frame rather than three timers, and
- * it respects the browser being backgrounded.
+ * What is drawn depends on the mode. Painting the ground (`fill` is the next
+ * section's colour) draws the region below each line. Cutting the plate
+ * (`cut`) draws the plate above its own line and, under it, two translucent
+ * wet strips between the plate's line and their own, a soft shadow the plate
+ * throws on the water, and a thread of foam along the crest. Nothing in cut
+ * mode is filled down to the bottom of the box, which is what used to end in
+ * a ruled line across the section below.
  */
 
 type Fill = 'bg' | 'bg-2' | 'black';
 
-type Band = {
-   /* Wavelength, amplitude and speed per component. */
-   waves: { length: number; amp: number; speed: number; phase: number }[];
-   lift: number;
-   fill: string;
-};
+type Wave = { length: number; amp: number; speed: number; phase: number };
+
+type Band = { waves: Wave[]; lift: number };
 
 const WIDTH = 1600;
 const HEIGHT = 90;
-/* Points along the curve. Sixty is smooth at this width and cheap to rebuild. */
-const STEPS = 60;
+/* Points along the curve. Ninety is smooth at this width and cheap to rebuild. */
+const STEPS = 90;
 
-function build(band: Band, t: number, above: boolean) {
-   const points: string[] = [];
-
+/* The y of each band at time t, with a breathing factor on the amplitude. */
+function trace(band: Band, t: number, breath: number): number[] {
+   const ys: number[] = [];
    for (let i = 0; i <= STEPS; i++) {
       const x = (i / STEPS) * WIDTH;
       let y = HEIGHT - band.lift;
-
       for (const wave of band.waves) {
          y -=
             Math.sin(
                (x / wave.length + t * wave.speed + wave.phase) * Math.PI * 2
-            ) * wave.amp;
+            ) *
+            wave.amp *
+            breath;
       }
-
-      points.push(`${x.toFixed(1)} ${y.toFixed(1)}`);
+      ys.push(y);
    }
-
-   /*
-    * Either the region below the line, closed along the bottom, or the region
-    * above it, closed along the top. Which one depends on what the band is
-    * standing in for: the next section's ground, or the plate being cut.
-    */
-   return above
-      ? `M${points.join(' L')} L${WIDTH} 0 L0 0 Z`
-      : `M${points.join(' L')} L${WIDTH} ${HEIGHT} L0 ${HEIGHT} Z`;
+   return ys;
 }
+
+const xAt = (i: number) => ((i / STEPS) * WIDTH).toFixed(1);
+
+/* The open line, left to right. */
+const lineOf = (ys: number[]) =>
+   ys.map((y, i) => `${i ? 'L' : 'M'}${xAt(i)} ${y.toFixed(1)}`).join('');
+
+/* Closed along the bottom of the box: the next section's ground. */
+const below = (ys: number[]) =>
+   `${lineOf(ys)} L${WIDTH} ${HEIGHT} L0 ${HEIGHT} Z`;
+
+/* Closed along the top of the box: the plate being cut. */
+const above = (ys: number[]) => `${lineOf(ys)} L${WIDTH} 0 L0 0 Z`;
+
+/* The region between two lines: a wet strip under the plate. */
+const between = (top: number[], bottom: number[]) =>
+   `${lineOf(top)} ${bottom
+      .map((y, i) => `L${xAt(bottom.length - 1 - i)} ${y.toFixed(1)}`)
+      .reverse()
+      .join('')} Z`;
 
 export function TornEdge({
    fill = 'bg',
@@ -73,18 +82,8 @@ export function TornEdge({
    flip?: boolean;
    seed?: number;
    /*
-    * Cut the plate rather than paint the ground.
-    *
-    * The default paints the next section's colour below the wave line, which
-    * is right where that section is a flat colour. It is wrong the moment the
-    * section carries anything on top of its colour, such as the underwater
-    * wash on the home page: the painted band can never match a moving
-    * gradient, and the join shows as a ruled line across the whole width.
-    *
-    * With `cut`, the solid band is the plate's own colour, filled above the
-    * line, and nothing is painted below it. Hung over the top of the next
-    * section, the plate ends in a wave and whatever that section draws shows
-    * through the troughs. `fill` then names the plate, not the ground.
+    * Cut the plate rather than paint the ground. `fill` then names the plate,
+    * not the ground, and the section under it shows through the troughs.
     */
    cut?: boolean;
    className?: string;
@@ -103,14 +102,13 @@ export function TornEdge({
 
       /*
        * Wavelengths deliberately not multiples of each other, so the three
-       * components never line up the same way twice. The back band is slower
-       * and taller, the front one quicker and shallower, which is the parallax
-       * that gives the edge depth.
+       * components never line up the same way twice. The back line is slower
+       * and taller, the front one quicker and shallower: the parallax that
+       * gives the edge depth.
        */
       const bands: Band[] = [
          {
-            lift: 16,
-            fill: 'rgba(244,241,236,0.30)',
+            lift: 18,
             waves: [
                { length: 760, amp: 13, speed: 0.021, phase: seed * 0.13 },
                { length: 430, amp: 7, speed: -0.034, phase: seed * 0.41 },
@@ -118,8 +116,7 @@ export function TornEdge({
             ],
          },
          {
-            lift: 8,
-            fill: 'rgba(244,241,236,0.45)',
+            lift: 9,
             waves: [
                { length: 610, amp: 11, speed: -0.028, phase: seed * 0.29 },
                { length: 347, amp: 6, speed: 0.045, phase: seed * 0.61 },
@@ -128,7 +125,6 @@ export function TornEdge({
          },
          {
             lift: 0,
-            fill: ground,
             waves: [
                { length: 520, amp: 10, speed: 0.037, phase: seed * 0.53 },
                { length: 281, amp: 5.5, speed: -0.057, phase: seed * 0.83 },
@@ -137,48 +133,87 @@ export function TornEdge({
          },
       ];
 
-      el.innerHTML =
-         `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" preserveAspectRatio="none" aria-hidden="true">` +
-         bands.map((b) => `<path fill="${b.fill}"/>`).join('') +
-         `</svg>`;
+      const id = `torn-${seed}-${cut ? 'cut' : 'ground'}`;
+      const paper = 'rgba(244,241,236,';
 
-      const paths = Array.from(el.querySelectorAll('path'));
+      el.innerHTML = cut
+         ? `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" preserveAspectRatio="none" aria-hidden="true" overflow="visible">` +
+           `<defs>` +
+           `<filter id="${id}-blur" x="-5%" y="-40%" width="110%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>` +
+           `<filter id="${id}-soft" x="-5%" y="-40%" width="110%" height="200%"><feGaussianBlur stdDeviation="1.2"/></filter>` +
+           `</defs>` +
+           /* the shadow the plate throws on the water */
+           `<path data-role="shadow" fill="rgba(0,0,0,0.42)" filter="url(#${id}-blur)"/>` +
+           /* two wet strips, the far one fainter */
+           `<path data-role="strip0" fill="${paper}0.22)"/>` +
+           `<path data-role="strip1" fill="${paper}0.40)"/>` +
+           /* the plate */
+           `<path data-role="plate" fill="${ground}"/>` +
+           /* foam along the crest */
+           `<path data-role="foam" fill="none" stroke="${paper}0.55)" stroke-width="2" stroke-linecap="round" filter="url(#${id}-soft)"/>` +
+           `</svg>`
+         : `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" preserveAspectRatio="none" aria-hidden="true">` +
+           `<path data-role="band0" fill="${paper}0.30)"/>` +
+           `<path data-role="band1" fill="${paper}0.45)"/>` +
+           `<path data-role="band2" fill="${ground}"/>` +
+           `</svg>`;
+
+      const path = (role: string) =>
+         el.querySelector<SVGPathElement>(`path[data-role="${role}"]`);
+      const set = (role: string, d: string) => path(role)?.setAttribute('d', d);
+
+      const state = { t: 0, breath: 1 };
+
+      const draw = () => {
+         const ys = bands.map((band) => trace(band, state.t, state.breath));
+         if (cut) {
+            const plate = ys[2]!;
+            /* The shadow sits a little below the plate's own line. */
+            set('shadow', above(plate.map((y) => y + 7)));
+            set('strip0', between(plate, ys[0]!));
+            set('strip1', between(plate, ys[1]!));
+            set('plate', above(plate));
+            set('foam', lineOf(plate));
+         } else {
+            set('band0', below(ys[0]!));
+            set('band1', below(ys[1]!));
+            set('band2', below(ys[2]!));
+         }
+      };
 
       /* Somebody who asked for stillness gets one frame and no ticker. */
       const still = window.matchMedia('(prefers-reduced-motion: reduce)');
-      /* The last band is the solid one; in cut mode it fills above the line. */
-      const draw = (t: number) =>
-         paths.forEach((path, i) => {
-            const band = bands[i];
-            if (band)
-               path.setAttribute(
-                  'd',
-                  build(band, t, cut && i === bands.length - 1)
-               );
-         });
-
       if (still.matches) {
-         draw(0);
+         draw();
          return () => {
             el.innerHTML = '';
          };
       }
 
-      const state = { t: 0 };
       /*
        * One tween running forever rather than a per frame clock, so GSAP owns
-       * the timing: it pauses with the tab and picks up without a jump.
+       * the timing: it pauses with the tab and picks up without a jump. The
+       * second tween is the swell: the whole surface rises and settles over
+       * about nine seconds.
        */
-      const tween = gsap.to(state, {
+      const run = gsap.to(state, {
          t: 1000,
          duration: 1000,
          ease: 'none',
          repeat: -1,
-         onUpdate: () => draw(state.t),
+         onUpdate: draw,
+      });
+      const swell = gsap.to(state, {
+         breath: 1.28,
+         duration: 4.6,
+         ease: 'sine.inOut',
+         yoyo: true,
+         repeat: -1,
       });
 
       return () => {
-         tween.kill();
+         run.kill();
+         swell.kill();
          el.innerHTML = '';
       };
    }, [fill, seed, theme, cut]);

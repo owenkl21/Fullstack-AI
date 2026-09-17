@@ -119,6 +119,7 @@ const catchPayloadSchema = z.object({
    title: z.string().trim().min(2).max(120),
    notes: z.string().trim().min(1).max(2000).optional().nullable(),
    caughtAt: z.coerce.date(),
+   caughtUntil: z.coerce.date().optional().nullable(),
    siteId: z.string().trim().min(1).optional().nullable(),
    speciesId: z.string().trim().min(1).optional().nullable(),
    /*

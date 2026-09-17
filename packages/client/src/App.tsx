@@ -107,6 +107,9 @@ const AnglerPage = lazyRoute(() =>
 const MapPage = lazyRoute(() =>
    import('@/pages/fishing/MapPage').then((m) => ({ default: m.MapPage }))
 );
+const InsightsPage = lazyRoute(() =>
+   import('@/pages/InsightsPage').then((m) => ({ default: m.InsightsPage }))
+);
 const SavedPage = lazyRoute(() =>
    import('@/pages/fishing/SavedPage').then((m) => ({ default: m.SavedPage }))
 );
@@ -156,6 +159,7 @@ function App() {
             <Route path="/map" element={<MapPage />} />
             <Route path="/forecast" element={<ForecastPage />} />
             <Route path="/saved" element={<SavedPage />} />
+            <Route path="/insights" element={<InsightsPage />} />
             <Route path="/boards" element={<BoardsPage />} />
             <Route path="/competitions" element={<CompetitionsPage />} />
             <Route path="*" element={<NotFoundPage />} />

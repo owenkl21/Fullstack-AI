@@ -57,16 +57,33 @@ export function CatchRow({
          marked={marked}
          right={
             headline ? (
-               <>
-                  <RowNumber className="md:w-24 md:text-right">
-                     {headline}
-                  </RowNumber>
-                  <span className="hidden md:block md:w-24 md:text-right">
-                     {lengthText && weightText ? (
-                        <RowNumber>{weightText}</RowNumber>
-                     ) : null}
+               /*
+                * Two columns, length then weight, each present whether or not
+                * it was taken. A row that only ever showed centimetres made
+                * the log look as though nothing was ever weighed.
+                */
+               <span className="flex items-baseline gap-4 md:gap-6">
+                  <span className="flex flex-col items-end md:w-24">
+                     <span className="lab text-ink-3">Length</span>
+                     {lengthText ? (
+                        <RowNumber>{lengthText}</RowNumber>
+                     ) : (
+                        <span className="text-[13px] text-ink-3">
+                           Not taken
+                        </span>
+                     )}
                   </span>
-               </>
+                  <span className="flex flex-col items-end md:w-24">
+                     <span className="lab text-ink-3">Weight</span>
+                     {weightText ? (
+                        <RowNumber>{weightText}</RowNumber>
+                     ) : (
+                        <span className="text-[13px] text-ink-3">
+                           Not taken
+                        </span>
+                     )}
+                  </span>
+               </span>
             ) : (
                <span className="text-sm text-ink-3 md:w-48 md:text-right">
                   Not measured

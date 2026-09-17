@@ -268,7 +268,10 @@ function CatchRecord({
       );
    }
 
-   const stamp = formatStamp(data.caughtAt);
+   /* One fish is a moment; several are a stretch, first shutter to last. */
+   const stamp = data.caughtUntil
+      ? `${formatStamp(data.caughtAt)} to ${new Date(data.caughtUntil).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`
+      : formatStamp(data.caughtAt);
    const spot = data.site?.name ?? 'No spot recorded';
    /*
     * Where it was caught: the catch's own pin first, the spot's position

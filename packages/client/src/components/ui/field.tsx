@@ -301,3 +301,169 @@ export function FieldRow({
       </div>
    );
 }
+
+/*
+ * Several on at once, as chips.
+ *
+ * The same chip as ChoiceGroup, with checkbox rather than radio semantics: a
+ * set of layers on a map, where any number can be showing. Kept beside the
+ * single-choice group so the two rows on a map line up, label for label.
+ */
+export function ToggleGroup({
+   label,
+   options,
+   className,
+   hideLabel,
+   size = 'md',
+   inline = false,
+   nowrap = false,
+}: Common & {
+   options: ReadonlyArray<{
+      value: string;
+      label: string;
+      on: boolean;
+      onToggle: () => void;
+   }>;
+   size?: 'sm' | 'md';
+   inline?: boolean;
+   nowrap?: boolean;
+}) {
+   const id = useId();
+
+   return (
+      <div
+         className={cn(
+            'flex min-w-0',
+            inline
+               ? cn(
+                    'items-center gap-x-3 gap-y-2',
+                    nowrap ? 'flex-nowrap' : 'flex-wrap'
+                 )
+               : 'flex-col',
+            className
+         )}
+      >
+         <span id={id} className={cn('lab shrink-0', hideLabel && 'sr-only')}>
+            {label}
+         </span>
+
+         <div
+            role="group"
+            aria-labelledby={id}
+            className={cn(
+               'flex gap-2',
+               nowrap ? 'flex-nowrap' : 'flex-wrap',
+               !inline && 'mt-1.5'
+            )}
+         >
+            {options.map((option) => (
+               <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={option.on}
+                  onClick={option.onToggle}
+                  className={cn(
+                     'g-tracked inline-flex items-center border transition-colors duration-150 [transition-timing-function:var(--ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal',
+                     size === 'sm'
+                        ? 'h-10 px-3 text-[15px]'
+                        : 'h-11 px-3.5 text-[16px]',
+                     option.on
+                        ? 'border-ink bg-ink text-background'
+                        : 'border-line text-ink-2 hover:border-ink hover:text-ink'
+                  )}
+               >
+                  {option.label}
+               </button>
+            ))}
+         </div>
+      </div>
+   );
+}
+
+/*
+ * A distance, by dragging.
+ *
+ * A native range input under our own drawing, so the thumb drags on a phone,
+ * steps with the arrow keys and reads to a screen reader as what it is. The
+ * stops are the distances anyone actually means; the thumb snaps between
+ * them and the value sits over it. The dashed track is the product's
+ * fishing line, which is what a radius is drawn with.
+ */
+export function RangeField({
+   label,
+   stops,
+   value,
+   onChange,
+   onCommit,
+   format,
+   hint,
+   className,
+}: Common & {
+   stops: ReadonlyArray<number>;
+   value: number;
+   onChange: (next: number) => void;
+   /** When the drag ends, for anything that costs a request. */
+   onCommit?: (next: number) => void;
+   format: (value: number) => string;
+}) {
+   const id = useId();
+   const index = Math.max(0, stops.indexOf(value));
+   const last = stops.length - 1;
+   const pct = last > 0 ? (index / last) * 100 : 0;
+
+   return (
+      <div className={cn('flex min-w-0 flex-col', className)}>
+         <div className="flex items-baseline justify-between gap-4">
+            <label htmlFor={id} className="lab">
+               {label}
+            </label>
+            <output htmlFor={id} className="g num text-[24px] leading-none">
+               {format(value)}
+            </output>
+         </div>
+
+         <div className="range mt-3">
+            <span
+               aria-hidden="true"
+               className="range-fill"
+               style={{ width: `${pct}%` }}
+            />
+            {stops.map((stop, i) => (
+               <span
+                  key={stop}
+                  aria-hidden="true"
+                  className={cn('range-tick', i <= index && 'range-tick-on')}
+                  style={{ left: `${(i / last) * 100}%` }}
+               />
+            ))}
+            <input
+               id={id}
+               type="range"
+               min={0}
+               max={last}
+               step={1}
+               value={index}
+               aria-valuetext={format(value)}
+               onChange={(event) => {
+                  const next = stops[Number(event.target.value)];
+                  if (typeof next === 'number') onChange(next);
+               }}
+               onPointerUp={() => onCommit?.(value)}
+               onKeyUp={() => onCommit?.(value)}
+               onBlur={() => onCommit?.(value)}
+            />
+         </div>
+
+         <div
+            aria-hidden="true"
+            className="num mt-1.5 flex justify-between text-[12px] text-ink-3"
+         >
+            {stops.map((stop) => (
+               <span key={stop}>{format(stop)}</span>
+            ))}
+         </div>
+
+         {hint ? <p className="mt-1.5 text-[14px] text-ink-3">{hint}</p> : null}
+      </div>
+   );
+}

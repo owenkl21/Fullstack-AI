@@ -256,7 +256,7 @@ export function ProfileSettingsPanel({
          <div className="mt-8 grid gap-8 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div>
                <span className="lab">Your photograph</span>
-               <p className="mt-1 text-[14px] text-ink-3">
+               <p className="mt-1 min-h-[42px] text-[14px] text-ink-3">
                   Round, small, beside your name everywhere.
                </p>
                <div className="mt-2 max-w-[420px]">
@@ -275,7 +275,7 @@ export function ProfileSettingsPanel({
 
             <div>
                <span className="lab">Your banner</span>
-               <p className="mt-1 text-[14px] text-ink-3">
+               <p className="mt-1 min-h-[42px] text-[14px] text-ink-3">
                   Wide, behind your name on your page. A stretch of coast works
                   best.
                </p>

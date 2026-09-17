@@ -271,6 +271,9 @@
       width: 100%;
       height: 100%;
       display: block;
+      /* The shadow and the foam are allowed past the box; nothing is filled
+         to its bottom edge, so there is nothing there to clip. */
+      overflow: visible;
    }
    /*
     * A cut edge hangs over the top of the section that follows, so the plate
@@ -279,6 +282,8 @@
     */
    .torn-hang {
       bottom: -88px;
+      /* Above whatever the next section draws in its top padding. */
+      z-index: 6;
    }
    @media (max-width: 640px) {
       .torn-hang {
@@ -900,6 +905,137 @@
 }
 .map-pin-other .map-pin-stem {
    border-top-color: #14110f;
+}
+
+/*
+ * The rows of controls under a map share one label column, so Base, Fish and
+ * Show line up and the chips start on the same vertical. Inline groups on
+ * their own each measured their label and started wherever it ended.
+ */
+.map-controls {
+   --map-label: 56px;
+}
+@media (min-width: 640px) {
+   .map-controls > * > .lab:first-child {
+      width: var(--map-label);
+   }
+}
+
+/* ---- The rank bar --------------------------------------------------------- */
+.rank-bar {
+   position: relative;
+   height: 6px;
+   background: var(--line);
+}
+.rank-bar > span {
+   position: absolute;
+   inset: 0 auto 0 0;
+   background: var(--teal);
+   transition: width 900ms var(--ease);
+}
+
+/* ---- A distance, by dragging --------------------------------------------- */
+.range {
+   position: relative;
+   height: 44px;
+}
+/* The line: dashed, like the fishing line the product draws everywhere. */
+.range::before {
+   content: '';
+   position: absolute;
+   left: 0;
+   right: 0;
+   top: 50%;
+   border-top: 2px dashed var(--line-2, var(--line));
+   transform: translateY(-50%);
+}
+.range-fill {
+   position: absolute;
+   left: 0;
+   top: 50%;
+   height: 2px;
+   background: var(--teal);
+   transform: translateY(-50%);
+   pointer-events: none;
+}
+.range-tick {
+   position: absolute;
+   top: 50%;
+   width: 8px;
+   height: 8px;
+   background: var(--background);
+   border: 2px solid var(--line-2, var(--line));
+   transform: translate(-50%, -50%);
+   pointer-events: none;
+}
+.range-tick-on {
+   border-color: var(--teal);
+   background: var(--teal);
+}
+.range input[type='range'] {
+   position: absolute;
+   inset: 0;
+   width: 100%;
+   height: 100%;
+   margin: 0;
+   background: transparent;
+   appearance: none;
+   -webkit-appearance: none;
+   cursor: pointer;
+}
+.range input[type='range']:focus-visible {
+   outline: 2px solid var(--teal);
+   outline-offset: 2px;
+}
+.range input[type='range']::-webkit-slider-runnable-track {
+   height: 100%;
+   background: transparent;
+}
+.range input[type='range']::-moz-range-track {
+   height: 100%;
+   background: transparent;
+}
+/* The thumb: a square of ink with a paper ring, like a pin's head. */
+.range input[type='range']::-webkit-slider-thumb {
+   -webkit-appearance: none;
+   appearance: none;
+   width: 24px;
+   height: 24px;
+   margin-top: 10px;
+   background: var(--ink);
+   border: 3px solid var(--background);
+   box-shadow: 0 0 0 1px var(--ink);
+   transition: transform 120ms var(--ease);
+}
+.range input[type='range']::-moz-range-thumb {
+   width: 24px;
+   height: 24px;
+   border-radius: 0;
+   background: var(--ink);
+   border: 3px solid var(--background);
+   box-shadow: 0 0 0 1px var(--ink);
+}
+.range input[type='range']:active::-webkit-slider-thumb {
+   transform: scale(1.12);
+}
+
+/* ---- The SVG pins ------------------------------------------------------- */
+.map-pin-svg {
+   display: block;
+   overflow: visible;
+   transform-origin: 50% 100%;
+   transition: transform 140ms var(--ease);
+}
+.map-pin-cluster .map-pin-svg {
+   transform-origin: 50% 50%;
+   cursor: pointer;
+}
+.map-pin-kind:hover .map-pin-svg {
+   transform: scale(1.08);
+}
+.map-pin-svg text {
+   font-variant-numeric: tabular-nums;
+   pointer-events: none;
 }
 
 /* ---- Several spots at once: a doubled disc -------------------------------- */

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ViewfinderCircleIcon } from '@heroicons/react/24/outline';
 import type { Map as LeafletMap, Marker } from 'leaflet';
 import { Button } from '@/components/ui/button';
-import { L, createMap, pinIcon, refreshSize } from '@/lib/leaflet';
+import { L, createMap, kindPin, refreshSize } from '@/lib/leaflet';
 import {
    formatCoordinate,
    parseGoogleMapsCoordinates,
@@ -85,7 +85,7 @@ export function MapLocationPicker({
          markerRef.current.setLatLng([next.lat, next.lng]);
       } else {
          const marker = L.marker([next.lat, next.lng], {
-            icon: pinIcon(),
+            icon: kindPin('spot'),
             draggable: true,
             title: 'The pin for this spot',
             keyboard: true,

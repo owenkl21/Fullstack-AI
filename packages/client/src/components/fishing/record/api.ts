@@ -17,11 +17,31 @@ export type CatchSummary = {
    id: string;
    title: string;
    caughtAt: string;
+   /* The last fish of a log with several, where the photographs gave a time. */
+   caughtUntil?: string | null;
    count: number;
    length: number | null;
    weight: number | null;
-   site: { id: string; name: string } | null;
+   released?: boolean;
+   /* The conditions on the record, for counting on the insights page. */
+   weatherConditionText?: string | null;
+   weatherWindDirectionCardinal?: string | null;
+   weatherWindSpeedValue?: number | null;
+   weatherAirPressureMeanSeaLevelMillibars?: number | null;
+   weatherSeaSurfaceTemperatureC?: number | null;
+   weatherSwellHeightM?: number | null;
+   weatherMoonPhase?: string | null;
+   weatherMoonSpringTide?: boolean | null;
+   weatherIsDaytime?: boolean | null;
+   waterTemp?: number | null;
+   site: {
+      id: string;
+      name: string;
+      latitude?: number | null;
+      longitude?: number | null;
+   } | null;
    species: { id: string; commonName: string } | null;
+   gears?: { id: string; name: string; type: string }[];
    images: CatchImage[];
 };
 
@@ -35,6 +55,7 @@ export type CatchDetail = {
    visibility?: 'PRIVATE' | 'GROUPS' | 'PUBLIC';
    hideLocation?: boolean;
    caughtAt: string;
+   caughtUntil?: string | null;
    weather: string | null;
    weatherConditionText: string | null;
    weatherTemperatureDegrees: number | null;

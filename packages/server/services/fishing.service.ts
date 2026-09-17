@@ -126,6 +126,7 @@ type CreateCatchInput = {
    title: string;
    notes?: string | null;
    caughtAt: Date;
+   caughtUntil?: Date | null;
    siteId?: string | null;
    speciesId?: string | null;
    released?: boolean;
@@ -698,6 +699,7 @@ export const fishingService = {
                title: input.title,
                notes: input.notes,
                caughtAt: input.caughtAt,
+               caughtUntil: input.caughtUntil ?? null,
                weight: input.weight,
                length: input.length,
                count: input.count ?? 1,
@@ -864,10 +866,35 @@ export const fishingService = {
             id: true,
             title: true,
             caughtAt: true,
+            caughtUntil: true,
             count: true,
             length: true,
             weight: true,
-            site: { select: { id: true, name: true } },
+            released: true,
+            /*
+             * What the insights page counts: the conditions the fish came in,
+             * as stored on the record. A few columns per row, so the whole
+             * log still comes down in one small request.
+             */
+            weatherConditionText: true,
+            weatherWindDirectionCardinal: true,
+            weatherWindSpeedValue: true,
+            weatherAirPressureMeanSeaLevelMillibars: true,
+            weatherSeaSurfaceTemperatureC: true,
+            weatherSwellHeightM: true,
+            weatherMoonPhase: true,
+            weatherMoonSpringTide: true,
+            weatherIsDaytime: true,
+            waterTemp: true,
+            site: {
+               select: {
+                  id: true,
+                  name: true,
+                  latitude: true,
+                  longitude: true,
+               },
+            },
+            gears: { select: { id: true, name: true, type: true } },
             /* The fast log offers the species this angler actually logs, so the
              * list has to carry them. */
             species: { select: { id: true, commonName: true } },
@@ -931,6 +958,7 @@ export const fishingService = {
                title: input.title,
                notes: input.notes,
                caughtAt: input.caughtAt,
+               caughtUntil: input.caughtUntil ?? null,
                ...relations,
                weight: input.weight,
                length: input.length,

@@ -52,12 +52,12 @@ export function ProfileView({
                      alt=""
                      width={80}
                      height={80}
-                     className="size-20 shrink-0 rounded-full object-cover ring-4 ring-background"
+                     className="relative z-10 size-20 shrink-0 rounded-full object-cover ring-4 ring-background"
                   />
                ) : (
                   <span
                      aria-hidden="true"
-                     className="g flex size-20 shrink-0 items-center justify-center rounded-full bg-bg-2 text-[30px] text-ink-2 ring-4 ring-background"
+                     className="g relative z-10 flex size-20 shrink-0 items-center justify-center rounded-full bg-bg-2 text-[30px] text-ink-2 ring-4 ring-background"
                   >
                      {initialOf(profile.displayName)}
                   </span>

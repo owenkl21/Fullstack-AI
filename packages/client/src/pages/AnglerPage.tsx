@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { FishMark } from '@/components/brand/FishMark';
 import { Banner } from '@/components/profile/Banner';
+import { RankCard } from '@/components/profile/RankCard';
 import { FollowCounts } from '@/components/profile/FollowCounts';
 import {
    initialOf,
@@ -165,12 +166,12 @@ function AnglerScreen() {
                      alt=""
                      width={80}
                      height={80}
-                     className="size-20 shrink-0 rounded-full object-cover ring-4 ring-background"
+                     className="relative z-10 size-20 shrink-0 rounded-full object-cover ring-4 ring-background"
                   />
                ) : (
                   <span
                      aria-hidden="true"
-                     className="g flex size-20 shrink-0 items-center justify-center rounded-full bg-bg-2 text-[26px] text-ink-2 ring-4 ring-background"
+                     className="g relative z-10 flex size-20 shrink-0 items-center justify-center rounded-full bg-bg-2 text-[26px] text-ink-2 ring-4 ring-background"
                   >
                      {initialOf(profile.displayName)}
                   </span>
@@ -218,6 +219,8 @@ function AnglerScreen() {
                following={profile.followingCount}
             />
          </header>
+
+         <RankCard userId={profile.id} className="mt-8" />
 
          <section className="mt-10 border-t border-line pt-6">
             <h2 className="g text-[28px] md:text-[34px]">Photographs</h2>

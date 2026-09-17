@@ -125,13 +125,13 @@ export type PinKind =
    | 'tackle'
    | 'parking';
 
-/* Drawn inside a 24 box, sitting above the pin's point. */
+/* Drawn inside a 24 box, in the head of the pin. Stroke only, round caps. */
 const GLYPHS: Record<PinKind, string> = {
    /* The house fish. */
    spot: '<path d="M4 12.5c2.6-3.6 6.2-5.2 10.4-4.2 2 .5 3.6 1.6 6.2 1.6-2 1.6-4.2 2-6.2 2-4.2 0-7.8-1-10.4.6Z"/>',
    other: '<path d="M4 12.5c2.6-3.6 6.2-5.2 10.4-4.2 2 .5 3.6 1.6 6.2 1.6-2 1.6-4.2 2-6.2 2-4.2 0-7.8-1-10.4.6Z"/>',
    /* A flag: something you marked for yourself. */
-   waypoint: '<path d="M8 20V5"/><path d="M8 6h9l-2 3 2 3H8"/>',
+   waypoint: '<path d="M7 20V4"/><path d="M7 5h10l-2.5 3.5L17 12H7"/>',
    /* A slipway: a ramp running into water. */
    ramp: '<path d="M4 17h16"/><path d="M6 17 14 7h4"/><path d="M4 20.5h16"/>',
    /* An anchor. */
@@ -143,73 +143,75 @@ const GLYPHS: Record<PinKind, string> = {
    parking: '<path d="M9 19V6h4a3.5 3.5 0 0 1 0 7H9"/>',
 };
 
-const TONE: Record<PinKind, string> = {
-   spot: 'map-pin-spot',
-   other: 'map-pin-other',
-   waypoint: 'map-pin-waypoint',
-   ramp: 'map-pin-poi',
-   marina: 'map-pin-poi',
-   tackle: 'map-pin-poi',
-   parking: 'map-pin-poi',
+/*
+ * The body colour of each kind. Saturated or dark, always inside a paper
+ * stroke, because the base is a photograph and can be any colour underneath.
+ */
+const BODY: Record<PinKind, { fill: string; ink: string }> = {
+   spot: { fill: 'var(--teal)', ink: '#06232a' },
+   other: { fill: '#14110f', ink: '#f4f1ec' },
+   waypoint: { fill: '#f4f1ec', ink: '#0b0909' },
+   ramp: { fill: '#1f6fb2', ink: '#f4f1ec' },
+   marina: { fill: '#1d3557', ink: '#f4f1ec' },
+   tackle: { fill: '#c97b1c', ink: '#f4f1ec' },
+   parking: { fill: '#4a4542', ink: '#f4f1ec' },
 };
 
+/*
+ * One pin shape, the teardrop every map reader already knows, drawn as SVG
+ * so the head, the point and the stroke are one piece rather than a disc
+ * with a triangle glued under it. 36 wide, 46 tall; the tip is the position.
+ *
+ * The head is a circle of radius 16 at (18,18); the sides run down to the tip
+ * at (18,45). Stroke is the paper ring the whole vocabulary shares.
+ */
+const TEARDROP =
+   'M18 45C18 45 3.5 28.6 3.5 18a14.5 14.5 0 1 1 29 0C32.5 28.6 18 45 18 45Z';
+
+/* A smaller drop for a private mark, so a note to yourself is quieter than a
+ * spot fish come out of. 28 wide, 36 tall, head radius 11 at (14,14). */
+const SMALL_DROP =
+   'M14 35C14 35 3 22.4 3 14a11 11 0 1 1 22 0C25 22.4 14 35 14 35Z';
+
+const SHADOW =
+   '<filter id="pin-shadow" x="-30%" y="-20%" width="160%" height="150%"><feDropShadow dx="0" dy="2" stdDeviation="1.6" flood-color="#000" flood-opacity="0.5"/></filter>';
+
 /**
- * A pin, of a shape that says what it is.
+ * A pin that says what it is.
  *
- * Six kinds and, before this, one silhouette with different ring colours,
- * which nobody could tell apart at a glance. Shape is the thing the eye reads
- * first, so each kind has its own:
- *
- *   spot      a round disc, teal, the count inside      "fish come out of here"
- *   other     a round disc, dark, the count inside      "somebody else's spot"
- *   waypoint  a pennant on a pole                       "a note to myself"
- *   ramp      a square, blue, a slipway drawn in it     "put a boat in"
- *   marina    a square, navy, an anchor                 "a harbour"
- *   tackle    a square, amber, a hook                   "buy bait"
- *   parking   a square, grey, a P
- *
- * All of them carry a light ring on a dark or saturated body, because the base
- * is a photograph and a photograph can be any colour underneath.
+ * Spots carry their catch count in the head; everything else carries a
+ * glyph. Colour tells the kinds apart and the count tells the spots apart:
+ * yours teal, theirs near black, a private mark paper, the places in their
+ * own colours. The shape is the same for all so the map reads as one map.
  */
 export const kindPin = (kind: PinKind, count?: number | null): L.DivIcon => {
    const n = typeof count === 'number' && count > 0 ? count : null;
-   const glyph = `<svg viewBox="0 0 24 24" class="map-pin-g" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[kind]}</svg>`;
+   const body = BODY[kind];
+   const small = kind === 'waypoint';
+   const w = small ? 28 : 36;
+   const h = small ? 36 : 46;
+   const cx = small ? 14 : 18;
+   const cy = small ? 14 : 18;
+   const glyphSize = small ? 14 : 18;
 
-   if (kind === 'waypoint') {
-      /* A pennant: a pole with a flag. The point of the pole is the position. */
-      return L.divIcon({
-         html:
-            `<span class="map-pin-pole"></span>` +
-            `<span class="map-pin-flag">${glyph}</span>`,
-         className: `map-pin map-pin-kind map-pin-waypoint`,
-         iconSize: [34, 44],
-         iconAnchor: [4, 43],
-         popupAnchor: [10, -40],
-      });
-   }
+   const face = n
+      ? `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-family="var(--font-display), 'League Gothic', sans-serif" font-size="${n > 99 ? 13 : 17}" letter-spacing="0.02em" fill="${body.ink}">${n > 99 ? '99+' : n}</text>`
+      : `<svg x="${cx - glyphSize / 2}" y="${cy - glyphSize / 2}" width="${glyphSize}" height="${glyphSize}" viewBox="0 0 24 24" fill="none" stroke="${body.ink}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[kind]}</svg>`;
 
-   if (kind === 'spot' || kind === 'other') {
-      const face = n
-         ? `<span class="map-pin-n">${n > 99 ? '99+' : n}</span>`
-         : glyph;
-      return L.divIcon({
-         html:
-            `<span class="map-pin-disc">${face}</span>` +
-            `<span class="map-pin-stem"></span>`,
-         className: `map-pin map-pin-kind ${TONE[kind]}`,
-         iconSize: [40, 50],
-         iconAnchor: [20, 49],
-         popupAnchor: [0, -46],
-      });
-   }
+   const html =
+      `<svg class="map-pin-svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">` +
+      `<defs>${SHADOW}</defs>` +
+      `<path d="${small ? SMALL_DROP : TEARDROP}" fill="${body.fill}" stroke="#f4f1ec" stroke-width="2.5" stroke-linejoin="round" filter="url(#pin-shadow)"/>` +
+      face +
+      `</svg>`;
 
-   /* Points of interest: a square plate, coloured by what it is. */
    return L.divIcon({
-      html: `<span class="map-pin-plate">${glyph}</span><span class="map-pin-stem"></span>`,
-      className: `map-pin map-pin-kind map-pin-poi map-pin-${kind}`,
-      iconSize: [32, 42],
-      iconAnchor: [16, 41],
-      popupAnchor: [0, -38],
+      html,
+      className: `map-pin map-pin-kind map-pin-${kind}`,
+      iconSize: [w, h],
+      /* The tip, not the middle, sits on the coordinate. */
+      iconAnchor: [w / 2, h - 1],
+      popupAnchor: [0, -(h - 6)],
    });
 };
 
@@ -337,11 +339,24 @@ export const clusterGroup = (): L.MarkerClusterGroup =>
                      .className ?? ''
                ).includes('map-pin-spot')
             );
+         const fill = mine ? 'var(--teal)' : '#14110f';
+         const ink = mine ? '#06232a' : '#f4f1ec';
+         /*
+          * A circle, not a drop: a cluster is not at a place, it stands for
+          * several. The second, thinner ring outside says "more than one".
+          */
+         const html =
+            `<svg class="map-pin-svg" width="48" height="48" viewBox="0 0 48 48" aria-hidden="true">` +
+            `<defs>${SHADOW}</defs>` +
+            `<circle cx="24" cy="24" r="22" fill="none" stroke="#f4f1ec" stroke-opacity="0.75" stroke-width="1.5"/>` +
+            `<circle cx="24" cy="24" r="17" fill="${fill}" stroke="#f4f1ec" stroke-width="2.5" filter="url(#pin-shadow)"/>` +
+            `<text x="24" y="24" text-anchor="middle" dominant-baseline="central" font-family="var(--font-display), 'League Gothic', sans-serif" font-size="${count > 99 ? 13 : 18}" letter-spacing="0.02em" fill="${ink}">${text}</text>` +
+            `</svg>`;
          return L.divIcon({
+            html,
             className: `map-pin map-pin-kind map-pin-cluster map-pin-cluster-${mine ? 'spot' : 'other'}`,
-            html: `<span class="map-pin-disc map-pin-disc-back" aria-hidden="true"></span><span class="map-pin-disc"><span class="map-pin-n">${text}</span></span>`,
-            iconSize: [46, 46],
-            iconAnchor: [23, 23],
+            iconSize: [48, 48],
+            iconAnchor: [24, 24],
          });
       },
    });

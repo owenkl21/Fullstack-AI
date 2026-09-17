@@ -50,10 +50,16 @@ export function SeasonStrip({
                          * image that failed to load, and most catches have no
                          * photograph.
                          */}
+                        {/*
+                         * Every tile the same height. The height used to be
+                         * the length of the best fish, which made the row
+                         * jump up and down and read as a chart of nothing in
+                         * particular. The length is printed under the tile;
+                         * the tile is the day.
+                         */}
                         <span
-                           style={{ height: `${item.height}px` }}
                            className={cn(
-                              'relative flex w-[88px] overflow-hidden',
+                              'relative flex h-[120px] w-[88px] overflow-hidden',
                               item.entry.images[0]?.image.url
                                  ? 'bg-bg-2'
                                  : item.measured
@@ -87,8 +93,11 @@ export function SeasonStrip({
                            {/* The day's tally, on the tile, so a three fish
                                morning is legible without opening it. */}
                            {item.count > 1 ? (
-                              <span className="absolute top-1 right-1 inline-flex min-w-[20px] justify-center bg-paper px-1 py-0.5 text-[11px] leading-none text-ink num">
+                              <span className="absolute top-1 right-1 inline-flex min-w-[22px] items-center justify-center gap-0.5 bg-paper px-1.5 py-0.5 text-[11px] leading-none text-ink num">
                                  {item.count}
+                                 <span className="font-sans text-[10px] text-ink-2">
+                                    fish
+                                 </span>
                               </span>
                            ) : null}
                         </span>

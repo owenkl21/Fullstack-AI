@@ -11,7 +11,7 @@ import {
    setBaseLayer,
    type BaseLayer,
 } from '@/lib/leaflet';
-import { ChoiceGroup } from '@/components/ui/field';
+import { ChoiceGroup, ToggleGroup } from '@/components/ui/field';
 import { fetchPois, type Poi } from '@/lib/overpass';
 import { requestPosition, usePosition } from '@/lib/position';
 import {
@@ -538,9 +538,6 @@ export function SpotsMap({
       [dropping]
    );
 
-   const toggle =
-      'g-tracked inline-flex min-h-11 items-center gap-2 border px-3 text-[14px] transition-colors duration-150';
-
    return (
       <div className="flex flex-col gap-3">
          {/*
@@ -577,7 +574,7 @@ export function SpotsMap({
             </button>
          </div>
 
-         <div className="flex flex-col gap-3">
+         <div className="map-controls flex flex-col gap-3">
             <ChoiceGroup
                inline
                size="sm"
@@ -606,37 +603,37 @@ export function SpotsMap({
                />
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-2">
-               <button
-                  type="button"
-                  onClick={() => setShowOthers((was) => !was)}
-                  aria-pressed={showOthers}
-                  className={`${toggle} ${showOthers ? 'border-ink bg-ink text-background' : 'border-line text-ink-2'}`}
-               >
-                  Other anglers
-               </button>
-               <button
-                  type="button"
-                  onClick={() => setShowWaypoints((was) => !was)}
-                  aria-pressed={showWaypoints}
-                  className={`${toggle} ${showWaypoints ? 'border-ink bg-ink text-background' : 'border-line text-ink-2'}`}
-               >
-                  My marks
-               </button>
-               <button
-                  type="button"
-                  onClick={() => setShowPois((was) => !was)}
-                  aria-pressed={showPois}
-                  className={`${toggle} ${showPois ? 'border-ink bg-ink text-background' : 'border-line text-ink-2'}`}
-               >
-                  Ramps and shops
-               </button>
-               <p className="text-[14px] text-ink-3">
-                  {showPois && zoomLevel > 0 && zoomLevel < POI_MIN_ZOOM
-                     ? 'Zoom in for slipways and tackle shops. Press and hold the map to drop a private mark.'
-                     : 'Press and hold the map to drop a private mark.'}
-               </p>
-            </div>
+            <ToggleGroup
+               inline
+               size="sm"
+               label="Show"
+               options={[
+                  {
+                     value: 'others',
+                     label: 'Other anglers',
+                     on: showOthers,
+                     onToggle: () => setShowOthers((was) => !was),
+                  },
+                  {
+                     value: 'marks',
+                     label: 'My marks',
+                     on: showWaypoints,
+                     onToggle: () => setShowWaypoints((was) => !was),
+                  },
+                  {
+                     value: 'places',
+                     label: 'Ramps and shops',
+                     on: showPois,
+                     onToggle: () => setShowPois((was) => !was),
+                  },
+               ]}
+            />
+
+            <p className="text-[14px] text-ink-3 sm:pl-[calc(var(--map-label)+12px)]">
+               {showPois && zoomLevel > 0 && zoomLevel < POI_MIN_ZOOM
+                  ? 'Zoom in for slipways and tackle shops. Press and hold the map to drop a private mark.'
+                  : 'Press and hold the map to drop a private mark.'}
+            </p>
          </div>
 
          {dropping ? (

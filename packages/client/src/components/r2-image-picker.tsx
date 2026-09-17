@@ -21,6 +21,11 @@ type Props = {
    disabled?: boolean;
    /** Lets the parent hold its save action while a photo is still going up. */
    onUploadingChange?: (isUploading: boolean) => void;
+   /**
+    * The files as picked, before anything is uploaded. For reading what the
+    * camera wrote into them, such as when the shutter went.
+    */
+   onFiles?: (files: File[]) => void;
 };
 
 type QueueItem = {
@@ -81,6 +86,7 @@ export function R2ImagePicker({
    multiple = maxItems > 1,
    disabled = false,
    onUploadingChange,
+   onFiles,
 }: Props) {
    const [queue, setQueue] = useState<QueueItem[]>([]);
    const [rejected, setRejected] = useState<RejectedFile[]>([]);
@@ -90,6 +96,8 @@ export function R2ImagePicker({
    valueRef.current = value;
    const onChangeRef = useRef(onChange);
    onChangeRef.current = onChange;
+   const onFilesRef = useRef(onFiles);
+   onFilesRef.current = onFiles;
 
    const takesMany = multiple && maxItems > 1;
    const limit = takesMany ? maxItems : 1;
@@ -150,6 +158,7 @@ export function R2ImagePicker({
 
    const addFiles = useCallback(
       (files: File[]) => {
+         onFilesRef.current?.(files);
          setRejected([]);
 
          const used = valueRef.current.length + queue.length;

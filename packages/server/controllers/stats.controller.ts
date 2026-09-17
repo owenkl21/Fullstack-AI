@@ -1,11 +1,30 @@
 import type { Request, Response } from 'express';
 import { getAuth } from '../lib/auth-context';
+import { progressService } from '../services/progress.service';
 import { statsService } from '../services/stats.service';
 
 const fail = (res: Response, code: string, message: string) =>
    res.status(500).json({ code, message });
 
 export const statsController = {
+   /* Your own rank, counted over every catch. */
+   async myProgress(req: Request, res: Response) {
+      const userId = getAuth(req).userId;
+      if (!userId) return res.status(401).json({ code: 'unauthorized' });
+      return res.json({
+         progress: await progressService.forUser(userId, userId),
+      });
+   },
+
+   /* Another angler's rank, counted over what they made public. */
+   async progressOf(req: Request, res: Response) {
+      const target = String(req.params.userId ?? '');
+      if (!target) return res.status(400).json({ code: 'missing_user_id' });
+      return res.json({
+         progress: await progressService.forUser(target, getAuth(req).userId),
+      });
+   },
+
    async myStats(req: Request, res: Response) {
       const auth = getAuth(req);
 

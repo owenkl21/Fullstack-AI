@@ -248,6 +248,9 @@ model Catch {
   length                                  Float?
   // Appendix E gap B5. Until this existed the seed had to put "Released." in
   // the notes text, which no query can read.
+  /* The last fish of a log that carries several, read from the photographs
+   * where they carry a time. Null when there was one fish or one photo. */
+  caughtUntil                             DateTime?
   released                                Boolean      @default(false)
   weightSource                            WeightSource @default(LENGTH)
   visibility                              Visibility   @default(PUBLIC)

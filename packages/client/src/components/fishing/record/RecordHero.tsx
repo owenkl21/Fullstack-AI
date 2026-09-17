@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
+import { FishMark } from '@/components/brand/FishMark';
 
 /*
  * The record's photograph: native ratio on a black ground so a portrait fish is
@@ -44,10 +45,15 @@ export function RecordHero({
                )}
             />
          ) : (
-            <div className="flex min-h-[320px] items-end px-4 pb-28">
-               <p className="text-[15px] text-paper-2">
-                  No photo of this catch.
-               </p>
+            /*
+             * No photograph. The house fish sits where the picture would be,
+             * well above the title band, so nothing reads through the name.
+             * The sentence used to sit at the bottom, under the title, and
+             * the two printed over each other.
+             */
+            <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 px-4 pb-24 md:min-h-[380px]">
+               <FishMark className="h-12 w-20 text-paper/20" />
+               <p className="lab text-paper-2/70">No photo of this catch</p>
             </div>
          )}
 

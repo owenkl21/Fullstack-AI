@@ -70,7 +70,7 @@ export function SpotHeader({
             />
          </div>
 
-         <div className="relative z-[2] pt-5 pb-11 md:pt-7 md:pb-16">
+         <div className="relative z-[2] pt-5 pb-9 md:pt-7 md:pb-10">
             <div className="mx-auto flex w-full max-w-[860px] flex-col gap-2.5 px-4 md:px-8">
                {/*
                 * Today's date is dropped when the last trip was today, because

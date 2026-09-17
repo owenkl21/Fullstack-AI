@@ -6,7 +6,7 @@ import {
 } from '@/components/profile/ConnectionsDialog';
 import { ProfileSettingsPanel } from '@/components/profile/ProfileSettingsPanel';
 import { ProfileStatsPanel } from '@/components/social/ProfileStats';
-import { AnglerIntel } from '@/components/profile/AnglerIntel';
+import { RankCard } from '@/components/profile/RankCard';
 import { ProfileView } from '@/components/profile/ProfileView';
 import type {
    ProfileResponse,
@@ -183,8 +183,8 @@ function ProfileScreen() {
                   tallies={tallies}
                   figures={
                      <>
+                        <RankCard own className="mt-8" />
                         <ProfileStatsPanel />
-                        <AnglerIntel />
                      </>
                   }
                   onOpenConnections={openConnections}

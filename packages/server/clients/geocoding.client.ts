@@ -129,16 +129,26 @@ export async function namePlace(
       );
 
       const a = data.address ?? {};
+      /*
+       * The first named place that is a place. OpenStreetMap carries the
+       * municipal wards as boundaries, and around Cape Town the nearest
+       * "suburb" to a beach is often "Cape Town Ward 21", which nobody has
+       * ever called anywhere. A ward is skipped in favour of the next name.
+       */
+      const isWard = (value: string | undefined) =>
+         !value || /\bward\b\s*\d*/i.test(value);
       const name =
-         a.suburb ??
-         a.village ??
-         a.hamlet ??
-         a.town ??
-         a.city_district ??
-         a.city ??
-         a.municipality ??
-         data.name ??
-         null;
+         [
+            a.neighbourhood,
+            a.suburb,
+            a.village,
+            a.hamlet,
+            a.town,
+            a.city_district,
+            a.city,
+            a.municipality,
+            data.name,
+         ].find((value) => !isWard(value)) ?? null;
 
       if (name) {
          value = { name, region: a.state ?? a.province ?? a.county ?? null };

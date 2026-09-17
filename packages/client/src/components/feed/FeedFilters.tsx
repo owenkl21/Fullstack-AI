@@ -1,5 +1,5 @@
 import type { ChipOption } from '@/components/feed/ChipRadioGroup';
-import { ChoiceGroup } from '@/components/ui/field';
+import { ChoiceGroup, RangeField } from '@/components/ui/field';
 import { plural } from '@/components/feed/format';
 import type { ScopeFilter, ShowFilter } from '@/components/feed/types';
 
@@ -92,26 +92,25 @@ export function FeedFilters({
                {locationState === 'ready' ? (
                   <div className="flex flex-col gap-2">
                      {/*
-                      * Distances rather than a dial. A radius is a decision,
-                      * not a dimmer: nobody wants 63 km, they want "round
-                      * here" or "the whole coast". The slider it replaces was
-                      * a dashed hairline with a block on it, fiddly on a phone
-                      * and cheap to look at, and it needed its own component.
+                      * A slider, drawn as the product's own fishing line,
+                      * snapping between the distances anyone actually means.
+                      * The request goes out when the drag ends, not on every
+                      * step through.
                       */}
-                     <ChoiceGroup
-                        inline
-                        size="sm"
+                     <RangeField
                         label="Within"
-                        value={String(radiusKm)}
-                        onChange={(next) => {
-                           const km = Number(next);
-                           onRadiusChange(km);
-                           onRadiusCommit(km);
-                        }}
-                        options={RADIUS_STEPS.map((km) => ({
-                           value: String(km),
-                           label: `${km} km`,
-                        }))}
+                        stops={RADIUS_STEPS}
+                        value={
+                           RADIUS_STEPS.includes(
+                              radiusKm as (typeof RADIUS_STEPS)[number]
+                           )
+                              ? radiusKm
+                              : 25
+                        }
+                        format={(km) => `${km} km`}
+                        onChange={onRadiusChange}
+                        onCommit={onRadiusCommit}
+                        className="max-w-[420px]"
                      />
                      <p className="text-[15px] text-ink-2" aria-live="polite">
                         {matchCount === null

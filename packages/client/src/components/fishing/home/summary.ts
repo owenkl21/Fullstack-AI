@@ -182,7 +182,8 @@ export function seasonItems(catches: CatchSummary[]): SeasonItem[] {
          entry: best,
          height: height(best.length),
          measured: best.length !== null,
-         count: entries.length,
+         /* Fish, not records: one log can carry three of the same species. */
+         count: entries.reduce((n, entry) => n + (entry.count ?? 1), 0),
       });
    }
 

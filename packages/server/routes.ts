@@ -124,6 +124,12 @@ router.get('/api/species', fishingController.searchSpecies);
 /* The social layer. Boards are public; your own numbers are not. */
 router.get('/api/stats/me', requireApiAuth, statsController.myStats);
 router.get('/api/stats/rivals', requireApiAuth, statsController.rivals);
+router.get('/api/stats/progress', requireApiAuth, statsController.myProgress);
+router.get(
+   '/api/users/:userId/progress',
+   attachApiAuth,
+   statsController.progressOf
+);
 router.get('/api/competitions/species', statsController.speciesBoards);
 
 /* Slipways, marinas and tackle shops, proxied from OpenStreetMap because
