@@ -2,6 +2,8 @@ import { Contours } from '@/components/brand/Contours';
 import { Button } from '@/components/ui/button';
 import { CountIn } from '@/components/fishing/record/CountIn';
 import type { toReadouts } from '@/components/fishing/record/api';
+import type { WeatherSnapshot } from '@/components/fishing/record/api';
+import { ConditionsDetail } from './ConditionsDetail';
 import { cn } from '@/lib/utils';
 
 /*
@@ -22,11 +24,14 @@ type ReadoutSet = ReturnType<typeof toReadouts>;
 export function Readouts({
    status,
    readouts,
+   snapshot,
    takenAt,
    onRequest,
 }: {
    status: ConditionsStatus;
    readouts: ReadoutSet | null;
+   /* The whole reading, for the detail under the three headline figures. */
+   snapshot?: WeatherSnapshot | null;
    takenAt: string | null;
    onRequest: () => void;
 }) {
@@ -71,7 +76,9 @@ export function Readouts({
                      divided
                   />
                </div>
-               <p className="relative mt-3 text-[14px] text-ink-3">
+               <ConditionsDetail snapshot={snapshot ?? null} />
+
+               <p className="relative mt-4 text-[14px] text-ink-3">
                   {takenAt
                      ? `Conditions at your position, taken ${takenAt}.`
                      : 'Conditions at your position.'}

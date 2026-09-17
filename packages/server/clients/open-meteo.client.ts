@@ -424,5 +424,32 @@ export const toWeatherSnapshot = (conditions: Conditions) => {
          },
       },
       cloudCover: conditions.cloudCover,
+
+      /*
+       * Everything else the reading carries. The block above keeps the shape
+       * the interface was built around; this adds the rest rather than
+       * rewriting it. Pressure in particular was being dropped here, which is
+       * why the pressure readout on the home page was always blank even though
+       * the figure had been fetched.
+       *
+       * Null where a reading is missing, never zero: nought millibars is not a
+       * calm day.
+       */
+      airPressure: { meanSeaLevelMillibars: conditions.pressureMsl },
+      feelsLike: { degrees: conditions.feelsLikeC, unit: 'CELSIUS' },
+      dewPoint: { degrees: conditions.dewPointC, unit: 'CELSIUS' },
+      relativeHumidity: conditions.relativeHumidity,
+      visibilityM: conditions.visibilityM,
+      uvIndex: conditions.uvIndex,
+      isDaytime: conditions.isDaytime,
+      observedAt: conditions.observedAt,
+      sun: { rise: conditions.sunrise, set: conditions.sunset },
+      moon: conditions.moon,
+      sea: {
+         surfaceTemperatureC: conditions.seaSurfaceTemperatureC,
+         waveHeightM: conditions.waveHeightM,
+         swellHeightM: conditions.swellHeightM,
+         swellPeriodS: conditions.swellPeriodS,
+      },
    };
 };

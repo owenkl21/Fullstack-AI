@@ -84,10 +84,29 @@ export type WeatherSnapshot = {
       speed?: { value?: number; unit?: string };
       gust?: { value?: number; unit?: string };
    };
-   airPressure?: { meanSeaLevelMillibars?: number };
-   relativeHumidity?: number;
-   uvIndex?: number;
-   cloudCover?: number;
+   airPressure?: { meanSeaLevelMillibars?: number | null };
+   relativeHumidity?: number | null;
+   uvIndex?: number | null;
+   cloudCover?: number | null;
+   dewPoint?: { degrees?: number | null; unit?: string };
+   visibilityM?: number | null;
+   isDaytime?: boolean | null;
+   observedAt?: string | null;
+   /** First and last light, as instants. Render them in the reader's own zone. */
+   sun?: { rise?: string | null; set?: string | null };
+   /** Worked out from the date rather than fetched. */
+   moon?: {
+      fraction: number;
+      illumination: number;
+      name: string;
+      spring: boolean;
+   } | null;
+   sea?: {
+      surfaceTemperatureC?: number | null;
+      waveHeightM?: number | null;
+      swellHeightM?: number | null;
+      swellPeriodS?: number | null;
+   };
 };
 
 export async function fetchMyCatches(signal?: AbortSignal) {
@@ -164,7 +183,8 @@ export function toSavableSnapshot(snapshot: WeatherSnapshot | null) {
    };
 }
 
-const numberOrNull = (value: number | undefined) =>
+/* A reading can be absent either way: the field missing, or present and null. */
+const numberOrNull = (value: number | null | undefined) =>
    typeof value === 'number' && Number.isFinite(value) ? value : null;
 
 export function toKilometresPerHour(value?: number, unit?: string) {
@@ -205,8 +225,6 @@ export function toReadouts(snapshot: WeatherSnapshot | null) {
                : (cardinal ??
                  (gust !== null ? `Gusting ${Math.round(gust)}` : null)),
       },
-      // TODO(api): appendix E, no pressure is stored on a catch, so there is no
-      // change to show since the last trip.
       pressure: {
          value: numberOrNull(snapshot?.airPressure?.meanSeaLevelMillibars),
          unit: 'hPa',

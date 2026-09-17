@@ -161,6 +161,7 @@ function useConditions() {
    return {
       status,
       readouts: snapshot ? toReadouts(snapshot) : null,
+      snapshot,
       takenAt,
       request,
    };
@@ -192,6 +193,7 @@ function HomeNow() {
                status={conditions.status}
                readouts={conditions.readouts}
                takenAt={conditions.takenAt}
+               snapshot={conditions.snapshot}
                onRequest={conditions.request}
             />
             {log.status === 'error' ? (
