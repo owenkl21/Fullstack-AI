@@ -1,6 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import { chatController } from './controllers/chat.controller';
+import { statsController } from './controllers/stats.controller';
 import { fishingController } from './controllers/fishing.controller';
 import { userController } from './controllers/user.controller';
 import { uploadsController } from './controllers/uploads.controller';
@@ -87,6 +88,11 @@ router.get('/api/sites', fishingController.listFishingSites);
 
 /* A reference table, not anyone's data, so no sign-in needed to name a fish. */
 router.get('/api/species', fishingController.searchSpecies);
+
+/* The social layer. Boards are public; your own numbers are not. */
+router.get('/api/stats/me', requireApiAuth, statsController.myStats);
+router.get('/api/stats/rivals', requireApiAuth, statsController.rivals);
+router.get('/api/competitions/species', statsController.speciesBoards);
 
 router.get(
    '/api/sites/me',
