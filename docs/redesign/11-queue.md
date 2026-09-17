@@ -247,6 +247,29 @@ in the code with no route and no nav word, as asked.
   (resize nudge, following the form) for half a second, so they no longer
   count as a dropped pin.
 
+## Done on 17 Sep, night (commits 6c2e3cb to a0751c6)
+
+- Contours live on each page's black plate (`brand/PageHead.tsx`), edge to
+  edge like the water, paper lines, drawn once; `ContourField` is gone and the
+  content grounds are plain. `Contours` measures its box once and never
+  rebuilds; the profile banner keeps its own (220px, 9 lines).
+- Place search: `clients/geocoding.client.ts` asks Photon (OpenStreetMap)
+  first with a position bias, Open-Meteo towns as the fallback; hits carry
+  `kind`. The forecast and the map picker share `/api/places/search?q&lat&lng`.
+  "Kanu wine" finds the farm at Stellenbosch; with no place or fix the
+  forecast leans on home waters (-33.9, 18.9).
+- The quick log is rebuilt on the catch form design: one card, header with
+  Save draft and a close cross, 01 The catch / 02 When and where / 03
+  Sharing, sticky footer with the privacy line and Save catch. New pieces:
+  `quicklog/MeasureField.tsx` (unit as a dropdown, method as a quiet line),
+  `quicklog/Segment.tsx`, `quicklog/CaughtAt.tsx`; `PhotoBlock` restyled
+  (choose or take, remove, the feed frame kept). Notes save on the record;
+  save-to-spots is a checkbox with a name and private or public. Checked
+  live on desktop and phone by `audit/lbl7.mjs`, including a full save.
+- Every paged list loads on scroll; the photo focal point is kept and the
+  feed crops to it; feed cards one height; an open thread grows the card;
+  the thread's fourth reply peeks so scrolling loads more.
+
 ## Next, in order
 
 1. **Switch the readers on**: set `ANTHROPIC_API_KEY` on Railway for the
