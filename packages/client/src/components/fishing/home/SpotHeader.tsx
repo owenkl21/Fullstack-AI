@@ -40,8 +40,8 @@ export function SpotHeader({
             className="pointer-events-none absolute inset-0 scrim-photo"
             aria-hidden="true"
          />
-         <div className="absolute inset-x-0 top-4 z-[2] px-4 md:px-8">
-            <div className="mx-auto w-full max-w-[860px]">
+         <div className="absolute inset-x-0 top-4 z-[2]">
+            <div className="mx-auto w-full max-w-[860px] px-4 md:px-8">
                <span className="lab text-paper-2">{today}</span>
             </div>
          </div>
@@ -51,8 +51,8 @@ export function SpotHeader({
           * also ran to the viewport edge while every section below sits in an
           * 860px column, so the page had two different left margins.
           */}
-         <div className="absolute inset-x-0 bottom-7 z-[2] px-4 md:bottom-12 md:px-8">
-            <div className="mx-auto flex w-full max-w-[860px] flex-col gap-2.5">
+         <div className="absolute inset-x-0 bottom-7 z-[2] md:bottom-12">
+            <div className="mx-auto flex w-full max-w-[860px] flex-col gap-2.5 px-4 md:px-8">
                {lastFished ? (
                   <span className="lab text-teal">{lastFished}</span>
                ) : null}
