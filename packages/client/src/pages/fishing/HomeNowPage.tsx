@@ -34,6 +34,7 @@ import {
    seasonItems,
    sortByNewest,
 } from '@/components/fishing/home/summary';
+import { usePosition } from '@/lib/position';
 
 const FALLBACK_PHOTO = '/photos/spot-rock-ocean.jpg';
 
@@ -99,48 +100,63 @@ function useMyCatches() {
    return { ...state, retry: () => setAttempt((count) => count + 1) };
 }
 
-/** The device position is asked for on a tap and never on arrival. */
+/*
+ * The conditions where the angler is.
+ *
+ * The prompt is still only ever raised by a tap, but the answer is remembered:
+ * once the browser has been told yes, arriving here loads the conditions
+ * straight away instead of asking again. Being asked for a position on every
+ * visit to your own home page is the thing this fixes.
+ */
 function useConditions() {
+   const { fix, state: positionState, ask } = usePosition();
    const [status, setStatus] = useState<ConditionsStatus>('idle');
    const [snapshot, setSnapshot] = useState<WeatherSnapshot | null>(null);
    const [takenAt, setTakenAt] = useState<string | null>(null);
 
-   const request = useCallback(() => {
-      if (typeof navigator === 'undefined' || !navigator.geolocation) {
-         setStatus('denied');
+   /* Whenever a position is known, fetch for it. A newer fix replaces the
+    * reading rather than leaving a stale one on screen. */
+   useEffect(() => {
+      if (!fix) {
          return;
       }
-      setStatus('locating');
-      navigator.geolocation.getCurrentPosition(
-         (position) => {
-            setStatus('loading');
-            const load = async () => {
-               try {
-                  const weather = await fetchConditions(
-                     position.coords.latitude,
-                     position.coords.longitude
-                  );
-                  if (!weather) {
-                     setStatus('error');
-                     return;
-                  }
-                  setSnapshot(weather);
-                  setTakenAt(formatClock(new Date()));
-                  setStatus('ready');
-               } catch {
-                  setStatus('error');
-               }
-            };
-            void load();
-         },
-         (error) => {
-            setStatus(
-               error.code === error.PERMISSION_DENIED ? 'denied' : 'error'
-            );
-         },
-         { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
-      );
-   }, []);
+
+      let cancelled = false;
+      setStatus((was) => (was === 'ready' ? was : 'loading'));
+
+      const load = async () => {
+         try {
+            const weather = await fetchConditions(fix.latitude, fix.longitude);
+            if (cancelled) return;
+            if (!weather) {
+               setStatus('error');
+               return;
+            }
+            setSnapshot(weather);
+            setTakenAt(formatClock(new Date()));
+            setStatus('ready');
+         } catch {
+            if (!cancelled) setStatus('error');
+         }
+      };
+
+      void load();
+      return () => {
+         cancelled = true;
+      };
+   }, [fix?.latitude, fix?.longitude, fix?.at]);
+
+   useEffect(() => {
+      if (positionState === 'denied' || positionState === 'unsupported') {
+         setStatus('denied');
+      } else if (positionState === 'asking' && !fix) {
+         setStatus('locating');
+      }
+   }, [positionState, fix]);
+
+   const request = useCallback(() => {
+      void ask();
+   }, [ask]);
 
    return {
       status,
