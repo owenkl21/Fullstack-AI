@@ -689,6 +689,22 @@
 }
 
 /*
+ * Tile seams.
+ *
+ * On a Retina display Leaflet places 256px tiles at fractional device pixels,
+ * and the browser leaves a hairline of background between them. On a satellite
+ * base that reads as faint grey lines ruled across the sea every 256 pixels,
+ * which is exactly what it looked like. Drawing each tile half a pixel larger
+ * makes neighbours overlap by less than a device pixel and closes the gap;
+ * this is the fix the Leaflet issue tracker has settled on for years.
+ */
+.map-surface .leaflet-tile-container img,
+.map-surface .leaflet-tile {
+   width: 256.5px !important;
+   height: 256.5px !important;
+}
+
+/*
  * At night the plain and street rasters are inverted, which is the standard
  * trick for turning a light map dark without a second tile set.
  *

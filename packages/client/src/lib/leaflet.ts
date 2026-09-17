@@ -204,6 +204,8 @@ export type CreateMapOptions = {
    zoom: number;
    /** Which base to draw. Satellite unless a reader has said otherwise. */
    base?: BaseLayer;
+   /** Scroll wheel zoom. Right where the map is the page, wrong inside one. */
+   wheelZoom?: boolean;
    /** False for the read-only embeds, which should not be panned or zoomed. */
    interactive?: boolean;
 };
@@ -220,12 +222,22 @@ export const createMap = (
    container: HTMLElement,
    options: CreateMapOptions
 ): L.Map => {
-   const { centre, zoom, interactive = true } = options;
+   const { centre, zoom, interactive = true, wheelZoom = false } = options;
 
    const map = L.map(container, {
       center: [centre.lat, centre.lng],
       zoom,
-      scrollWheelZoom: false,
+      scrollWheelZoom: interactive && wheelZoom,
+      /*
+       * Quarter-level steps rather than whole ones. The default snaps a full
+       * zoom level per notch, which lurches, and the wheel covered a level in
+       * sixty pixels of travel, which is a flick. Both are set so zooming in
+       * on a ledge is a glide rather than a series of jumps.
+       */
+      zoomSnap: 0.25,
+      zoomDelta: 0.5,
+      wheelPxPerZoomLevel: 110,
+      wheelDebounceTime: 30,
       zoomControl: interactive,
       dragging: interactive,
       doubleClickZoom: interactive,

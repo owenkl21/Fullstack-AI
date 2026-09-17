@@ -81,7 +81,11 @@ function MapScreen() {
          </p>
 
          <div className="mt-6">
-            <SpotsMap spots={mine} onOpen={(id) => navigate(`/sites/${id}`)} />
+            <SpotsMap
+               spots={mine}
+               wheelZoom
+               onOpen={(id) => navigate(`/sites/${id}`)}
+            />
          </div>
       </section>
    );

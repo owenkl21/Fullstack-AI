@@ -74,9 +74,13 @@ const POI_MIN_ZOOM = 8;
 export function SpotsMap({
    spots,
    onOpen,
+   wheelZoom = false,
 }: {
    spots: SpotPin[];
    onOpen: (id: string) => void;
+   /** On where the map is the whole page. Off inside a scrolling one, where a
+    * wheel over the map would hijack the scroll. */
+   wheelZoom?: boolean;
 }) {
    const holder = useRef<HTMLDivElement | null>(null);
    const map = useRef<LeafletMap | null>(null);
@@ -98,6 +102,14 @@ export function SpotsMap({
    const [showOthers, setShowOthers] = useState(true);
    const [species, setSpecies] = useState<string>('');
    const [base, setBase] = useState<BaseLayer>('satellite');
+   /*
+    * Bumped when the map is built. Every layer's draw effect depends on it,
+    * because data can arrive before the map does: the waypoints fetch would
+    * resolve, the draw effect would find no layer to draw into and bail, and
+    * then never run again. Marks appeared or did not depending on which
+    * request won, which is the worst kind of bug to reproduce.
+    */
+   const [mapReady, setMapReady] = useState(0);
    const [pois, setPois] = useState<Poi[]>([]);
    const [showPois, setShowPois] = useState(true);
    const [showWaypoints, setShowWaypoints] = useState(true);
@@ -121,10 +133,14 @@ export function SpotsMap({
    useEffect(() => {
       const controller = new AbortController();
       fetch('/api/sites', { signal: controller.signal, credentials: 'include' })
-         .then((r) => (r.ok ? r.json() : []))
-         .then((rows: PublicSpot[]) =>
-            setDiscovered(Array.isArray(rows) ? rows : [])
-         )
+         .then((r) => (r.ok ? r.json() : { sites: [] }))
+         .then((data: { sites?: PublicSpot[] } | PublicSpot[]) => {
+            /* The endpoint wraps its list. Reading it as a bare array meant
+             * this layer was always empty, which is why other anglers' spots
+             * never appeared. */
+            const rows = Array.isArray(data) ? data : (data.sites ?? []);
+            setDiscovered(rows);
+         })
          .catch(() => setDiscovered([]));
       return () => controller.abort();
    }, []);
@@ -177,13 +193,14 @@ export function SpotsMap({
              }
            : { centre: DEFAULT_CENTER, zoom: DEFAULT_ZOOM };
 
-      const created = createMap(node, { ...opening, base });
+      const created = createMap(node, { ...opening, base, wheelZoom });
       map.current = created;
 
       spotLayer.current = L.layerGroup().addTo(created);
       waypointLayer.current = L.layerGroup().addTo(created);
       poiLayer.current = L.layerGroup().addTo(created);
       othersLayer.current = L.layerGroup().addTo(created);
+      setMapReady((n) => n + 1);
 
       const markers: Marker[] = spots.map((spot) => {
          const marker = L.marker([spot.latitude, spot.longitude], {
@@ -294,7 +311,7 @@ export function SpotsMap({
          if (timer) window.clearTimeout(timer);
          controller?.abort();
       };
-   }, [showPois, key]);
+   }, [showPois, key, mapReady]);
 
    /*
     * Other anglers' spots, filtered by the fish you are after.
@@ -349,7 +366,7 @@ export function SpotsMap({
          popup.append(title, who, fish, open);
          marker.bindPopup(popup);
       }
-   }, [discovered, showOthers, species, spots]);
+   }, [discovered, showOthers, species, spots, mapReady]);
 
    /* Draw the waypoints. */
    useEffect(() => {
@@ -386,7 +403,7 @@ export function SpotsMap({
          popup.append(title, note, remove);
          marker.bindPopup(popup);
       }
-   }, [waypoints, showWaypoints]);
+   }, [waypoints, showWaypoints, mapReady]);
 
    /* Draw the points of interest. */
    useEffect(() => {
@@ -418,7 +435,7 @@ export function SpotsMap({
          popup.append(title, kind);
          marker.bindPopup(popup);
       }
-   }, [pois]);
+   }, [pois, mapReady]);
 
    const saveWaypoint = useCallback(
       async (name: string, note: string, kind: WaypointKind) => {
