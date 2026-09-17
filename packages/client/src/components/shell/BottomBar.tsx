@@ -1,5 +1,6 @@
 import {
    MapPinIcon,
+   PlusIcon,
    NewspaperIcon,
    TrophyIcon,
 } from '@heroicons/react/24/outline';
@@ -88,11 +89,16 @@ export function BottomBar() {
                      aria-label="Log a catch"
                      className={({ isActive }) =>
                         cn(
-                           'g-tracked absolute bottom-3 left-1/2 flex size-[72px] -translate-x-1/2 items-center justify-center bg-teal text-[24px] text-teal-ink transition-[filter,transform] duration-150 [transition-timing-function:var(--ease)] hover:brightness-105 active:scale-[0.97]',
+                           'g-tracked absolute bottom-3 left-1/2 flex size-[72px] -translate-x-1/2 flex-col items-center justify-center gap-0.5 rounded-2xl bg-teal text-[20px] text-teal-ink shadow-[0_6px_18px_rgba(0,0,0,0.28)] transition-[filter,transform] duration-150 [transition-timing-function:var(--ease)] hover:brightness-105 active:scale-[0.97]',
                            isActive && 'brightness-95'
                         )
                      }
                   >
+                     <PlusIcon
+                        aria-hidden="true"
+                        className="size-6"
+                        strokeWidth={2}
+                     />
                      Log
                   </NavLink>
                </div>

@@ -1,4 +1,12 @@
+import {
+   ChatBubbleOvalLeftIcon,
+   HeartIcon,
+   UserMinusIcon,
+   UserPlusIcon,
+} from '@heroicons/react/24/outline';
+import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid';
 import { useState } from 'react';
+import { FishMark } from '@/components/brand/FishMark';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
@@ -217,7 +225,21 @@ export function FeedPostBlock({
                </div>
                <CarouselCounter className="px-4 pt-3 text-paper-2" />
             </Carousel>
-         ) : null}
+         ) : (
+            /*
+             * No photograph. A card that simply skips the picture collapses to a
+             * headline over a link and reads as though something failed to load,
+             * so the space is kept and given the house fish. Most catches are
+             * never photographed, so this is the common card, not the odd one.
+             */
+            <div
+               aria-hidden="true"
+               className="relative flex h-[132px] w-full items-center justify-center overflow-hidden bg-black-block-2"
+            >
+               <FishMark className="h-9 w-14 text-paper/20" />
+               <span className="absolute inset-x-0 bottom-0 h-1 bg-teal/70" />
+            </div>
+         )}
 
          <div className="flex flex-col gap-3 px-4 pt-5 pb-6">
             {heading ? (
@@ -273,16 +295,25 @@ export function FeedPostBlock({
                      type="button"
                      aria-pressed={post.likedByMe}
                      onClick={onLike}
-                     className={`${textControl} ${post.likedByMe ? 'text-teal' : 'text-paper-2 hover:text-paper'}`}
+                     className={`${textControl} gap-2 ${post.likedByMe ? 'text-teal' : 'text-paper-2 hover:text-paper'}`}
                   >
+                     {post.likedByMe ? (
+                        <HeartSolid aria-hidden="true" className="size-5" />
+                     ) : (
+                        <HeartIcon aria-hidden="true" className="size-5" />
+                     )}
                      {post.likedByMe ? 'Liked' : 'Like'}
+                     {post.likeCount > 0 ? (
+                        <span className="num">{post.likeCount}</span>
+                     ) : null}
                   </button>
                ) : (
                   <Link
                      to="/sign-in"
                      aria-pressed={false}
-                     className={`${textControl} text-paper-2 hover:text-paper`}
+                     className={`${textControl} gap-2 text-paper-2 hover:text-paper`}
                   >
+                     <HeartIcon aria-hidden="true" className="size-5" />
                      Like
                   </Link>
                )}
@@ -293,9 +324,16 @@ export function FeedPostBlock({
                   aria-expanded={commentsOpen}
                   aria-controls={threadId}
                   onClick={onToggleComments}
-                  className={`${textControl} ${commentsOpen ? 'text-teal' : 'text-paper-2 hover:text-paper'}`}
+                  className={`${textControl} gap-2 ${commentsOpen ? 'text-teal' : 'text-paper-2 hover:text-paper'}`}
                >
+                  <ChatBubbleOvalLeftIcon
+                     aria-hidden="true"
+                     className="size-5"
+                  />
                   Comment
+                  {post.commentCount > 0 ? (
+                     <span className="num">{post.commentCount}</span>
+                  ) : null}
                </button>
 
                {canFollow ? (
@@ -303,8 +341,13 @@ export function FeedPostBlock({
                      type="button"
                      aria-pressed={post.authorFollowedByMe === true}
                      onClick={post.authorFollowedByMe ? onUnfollow : onFollow}
-                     className={`${textControl} ml-auto ${post.authorFollowedByMe ? 'text-teal' : 'text-paper-2 hover:text-paper'}`}
+                     className={`${textControl} ml-auto gap-2 ${post.authorFollowedByMe ? 'text-teal' : 'text-paper-2 hover:text-paper'}`}
                   >
+                     {post.authorFollowedByMe ? (
+                        <UserMinusIcon aria-hidden="true" className="size-5" />
+                     ) : (
+                        <UserPlusIcon aria-hidden="true" className="size-5" />
+                     )}
                      {post.authorFollowedByMe ? 'Following' : 'Follow'}
                   </button>
                ) : null}

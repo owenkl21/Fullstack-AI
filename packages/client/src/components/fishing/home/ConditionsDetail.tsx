@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { WeatherSnapshot } from '@/components/fishing/record/api';
 import {
+   DaylightIcon,
    DropIcon,
    MoonPhaseIcon,
    SwellIcon,
@@ -112,7 +113,7 @@ export function ConditionsDetail({
    const set = clock(snapshot.sun?.set);
    push(
       'sun',
-      <Sky className="size-5" aria-hidden="true" />,
+      <DaylightIcon aria-hidden="true" />,
       'Light',
       rise && set ? `${rise} to ${set}` : (rise ?? set)
    );

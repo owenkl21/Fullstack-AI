@@ -177,6 +177,22 @@ export function MoonPhaseIcon({
    );
 }
 
+/** Sun over a horizon, for first and last light. Distinct from the sky mark. */
+export function DaylightIcon({ className, ...rest }: IconProps) {
+   return (
+      <svg
+         viewBox="0 0 24 24"
+         className={cn('size-5', className)}
+         {...stroke}
+         {...rest}
+      >
+         <path d="M2.5 18.5h19" />
+         <path d="M6.5 18.5a5.5 5.5 0 0 1 11 0" />
+         <path d="M12 5.5V3M5 8 3.6 6.6M19 8l1.4-1.4" />
+      </svg>
+   );
+}
+
 /** The sky, picked from the words Open-Meteo gives for a WMO code. */
 export function skyIcon(
    text: string | null | undefined
