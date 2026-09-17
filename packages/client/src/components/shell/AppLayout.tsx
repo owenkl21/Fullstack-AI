@@ -1,6 +1,7 @@
 import { Suspense, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
+import { RouteBoundary, clearChunkReloadMark } from '@/lib/lazy-route';
 import { cn } from '@/lib/utils';
 import { AppHeader } from './AppHeader';
 import { isTaskRoute } from './routes';
@@ -13,6 +14,8 @@ import { BottomBar } from './BottomBar';
 export function AppLayout() {
    const { pathname } = useLocation();
    useEffect(() => {
+      /* We got here, so whatever chunk was stale has been replaced. */
+      clearChunkReloadMark();
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
 
       /*
@@ -79,15 +82,21 @@ export function AppLayout() {
                   : 'pb-[calc(64px+env(safe-area-inset-bottom))]'
             )}
          >
-            <Suspense
-               fallback={
-                  <div className="mx-auto w-full max-w-3xl px-4 py-10">
-                     <FishingBobberLoader label="Loading the page" />
-                  </div>
-               }
-            >
-               <Outlet />
-            </Suspense>
+            {/*
+             * The boundary is keyed on the path so a route that failed does not
+             * keep its error state over the next navigation.
+             */}
+            <RouteBoundary key={pathname}>
+               <Suspense
+                  fallback={
+                     <div className="mx-auto w-full max-w-3xl px-4 py-10">
+                        <FishingBobberLoader label="Loading the page" />
+                     </div>
+                  }
+               >
+                  <Outlet />
+               </Suspense>
+            </RouteBoundary>
          </main>
          <BottomBar />
       </div>

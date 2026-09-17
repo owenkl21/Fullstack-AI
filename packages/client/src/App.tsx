@@ -1,8 +1,8 @@
-import { lazy } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/components/shell/AppLayout';
 import { HomePage } from '@/pages/HomePage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { lazyRoute } from '@/lib/lazy-route';
 
 /*
  * Two pages stay eager on purpose. HomePage is the entry route, so splitting it
@@ -13,98 +13,98 @@ import { NotFoundPage } from '@/pages/NotFoundPage';
  * Everything else is split per route. No page has a default export, so each one
  * needs the shim. React.lazy resolves module.default and these are all named.
  */
-const ProfilePage = lazy(() =>
+const ProfilePage = lazyRoute(() =>
    import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage }))
 );
-const QuickLogPage = lazy(() =>
+const QuickLogPage = lazyRoute(() =>
    import('@/pages/fishing/QuickLogPage').then((m) => ({
       default: m.QuickLogPage,
    }))
 );
-const LogCatchPage = lazy(() =>
+const LogCatchPage = lazyRoute(() =>
    import('@/pages/fishing/LogCatchPage').then((m) => ({
       default: m.LogCatchPage,
    }))
 );
-const MyCatchesPage = lazy(() =>
+const MyCatchesPage = lazyRoute(() =>
    import('@/pages/fishing/MyCatchesPage').then((m) => ({
       default: m.MyCatchesPage,
    }))
 );
-const CatchDetailPage = lazy(() =>
+const CatchDetailPage = lazyRoute(() =>
    import('@/pages/fishing/CatchDetailPage').then((m) => ({
       default: m.CatchDetailPage,
    }))
 );
-const EditCatchPage = lazy(() =>
+const EditCatchPage = lazyRoute(() =>
    import('@/pages/fishing/EditCatchPage').then((m) => ({
       default: m.EditCatchPage,
    }))
 );
-const LogSitePage = lazy(() =>
+const LogSitePage = lazyRoute(() =>
    import('@/pages/fishing/LogSitePage').then((m) => ({
       default: m.LogSitePage,
    }))
 );
-const MySitesPage = lazy(() =>
+const MySitesPage = lazyRoute(() =>
    import('@/pages/fishing/MySitesPage').then((m) => ({
       default: m.MySitesPage,
    }))
 );
-const SiteDetailPage = lazy(() =>
+const SiteDetailPage = lazyRoute(() =>
    import('@/pages/fishing/SiteDetailPage').then((m) => ({
       default: m.SiteDetailPage,
    }))
 );
-const EditSitePage = lazy(() =>
+const EditSitePage = lazyRoute(() =>
    import('@/pages/fishing/EditSitePage').then((m) => ({
       default: m.EditSitePage,
    }))
 );
-const LogGearPage = lazy(() =>
+const LogGearPage = lazyRoute(() =>
    import('@/pages/fishing/LogGearPage').then((m) => ({
       default: m.LogGearPage,
    }))
 );
-const MyGearPage = lazy(() =>
+const MyGearPage = lazyRoute(() =>
    import('@/pages/fishing/MyGearPage').then((m) => ({
       default: m.MyGearPage,
    }))
 );
-const EditGearPage = lazy(() =>
+const EditGearPage = lazyRoute(() =>
    import('@/pages/fishing/EditGearPage').then((m) => ({
       default: m.EditGearPage,
    }))
 );
-const FeedPage = lazy(() =>
+const FeedPage = lazyRoute(() =>
    import('@/pages/fishing/FeedPage').then((m) => ({ default: m.FeedPage }))
 );
 
-const SignInPage = lazy(() =>
+const SignInPage = lazyRoute(() =>
    import('@/pages/auth/SignInPage').then((m) => ({ default: m.SignInPage }))
 );
-const SignUpPage = lazy(() =>
+const SignUpPage = lazyRoute(() =>
    import('@/pages/auth/SignUpPage').then((m) => ({ default: m.SignUpPage }))
 );
-const ForgotPasswordPage = lazy(() =>
+const ForgotPasswordPage = lazyRoute(() =>
    import('@/pages/auth/ForgotPasswordPage').then((m) => ({
       default: m.ForgotPasswordPage,
    }))
 );
-const ResetPasswordPage = lazy(() =>
+const ResetPasswordPage = lazyRoute(() =>
    import('@/pages/auth/ResetPasswordPage').then((m) => ({
       default: m.ResetPasswordPage,
    }))
 );
-const VerifyEmailPage = lazy(() =>
+const VerifyEmailPage = lazyRoute(() =>
    import('@/pages/auth/VerifyEmailPage').then((m) => ({
       default: m.VerifyEmailPage,
    }))
 );
-const BoardsPage = lazy(() =>
+const BoardsPage = lazyRoute(() =>
    import('@/pages/social/BoardsPage').then((m) => ({ default: m.BoardsPage }))
 );
-const AccountPage = lazy(() =>
+const AccountPage = lazyRoute(() =>
    import('@/pages/auth/AccountPage').then((m) => ({ default: m.AccountPage }))
 );
 
