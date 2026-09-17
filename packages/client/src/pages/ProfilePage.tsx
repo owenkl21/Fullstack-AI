@@ -6,6 +6,7 @@ import {
 } from '@/components/profile/ConnectionsDialog';
 import { ProfileSettingsPanel } from '@/components/profile/ProfileSettingsPanel';
 import { ProfileStatsPanel } from '@/components/social/ProfileStats';
+import { AnglerIntel } from '@/components/profile/AnglerIntel';
 import { ProfileView } from '@/components/profile/ProfileView';
 import type {
    ProfileResponse,
@@ -180,7 +181,12 @@ function ProfileScreen() {
                <ProfileView
                   profile={profile}
                   tallies={tallies}
-                  figures={<ProfileStatsPanel />}
+                  figures={
+                     <>
+                        <ProfileStatsPanel />
+                        <AnglerIntel />
+                     </>
+                  }
                   onOpenConnections={openConnections}
                />
 
