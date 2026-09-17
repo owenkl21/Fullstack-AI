@@ -19,11 +19,19 @@ type SeedSpecies = {
     * Regulation data, from the DFFE recreational limits the social research
     * cites. Seeded because it is published and checkable.
     *
-    * lwA and lwB are deliberately NOT seeded. FishBase publishes them per
-    * species and the research does not carry the values; a guessed coefficient
-    * would put invented mass on a leaderboard and call it arithmetic. A species
-    * without them simply does not score, and says so.
+    * lwA and lwB come from FishBase itself, retrieved per species. Only the
+    * species that have published figures carry them; the rest are left null
+    * rather than guessed at, and a species without them does not score and
+    * says exactly why.
     */
+   /*
+    * FishBase Bayesian length-weight estimates, total length in cm to grams.
+    * These are FishBase's own published figures, retrieved per species from its
+    * summary pages on 17 September 2026, not measurements of our own and not
+    * guesses. A species left without them does not score, and says so.
+    */
+   lwA?: number;
+   lwB?: number;
    sizeClass?: 'EDIBLE' | 'NON_EDIBLE';
    minLegalCm?: number;
    closedFrom?: string;
@@ -33,6 +41,14 @@ type SeedSpecies = {
 const LIMITS_SOURCE =
    'DFFE recreational fishing limits, via docs/redesign/research/social.md';
 
+/*
+ * Bayesian estimates rather than a single measured study, which is what
+ * FishBase publishes for most species. Recorded as such so the interface can be
+ * honest about where a mass came from.
+ */
+const LW_SOURCE =
+   'FishBase Bayesian length-weight, TL cm to g, retrieved 2026-09-17';
+
 const SPECIES: SeedSpecies[] = [
    // Saltwater, shore
    {
@@ -40,6 +56,8 @@ const SPECIES: SeedSpecies[] = [
       scientificName: 'Argyrosomus japonicus',
       aliases: ['kob', 'kabeljou', 'daga salmon', 'salmon'],
       regionTags: ['saltwater', 'shore', 'estuary'],
+      lwA: 0.01,
+      lwB: 3.06,
       minLegalCm: 40,
    },
    {
@@ -47,6 +65,8 @@ const SPECIES: SeedSpecies[] = [
       scientificName: 'Dichistius capensis',
       aliases: ['blackfish', 'damba'],
       regionTags: ['saltwater', 'shore'],
+      lwA: 0.01622,
+      lwB: 3.01,
       minLegalCm: 35,
       closedFrom: '10-15',
       closedTo: '02-28',
@@ -56,6 +76,8 @@ const SPECIES: SeedSpecies[] = [
       scientificName: 'Lichia amia',
       aliases: ['leervis', 'leerfish', 'leerie'],
       regionTags: ['saltwater', 'shore'],
+      lwA: 0.01413,
+      lwB: 2.93,
       minLegalCm: 70,
    },
    {
@@ -63,6 +85,8 @@ const SPECIES: SeedSpecies[] = [
       scientificName: 'Pomatomus saltatrix',
       aliases: ['shad', 'bluefish', 'tailor'],
       regionTags: ['saltwater', 'shore'],
+      lwA: 0.01072,
+      lwB: 2.97,
       minLegalCm: 30,
       closedFrom: '09-01',
       closedTo: '11-30',
@@ -78,6 +102,8 @@ const SPECIES: SeedSpecies[] = [
       scientificName: 'Lithognathus lithognathus',
       aliases: ['witsteenbras', 'pignose grunter', 'steenbras'],
       regionTags: ['saltwater', 'shore', 'estuary'],
+      lwA: 0.01549,
+      lwB: 3.04,
       minLegalCm: 40,
    },
    {
@@ -85,12 +111,16 @@ const SPECIES: SeedSpecies[] = [
       scientificName: 'Diplodus capensis',
       aliases: ['dassie'],
       regionTags: ['saltwater', 'shore', 'rock'],
+      lwA: 0.01318,
+      lwB: 3.04,
    },
    {
       commonName: 'Bronze bream',
       scientificName: 'Pachymetopon grande',
       aliases: ['john brown', 'bronzie'],
       regionTags: ['saltwater', 'shore', 'rock'],
+      lwA: 0.02042,
+      lwB: 2.97,
    },
    {
       commonName: 'White musselcracker',
@@ -121,6 +151,8 @@ const SPECIES: SeedSpecies[] = [
       scientificName: 'Pomadasys commersonnii',
       aliases: ['grunter', 'knorhaan'],
       regionTags: ['saltwater', 'estuary'],
+      lwA: 0.01905,
+      lwB: 2.94,
    },
    {
       commonName: 'Red roman',
@@ -133,6 +165,8 @@ const SPECIES: SeedSpecies[] = [
       scientificName: 'Pachymetopon blochii',
       aliases: ['hangberger'],
       regionTags: ['saltwater', 'shore', 'rock'],
+      lwA: 0.01514,
+      lwB: 3.05,
    },
    {
       commonName: 'Santer',
@@ -172,6 +206,8 @@ const SPECIES: SeedSpecies[] = [
       scientificName: 'Micropterus salmoides',
       aliases: ['bass'],
       regionTags: ['freshwater'],
+      lwA: 0.01047,
+      lwB: 3.08,
    },
    {
       commonName: 'Smallmouth bass',
@@ -212,6 +248,9 @@ export async function seedSpecies() {
                commonName: entry.commonName,
                aliases: entry.aliases,
                regionTags: entry.regionTags,
+               lwA: entry.lwA ?? null,
+               lwB: entry.lwB ?? null,
+               lwSource: entry.lwA ? LW_SOURCE : null,
                sizeClass: entry.sizeClass ?? 'EDIBLE',
                minLegalCm: entry.minLegalCm ?? null,
                closedFrom: entry.closedFrom ?? null,
@@ -228,6 +267,9 @@ export async function seedSpecies() {
             scientificName: entry.scientificName,
             aliases: entry.aliases,
             regionTags: entry.regionTags,
+            lwA: entry.lwA ?? null,
+            lwB: entry.lwB ?? null,
+            lwSource: entry.lwA ? LW_SOURCE : null,
             sizeClass: entry.sizeClass ?? 'EDIBLE',
             minLegalCm: entry.minLegalCm ?? null,
             closedFrom: entry.closedFrom ?? null,

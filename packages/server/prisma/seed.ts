@@ -261,6 +261,50 @@ async function seedFollows() {
    return pairs.length;
 }
 
+/*
+ * A convenience for testing, not part of the data set.
+ *
+ * The rivalry board is mutual follows only, and a freshly signed up account has
+ * none, so the board renders correctly and says nothing. This gives the real
+ * account mutual follows with three seeded anglers so there is something to
+ * look at. It does nothing at all when that account does not exist.
+ */
+async function seedTestAccountFollows() {
+   const tester = await prisma.user.findUnique({
+      where: { email: 'owen@fishlogger.app' },
+      select: { id: true },
+   });
+
+   if (!tester) {
+      return 0;
+   }
+
+   const rivals = [
+      'seed_angler_thabo',
+      'seed_angler_nadia',
+      'seed_angler_karen',
+   ];
+
+   for (const rival of rivals) {
+      for (const [follower, following] of [
+         [tester.id, rival],
+         [rival, tester.id],
+      ] as const) {
+         await prisma.follow.upsert({
+            where: { id: `seed_follow_${follower}_${following}` },
+            update: {},
+            create: {
+               id: `seed_follow_${follower}_${following}`,
+               followerId: follower,
+               followingId: following,
+            },
+         });
+      }
+   }
+
+   return rivals.length;
+}
+
 async function main() {
    /* Refuses before any write. See seed/guard.ts for why this matters. */
    assertSeedable();
@@ -273,9 +317,10 @@ async function main() {
    const catches = await seedCatches();
    const follows = await seedFollows();
    const posts = await seedFeed();
+   const testRivals = await seedTestAccountFollows();
 
    console.log(
-      `[seed] ${species} species, ${anglers} anglers, ${spots} spots, ${gear} gear, ${catches} catches, ${images} images, ${follows} follows, ${posts} feed posts`
+      `[seed] ${species} species, ${anglers} anglers, ${spots} spots, ${gear} gear, ${catches} catches, ${images} images, ${follows} follows, ${posts} feed posts${testRivals ? `, ${testRivals} test rivals` : ''}`
    );
    console.log(
       '[seed] Photographs are Unsplash stand-ins. Not these anglers, not these species, mostly not this coastline.'
