@@ -37,7 +37,12 @@ export function SpotHeader({
 
    return (
       <header className="relative bg-black-block text-paper">
-         <div className="relative h-[190px] overflow-hidden md:h-[260px]">
+         {/*
+          * Tall enough on a wide screen to still be a photograph. At 260px
+          * across 1440 the crop is five and a half to one, which cut the
+          * angler off at the shoulders.
+          */}
+         <div className="relative h-[190px] overflow-hidden md:h-[340px]">
             <img
                src={photoUrl}
                alt=""

@@ -560,7 +560,7 @@ function SiteHeader({
     */
    return (
       <header className="relative bg-black-block text-paper">
-         <div className="relative h-[210px] overflow-hidden md:h-[300px]">
+         <div className="relative h-[210px] overflow-hidden md:h-[360px]">
             {photoUrl ? (
                <img
                   src={photoUrl}
