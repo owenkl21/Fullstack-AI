@@ -158,7 +158,7 @@ export function CommentThread({
                      loadMore();
                   }
                }}
-               className="thread-scroll flex max-h-[312px] flex-col gap-3 overflow-y-auto pr-2"
+               className="thread-scroll flex max-h-[276px] flex-col gap-3 overflow-y-auto pr-2"
             >
                {shown.map((comment, i) => {
                   const stamp = formatStamp(comment.createdAt);
