@@ -215,6 +215,25 @@
       background: var(--black);
       color: var(--paper);
    }
+
+   /*
+    * The black block is a light-mode device: a card cut out of dark against
+    * paper. At night the page ground is #0b0909 and so was the card, the same
+    * value byte for byte, so the feed was a column of invisible cards.
+    *
+    * The device inverts rather than being patched. A block that sat below the
+    * paper now sits above the dark: lifted a step, with an edge and a shadow to
+    * separate it. Same idea, read the other way up.
+    */
+   :root[data-theme='night'] .blk {
+      background: #161414;
+      border: 1px solid rgba(244, 241, 236, 0.1);
+      box-shadow: 0 1px 0 rgba(244, 241, 236, 0.04) inset;
+   }
+   :root[data-theme='night'] .blk {
+      --bg: #161414;
+      --bg-2: #201d1d;
+   }
    .blk::before {
       content: '';
       position: absolute;
@@ -249,15 +268,177 @@
       pointer-events: none;
    }
    .torn svg {
-      width: 100%;
+      /* Twice the width: each stroke is drawn twice for a seamless loop. */
+      width: 200%;
       height: 100%;
       display: block;
+   }
+
+   /*
+    * The swell.
+    *
+    * Three strokes at three speeds, sliding by exactly one copy so the loop
+    * never shows a seam. Slow on purpose: water at the edge of a photograph
+    * should be something noticed on the second look, not something that
+    * competes with the words above it. The global reduced-motion rule already
+    * stops all of this for anyone who has asked for stillness.
+    */
+   @keyframes torn-drift {
+      from {
+         transform: translateX(0);
+      }
+      to {
+         transform: translateX(-50%);
+      }
+   }
+   .torn-band {
+      animation: torn-drift linear infinite;
+      will-change: transform;
+   }
+   .torn-band-1 {
+      animation-duration: 38s;
+   }
+   .torn-band-2 {
+      animation-duration: 26s;
+      animation-direction: reverse;
+   }
+   .torn-band-3 {
+      animation-duration: 31s;
    }
    @media (max-width: 640px) {
       .torn {
          height: 56px;
       }
    }
+   /*
+    * Under the waterline.
+    *
+    * Decoration, so it never takes a pointer and never sits above the words.
+    * The global reduced-motion rule stops all of it for anyone who asked for
+    * stillness.
+    */
+   .underwater {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+   }
+
+   /* Light coming down through moving water. This is the part that actually
+    * says "under water"; the bubbles only confirm it. */
+   @keyframes caustics {
+      0% {
+         transform: translate3d(-6%, 0, 0) scale(1.15);
+         opacity: 0.5;
+      }
+      50% {
+         transform: translate3d(6%, 2%, 0) scale(1.28);
+         opacity: 0.85;
+      }
+      100% {
+         transform: translate3d(-6%, 0, 0) scale(1.15);
+         opacity: 0.5;
+      }
+   }
+   .underwater-caustics {
+      position: absolute;
+      inset: -20%;
+      background:
+         radial-gradient(
+            60% 40% at 20% 0%,
+            rgba(93, 198, 211, 0.16),
+            transparent 70%
+         ),
+         radial-gradient(
+            50% 45% at 70% 10%,
+            rgba(93, 198, 211, 0.12),
+            transparent 70%
+         ),
+         radial-gradient(
+            40% 30% at 45% 0%,
+            rgba(244, 241, 236, 0.1),
+            transparent 70%
+         );
+      animation: caustics 14s ease-in-out infinite;
+      will-change: transform, opacity;
+   }
+
+   @keyframes rise {
+      0% {
+         transform: translate3d(0, 0, 0) scale(0.7);
+         opacity: 0;
+      }
+      12% {
+         opacity: 0.75;
+      }
+      85% {
+         opacity: 0.55;
+      }
+      100% {
+         transform: translate3d(var(--drift, 0), -105%, 0) scale(1);
+         opacity: 0;
+      }
+   }
+   .bubble {
+      position: absolute;
+      bottom: -12px;
+      border-radius: 999px;
+      border: 1px solid rgba(244, 241, 236, 0.5);
+      background: radial-gradient(
+         circle at 32% 28%,
+         rgba(244, 241, 236, 0.55),
+         rgba(93, 198, 211, 0.12) 60%,
+         transparent 72%
+      );
+      animation-name: rise;
+      animation-timing-function: ease-in;
+      animation-iteration-count: infinite;
+      will-change: transform, opacity;
+   }
+
+   /*
+    * One fish, crossing. It swims right to left, sinks and lifts as it goes,
+    * and is gone for most of the cycle: a fish that is always on screen is an
+    * aquarium, and this is a section of a page.
+    */
+   @keyframes swim {
+      0% {
+         transform: translate3d(108%, 0, 0) scaleX(1);
+         opacity: 0;
+      }
+      6% {
+         opacity: 0.5;
+      }
+      35% {
+         transform: translate3d(58%, 16px, 0) scaleX(1);
+      }
+      65% {
+         transform: translate3d(22%, -12px, 0) scaleX(1);
+      }
+      94% {
+         opacity: 0.45;
+      }
+      100% {
+         transform: translate3d(-24%, 6px, 0) scaleX(1);
+         opacity: 0;
+      }
+   }
+   .swimmer {
+      position: absolute;
+      top: 38%;
+      left: 0;
+      width: 62px;
+      color: rgba(244, 241, 236, 0.45);
+      animation: swim 21s linear infinite;
+      will-change: transform, opacity;
+   }
+   .swimmer svg {
+      display: block;
+      width: 100%;
+      height: auto;
+   }
+
    /* Contour line art (paths are generated by <Contours/>), fades before any edge */
    .contour {
       position: absolute;

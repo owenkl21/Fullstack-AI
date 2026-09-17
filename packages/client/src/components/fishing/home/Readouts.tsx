@@ -1,4 +1,5 @@
 import { Contours } from '@/components/brand/Contours';
+import { Underwater } from '@/components/brand/Underwater';
 import { Button } from '@/components/ui/button';
 import { CountIn } from '@/components/fishing/record/CountIn';
 import type { toReadouts } from '@/components/fishing/record/api';
@@ -42,6 +43,13 @@ export function Readouts({
          aria-labelledby="conditions-heading"
          className="relative overflow-hidden px-4 pt-6 pb-2 md:px-8"
       >
+         {/*
+          * This section sits directly under the torn edge, which reads as the
+          * waterline, so it is the one place in the product that is literally
+          * under water. The contours stay: they are the sea floor now rather
+          * than decoration.
+          */}
+         <Underwater seed={3} />
          <Contours
             seed={3}
             width={460}

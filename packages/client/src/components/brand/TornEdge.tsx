@@ -72,11 +72,32 @@ export function TornEdge({
       const ground = cs.getPropertyValue(varName).trim() || '#ffffff';
       const w = 1600;
       const h = 90;
+
+      /*
+       * Each stroke is drawn twice, side by side, and the pair is slid left by
+       * exactly one width. Because the two copies are identical the loop has no
+       * seam, which is the only way to make water move without a visible jump
+       * every time it repeats.
+       *
+       * The three strokes drift at different speeds. That difference is the
+       * whole effect: a single layer sliding reads as a moving picture, three
+       * at different rates reads as a swell passing under you.
+       */
+      const band = (seed: number, amp: number, lift: number, fill: string) => {
+         const d = edgePath(seed, amp, lift, w, h);
+         return (
+            `<g fill="${fill}">` +
+            `<path d="${d}"/>` +
+            `<path d="${d}" transform="translate(${w} 0)"/>` +
+            `</g>`
+         );
+      };
+
       el.innerHTML =
-         `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">` +
-         `<path d="${edgePath(s * 11 + 5, 34, 14, w, h)}" fill="rgba(244,241,236,0.38)"/>` +
-         `<path d="${edgePath(s * 11 + 29, 30, 4, w, h)}" fill="rgba(244,241,236,0.5)"/>` +
-         `<path d="${edgePath(s * 11 + 2, 30, 0, w, h)}" fill="${ground}"/>` +
+         `<svg viewBox="0 0 ${w * 2} ${h}" preserveAspectRatio="none" aria-hidden="true">` +
+         `<g class="torn-band torn-band-1">${band(s * 11 + 5, 34, 14, 'rgba(244,241,236,0.38)')}</g>` +
+         `<g class="torn-band torn-band-2">${band(s * 11 + 29, 30, 4, 'rgba(244,241,236,0.5)')}</g>` +
+         `<g class="torn-band torn-band-3">${band(s * 11 + 2, 30, 0, ground)}</g>` +
          `</svg>`;
    }, [fill, seed, id, theme]);
 
