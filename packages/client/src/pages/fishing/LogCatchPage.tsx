@@ -1259,7 +1259,6 @@ export function CatchForm({
                      onChange={setLengthValue}
                      onBlur={() => markTouched('length')}
                      onUnit={switchLengthUnit}
-                     placeholder="Not measured"
                   />
                   <MeasureField
                      id="weight"
@@ -1280,7 +1279,6 @@ export function CatchForm({
                      onChange={setWeightValue}
                      onBlur={() => markTouched('weight')}
                      onUnit={switchWeightUnit}
-                     placeholder="Not weighed"
                   />
                </div>
 

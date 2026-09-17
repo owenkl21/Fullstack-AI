@@ -1045,6 +1045,19 @@ td.fact {
    transform: scale(1.12);
 }
 
+/*
+ * The toolbar sits over the map's top left, where Leaflet puts its zoom
+ * control, so the zoom control moves down out from under it.
+ */
+.map-surface .leaflet-top.leaflet-left .leaflet-control-zoom {
+   margin-top: 62px;
+}
+@media (max-width: 640px) {
+   .map-surface .leaflet-top.leaflet-left .leaflet-control-zoom {
+      margin-top: 62px;
+   }
+}
+
 /* ---- The SVG pins ------------------------------------------------------- */
 .map-pin-svg {
    display: block;
