@@ -11,6 +11,8 @@
  * Open-Meteo.com" ships in the interface.
  */
 
+import { moonPhase, type MoonPhase } from '../lib/moon';
+
 const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
 const HISTORICAL_URL =
    'https://historical-forecast-api.open-meteo.com/v1/forecast';
@@ -39,6 +41,9 @@ const HOURLY_FIELDS = [
    'uv_index',
    'is_day',
 ].join(',');
+
+/* The light. Most shore sessions are planned around one end of it or the other. */
+const DAILY_FIELDS = ['sunrise', 'sunset'].join(',');
 
 const MARINE_FIELDS = [
    'sea_surface_temperature',
@@ -130,9 +135,17 @@ export type Conditions = {
    waveHeightM: number | null;
    swellHeightM: number | null;
    swellPeriodS: number | null;
+   /** Local time of first and last light on the day read. */
+   sunrise: string | null;
+   sunset: string | null;
+   /** Worked out from the date, not fetched. Null only when the date is unusable. */
+   moon: MoonPhase | null;
 };
 
 const EMPTY: Conditions = {
+   sunrise: null,
+   sunset: null,
+   moon: null,
    observedAt: null,
    timeZoneId: null,
    conditionText: null,
@@ -184,6 +197,28 @@ const hourKey = (when: Date) =>
       when.getUTCDate()
    ).padStart(2, '0')}T${String(when.getUTCHours()).padStart(2, '0')}:00`;
 
+/*
+ * The daily block is one entry per day; a forecast asks for the day in hand.
+ *
+ * The request is made in UTC on purpose, because the hourly lookup matches the
+ * hour a fish was caught by its UTC key. That means Open-Meteo returns a naive
+ * "2026-09-16T03:53" which is really UTC, and printing it as written would have
+ * told a Durban angler the sun rose at ten to four. Marking it as the instant it
+ * actually is lets the screen show it in the reader's own time.
+ */
+const firstDaily = (weather: MeteoResponse, field: string): string | null => {
+   const block = (weather as unknown as Record<string, unknown>).daily as
+      | Record<string, unknown>
+      | undefined;
+   const series = block?.[field];
+   const value =
+      Array.isArray(series) && typeof series[0] === 'string' ? series[0] : null;
+   if (!value) {
+      return null;
+   }
+   return /[Zz]|[+-]\d{2}:\d{2}$/.test(value) ? value : `${value}Z`;
+};
+
 const readAt = (hourly: HourlyBlock, field: string, index: number) => {
    const series = hourly[field];
 
@@ -216,6 +251,7 @@ export async function getConditionsAt(
       latitude: String(latitude),
       longitude: String(longitude),
       hourly: HOURLY_FIELDS,
+      daily: DAILY_FIELDS,
       timezone: 'UTC',
       wind_speed_unit: 'kmh',
    });
@@ -286,6 +322,14 @@ export async function getConditionsAt(
          windGustKph: readAt(hourly, 'wind_gusts_10m', index),
          uvIndex: readAt(hourly, 'uv_index', index),
          isDaytime: isDay === null ? null : isDay === 1,
+         sunrise: firstDaily(weather, 'sunrise'),
+         sunset: firstDaily(weather, 'sunset'),
+         /*
+          * Worked out rather than fetched: no weather API publishes a moon
+          * phase, and spring tides run with the new and the full moon, which is
+          * what a shore angler plans around.
+          */
+         moon: moonPhase(when),
          ...marine,
       };
    } catch (error) {
