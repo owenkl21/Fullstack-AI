@@ -52,6 +52,70 @@ const MARINE_FIELDS = [
    'swell_wave_period',
 ].join(',');
 
+/*
+ * One fetch for every endpoint, with the two things a keyless upstream needs:
+ * a name in the User-Agent, and a second try. Open-Meteo throttles by address,
+ * and a hosted server shares its outbound address with strangers, so a 429 on
+ * the first try says nothing about a second one a moment later. The status and
+ * the start of the body are logged on the way out, because "no reading" on its
+ * own cost an afternoon of guessing.
+ */
+const UA = 'fishlogger/1.0 (rock and surf fishing log; non-commercial)';
+const TRIES = 3;
+
+async function getJson<T>(url: string, attempt = 1): Promise<T | null> {
+   try {
+      const response = await fetch(url, { headers: { 'User-Agent': UA } });
+      if (response.ok) return (await response.json()) as T;
+
+      const body = (await response.text().catch(() => '')).slice(0, 240);
+      const again =
+         attempt < TRIES && (response.status === 429 || response.status >= 500);
+      console.warn('[open-meteo] upstream answered', {
+         status: response.status,
+         attempt,
+         body,
+         endpoint: url.replace(/\?.*$/, ''),
+      });
+      if (!again) return null;
+   } catch (error) {
+      console.warn('[open-meteo] request failed', {
+         attempt,
+         error: String(error),
+      });
+      if (attempt >= TRIES) return null;
+   }
+
+   await new Promise((resolve) => setTimeout(resolve, 700 * attempt));
+   return getJson<T>(url, attempt + 1);
+}
+
+/*
+ * The same hour at the same place is asked for over and over: every visit to
+ * the home page reads the conditions here and now, and two anglers on one
+ * beach ask the same question. Remembered for ten minutes, keyed on the hour
+ * and the place to two decimals (about a kilometre), so the upstream sees one
+ * request where it used to see dozens. Only a full reading is kept; an empty
+ * one is a failure, and a failure should be retried, not repeated.
+ */
+const memory = new Map<string, { until: number; value: Conditions }>();
+const REMEMBER_MS = 10 * 60 * 1000;
+
+function remembered(key: string): Conditions | null {
+   const hit = memory.get(key);
+   if (!hit) return null;
+   if (hit.until < Date.now()) {
+      memory.delete(key);
+      return null;
+   }
+   return hit.value;
+}
+
+function remember(key: string, value: Conditions) {
+   if (memory.size > 500) memory.clear();
+   memory.set(key, { until: Date.now() + REMEMBER_MS, value });
+}
+
 /* WMO 4677 weather codes, in the words a person would use. */
 const WEATHER_CODES: Record<number, string> = {
    0: 'Clear',
@@ -276,11 +340,13 @@ export async function getConditionsAt(
       url = `${FORECAST_URL}?${params.toString()}`;
    }
 
+   const key = `${latitude.toFixed(2)}|${longitude.toFixed(2)}|${wanted}`;
+   const known = remembered(key);
+   if (known) return known;
+
    try {
       const [weather, marine] = await Promise.all([
-         fetch(url).then((r) =>
-            r.ok ? (r.json() as Promise<MeteoResponse>) : null
-         ),
+         getJson<MeteoResponse>(url),
          fetchMarine(latitude, longitude, wanted, age).catch(() => NO_MARINE),
       ]);
 
@@ -319,7 +385,7 @@ export async function getConditionsAt(
       const direction = readAt(hourly, 'wind_direction_10m', index);
       const isDay = readAt(hourly, 'is_day', index);
 
-      return {
+      const reading: Conditions = {
          observedAt: times[index] ?? null,
          timeZoneId: weather.timezone ?? null,
          conditionText: code === null ? null : (WEATHER_CODES[code] ?? null),
@@ -351,6 +417,9 @@ export async function getConditionsAt(
          moon: moonPhase(when),
          ...marine,
       };
+
+      remember(key, reading);
+      return reading;
    } catch (error) {
       console.error('[open-meteo] conditions lookup failed', error);
       return EMPTY;
@@ -382,13 +451,14 @@ async function fetchMarine(
       params.set('end_date', day);
    }
 
-   const response = await fetch(`${MARINE_URL}?${params.toString()}`);
+   const payload = await getJson<MeteoResponse>(
+      `${MARINE_URL}?${params.toString()}`
+   );
 
-   if (!response.ok) {
+   if (!payload) {
       return NO_MARINE;
    }
 
-   const payload = (await response.json()) as MeteoResponse;
    const hourly = payload.hourly ?? {};
    const times = Array.isArray(hourly.time) ? hourly.time : [];
    const index = times.indexOf(wanted);
