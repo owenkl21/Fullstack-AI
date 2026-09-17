@@ -195,11 +195,15 @@ export function ChoiceGroup<T extends string>({
    hideLabel,
    size = 'md',
    inline = false,
+   nowrap = false,
 }: Common & {
    value: T;
    options: ReadonlyArray<{ value: T; label: string }>;
    onChange: (next: T) => void;
    size?: 'sm' | 'md';
+   /* One row that scrolls sideways rather than wrapping, for a strip of
+    * filters at the top of a phone where every wrapped row is a post lost. */
+   nowrap?: boolean;
    /*
     * Label beside the chips rather than above them. Two filter groups stacked
     * with a label over each cost four rows near the top of a phone, which is
@@ -213,7 +217,12 @@ export function ChoiceGroup<T extends string>({
       <div
          className={cn(
             'flex min-w-0',
-            inline ? 'flex-wrap items-center gap-x-3 gap-y-2' : 'flex-col',
+            inline
+               ? cn(
+                    'items-center gap-x-3 gap-y-2',
+                    nowrap ? 'flex-nowrap' : 'flex-wrap'
+                 )
+               : 'flex-col',
             className
          )}
       >
@@ -224,7 +233,11 @@ export function ChoiceGroup<T extends string>({
          <div
             role="radiogroup"
             aria-labelledby={id}
-            className={cn('flex flex-wrap gap-2', !inline && 'mt-1.5')}
+            className={cn(
+               'flex gap-2',
+               nowrap ? 'flex-nowrap' : 'flex-wrap',
+               !inline && 'mt-1.5'
+            )}
          >
             {options.map((option) => {
                const on = option.value === value;

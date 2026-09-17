@@ -68,6 +68,10 @@ the live deploy.
 - [x] **Spot and gear forms on the shared field set.**
 - [x] **A private spot was public by address.** Not found to everyone but its
       owner now.
+- [x] **The catch form's last nine raw inputs** on the field set, and the gear
+      list under its kinds (rod, reel, line, hook, weights, lure, bait) with a
+      kind filter once there is enough gear to need one.
+- [x] **Phone: the Log key** has its plus and rounded corners.
 - [x] **Deploys.** Vercel builds `fishlogger` `main`; `git push origin` deploys
       nothing. Railway is `railway up --service server --detach`.
 
@@ -78,14 +82,10 @@ the live deploy.
 2. **This season strip.** Several fish in one day need a better shape than one
     bar each.
 3. **Contours on desktop.** Cut off and repetitive, worst on the home page.
-4. **Phone: the Log key** wants an icon and less sharp corners.
-5. **Phone: the filters** still take too much room.
-6. **The catch form's last raw inputs** (nine of them) onto the field set.
-7. **Gear picker with categories** on the log, the way FishAngler groups rods,
-    reels, lines and lures.
-8. **Angler Intel chart:** catches by hour and by tide or moon, from the log.
-9. **Pin clustering** at low zoom, and the map modes from the pin brief.
-10. **Species from a photograph.** Needs a model decision first.
+4. **Phone: the filters** still take too much room.
+5. **Angler Intel chart:** catches by hour and by tide or moon, from the log.
+6. **Pin clustering** at low zoom, and the map modes from the pin brief.
+7. **Species from a photograph.** Needs a model decision first.
 
 ## Standing constraints
 

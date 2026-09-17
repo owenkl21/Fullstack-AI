@@ -118,10 +118,25 @@ export function FeedPostBlock({
       post.type === 'CATCH'
          ? (post.catch?.images ?? [])
          : (post.site?.images ?? []);
+   /*
+    * The fish leads. A card used to be headed by whatever the angler typed
+    * as a title, with the species in small type under it, so a row of cards
+    * read "Morning session", "Tuesday", "Slangkop" and never said what was
+    * caught. The species is the heading; the angler's own title, when it is
+    * more than the species again, sits under the figures as what they called
+    * it.
+    */
    const heading =
       post.type === 'CATCH'
-         ? (post.catch?.title ?? null)
+         ? post.catch?.species?.trim() || post.catch?.title || null
          : (post.site?.name ?? null);
+   const called =
+      post.type === 'CATCH' &&
+      post.catch?.title &&
+      heading &&
+      post.catch.title.trim().toLowerCase() !== heading.trim().toLowerCase()
+         ? post.catch.title.trim()
+         : null;
    const recordHref = post.catch
       ? `/catches/${post.catch.id}`
       : post.site
@@ -134,7 +149,7 @@ export function FeedPostBlock({
 
    return (
       <article className="blk" aria-labelledby={`post-${post.id}`}>
-         <header className="flex items-center gap-3 px-4 pt-5 pr-12 pb-3">
+         <header className="flex items-center gap-3 px-4 pt-5 pr-12 pb-4">
             {/*
              * The photograph and the name are one link. Making only the name
              * clickable left a 26px target, which is under the minimum and
@@ -178,10 +193,6 @@ export function FeedPostBlock({
                </span>
             </Link>
          </header>
-
-         <p className="px-4 pb-4 text-[15px] text-paper-2">
-            {contextSentence(post, showDistance)}
-         </p>
 
          {images.length > 0 ? (
             <Carousel label={heading ? `Photos of ${heading}` : 'Photos'}>
@@ -264,18 +275,11 @@ export function FeedPostBlock({
                </span>
             )}
 
-            {/*
-             * The fish itself. A title is whatever the angler called the
-             * morning, so without this the card never said what was caught.
-             */}
-            {post.catch?.species ? (
-               <p className="text-[15px] text-paper-2">{post.catch.species}</p>
-            ) : null}
-
             {measurement ? (
                /* League Gothic for the figures, but not uppercased: `cm` and `lb`
-                  are units and are never shouted. */
-               <p className="num font-display text-[24px] tracking-[0.03em] text-paper">
+                  are units and are never shouted. Straight under the species,
+                  because the fish and its size are one fact. */
+               <p className="num -mt-1 font-display text-[26px] tracking-[0.03em] text-paper">
                   {measurement.value}
                   {measurement.source ? (
                      <span className="ml-2 font-sans text-[14px] tracking-normal text-paper-2">
@@ -284,6 +288,14 @@ export function FeedPostBlock({
                   ) : null}
                </p>
             ) : null}
+
+            {/* Where and when, after what: the meta line reads as a caption
+                to the fish rather than as a preamble to the photograph. */}
+            <p className="text-[14px] text-paper-2">
+               {contextSentence(post, showDistance)}
+            </p>
+
+            {called ? <p className="text-[15px] text-paper">{called}</p> : null}
 
             {post.content ? (
                <p className="text-[15px] leading-relaxed whitespace-pre-line text-paper">

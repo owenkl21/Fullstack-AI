@@ -585,7 +585,7 @@ export function FeedPage() {
       >
          <header className="rv flex flex-col gap-3">
             <h1 className="g text-[44px] md:text-[56px]">Feed</h1>
-            <p className="max-w-[46ch] text-[17px] text-ink-2">
+            <p className="hidden sm:block max-w-[46ch] text-[17px] text-ink-2">
                What other anglers logged, newest first.
             </p>
          </header>

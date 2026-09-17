@@ -58,22 +58,32 @@ export function FeedFilters({
           * room before the first post. Beside them it is two, and the labels
           * stay, so the two groups still read as two.
           */}
-         <div className="flex flex-col gap-3 sm:flex-row sm:gap-10">
+         {/*
+          * On a phone, one row that scrolls sideways: the two groups side by
+          * side with their labels, and the bar itself bleeds to the screen
+          * edge so the last chip peeks in and says there is more. Two stacked
+          * rows here cost the first post its place above the fold.
+          */}
+         <div className="-mx-4 flex gap-8 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:gap-10 sm:overflow-visible sm:px-0">
             <ChoiceGroup
                inline
+               nowrap
                size="sm"
                label="Scope"
                value={scope}
                options={SCOPE_OPTIONS}
                onChange={onScopeChange}
+               className="shrink-0"
             />
             <ChoiceGroup
                inline
+               nowrap
                size="sm"
                label="Show"
                value={show}
                options={SHOW_OPTIONS}
                onChange={onShowChange}
+               className="shrink-0"
             />
          </div>
 
