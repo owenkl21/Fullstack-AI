@@ -20,6 +20,7 @@ import {
    speciesChoices,
    type Species,
 } from '@/components/fishing/quicklog/species';
+import { AddGearInline } from '@/components/fishing/AddGearInline';
 
 type SiteOption = {
    id: string;
@@ -316,6 +317,20 @@ export function CatchForm({
          }
       }
    }, [initial?.gears]);
+
+   /*
+    * A piece added here joins the list and is ticked straight away: it was
+    * added because it caught this fish.
+    */
+   const addGear = (entry: GearOption) => {
+      setGear((current) =>
+         current.some((g) => g.id === entry.id) ? current : [entry, ...current]
+      );
+      setSelectedGearIds((current) =>
+         current.includes(entry.id) ? current : [...current, entry.id]
+      );
+      setGearSearch('');
+   };
 
    const retryOptions = () => {
       setSitesState('loading');
@@ -1464,10 +1479,12 @@ export function CatchForm({
                      </Button>
                   </div>
                ) : gear.length === 0 ? (
-                  <p className="text-ink-2">
-                     You have no gear yet. Add a rod or a reel and it shows up
-                     here.
-                  </p>
+                  <div className="flex flex-col items-start gap-3">
+                     <p className="text-ink-2">
+                        No gear yet. Add a rod or a reel and it shows up here.
+                     </p>
+                     <AddGearInline onAdded={addGear} />
+                  </div>
                ) : filteredGear.length === 0 ? (
                   <div className="flex flex-col items-start gap-3">
                      <p className="text-ink-2">No gear goes by that name.</p>
@@ -1514,6 +1531,10 @@ export function CatchForm({
                      ))}
                   </ul>
                )}
+
+               {gearState === 'ready' && gear.length > 0 ? (
+                  <AddGearInline onAdded={addGear} />
+               ) : null}
             </div>
 
             <div>
