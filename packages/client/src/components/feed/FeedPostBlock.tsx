@@ -272,7 +272,7 @@ export function FeedPostBlock({
             </div>
          )}
 
-         <div className="flex min-h-[236px] flex-1 flex-col gap-3 px-4 pt-5 pb-6">
+         <div className="flex flex-1 flex-col gap-3 overflow-hidden px-4 pt-5 pb-6 md:h-[292px]">
             {heading ? (
                <h2 id={`post-${post.id}`} className="g text-[30px] text-paper">
                   {heading}
@@ -307,7 +307,7 @@ export function FeedPostBlock({
             {called ? <p className="text-[15px] text-paper">{called}</p> : null}
 
             {post.content ? (
-               <p className="text-[15px] leading-relaxed whitespace-pre-line text-paper">
+               <p className="line-clamp-3 text-[15px] leading-relaxed whitespace-pre-line text-paper">
                   {post.content}
                </p>
             ) : null}

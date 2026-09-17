@@ -94,6 +94,16 @@ export function MapLocationPicker({
    const mapContainerRef = useRef<HTMLDivElement | null>(null);
    const mapRef = useRef<LeafletMap | null>(null);
    const lastSentRef = useRef<MapPosition | null>(null);
+   /*
+    * Moves made by this code (following the form, Leaflet's own resize
+    * nudge) are not the reader's. A short silent window after each one
+    * keeps the resulting moveend from being reported as a dropped pin,
+    * which would then outrank a photograph's own position.
+    */
+   const silentUntil = useRef(0);
+   const hush = () => {
+      silentUntil.current = Date.now() + 500;
+   };
    const onChangeRef = useRef(onChange);
    const startRef = useRef<MapPosition | null>(
       readPosition(latitude, longitude)
@@ -157,6 +167,7 @@ export function MapLocationPicker({
          map.on('movestart', () => setMoving(true));
          map.on('moveend', () => {
             setMoving(false);
+            if (Date.now() < silentUntil.current) return;
             const c = map.getCenter();
             const next = { lat: c.lat, lng: c.lng };
             const last = lastSentRef.current;
@@ -169,7 +180,10 @@ export function MapLocationPicker({
             send(next);
          });
 
-         observer = new ResizeObserver(() => refreshSize(map));
+         observer = new ResizeObserver(() => {
+            hush();
+            refreshSize(map);
+         });
          observer.observe(node);
       } catch (error) {
          console.error(error);
@@ -196,6 +210,7 @@ export function MapLocationPicker({
       )
          return;
       lastSentRef.current = next;
+      hush();
       mapRef.current?.setView(
          [next.lat, next.lng],
          Math.max(mapRef.current.getZoom(), FOCUSED_ZOOM),

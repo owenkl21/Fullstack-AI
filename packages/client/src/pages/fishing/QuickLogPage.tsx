@@ -135,15 +135,13 @@ function QuickLog() {
             setTimeSource('photo');
          }
          if (meta.latitude !== null && meta.longitude !== null) {
-            setWhere((was) =>
-               was?.source === 'pin'
-                  ? was
-                  : {
-                       latitude: meta.latitude as number,
-                       longitude: meta.longitude as number,
-                       source: 'photo',
-                    }
-            );
+            /* The photograph knows where it was taken. It moves the pin;
+             * the pin can still be moved afterwards. */
+            setWhere({
+               latitude: meta.latitude,
+               longitude: meta.longitude,
+               source: 'photo',
+            });
          }
       });
    };
