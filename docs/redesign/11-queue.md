@@ -270,6 +270,27 @@ in the code with no route and no nav word, as asked.
   feed crops to it; feed cards one height; an open thread grows the card;
   the thread's fourth reply peeks so scrolling loads more.
 
+## Done on 17 Sep, midnight (commits 9cbcafc, 2a93b6b)
+
+- Phones: the catch form is three steps from the same blocks (`usePhone` in
+  `lib/media.ts`): the catch (photo, species, when and where), size and gear,
+  sharing and save; Next and Back in the footer; a step bar under the title.
+  The desktop card is unchanged.
+- The photo is one thing: the feed's 4:3 frame with the picture inside,
+  dragged to place; Change and Remove on it.
+- `ui/sheet.tsx` (Radix Dialog) rises from the bottom on a phone. `ui/picker`
+  uses it under md, a popover above; the button says how many are chosen
+  with a badge, the open one is ruled in teal, chosen rows are marked and
+  tinted; Clear and Done in the head. The map's layers panel and the legend
+  share one sheet on a phone.
+- `map/MapToolbar` takes `placement`: overlay on a desktop, a bar of four
+  under the map on a phone (Layers, Fish, Mark, Log here); the legend button
+  goes; `@media (pointer: coarse)` hides the zoom control. The pin picker on
+  a phone puts search above the map and locate and the base below.
+- Waves back: the plate's contours are clipped by their own box, not by the
+  header, which had been clipping the hanging edge.
+- Checked live by `audit/lbl8.mjs` on a phone and a desktop: five of five.
+
 ## Next, in order
 
 1. **Switch the readers on**: set `ANTHROPIC_API_KEY` on Railway for the
