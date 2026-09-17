@@ -283,8 +283,13 @@ export function SpotsMap({
       let timer: number | null = null;
 
       const load = () => {
+         /*
+          * Too far out to ask, but what is drawn stays drawn. Clearing here is
+          * why places seemed to vanish: zoom in, they load; zoom out a step,
+          * gone. Pins outside the view cost nothing, and the next successful
+          * fetch replaces them.
+          */
          if (created.getZoom() < POI_MIN_ZOOM) {
-            setPois([]);
             return;
          }
 

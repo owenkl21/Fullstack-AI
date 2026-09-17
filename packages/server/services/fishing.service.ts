@@ -170,7 +170,19 @@ const siteDetailInclude = {
  * does not separate thunderstorm probability from the weather code.
  */
 const mapConditionsToCatchData = (conditions: Conditions) => ({
-   weatherCurrentTime: conditions.observedAt,
+   /*
+    * Open-Meteo hands back the hour it read as a naive "2026-09-14T04:00",
+    * with no seconds and no zone. Prisma wants a full ISO instant, and given
+    * the naive string it refused with "premature end of input" and the whole
+    * save was a 500. The request is made in UTC, so the string is UTC.
+    */
+   weatherCurrentTime: conditions.observedAt
+      ? new Date(
+           /[Zz]|[+-]\d{2}:\d{2}$/.test(conditions.observedAt)
+              ? conditions.observedAt
+              : `${conditions.observedAt}:00Z`.replace(/:00:00Z$/, ':00Z')
+        )
+      : null,
    weatherTimeZoneId: conditions.timeZoneId,
    weatherConditionType: conditions.conditionText,
    weatherConditionText: conditions.conditionText,
