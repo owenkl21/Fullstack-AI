@@ -159,6 +159,34 @@ the live deploy.
 
 Verified live with `audit/verify17.mjs`, `comments2.mjs`, `nearby.mjs`.
 
+## Done on 17 Sep, evening (commits c3f8cf7, 299b109, 13db842)
+
+Line by line, both lists, checked on the live site by `audit/lbl.mjs`,
+`lbl2.mjs` and `lbl3.mjs` (desktop at 1900 and 2000, phone at 390): 40 checks,
+all passing.
+
+- Distance control is a fader (`ui/slider.tsx`): deep track, teal fill, a grip,
+  a ruled scale; value held while dragging, committed on release.
+- Comments: four in view, the list scrolls on a teal rail (`.thread-scroll`),
+  Load more brings four at a time and reads the whole thread when it runs out.
+- Every page column widened again (content 1320 to 1400, data pages and the
+  header 1680); the feed runs two columns of cards from `xl`.
+- Spot page: no photograph, no empty 360px block above the name.
+- Waves (`brand/TornEdge.tsx`): bigger chop, quicker drift, taller box (120,
+  80 on phones), and the plate and ground paths close 40 units past the box so
+  the one pixel seam between a plate and its section is gone.
+- Conditions snapshot: the client no longer drops a reading without an icon
+  URL (Open-Meteo has none), so a quick log catch keeps its full conditions.
+- The app opens on the feed (`/`), the wordmark and Feed go there, the
+  conditions page is `/now` with a Now word in the nav.
+- The season strip moved to the bottom of Insights (`insights/SeasonStrip.tsx`),
+  by month with a heading per month and a year switch; `summary.ts` has
+  `seasonYears` and `seasonMonths`. Dates outside the current year carry the
+  year (`record/format.ts`, `feed/format.ts`).
+- Profile: personal bests and photographs fold (`ui/fold.tsx`), closed at first.
+- Contour drift sits behind insights, forecast, boards, competitions, the feed,
+  the catch list and a catch.
+
 ## Next, in order
 
 1. **Switch the readers on**: set `ANTHROPIC_API_KEY` on Railway for the
