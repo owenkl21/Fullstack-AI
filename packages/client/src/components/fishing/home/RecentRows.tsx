@@ -25,7 +25,10 @@ export function RecentRows({
             <h2 id="recent-heading" className="g text-[30px]">
                Recent
             </h2>
-            <Link to="/catches/me" className="lab text-teal-text">
+            <Link
+               to="/catches/me"
+               className="lab inline-flex min-h-11 items-center text-teal-text"
+            >
                All {plural(total, 'catch', 'catches')}
             </Link>
          </div>
