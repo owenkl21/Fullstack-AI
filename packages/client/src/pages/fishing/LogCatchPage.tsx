@@ -819,7 +819,11 @@ export function CatchForm({
    const isBusy = isSaving || isPhotoUploading;
 
    return (
-      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-10">
+      <form
+         onSubmit={onSubmit}
+         noValidate
+         className="flex max-w-[680px] flex-col gap-10"
+      >
          {/* ---------------- The fish ---------------- */}
          <section className="flex flex-col gap-6">
             <GroupHeading>The fish</GroupHeading>

@@ -269,7 +269,12 @@ export function SpotForm({
    };
 
    return (
-      <form ref={formRef} onSubmit={save} noValidate className="grid gap-10">
+      <form
+         ref={formRef}
+         onSubmit={save}
+         noValidate
+         className="grid max-w-[680px] gap-10"
+      >
          <Group title="The spot">
             <Field
                id={`${fieldId}-name`}
