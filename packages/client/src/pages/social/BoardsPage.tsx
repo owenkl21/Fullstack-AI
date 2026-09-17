@@ -76,9 +76,8 @@ export function BoardsPage() {
          ref={root}
          className="mx-auto w-full max-w-[1000px] px-4 py-10 md:px-8"
       >
-         <span className="lab lab-rule rv text-ink-2">Boards</span>
          <h1
-            className="g rv mt-5 text-[40px] md:text-[56px]"
+            className="g rv text-[40px] md:text-[56px]"
             style={{ '--i': 1 } as React.CSSProperties}
          >
             Who is catching what

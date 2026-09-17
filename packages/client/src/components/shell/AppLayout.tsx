@@ -1,7 +1,9 @@
 import { Suspense, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
+import { cn } from '@/lib/utils';
 import { AppHeader } from './AppHeader';
+import { isTaskRoute } from './routes';
 import { BottomBar } from './BottomBar';
 
 /*
@@ -70,7 +72,12 @@ export function AppLayout() {
          <AppHeader />
          <main
             id="main"
-            className="flex-1 pb-[calc(64px+env(safe-area-inset-bottom))] md:pb-0"
+            className={cn(
+               'flex-1 md:pb-0',
+               isTaskRoute(pathname)
+                  ? 'pb-0'
+                  : 'pb-[calc(64px+env(safe-area-inset-bottom))]'
+            )}
          >
             <Suspense
                fallback={

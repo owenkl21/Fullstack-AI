@@ -4,8 +4,9 @@ import {
    WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
 import type { ComponentType, SVGProps } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { FishMark } from '@/components/brand/FishMark';
+import { isTaskRoute } from '@/components/shell/routes';
 import { SignedIn, SignedOut } from '@/components/shell/Signed';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +37,12 @@ const right: Slot[] = [
  * read the same at a glance, which is the one thing a thumb bar cannot afford.
  */
 export function BottomBar() {
+   const { pathname } = useLocation();
+
+   if (isTaskRoute(pathname)) {
+      return null;
+   }
+
    const slot =
       'g-tracked flex h-16 flex-col items-center justify-center gap-1 text-[13px] text-paper-2 transition-colors duration-150 [transition-timing-function:var(--ease)] hover:text-paper';
    const active = 'text-paper shadow-[inset_0_3px_0_var(--teal)]';

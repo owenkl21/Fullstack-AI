@@ -328,7 +328,7 @@ function QuickLog() {
             type="button"
             onClick={() => void save()}
             disabled={photoBusy || isSaving}
-            className="g-tracked sticky bottom-[calc(64px+env(safe-area-inset-bottom))] z-10 flex h-14 w-full shrink-0 items-center justify-center bg-teal text-[26px] text-teal-ink transition-[filter] duration-150 active:brightness-95 disabled:opacity-60 md:bottom-0"
+            className="g-tracked sticky bottom-0 z-10 flex h-14 w-full shrink-0 items-center justify-center bg-teal text-[26px] text-teal-ink transition-[filter] duration-150 active:brightness-95 disabled:opacity-60 md:bottom-0"
          >
             {isSaving
                ? 'Saving'
