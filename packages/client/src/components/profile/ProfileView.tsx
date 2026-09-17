@@ -37,8 +37,13 @@ export function ProfileView({
 
    const since = monthAndYear(profile.createdAt);
    const bio = profile.bio?.trim();
+   /*
+    * These sit inside a sentence, so the 44px target goes around the words
+    * rather than being the words. As an h-11 inline-flex box each one opened a
+    * gap in the middle of the line it was part of.
+    */
    const control =
-      'inline-flex h-11 items-center align-middle text-teal-text underline-offset-4 transition-colors duration-150 [transition-timing-function:var(--ease)] hover:underline';
+      'tap-inline text-teal-text underline-offset-4 transition-colors duration-150 [transition-timing-function:var(--ease)] hover:underline';
 
    return (
       <div ref={root}>

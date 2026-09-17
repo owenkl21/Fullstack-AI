@@ -79,10 +79,7 @@ export function ProfileStatsPanel() {
                {stats.unscored === 1 ? 'catch does' : 'catches do'} not score
                yet. A catch needs a species, a length, and published figures for
                that species before it can be ranked.{' '}
-               <Link
-                  to="/boards"
-                  className="inline-flex min-h-11 items-center text-teal-text"
-               >
+               <Link to="/boards" className="tap-inline text-teal-text">
                   See the boards
                </Link>
             </p>

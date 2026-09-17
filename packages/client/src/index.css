@@ -337,6 +337,20 @@
       );
    }
    /* Dashed underline inputs */
+   /*
+    * A link inside running prose still needs a 44px target, but making the link
+    * itself 44px tall puts a box in the middle of a sentence and opens gaps
+    * between the lines. The target is grown around the text instead, so the
+    * typography is untouched and the thumb still has something to hit.
+    */
+   .tap-inline {
+      position: relative;
+   }
+   .tap-inline::after {
+      content: '';
+      position: absolute;
+      inset: -0.7rem -0.2rem;
+   }
    .input-line {
       /*
        * A field you can see the edges of. The old one was a dashed hairline on

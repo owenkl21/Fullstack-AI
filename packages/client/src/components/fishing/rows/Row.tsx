@@ -129,5 +129,14 @@ export function RowList({
    children: ReactNode;
    className?: string;
 }) {
-   return <div className={cn('flex flex-col', className)}>{children}</div>;
+   /*
+    * The closing rule matters most on a short list: with a rule above every row
+    * and none below the last, two catches trailed off into empty page rather
+    * than reading as a list that had ended.
+    */
+   return (
+      <div className={cn('flex flex-col border-b border-line', className)}>
+         {children}
+      </div>
+   );
 }
