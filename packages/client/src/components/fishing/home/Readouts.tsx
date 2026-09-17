@@ -47,18 +47,29 @@ export function Readouts({
          aria-labelledby="conditions-heading"
          /* Top padding makes room for the plate's edge hanging over this
             section; the water shows through its troughs. */
-         className="relative overflow-hidden px-4 pt-[78px] pb-2 md:px-8 md:pt-[112px]"
+         className="relative px-4 pt-[78px] pb-2 md:px-8 md:pt-[112px]"
       >
          {/*
           * This section sits directly under the torn edge, which reads as the
           * waterline, so it is the one place in the product that is literally
           * under water. The contours stay: they are the sea floor now rather
           * than decoration.
+          *
+          * The water runs the width of the screen, not the width of the
+          * column of text. Clipped to the 860px column it stopped at a hard
+          * vertical edge on a desktop, which is the one thing a sea floor
+          * never does. The root hides horizontal overflow, so a 100vw layer
+          * costs no scrollbar.
           */}
-         <Underwater seed={3} />
-         {/* No fixed size: the art is generated at whatever shape this section
-             is, so it does not smear on a wide screen. */}
-         <Contours seed={3} className="inset-0 h-full w-full" />
+         <div
+            aria-hidden="true"
+            className="absolute inset-y-0 left-1/2 w-screen -translate-x-1/2 overflow-hidden"
+         >
+            <Underwater seed={3} />
+            {/* No fixed size: the art is generated at whatever shape this
+                layer is, so it does not smear on a wide screen. */}
+            <Contours seed={3} className="inset-0 h-full w-full" />
+         </div>
          <h2 id="conditions-heading" className="sr-only">
             Conditions
          </h2>
