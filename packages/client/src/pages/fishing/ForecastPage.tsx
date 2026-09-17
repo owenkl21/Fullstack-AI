@@ -48,6 +48,11 @@ type Target = { latitude: number; longitude: number; name: string | null };
 
 type Status = 'idle' | 'loading' | 'ready' | 'error';
 
+/* With no place and no fix, a search leans towards the coast most of the
+   first anglers fish, so Kanu is the farm at Stellenbosch, not a town in
+   Japan. */
+const HOME_WATERS = { latitude: -33.9, longitude: 18.9 };
+
 export function ForecastPage() {
    useDocumentTitle('Forecast');
 
@@ -190,7 +195,12 @@ export function ForecastPage() {
                onPick={pick}
                onUseMine={useMine}
                locating={positionState === 'asking'}
-               near={target}
+               near={
+                  target ??
+                  (fix
+                     ? { latitude: fix.latitude, longitude: fix.longitude }
+                     : HOME_WATERS)
+               }
                className="w-full"
             />
          </div>
