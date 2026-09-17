@@ -44,7 +44,7 @@ export function SignInPage() {
          title="Sign in"
          lead="Your catches, your spots and your gear are where you left them."
          footer={
-            <p className="inline-flex min-h-11 items-center text-[17px] text-ink-2">
+            <p className="inline-flex min-h-11 items-center gap-1.5 text-[17px] text-ink-2">
                No account yet?{' '}
                <Link
                   to="/sign-up"

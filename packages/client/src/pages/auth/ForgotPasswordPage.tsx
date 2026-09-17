@@ -34,7 +34,7 @@ export function ForgotPasswordPage() {
             title="Check your email"
             lead="If that address has an account, a link to set a new password is on its way. The link works once, and for an hour."
             footer={
-               <p className="inline-flex min-h-11 items-center text-[17px] text-ink-2">
+               <p className="inline-flex min-h-11 items-center gap-1.5 text-[17px] text-ink-2">
                   <Link
                      to="/sign-in"
                      className="inline-flex min-h-11 items-center text-teal-text"
@@ -57,7 +57,7 @@ export function ForgotPasswordPage() {
          title="Reset your password"
          lead="Give the address you signed up with and we will send a link to set a new one."
          footer={
-            <p className="inline-flex min-h-11 items-center text-[17px] text-ink-2">
+            <p className="inline-flex min-h-11 items-center gap-1.5 text-[17px] text-ink-2">
                Remembered it?{' '}
                <Link
                   to="/sign-in"
