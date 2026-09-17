@@ -211,41 +211,49 @@ export function toSavableSnapshot(snapshot: WeatherSnapshot | null) {
    const wind = snapshot?.wind;
    const percent = snapshot?.precipitation?.probability?.percent;
 
+   /*
+    * Open-Meteo sends no icon and no probability for some hours; a reading
+    * missing those is still a reading. What must be there is the sky, the
+    * air and the wind. The rest defaults rather than sinking the snapshot.
+    */
    if (
-      !condition?.iconBaseUri ||
-      !condition.description?.text ||
+      !snapshot ||
+      !condition?.description?.text ||
       typeof temperature?.degrees !== 'number' ||
       !temperature.unit ||
-      typeof percent !== 'number' ||
-      !wind?.direction?.cardinal ||
-      typeof wind.speed?.value !== 'number' ||
-      !wind.speed.unit ||
-      typeof wind.gust?.value !== 'number' ||
-      !wind.gust.unit ||
-      typeof snapshot?.cloudCover !== 'number'
+      typeof wind?.speed?.value !== 'number' ||
+      !wind.speed.unit
    ) {
       return null;
    }
+   const gust = wind.gust ?? wind.speed;
+   const cardinal = wind.direction?.cardinal || 'N';
+   const chance = typeof percent === 'number' ? percent : 0;
+   const cloud =
+      typeof snapshot?.cloudCover === 'number' ? snapshot.cloudCover : 0;
 
    return {
       weatherCondition: {
-         iconBaseUri: condition.iconBaseUri,
+         iconBaseUri: condition.iconBaseUri ?? '',
          description: { text: condition.description.text },
       },
       temperature: { degrees: temperature.degrees, unit: temperature.unit },
       precipitation: {
-         probability: { percent },
+         probability: { percent: chance },
          amountMm: snapshot.precipitation?.amountMm ?? null,
       },
       wind: {
          direction: {
-            cardinal: wind.direction.cardinal,
-            degrees: wind.direction.degrees ?? null,
+            cardinal,
+            degrees: wind.direction?.degrees ?? null,
          },
          speed: { value: wind.speed.value, unit: wind.speed.unit },
-         gust: { value: wind.gust.value, unit: wind.gust.unit },
+         gust: {
+            value: gust.value ?? wind.speed.value,
+            unit: gust.unit ?? wind.speed.unit,
+         },
       },
-      cloudCover: snapshot.cloudCover,
+      cloudCover: cloud,
       /*
        * The rest of the reading, so a save made while the server cannot reach
        * Open-Meteo still stores the sea, the moon and the pressure. The

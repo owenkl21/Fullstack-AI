@@ -146,7 +146,7 @@ export function EditCatchPage() {
 
    return (
       <RequireSignIn what="this catch">
-         <section className="mx-auto w-[min(720px,100%-32px)] py-8 md:py-12">
+         <section className="mx-auto w-[min(1400px,100%-32px)] py-8 md:py-12">
             <h1 className="g text-[44px] md:text-[56px]">
                {record ? record.title : 'Edit a catch'}
             </h1>

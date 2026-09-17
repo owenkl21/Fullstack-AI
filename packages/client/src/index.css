@@ -263,7 +263,7 @@
       left: 0;
       right: 0;
       bottom: -2px;
-      height: 90px;
+      height: 120px;
       z-index: 3;
       pointer-events: none;
    }
@@ -281,19 +281,19 @@
     * underneath pads its top by the same amount so nothing sits under it.
     */
    .torn-hang {
-      bottom: -88px;
+      bottom: -118px;
       /* Above whatever the next section draws in its top padding. */
       z-index: 6;
    }
    @media (max-width: 640px) {
       .torn-hang {
-         bottom: -54px;
+         bottom: -78px;
       }
    }
 
    @media (max-width: 640px) {
       .torn {
-         height: 56px;
+         height: 80px;
       }
    }
    /*
@@ -1041,6 +1041,34 @@ td.fact {
    .fact {
       animation: none;
    }
+}
+
+/* ---- The fader ------------------------------------------------------------- */
+.fader-track {
+   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.fader-grip {
+   box-shadow:
+      0 0 0 2px var(--background),
+      0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* ---- A thread that scrolls ------------------------------------------------- */
+/* Four replies high, then it scrolls, on a rail in the product's own colour. */
+.thread-scroll {
+   scrollbar-width: thin;
+   scrollbar-color: var(--teal)
+      color-mix(in srgb, var(--paper) 12%, transparent);
+   overscroll-behavior: contain;
+}
+.thread-scroll::-webkit-scrollbar {
+   width: 6px;
+}
+.thread-scroll::-webkit-scrollbar-track {
+   background: color-mix(in srgb, var(--paper) 12%, transparent);
+}
+.thread-scroll::-webkit-scrollbar-thumb {
+   background: var(--teal);
 }
 
 /* ---- A reply arriving ------------------------------------------------------ */

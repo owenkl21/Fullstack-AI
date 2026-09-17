@@ -115,7 +115,7 @@ function AnglerScreen() {
    if (status === 'loading') {
       return (
          <section
-            className="mx-auto w-[min(820px,100%-32px)] py-10 md:py-14"
+            className="mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14"
             role="status"
             aria-label="Loading the angler"
          >
@@ -132,7 +132,7 @@ function AnglerScreen() {
 
    if (status !== 'ready' || !profile) {
       return (
-         <section className="mx-auto w-[min(820px,100%-32px)] py-10 md:py-14">
+         <section className="mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14">
             <h1 className="g text-[40px] md:text-[52px]">
                {status === 'missing' ? 'No such angler' : 'That did not load'}
             </h1>
@@ -156,7 +156,7 @@ function AnglerScreen() {
    const since = monthAndYear(profile.createdAt);
 
    return (
-      <section className="mx-auto w-[min(820px,100%-32px)] py-10 md:py-14">
+      <section className="mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14">
          <header>
             <Banner url={profile.bannerUrl} />
             <div className="-mt-8 flex flex-wrap items-end gap-4">

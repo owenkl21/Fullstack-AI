@@ -28,7 +28,7 @@ type Wave = { length: number; amp: number; speed: number; phase: number };
 type Band = { waves: Wave[]; lift: number };
 
 const WIDTH = 1600;
-const HEIGHT = 90;
+const HEIGHT = 120;
 /* Points along the curve. Ninety is smooth at this width and cheap to rebuild. */
 const STEPS = 90;
 
@@ -57,12 +57,21 @@ const xAt = (i: number) => ((i / STEPS) * WIDTH).toFixed(1);
 const lineOf = (ys: number[]) =>
    ys.map((y, i) => `${i ? 'L' : 'M'}${xAt(i)} ${y.toFixed(1)}`).join('');
 
-/* Closed along the bottom of the box: the next section's ground. */
-const below = (ys: number[]) =>
-   `${lineOf(ys)} L${WIDTH} ${HEIGHT} L0 ${HEIGHT} Z`;
+/*
+ * Closed well past the box rather than on its edge. A path that ends exactly
+ * on the box boundary is anti-aliased there and draws a one pixel seam
+ * between the plate and the section it belongs to; the SVG lets its
+ * contents overflow, so the closing edge can sit where nothing shows it.
+ */
+const PAST = 40;
 
-/* Closed along the top of the box: the plate being cut. */
-const above = (ys: number[]) => `${lineOf(ys)} L${WIDTH} 0 L0 0 Z`;
+/* Closed below the box: the next section's ground. */
+const below = (ys: number[]) =>
+   `${lineOf(ys)} L${WIDTH} ${HEIGHT + PAST} L0 ${HEIGHT + PAST} Z`;
+
+/* Closed above the box: the plate being cut. */
+const above = (ys: number[]) =>
+   `${lineOf(ys)} L${WIDTH} ${-PAST} L0 ${-PAST} Z`;
 
 /* The region between two lines: a wet strip under the plate. */
 const between = (top: number[], bottom: number[]) =>
@@ -108,27 +117,27 @@ export function TornEdge({
        */
       const bands: Band[] = [
          {
-            lift: 18,
+            lift: 26,
             waves: [
-               { length: 760, amp: 13, speed: 0.021, phase: seed * 0.13 },
-               { length: 430, amp: 7, speed: -0.034, phase: seed * 0.41 },
-               { length: 237, amp: 3.5, speed: 0.052, phase: seed * 0.77 },
+               { length: 760, amp: 19, speed: 0.036, phase: seed * 0.13 },
+               { length: 430, amp: 10, speed: -0.058, phase: seed * 0.41 },
+               { length: 237, amp: 5, speed: 0.088, phase: seed * 0.77 },
             ],
          },
          {
-            lift: 9,
+            lift: 13,
             waves: [
-               { length: 610, amp: 11, speed: -0.028, phase: seed * 0.29 },
-               { length: 347, amp: 6, speed: 0.045, phase: seed * 0.61 },
-               { length: 193, amp: 3, speed: -0.068, phase: seed * 0.19 },
+               { length: 610, amp: 16, speed: -0.048, phase: seed * 0.29 },
+               { length: 347, amp: 9, speed: 0.076, phase: seed * 0.61 },
+               { length: 193, amp: 4.5, speed: -0.115, phase: seed * 0.19 },
             ],
          },
          {
             lift: 0,
             waves: [
-               { length: 520, amp: 10, speed: 0.037, phase: seed * 0.53 },
-               { length: 281, amp: 5.5, speed: -0.057, phase: seed * 0.83 },
-               { length: 157, amp: 2.5, speed: 0.081, phase: seed * 0.31 },
+               { length: 520, amp: 15, speed: 0.063, phase: seed * 0.53 },
+               { length: 281, amp: 8, speed: -0.097, phase: seed * 0.83 },
+               { length: 157, amp: 3.5, speed: 0.138, phase: seed * 0.31 },
             ],
          },
       ];
@@ -169,7 +178,7 @@ export function TornEdge({
          if (cut) {
             const plate = ys[2]!;
             /* The shadow sits a little below the plate's own line. */
-            set('shadow', above(plate.map((y) => y + 7)));
+            set('shadow', above(plate.map((y) => y + 9)));
             set('strip0', between(plate, ys[0]!));
             set('strip1', between(plate, ys[1]!));
             set('plate', above(plate));
@@ -204,8 +213,8 @@ export function TornEdge({
          onUpdate: draw,
       });
       const swell = gsap.to(state, {
-         breath: 1.28,
-         duration: 4.6,
+         breath: 1.3,
+         duration: 3.8,
          ease: 'sine.inOut',
          yoyo: true,
          repeat: -1,

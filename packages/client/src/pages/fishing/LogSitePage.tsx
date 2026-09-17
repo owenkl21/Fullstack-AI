@@ -369,7 +369,7 @@ export function LogSitePage() {
 
    return (
       <RequireSignIn what="your spots">
-         <section className="mx-auto w-[min(720px,100%-32px)] py-10 md:py-14">
+         <section className="mx-auto w-[min(1400px,100%-32px)] py-10 md:py-14">
             <h1 className="g text-[44px] md:text-[56px]">Add a spot</h1>
             <p className="mt-3 max-w-[52ch] text-ink-2">
                Name the water, put the pin where you fish, and say how to get

@@ -2000,7 +2000,7 @@ export function LogCatchPage() {
 
    return (
       <RequireSignIn what="your log">
-         <section className="mx-auto w-[min(1120px,100%-32px)] py-8 md:py-12">
+         <section className="mx-auto w-[min(1400px,100%-32px)] py-8 md:py-12">
             <h1 className="g text-[44px] md:text-[56px]">Log a catch</h1>
             <p className="mt-3 max-w-[52ch] text-ink-2">
                Everything here is optional except the fish and the time.

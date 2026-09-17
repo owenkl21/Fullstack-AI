@@ -31,7 +31,7 @@ export function AppHeader() {
           * fills the bar deliberately and keeps the wordmark and the actions
           * anchored to their own edges.
           */}
-         <div className="relative mx-auto flex h-[60px] w-[min(1200px,100%-32px)] items-center gap-4 md:w-[min(1200px,100%-48px)]">
+         <div className="relative mx-auto flex h-[60px] w-[min(1680px,100%-32px)] items-center gap-4 md:w-[min(1200px,100%-48px)]">
             <Wordmark />
             <SignedIn>
                <nav

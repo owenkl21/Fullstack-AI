@@ -278,7 +278,7 @@ function SiteRecord({
 
    if (state.status === 'error' || !data) {
       return (
-         <section className="mx-auto w-[min(960px,100%-32px)] py-16">
+         <section className="mx-auto w-[min(1320px,100%-32px)] py-16">
             <h1 className="g text-[44px]">This spot</h1>
             <p role="alert" className="mt-4 max-w-[60ch] text-base text-ink-2">
                {LOAD_FAILED}
@@ -545,7 +545,7 @@ function SiteBody({ children }: { children: ReactNode }) {
    return (
       <div
          ref={root}
-         className="mx-auto w-[min(960px,100%-32px)] pt-[78px] pb-8 md:pt-[112px] md:pb-12"
+         className="mx-auto w-[min(1320px,100%-32px)] pt-[102px] pb-8 md:pt-[142px] md:pb-12"
       >
          {children}
       </div>
@@ -576,7 +576,16 @@ function SiteHeader({
     */
    return (
       <header className="relative bg-black-block text-paper">
-         <div className="relative h-[210px] overflow-hidden md:h-[360px]">
+         {/* Without a photograph there is nothing to look at up here, so
+             the block shrinks to a band above the name rather than
+             standing 360 pixels of empty black on a desktop. */}
+         <div
+            className={
+               photoUrl
+                  ? 'relative h-[210px] overflow-hidden md:h-[360px]'
+                  : 'relative h-6 md:h-8'
+            }
+         >
             {photoUrl ? (
                <img
                   src={photoUrl}
@@ -591,7 +600,7 @@ function SiteHeader({
          </div>
 
          <div className="relative z-[4] pt-5 pb-11 md:pt-7 md:pb-16">
-            <div className="mx-auto w-[min(960px,100%-32px)]">
+            <div className="mx-auto w-[min(1320px,100%-32px)]">
                <h1 className="g text-[44px] text-paper md:text-[72px]">
                   {name}
                </h1>
@@ -644,7 +653,7 @@ function SiteSkeleton() {
    return (
       <div role="status" aria-label="Loading this spot">
          <div className="h-[300px] bg-bg-2 md:h-[420px]" />
-         <div className="mx-auto w-[min(960px,100%-32px)] pt-[78px] pb-8 md:pt-[112px] md:pb-12">
+         <div className="mx-auto w-[min(1320px,100%-32px)] pt-[102px] pb-8 md:pt-[142px] md:pb-12">
             <span className="block h-4 w-2/5 bg-bg-2" />
             <span className="mt-6 block h-4 w-full bg-bg-2" />
             <span className="mt-2 block h-4 w-4/5 bg-bg-2" />

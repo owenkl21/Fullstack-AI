@@ -135,7 +135,7 @@ function CompetitionsScreen() {
    }, []);
 
    return (
-      <section className="mx-auto w-[min(1000px,100%-32px)] py-10 md:py-14">
+      <section className="mx-auto w-[min(1320px,100%-32px)] py-10 md:py-14">
          <div className="flex flex-wrap items-baseline justify-between gap-4">
             <h1 className="g text-[44px] md:text-[56px]">Competitions</h1>
             {!starting ? (

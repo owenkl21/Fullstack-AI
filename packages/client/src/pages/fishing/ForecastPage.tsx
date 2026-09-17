@@ -149,7 +149,7 @@ export function ForecastPage() {
    );
 
    return (
-      <section className="mx-auto w-[min(1200px,100%-32px)] py-8 md:py-12">
+      <section className="mx-auto w-[min(1680px,100%-32px)] py-8 md:py-12">
          <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
             <div className="min-w-0">
                <p className="lab text-ink-3">Forecast</p>

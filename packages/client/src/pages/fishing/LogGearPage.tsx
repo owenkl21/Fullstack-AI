@@ -305,7 +305,7 @@ export function LogGearPage() {
 
    return (
       <RequireSignIn what="your gear">
-         <section className="mx-auto w-[min(720px,100%-32px)] py-10 md:py-14">
+         <section className="mx-auto w-[min(1400px,100%-32px)] py-10 md:py-14">
             <h1 className="g text-[44px] md:text-[56px]">Add gear</h1>
             <p className="mt-3 max-w-[52ch] text-ink-2">
                Name it, say who makes it and what it is. You can then put it on

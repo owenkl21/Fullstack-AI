@@ -335,7 +335,7 @@ function Insights() {
 
    if (failed) {
       return (
-         <section className="mx-auto w-[min(1200px,100%-32px)] py-8 md:py-12">
+         <section className="mx-auto w-[min(1680px,100%-32px)] py-8 md:py-12">
             <h1 className="g text-[44px] md:text-[56px]">Insights</h1>
             <p className="mt-3 text-[17px] text-ink-2">
                Could not read your log just now.
@@ -347,7 +347,7 @@ function Insights() {
    if (!catches || !progress || !charts || !tables) {
       return (
          <section
-            className="mx-auto w-[min(1200px,100%-32px)] py-8 md:py-12"
+            className="mx-auto w-[min(1680px,100%-32px)] py-8 md:py-12"
             role="status"
             aria-label="Reading your log"
          >
@@ -380,7 +380,7 @@ function Insights() {
    const bestWind = charts.wind.reduce((a, b) => (b.count > a.count ? b : a));
 
    return (
-      <section className="mx-auto w-[min(1200px,100%-32px)] py-8 md:py-12">
+      <section className="mx-auto w-[min(1680px,100%-32px)] py-8 md:py-12">
          <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
             <div>
                <p className="lab text-ink-3">Your log, counted</p>

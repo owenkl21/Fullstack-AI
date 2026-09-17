@@ -47,7 +47,7 @@ export function Readouts({
          aria-labelledby="conditions-heading"
          /* Top padding makes room for the plate's edge hanging over this
             section; the water shows through its troughs. */
-         className="relative px-4 pt-[78px] pb-2 md:px-8 md:pt-[112px]"
+         className="relative px-4 pt-[102px] pb-2 md:px-8 md:pt-[142px]"
       >
          {/*
           * This section sits directly under the torn edge, which reads as the

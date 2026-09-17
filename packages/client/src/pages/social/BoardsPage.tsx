@@ -90,7 +90,7 @@ export function BoardsPage() {
    return (
       <section
          ref={root}
-         className="mx-auto w-full max-w-[1000px] px-4 py-10 md:px-8"
+         className="mx-auto w-full max-w-[1320px] px-4 py-10 md:px-8"
       >
          <h1
             className="g rv text-[40px] md:text-[56px]"

@@ -25,6 +25,8 @@ type MapLocationPickerProps = {
    longitude: string;
    onChange: (latitude: number, longitude: number) => void;
    className?: string;
+   /* The map box alone, for a parent that wants it to bleed to its edges. */
+   mapClassName?: string;
 };
 
 /* The country the first anglers fish, rather than a continent they do not. */
@@ -86,6 +88,7 @@ export function MapLocationPicker({
    longitude,
    onChange,
    className,
+   mapClassName,
 }: MapLocationPickerProps) {
    const fieldId = useId();
    const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -311,7 +314,12 @@ export function MapLocationPicker({
                The map cannot be drawn here. Type the position or use your own.
             </p>
          ) : (
-            <div className="map-surface relative h-[340px] w-full overflow-hidden border border-line sm:h-[440px]">
+            <div
+               className={cn(
+                  'map-surface relative h-[340px] overflow-hidden border border-line sm:h-[440px]',
+                  mapClassName
+               )}
+            >
                <div ref={mapContainerRef} className="absolute inset-0" />
 
                {/* Search across the top. Enter asks; a link or a pair goes straight there. */}

@@ -243,7 +243,7 @@ function CatchRecord({
 
    if (state.status === 'loading') {
       return (
-         <article className="mx-auto w-full max-w-[820px]">
+         <article className="mx-auto w-full max-w-[1680px]">
             <RecordSkeleton />
          </article>
       );
@@ -251,7 +251,7 @@ function CatchRecord({
 
    if (state.status === 'error' || !data) {
       return (
-         <section className="mx-auto w-[min(720px,100%-32px)] py-16">
+         <section className="mx-auto w-[min(1400px,100%-32px)] py-16">
             <h1 className="g text-[44px]">Could not load this catch</h1>
             <p className="mt-3 text-ink-2">
                The record is there, the connection was not. Try again.
@@ -314,7 +314,7 @@ function CatchRecord({
       .join(' ');
 
    return (
-      <article className="mx-auto w-full max-w-[820px] pb-4">
+      <article className="mx-auto w-full max-w-[1680px] pb-4">
          <RecordHero
             images={images}
             index={index}

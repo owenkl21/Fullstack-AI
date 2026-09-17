@@ -51,7 +51,7 @@ function Saved() {
    }, [attempt]);
 
    return (
-      <section className="mx-auto w-[min(1200px,100%-32px)] py-8 md:py-12">
+      <section className="mx-auto w-[min(1680px,100%-32px)] py-8 md:py-12">
          <div className="flex flex-wrap items-baseline justify-between gap-4">
             <h1 className="g text-[44px] md:text-[56px]">Kept</h1>
             {state.status === 'ready' ? (

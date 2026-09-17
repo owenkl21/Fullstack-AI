@@ -212,7 +212,7 @@ function HomeNow() {
             /* The latest catch that was at a spot; a pin-only catch has no name to give. */
             lastSpot={sorted.find((entry) => entry.site)?.site?.name ?? null}
          />
-         <div className="mx-auto w-full max-w-[1040px]">
+         <div className="mx-auto w-full max-w-[1400px]">
             <Readouts
                status={conditions.status}
                readouts={conditions.readouts}

@@ -366,7 +366,7 @@ function QuickLog() {
    return (
       <section
          className={cn(
-            'mx-auto flex min-h-[calc(100dvh-124px)] w-full max-w-[560px] flex-col lg:max-w-[1080px] transition-[transform,opacity] duration-[460ms] [transition-timing-function:cubic-bezier(0.2,0,0,1)] md:my-10 md:min-h-0 md:border md:border-line',
+            'mx-auto flex min-h-[calc(100dvh-124px)] w-full max-w-[560px] flex-col lg:max-w-[1400px] transition-[transform,opacity] duration-[460ms] [transition-timing-function:cubic-bezier(0.2,0,0,1)] md:my-10 md:min-h-0 md:border md:border-line',
             entered ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'
          )}
       >
@@ -402,6 +402,7 @@ function QuickLog() {
                   onTogglePin={() => setPinOpen((open) => !open)}
                >
                   <MapLocationPicker
+                     mapClassName="-mx-3.5 sm:mx-0"
                      latitude={where ? String(where.latitude) : ''}
                      longitude={where ? String(where.longitude) : ''}
                      onChange={(latitude, longitude) =>

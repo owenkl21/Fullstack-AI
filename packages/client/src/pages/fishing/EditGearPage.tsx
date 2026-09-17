@@ -113,7 +113,7 @@ export function EditGearPage() {
 
    return (
       <RequireSignIn what="your gear">
-         <section className="mx-auto w-[min(720px,100%-32px)] py-10 md:py-14">
+         <section className="mx-auto w-[min(1400px,100%-32px)] py-10 md:py-14">
             <h1 className="g text-[44px] md:text-[56px]">
                {values?.name ? `Edit ${values.name}` : 'Edit gear'}
             </h1>

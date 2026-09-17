@@ -1,4 +1,10 @@
-import { useId, useRef, type FormEvent, type KeyboardEvent } from 'react';
+import {
+   useId,
+   useRef,
+   useState,
+   type FormEvent,
+   type KeyboardEvent,
+} from 'react';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
 
 import { formatStamp, plural } from '@/components/feed/format';
@@ -7,15 +13,18 @@ import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 
 const COMMENT_LIMIT = 1000;
+/* Shown at first, and how many more each Load more brings. */
+const PAGE = 4;
 
 const initialOf = (name: string) => (name.trim()[0] ?? '?').toUpperCase();
 
 /*
  * The thread under a post.
  *
- * Each reply is a small card: who, when, what. The composer is a box you can
- * see, with a send button that is a button, because a dashed underline and
- * the word Send in teal read as decoration, and nobody found them. Enter
+ * Four replies show; the list scrolls for the rest on a teal rail, and Load
+ * more brings the next four, reading the whole thread from the server the
+ * first time it runs out. Each reply is a small card: who, when, what. The
+ * composer is a box you can see with a send button that is a button. Enter
  * sends, Shift and Enter takes a new line, and a reply appears the moment
  * it is written rather than after the round trip.
  */
@@ -48,15 +57,68 @@ export function CommentThread({
 }) {
    const fieldId = useId();
    const box = useRef<HTMLTextAreaElement>(null);
+   const list = useRef<HTMLUListElement>(null);
    const trimmed = draft.trim();
    const remaining = COMMENT_LIMIT - draft.length;
-   const hidden = Math.max(commentCount - comments.length, 0);
    const canSend = Boolean(trimmed) && !isSubmitting;
+
+   /*
+    * How many are open to view. Held as a count of comments, so a reply just
+    * written (the list grew by one since the last render) is always inside
+    * the window: the window follows the list when the list grows by one.
+    */
+   const [shownCount, setShownCount] = useState(PAGE);
+   const [seenLength, setSeenLength] = useState(comments.length);
+   let open = shownCount;
+   if (comments.length !== seenLength) {
+      /* Derived during render, the way React asks: no effect, no extra pass. */
+      const grewByOne = comments.length === seenLength + 1;
+      setSeenLength(comments.length);
+      if (grewByOne) {
+         open = Math.max(shownCount, comments.length);
+         setShownCount(open);
+      }
+   }
+   const shown = comments.slice(0, open);
+   const total = Math.max(commentCount, comments.length);
+   const left = total - shown.length;
+
+   /* A reply just written is at the end; scroll the list to it. */
+   const scrollToEnd = () =>
+      requestAnimationFrame(() => {
+         list.current?.scrollTo({
+            top: list.current.scrollHeight,
+            behavior: 'smooth',
+         });
+      });
+
+   /*
+    * Load more asked for a page the client did not have. The whole thread
+    * is read, and once it lands the next page opens: tracked as a wish,
+    * settled in the click handler of the button the reader presses.
+    */
+   const [wanted, setWanted] = useState(false);
+   if (wanted && hasReadAll) {
+      setWanted(false);
+      setShownCount((n) => n + PAGE);
+   }
+
+   const loadMore = () => {
+      if (comments.length > open) {
+         setShownCount((n) => n + PAGE);
+         return;
+      }
+      if (!hasReadAll) {
+         setWanted(true);
+         onReadAll();
+      }
+   };
 
    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       if (!canSend) return;
       onSubmit();
+      scrollToEnd();
       box.current?.focus();
    };
 
@@ -65,6 +127,7 @@ export function CommentThread({
          event.preventDefault();
          if (canSend) {
             onSubmit();
+            scrollToEnd();
          }
       }
    };
@@ -78,30 +141,24 @@ export function CommentThread({
    return (
       <div
          id={id}
-         className="flex flex-col gap-4 border-t border-paper/15 pt-4"
+         className="flex flex-col gap-3 border-t border-paper/15 pt-4"
       >
-         {hidden > 0 && !hasReadAll ? (
-            <button
-               type="button"
-               onClick={onReadAll}
-               disabled={isReadingAll}
-               className="g-tracked inline-flex h-10 items-center gap-2 self-start text-[17px] text-teal transition-[opacity] duration-150 [transition-timing-function:var(--ease)] hover:opacity-80 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+         {shown.length > 0 ? (
+            <ul
+               ref={list}
+               className="thread-scroll flex max-h-[312px] flex-col gap-3 overflow-y-auto pr-2"
             >
-               {isReadingAll
-                  ? 'Reading the thread'
-                  : `Read all ${plural(commentCount, 'comment', 'comments')}`}
-            </button>
-         ) : null}
-
-         {comments.length > 0 ? (
-            <ul className="flex flex-col gap-3">
-               {comments.map((comment, i) => {
+               {shown.map((comment, i) => {
                   const stamp = formatStamp(comment.createdAt);
                   return (
                      <li
                         key={comment.id}
                         className="comment-in flex gap-3"
-                        style={{ '--i': Math.min(i, 6) } as React.CSSProperties}
+                        style={
+                           {
+                              '--i': Math.min(i % PAGE, 6),
+                           } as React.CSSProperties
+                        }
                      >
                         <span
                            aria-hidden="true"
@@ -133,6 +190,24 @@ export function CommentThread({
                Nobody has said anything yet.
             </p>
          )}
+
+         {left > 0 ? (
+            <div className="flex items-baseline justify-between gap-4">
+               <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={isReadingAll}
+                  className="g-tracked inline-flex h-10 items-center gap-2 text-[17px] text-teal transition-[opacity] duration-150 [transition-timing-function:var(--ease)] hover:opacity-80 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+               >
+                  {isReadingAll
+                     ? 'Reading the thread'
+                     : `Load ${Math.min(PAGE, left)} more`}
+               </button>
+               <span className="num text-[13px] text-paper-2">
+                  {shown.length} of {plural(total, 'comment', 'comments')}
+               </span>
+            </div>
+         ) : null}
 
          {isSignedIn ? (
             <form onSubmit={handleSubmit} className="flex flex-col gap-2">
@@ -171,7 +246,7 @@ export function CommentThread({
                      <PaperAirplaneIcon
                         aria-hidden="true"
                         className={cn(
-                           'size-5 -rotate-45 translate-x-[1px]',
+                           'size-5 translate-x-[1px] -rotate-45',
                            isSubmitting && 'animate-pulse'
                         )}
                      />

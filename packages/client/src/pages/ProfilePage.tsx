@@ -144,7 +144,7 @@ function ProfileScreen() {
    }, []);
 
    return (
-      <section className="mx-auto w-[min(960px,100%-32px)] py-10 md:py-14">
+      <section className="mx-auto w-[min(1320px,100%-32px)] py-10 md:py-14">
          {status === 'loading' ? (
             <ProfileSkeleton />
          ) : status === 'error' || !profile ? (

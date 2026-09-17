@@ -150,7 +150,7 @@ function MySitesList() {
    return (
       <section
          ref={root}
-         className="mx-auto w-[min(820px,100%-32px)] py-10 md:py-14"
+         className="mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14"
       >
          <header className="rv">
             <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">

@@ -3,17 +3,15 @@ import { useId, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 /*
- * A distance, by dragging.
+ * A fader.
  *
- * Radix does the dragging, the keys and the screen reader; the drawing is
- * ours. The track is the product's dashed fishing line, the filled part is
- * teal, the stops are small squares that light as the thumb passes them,
- * and the thumb is a square of ink in a paper ring with the value riding
- * above it.
+ * The distance control is drawn like a fader on a desk: a deep track, a
+ * teal fill up to where you are, a tall grip you can actually get hold of,
+ * and a ruled scale under it. Radix does the dragging, the keys and the
+ * screen reader; every pixel of the drawing is ours.
  *
- * The value is held here while the thumb moves and handed out only when it
- * settles. Handing out every step re-filtered a whole feed per pixel, which
- * is what made the first version feel like dragging through mud.
+ * The value is held here while the grip moves and handed out only when it
+ * settles. Handing out every step re-filtered a whole feed per pixel.
  */
 export function StopSlider({
    label,
@@ -38,7 +36,6 @@ export function StopSlider({
    const [drag, setDrag] = useState<number | null>(null);
    const dragging = drag !== null;
    const index = drag ?? Math.max(0, stops.indexOf(value));
-
    const shown = stops[index] ?? value;
 
    return (
@@ -47,13 +44,18 @@ export function StopSlider({
             <span id={id} className="lab">
                {label}
             </span>
-            <output className="g num text-[26px] leading-none">
+            <output
+               className={cn(
+                  'g num text-[34px] leading-none transition-colors duration-150',
+                  dragging ? 'text-teal-text' : 'text-ink'
+               )}
+            >
                {format(shown)}
             </output>
          </div>
 
          <RadixSlider.Root
-            className="relative mt-4 flex h-11 w-full touch-none items-center select-none [will-change:transform]"
+            className="fader relative mt-3 flex h-14 w-full touch-none items-center select-none"
             min={0}
             max={last}
             step={1}
@@ -66,47 +68,57 @@ export function StopSlider({
                if (typeof stop === 'number') onCommit(stop);
             }}
          >
-            <RadixSlider.Track className="relative h-[2px] w-full grow [background:repeating-linear-gradient(90deg,var(--line-2)_0_8px,transparent_8px_14px)]">
+            <RadixSlider.Track className="fader-track relative h-3 w-full grow bg-line">
                <RadixSlider.Range className="absolute h-full bg-teal" />
             </RadixSlider.Track>
-            {stops.map((stop, i) => (
-               <span
-                  key={stop}
-                  aria-hidden="true"
-                  className={cn(
-                     'pointer-events-none absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 border-2 transition-colors duration-150',
-                     i <= index
-                        ? 'border-teal bg-teal'
-                        : 'border-line-2 bg-background'
-                  )}
-                  style={{ left: `${(i / last) * 100}%` }}
-               />
-            ))}
             <RadixSlider.Thumb
                aria-valuetext={format(shown)}
-               className="group relative block size-6 border-[3px] border-background bg-ink shadow-[0_0_0_1px_var(--ink)] transition-transform duration-100 [transition-timing-function:var(--ease)] hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal data-[state=active]:scale-110"
+               className="fader-grip group relative block h-9 w-5 cursor-grab bg-ink outline-none transition-transform duration-100 [transition-timing-function:var(--ease)] hover:scale-y-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal active:cursor-grabbing data-[state=active]:scale-y-105"
             >
                <span
                   aria-hidden="true"
                   className={cn(
-                     'g num pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 bg-ink px-2 py-1 text-[15px] whitespace-nowrap text-background transition-opacity duration-150',
-                     dragging ? 'opacity-100' : 'opacity-0'
+                     'absolute top-1/2 left-1/2 block h-4 w-[2px] -translate-x-1/2 -translate-y-1/2 transition-colors duration-100',
+                     dragging ? 'bg-teal' : 'bg-background'
                   )}
-               >
-                  {format(shown)}
-               </span>
+               />
             </RadixSlider.Thumb>
          </RadixSlider.Root>
 
-         <div
-            aria-hidden="true"
-            className="num mt-1 flex justify-between text-[12px] text-ink-3"
-         >
-            {stops.map((stop) => (
-               <span key={stop}>{format(stop)}</span>
+         {/* The scale: a rule under the track, a tick per stop, the figure below. */}
+         <div aria-hidden="true" className="relative mt-1 h-7">
+            {stops.map((stop, i) => (
+               <span
+                  key={stop}
+                  className="absolute top-0 flex flex-col items-center"
+                  style={{
+                     left: `${(i / last) * 100}%`,
+                     transform:
+                        i === 0
+                           ? 'translateX(0)'
+                           : i === last
+                             ? 'translateX(-100%)'
+                             : 'translateX(-50%)',
+                  }}
+               >
+                  <span
+                     className={cn(
+                        'block h-2 w-[2px]',
+                        i <= index ? 'bg-teal' : 'bg-line-2'
+                     )}
+                  />
+                  <span
+                     className={cn(
+                        'num mt-1 text-[12px] whitespace-nowrap',
+                        i === index ? 'text-ink' : 'text-ink-3'
+                     )}
+                  >
+                     {format(stop)}
+                  </span>
+               </span>
             ))}
          </div>
-         {hint ? <p className="mt-1.5 text-[14px] text-ink-3">{hint}</p> : null}
+         {hint ? <p className="mt-1 text-[14px] text-ink-3">{hint}</p> : null}
       </div>
    );
 }

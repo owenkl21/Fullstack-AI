@@ -581,7 +581,7 @@ export function FeedPage() {
    return (
       <div
          ref={pageRef}
-         className="mx-auto w-[min(800px,100%-32px)] py-8 md:py-12"
+         className="mx-auto w-[min(1320px,100%-32px)] py-8 md:py-12"
       >
          <header className="rv flex flex-col gap-3">
             <h1 className="g text-[44px] md:text-[56px]">Feed</h1>
@@ -652,40 +652,42 @@ export function FeedPage() {
                ? emptyState()
                : null}
 
-            {status === 'ready' && showList && visiblePosts.length > 0
-               ? visiblePosts.map((post) => (
-                    <FeedPostBlock
-                       key={post.id}
-                       post={post}
-                       isSignedIn={isSignedIn === true}
-                       showDistance={scope === 'near-me'}
-                       commentsOpen={Boolean(openThreads[post.id])}
-                       onToggleComments={() =>
-                          setOpenThreads((previous) => ({
-                             ...previous,
-                             [post.id]: !previous[post.id],
-                          }))
-                       }
-                       onLike={() => void toggleLike(post)}
-                       onFollow={() => void follow(post)}
-                       onUnfollow={() => setPendingUnfollow(post.author)}
-                       actionError={actionErrors[post.id] ?? null}
-                       draft={drafts[post.id] ?? ''}
-                       onDraftChange={(next) =>
-                          setDrafts((previous) => ({
-                             ...previous,
-                             [post.id]: next,
-                          }))
-                       }
-                       onSubmitComment={() => void submitComment(post)}
-                       isSubmittingComment={Boolean(sendingComment[post.id])}
-                       commentError={commentErrors[post.id] ?? null}
-                       onReadAllComments={() => void readWholeThread(post)}
-                       isReadingAllComments={Boolean(readingThread[post.id])}
-                       hasReadAllComments={Boolean(wholeThread[post.id])}
-                    />
-                 ))
-               : null}
+            {status === 'ready' && showList && visiblePosts.length > 0 ? (
+               <div className="grid gap-8 xl:grid-cols-2 xl:items-start">
+                  {visiblePosts.map((post) => (
+                     <FeedPostBlock
+                        key={post.id}
+                        post={post}
+                        isSignedIn={isSignedIn === true}
+                        showDistance={scope === 'near-me'}
+                        commentsOpen={Boolean(openThreads[post.id])}
+                        onToggleComments={() =>
+                           setOpenThreads((previous) => ({
+                              ...previous,
+                              [post.id]: !previous[post.id],
+                           }))
+                        }
+                        onLike={() => void toggleLike(post)}
+                        onFollow={() => void follow(post)}
+                        onUnfollow={() => setPendingUnfollow(post.author)}
+                        actionError={actionErrors[post.id] ?? null}
+                        draft={drafts[post.id] ?? ''}
+                        onDraftChange={(next) =>
+                           setDrafts((previous) => ({
+                              ...previous,
+                              [post.id]: next,
+                           }))
+                        }
+                        onSubmitComment={() => void submitComment(post)}
+                        isSubmittingComment={Boolean(sendingComment[post.id])}
+                        commentError={commentErrors[post.id] ?? null}
+                        onReadAllComments={() => void readWholeThread(post)}
+                        isReadingAllComments={Boolean(readingThread[post.id])}
+                        hasReadAllComments={Boolean(wholeThread[post.id])}
+                     />
+                  ))}
+               </div>
+            ) : null}
 
             {isLoadingMore ? <FeedSkeleton count={1} /> : null}
 
