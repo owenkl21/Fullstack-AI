@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import {
    ArrowRightIcon,
    ChatBubbleOvalLeftIcon,
@@ -249,7 +250,16 @@ export function FeedPostBlock({
             </div>
          )}
 
-         <div className="flex flex-col gap-3 overflow-hidden px-4 pt-5 pb-6 md:h-[292px]">
+         <div
+            className={cn(
+               'flex flex-col gap-3 px-4 pt-5 pb-6',
+               /* One height while closed, so stacked cards line up; an open
+                  thread needs the room and gets it. */
+               commentsOpen
+                  ? 'md:min-h-[292px]'
+                  : 'overflow-hidden md:h-[292px]'
+            )}
+         >
             {heading ? (
                <h2 id={`post-${post.id}`} className="g text-[30px] text-paper">
                   {heading}

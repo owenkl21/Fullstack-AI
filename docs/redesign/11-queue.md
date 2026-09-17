@@ -220,6 +220,33 @@ Checked live by `audit/lbl4.mjs` (three of its fails were the check reading
 upper-cased text; confirmed by `a2.mjs`). The Now page (`HomeNowPage`) is
 in the code with no route and no nav word, as asked.
 
+## Done on 17 Sep, later still (commits 805679b to f6256b0)
+
+- Contours: one sheet per page (`brand/ContourField.tsx` over a single
+  `Contours`), drawn past the edges and clipped, no fade; rings close with Z,
+  the rest run edge to edge; seven levels, features in cycles per 1400 px.
+- Map: pin cards are a React tree mounted into the popup (`map/popup.tsx`)
+  with Heroicons marks; pin glyphs are Heroicons rendered to markup in
+  `lib/leaflet.ts`; the fish is `brand/FishMark`, which now takes SVG props.
+- Avatars signed on standings and notification actors; the header reads the
+  profile's signed avatar (`profile/avatar-api.ts`) and clips it; the profile
+  name row sits above the banner (`relative z-10`).
+- Photo focal point: `Image.focusX/focusY`, accepted on `imageInputSchema`,
+  returned on catch and feed images; the quick log's `PhotoBlock` shows a
+  four by three frame the reader drags; the feed crops to it. Every feed
+  photo sits in a 4:3 frame; cards are 80 + 720 + 292 on a desktop.
+- Scroll to load: `lib/load-on-scroll.ts` on my catches, my spots,
+  notifications, competitions (pages append), standings (ten more at a
+  time), a spot's catches. Comments and the feed already did.
+- Phone feed actions are icons with counts; counts always show.
+- `main.tsx` reloads once on `vite:preloadError` (stale chunk after a
+  deploy); `lib/lazy-route.tsx` already retried and reloaded on a failed
+  import. A cold load measured signed out (landing at 1.4 s) and signed in
+  (insights and feed under 0.8 s) with no page errors.
+- A photograph's GPS moves the pin: the picker ignores its own moves
+  (resize nudge, following the form) for half a second, so they no longer
+  count as a dropped pin.
+
 ## Next, in order
 
 1. **Switch the readers on**: set `ANTHROPIC_API_KEY` on Railway for the
