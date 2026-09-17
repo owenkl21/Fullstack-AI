@@ -73,7 +73,7 @@ export function LandingHero() {
             <p
                className={cn(
                   line.className,
-                  'max-w-[52ch] text-[16px] text-paper/90 text-pretty [text-shadow:0_1px_14px_rgba(0,0,0,0.55)] md:text-[18px]'
+                  'max-w-[52ch] text-[16px] text-paper text-pretty [text-shadow:0_1px_14px_rgba(0,0,0,0.55)] md:text-[18px]'
                )}
                style={line.style}
             >

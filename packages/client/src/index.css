@@ -304,14 +304,20 @@
        * Holds a readable floor through the middle, which is where the headline
        * sits. The old ramp fell to 5 per cent there and put white type straight
        * onto a lit sunset.
+       *
+       * The floor under the standfirst is set from a measurement rather than by
+       * eye: the photograph reads about 0.45 luminance behind that line, and
+       * 16px body text needs 4.5:1, which takes roughly two thirds black. It
+       * measured 3.35:1 before this.
        */
       background: linear-gradient(
          180deg,
-         rgba(11, 9, 9, 0.55) 0%,
-         rgba(11, 9, 9, 0.42) 22%,
-         rgba(11, 9, 9, 0.46) 52%,
-         rgba(11, 9, 9, 0.62) 74%,
-         rgba(11, 9, 9, 0.88) 100%
+         rgba(11, 9, 9, 0.58) 0%,
+         rgba(11, 9, 9, 0.46) 22%,
+         rgba(11, 9, 9, 0.54) 48%,
+         rgba(11, 9, 9, 0.7) 64%,
+         rgba(11, 9, 9, 0.78) 80%,
+         rgba(11, 9, 9, 0.9) 100%
       );
    }
    .scrim-photo {

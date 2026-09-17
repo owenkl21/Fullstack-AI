@@ -24,6 +24,7 @@ import { useDocumentTitle } from '@/lib/title';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { StaticMap } from '@/components/map/StaticMap';
 import { useIsSignedIn } from '@/lib/auth-client';
+import { NoPhoto } from '@/components/brand/FishMark';
 
 /*
  * A spot: the photograph and the name first, then what the place is and how to get
@@ -551,22 +552,36 @@ function SiteHeader({
       return () => window.clearTimeout(timer);
    }, [photoUrl]);
 
+   /*
+    * The name sits on a plate under the photograph rather than on top of it,
+    * for the same reason the home hero does: paper white over a bright sky
+    * measures near 1:1, and the scrim that would fix it would paint the
+    * photograph out. See SpotHeader.
+    */
    return (
-      <header className="relative h-[300px] overflow-hidden bg-black-block text-paper md:h-[420px]">
-         {photoUrl ? (
-            <img
-               src={photoUrl}
-               alt={name}
-               fetchPriority="high"
-               className={`absolute inset-0 size-full object-cover transition-transform duration-[12000ms] ease-linear ${
-                  settled ? 'scale-100' : 'scale-[1.06]'
-               }`}
-            />
-         ) : null}
-         <div aria-hidden="true" className="scrim-photo absolute inset-0" />
-         <div className="absolute right-0 bottom-[60px] left-0 z-[4] mx-auto w-[min(820px,100%-32px)] md:bottom-[84px]">
-            <h1 className="g text-[44px] text-paper md:text-[72px]">{name}</h1>
+      <header className="relative bg-black-block text-paper">
+         <div className="relative h-[210px] overflow-hidden md:h-[300px]">
+            {photoUrl ? (
+               <img
+                  src={photoUrl}
+                  alt={name}
+                  fetchPriority="high"
+                  className={`absolute inset-0 size-full object-cover transition-transform duration-[12000ms] ease-linear ${
+                     settled ? 'scale-100' : 'scale-[1.06]'
+                  }`}
+               />
+            ) : null}
+            <div aria-hidden="true" className="scrim-photo absolute inset-0" />
          </div>
+
+         <div className="relative z-[4] pt-5 pb-11 md:pt-7 md:pb-16">
+            <div className="mx-auto w-[min(820px,100%-32px)]">
+               <h1 className="g text-[44px] text-paper md:text-[72px]">
+                  {name}
+               </h1>
+            </div>
+         </div>
+
          <TornEdge fill="bg" />
       </header>
    );
@@ -594,10 +609,7 @@ function CatchRow({ item }: { item: SiteCatch }) {
                   className="size-[52px] shrink-0 object-cover"
                />
             ) : (
-               <span
-                  aria-hidden="true"
-                  className="size-[52px] shrink-0 bg-bg-2"
-               />
+               <NoPhoto className="size-[52px]" />
             )}
             <span className="min-w-0 flex-1">
                <span className="g block truncate text-[22px] text-ink">
