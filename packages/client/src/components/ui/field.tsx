@@ -194,24 +194,37 @@ export function ChoiceGroup<T extends string>({
    className,
    hideLabel,
    size = 'md',
+   inline = false,
 }: Common & {
    value: T;
    options: ReadonlyArray<{ value: T; label: string }>;
    onChange: (next: T) => void;
    size?: 'sm' | 'md';
+   /*
+    * Label beside the chips rather than above them. Two filter groups stacked
+    * with a label over each cost four rows near the top of a phone, which is
+    * most of the space before the first post. Beside them it is two.
+    */
+   inline?: boolean;
 }) {
    const id = useId();
 
    return (
-      <div className={cn('flex min-w-0 flex-col', className)}>
-         <span id={id} className={cn('lab', hideLabel && 'sr-only')}>
+      <div
+         className={cn(
+            'flex min-w-0',
+            inline ? 'flex-wrap items-center gap-x-3 gap-y-2' : 'flex-col',
+            className
+         )}
+      >
+         <span id={id} className={cn('lab shrink-0', hideLabel && 'sr-only')}>
             {label}
          </span>
 
          <div
             role="radiogroup"
             aria-labelledby={id}
-            className="mt-1.5 flex flex-wrap gap-2"
+            className={cn('flex flex-wrap gap-2', !inline && 'mt-1.5')}
          >
             {options.map((option) => {
                const on = option.value === value;

@@ -1,10 +1,8 @@
 import { useId } from 'react';
 
 import { Slider } from '@/components/ui/slider';
-import {
-   ChipRadioGroup,
-   type ChipOption,
-} from '@/components/feed/ChipRadioGroup';
+import type { ChipOption } from '@/components/feed/ChipRadioGroup';
+import { ChoiceGroup } from '@/components/ui/field';
 import { plural } from '@/components/feed/format';
 import type { ScopeFilter, ShowFilter } from '@/components/feed/types';
 
@@ -56,14 +54,24 @@ export function FeedFilters({
 
    return (
       <section aria-label="Filters" className="flex flex-col gap-6">
+         {/*
+          * Label beside the chips, not above them. Two groups with a label over
+          * each cost four rows at the top of a phone, which was most of the
+          * room before the first post. Beside them it is two, and the labels
+          * stay, so the two groups still read as two.
+          */}
          <div className="flex flex-col gap-3 sm:flex-row sm:gap-10">
-            <ChipRadioGroup
+            <ChoiceGroup
+               inline
+               size="sm"
                label="Scope"
                value={scope}
                options={SCOPE_OPTIONS}
                onChange={onScopeChange}
             />
-            <ChipRadioGroup
+            <ChoiceGroup
+               inline
+               size="sm"
                label="Show"
                value={show}
                options={SHOW_OPTIONS}
