@@ -1,7 +1,13 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SpotsMap, type SpotPin } from '@/components/map/SpotsMap';
+import {
+   SpotsMap,
+   type MapFocus,
+   type SpotPin,
+} from '@/components/map/SpotsMap';
+import { PlaceSearch } from '@/components/forecast/PlaceSearch';
+import { usePosition } from '@/lib/position';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { useDocumentTitle } from '@/lib/title';
 
@@ -37,6 +43,8 @@ export function MapPage() {
 function MapScreen() {
    const navigate = useNavigate();
    const [mine, setMine] = useState<SpotPin[]>([]);
+   const [focus, setFocus] = useState<MapFocus | null>(null);
+   const { ask, state: positionState } = usePosition({ auto: false });
 
    useEffect(() => {
       const controller = new AbortController();
@@ -68,22 +76,50 @@ function MapScreen() {
 
    return (
       <section className="mx-auto w-[min(1200px,100%-32px)] py-8 md:py-12">
-         <div className="flex flex-wrap items-baseline justify-between gap-4">
-            <h1 className="g text-[44px] md:text-[56px]">Map</h1>
-            <p className="lab num text-ink-3">
-               {mine.length === 1 ? '1 of yours' : `${mine.length} of yours`}
-            </p>
+         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
+            <div>
+               <h1 className="g text-[44px] md:text-[56px]">Map</h1>
+               <p className="mt-3 max-w-[58ch] text-[17px] text-ink-2">
+                  Your spots, what other anglers have made public, your own
+                  private marks, and the slipways and tackle shops around them.
+                  {mine.length
+                     ? ` ${mine.length === 1 ? 'One' : mine.length} of the spots ${mine.length === 1 ? 'is' : 'are'} yours.`
+                     : ''}
+               </p>
+            </div>
+            {/* Somewhere else on the coast, by name, without dragging there. */}
+            <PlaceSearch
+               className="w-full md:w-auto"
+               showMine={false}
+               locating={positionState === 'asking'}
+               onPick={(place) =>
+                  setFocus({
+                     latitude: place.latitude,
+                     longitude: place.longitude,
+                     zoom: 12,
+                     key: Date.now(),
+                  })
+               }
+               onUseMine={() => {
+                  void ask().then((fix) => {
+                     if (fix) {
+                        setFocus({
+                           latitude: fix.latitude,
+                           longitude: fix.longitude,
+                           zoom: 13,
+                           key: Date.now(),
+                        });
+                     }
+                  });
+               }}
+            />
          </div>
-
-         <p className="mt-3 max-w-[58ch] text-[17px] text-ink-2">
-            Your spots, what other anglers have made public, your own private
-            marks, and the slipways and tackle shops around them.
-         </p>
 
          <div className="mt-6">
             <SpotsMap
                spots={mine}
                wheelZoom
+               focus={focus}
                onOpen={(id) => navigate(`/sites/${id}`)}
             />
          </div>

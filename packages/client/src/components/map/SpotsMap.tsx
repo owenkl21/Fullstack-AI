@@ -80,19 +80,38 @@ const POI_MIN_ZOOM = 10;
  * this and needs no button. Leaflet reports it as `contextmenu`, which covers
  * a right click on a desktop at the same time.
  */
+export type MapFocus = {
+   latitude: number;
+   longitude: number;
+   zoom?: number;
+   /* Changes on every request, so asking for the same place twice moves twice. */
+   key: number;
+};
+
 export function SpotsMap({
    spots,
    onOpen,
    wheelZoom = false,
+   focus = null,
 }: {
    spots: SpotPin[];
    onOpen: (id: string) => void;
    /** On where the map is the whole page. Off inside a scrolling one, where a
     * wheel over the map would hijack the scroll. */
    wheelZoom?: boolean;
+   /** Somewhere to go: a searched place, or the angler's own position. */
+   focus?: MapFocus | null;
 }) {
    const holder = useRef<HTMLDivElement | null>(null);
    const map = useRef<LeafletMap | null>(null);
+
+   /* Go where the page points, whenever it points somewhere new. */
+   useEffect(() => {
+      if (!focus || !map.current) return;
+      map.current.setView([focus.latitude, focus.longitude], focus.zoom ?? 12, {
+         animate: true,
+      });
+   }, [focus?.key]);
    const onOpenRef = useRef(onOpen);
    const kept = useKept();
    const keptRef = useRef(kept.spots);

@@ -17,11 +17,14 @@ export function PlaceSearch({
    onPick,
    onUseMine,
    locating = false,
+   showMine = true,
    className,
 }: {
    onPick: (place: PlaceHit) => void;
    onUseMine: () => void;
    locating?: boolean;
+   /** Off where the page already has its own way of going to the angler. */
+   showMine?: boolean;
    className?: string;
 }) {
    const id = useId();
@@ -176,16 +179,18 @@ export function PlaceSearch({
             ) : null}
          </div>
 
-         <Button
-            type="button"
-            variant="outline"
-            onClick={onUseMine}
-            disabled={locating}
-            className="h-11"
-         >
-            <MapPinIcon aria-hidden="true" />
-            {locating ? 'Finding you' : 'Where I am'}
-         </Button>
+         {showMine ? (
+            <Button
+               type="button"
+               variant="outline"
+               onClick={onUseMine}
+               disabled={locating}
+               className="h-11"
+            >
+               <MapPinIcon aria-hidden="true" />
+               {locating ? 'Finding you' : 'Where I am'}
+            </Button>
+         ) : null}
       </div>
    );
 }
