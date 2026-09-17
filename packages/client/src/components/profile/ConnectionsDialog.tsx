@@ -195,7 +195,7 @@ function Connections({
                               {person.displayName}
                            </span>
                            <span className="block truncate text-sm text-paper-2">
-                              @{person.username}
+                              {person.username ? `@${person.username}` : ''}
                            </span>
                         </span>
                      </li>

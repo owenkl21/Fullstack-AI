@@ -58,7 +58,11 @@ export function ProfileView({
                   <h1 className="g text-[44px] break-words md:text-[56px]">
                      {profile.displayName}
                   </h1>
-                  <p className="text-[15px] text-ink-2">@{profile.username}</p>
+                  {profile.username ? (
+                     <p className="text-[15px] text-ink-2">
+                        @{profile.username}
+                     </p>
+                  ) : null}
                </div>
             </div>
 
