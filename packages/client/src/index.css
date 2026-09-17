@@ -687,40 +687,123 @@
    font: inherit;
    outline-offset: 2px;
 }
-:root[data-theme='night'] .map-surface .leaflet-tile-pane {
+
+/*
+ * At night the plain and street rasters are inverted, which is the standard
+ * trick for turning a light map dark without a second tile set.
+ *
+ * It is scoped to those two on purpose. Inverting a photograph turns the sea
+ * orange and the veld blue, so satellite imagery is left exactly as it is: it
+ * is already dark, and it is a photograph of the world rather than a drawing
+ * of it.
+ */
+:root[data-theme='night'] .map-surface[data-base='plain'] .leaflet-tile-pane,
+:root[data-theme='night'] .map-surface[data-base='streets'] .leaflet-tile-pane {
    filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9)
       saturate(0.8);
 }
-.map-surface .leaflet-bar,
-.map-surface .leaflet-bar a {
+
+/*
+ * Leaflet's own controls, in the product's vocabulary.
+ *
+ * The shipped ones are small rounded boxes with a hairline and a drop shadow,
+ * which is a different design language from every other control here and the
+ * thing that makes an otherwise good map look like a widget somebody embedded.
+ * Square, 44px, ink on paper, same as every other control.
+ */
+.map-surface .leaflet-bar {
+   border: 0;
    border-radius: 0;
-   box-shadow: none;
-   border-color: var(--line);
+   box-shadow: 0 2px 10px rgba(11, 9, 9, 0.22);
+   overflow: hidden;
+}
+.map-surface .leaflet-bar a,
+.map-surface .leaflet-bar a:link {
+   width: 44px;
+   height: 44px;
+   line-height: 44px;
+   border-radius: 0;
+   border: 0;
+   border-bottom: 1px solid var(--line);
    background: var(--bg);
    color: var(--ink);
+   font-family: var(--font-display), sans-serif;
+   font-size: 22px;
+   transition: background-color 140ms var(--ease);
+}
+.map-surface .leaflet-bar a:last-child {
+   border-bottom: 0;
 }
 .map-surface .leaflet-bar a:hover,
 .map-surface .leaflet-bar a:focus-visible {
    background: var(--bg-2);
    color: var(--ink);
 }
+.map-surface .leaflet-bar a.leaflet-disabled {
+   background: var(--bg-2);
+   color: var(--ink-3);
+}
+
+/*
+ * Attribution is a licence condition, so it never hides. It does not have to
+ * shout either: quiet, small, and out of the way of the imagery.
+ */
 .map-surface .leaflet-control-attribution {
    border-radius: 0;
-   background: var(--bg);
-   color: var(--ink-2);
-   font-size: 0.6875rem;
-   padding: 0.125rem 0.375rem;
+   background: color-mix(in srgb, var(--bg) 88%, transparent);
+   color: var(--ink-3);
+   font-size: 0.625rem;
+   line-height: 1.5;
+   padding: 0.1rem 0.4rem;
 }
 .map-surface .leaflet-control-attribution a {
+   color: var(--ink-2);
+}
+.map-surface .leaflet-control-attribution a:hover {
    color: var(--teal-text);
 }
+
+/*
+ * Popups. The shipped one is a white rounded card with a drop shadow and a
+ * serif close cross, which belongs to a different product.
+ */
+.map-surface .leaflet-popup-content-wrapper {
+   border-radius: 0;
+   background: var(--bg);
+   color: var(--ink);
+   box-shadow: 0 6px 22px rgba(11, 9, 9, 0.3);
+   border: 1px solid var(--line);
+}
+.map-surface .leaflet-popup-content {
+   margin: 0.85rem 1rem;
+   font: inherit;
+   line-height: 1.45;
+}
+.map-surface .leaflet-popup-tip {
+   background: var(--bg);
+   border: 1px solid var(--line);
+   box-shadow: none;
+}
+.map-surface .leaflet-popup-close-button {
+   width: 32px;
+   height: 32px;
+   font-size: 20px;
+   color: var(--ink-3);
+   padding: 0;
+   line-height: 30px;
+}
+.map-surface .leaflet-popup-close-button:hover {
+   color: var(--ink);
+   background: transparent;
+}
+
 /*
  * The zoom control sits top-left by default, which is where .blk's corner tab
  * would be if a map ever lands inside one. Keep it clear of that corner.
  */
 .map-surface .leaflet-top.leaflet-left {
-   top: 0.5rem;
-   left: 0.5rem;
+   top: 0.75rem;
+   left: 0.75rem;
 }
 .map-pin-icon {
    display: block;

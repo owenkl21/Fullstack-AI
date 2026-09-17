@@ -446,6 +446,9 @@ export function SpotsMap({
          <div className="relative">
             <div
                ref={holder}
+               /* The base is on the element so the night rule can leave a
+                  photograph alone and only invert the drawn maps. */
+               data-base={base}
                className="map-surface h-[62vh] min-h-[380px] w-full border border-line"
             />
 
