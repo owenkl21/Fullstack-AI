@@ -21,6 +21,7 @@ import {
    type Species,
 } from '@/components/fishing/quicklog/species';
 import { AddGearInline } from '@/components/fishing/AddGearInline';
+import { ChoiceGroup } from '@/components/ui/field';
 
 type SiteOption = {
    id: string;
@@ -50,6 +51,8 @@ export type CatchFormInitial = {
    count: number | null;
    depth: number | null;
    waterTemp: number | null;
+   visibility?: 'PRIVATE' | 'GROUPS' | 'PUBLIC';
+   hideLocation?: boolean;
    gearIds: string[];
    gears: GearOption[];
    images: UploadedImage[];
@@ -188,6 +191,12 @@ export function CatchForm({
 
    const [species, setSpecies] = useState(initial?.title ?? '');
    const [recentSpecies, setRecentSpecies] = useState<string[]>([]);
+   const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>(
+      initial?.visibility === 'PRIVATE' ? 'PRIVATE' : 'PUBLIC'
+   );
+   const [hideLocation, setHideLocation] = useState(
+      initial?.hideLocation ?? false
+   );
    const [speciesList, setSpeciesList] = useState<Species[]>([]);
 
    const [lengthValue, setLengthValue] = useState(
@@ -693,6 +702,9 @@ export function CatchForm({
          /* Null where the name is not one we publish figures for. The catch
           * still saves; it just cannot be ranked, and the profile says so. */
          speciesId: matchSpecies(species, speciesList)?.id ?? null,
+         visibility,
+         /* Only meaningful on a catch anyone else can see. */
+         hideLocation: visibility === 'PUBLIC' ? hideLocation : false,
          weather: sky ? sky.slice(0, 280) : null,
          weatherSnapshot: snapshot,
          length: length === null || Number.isNaN(length) ? null : length,
@@ -1554,6 +1566,49 @@ export function CatchForm({
                   {notes.length} of {NOTES_LIMIT}
                </p>
             </div>
+         </section>
+
+         <section className="flex flex-col gap-5">
+            <GroupHeading>Who sees this</GroupHeading>
+
+            <ChoiceGroup
+               label="Who can see the catch"
+               value={visibility}
+               onChange={setVisibility}
+               options={[
+                  { value: 'PUBLIC', label: 'Everyone' },
+                  { value: 'PRIVATE', label: 'Only me' },
+               ]}
+               hint={
+                  visibility === 'PRIVATE'
+                     ? 'It stays in your log and never reaches the feed or a board.'
+                     : 'It appears in the feed and counts on the boards.'
+               }
+            />
+
+            {/*
+             * A separate question from who can see it. An angler will happily
+             * show a fish and not the gully it came out of, and making that all
+             * or nothing is how a log stops being used. The position is still
+             * stored either way; it is withheld from other anglers rather than
+             * thrown away, so the record stays complete.
+             */}
+            {visibility === 'PUBLIC' ? (
+               <ChoiceGroup
+                  label="Show where it was caught"
+                  value={hideLocation ? 'HIDE' : 'SHOW'}
+                  onChange={(next) => setHideLocation(next === 'HIDE')}
+                  options={[
+                     { value: 'SHOW', label: 'Show the spot' },
+                     { value: 'HIDE', label: 'Keep it to myself' },
+                  ]}
+                  hint={
+                     hideLocation
+                        ? 'The fish shows, the mark does not. You still see it on your own map.'
+                        : 'Other anglers can see which spot this came from.'
+                  }
+               />
+            ) : null}
          </section>
 
          <div className="flex flex-wrap items-center gap-4 pb-4">

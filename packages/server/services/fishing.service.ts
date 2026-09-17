@@ -46,6 +46,7 @@ type CreateCatchInput = {
    siteId?: string | null;
    speciesId?: string | null;
    released?: boolean;
+   hideLocation?: boolean;
    visibility?: 'PRIVATE' | 'GROUPS' | 'PUBLIC';
    weight?: number | null;
    length?: number | null;
@@ -197,6 +198,22 @@ const mapConditionsToCatchData = (conditions: Conditions) => ({
    weatherUvIndex: conditions.uvIndex,
    weatherThunderstormProbability: null,
    weatherCloudCover: conditions.cloudCover,
+
+   /*
+    * The sea, the light and the moon. Fetched and shown for a while before
+    * this and then dropped on save, so a catch could report the air pressure
+    * at the time and not the water temperature, which is the first thing a
+    * shore angler would ask about.
+    */
+   weatherSeaSurfaceTemperatureC: conditions.seaSurfaceTemperatureC,
+   weatherWaveHeightM: conditions.waveHeightM,
+   weatherSwellHeightM: conditions.swellHeightM,
+   weatherSwellPeriodS: conditions.swellPeriodS,
+   weatherSunrise: conditions.sunrise ? new Date(conditions.sunrise) : null,
+   weatherSunset: conditions.sunset ? new Date(conditions.sunset) : null,
+   weatherMoonPhase: conditions.moon?.name ?? null,
+   weatherMoonIllumination: conditions.moon?.illumination ?? null,
+   weatherMoonSpringTide: conditions.moon?.spring ?? null,
 });
 
 const mapWeatherSnapshotToCatchData = (
@@ -485,6 +502,7 @@ export const fishingService = {
                length: input.length,
                count: input.count ?? 1,
                released: input.released ?? false,
+               hideLocation: input.hideLocation ?? false,
                visibility: input.visibility ?? 'PUBLIC',
                weather: input.weather,
                waterTemp:
@@ -674,6 +692,7 @@ export const fishingService = {
                length: input.length,
                count: input.count,
                released: input.released,
+               hideLocation: input.hideLocation,
                visibility: input.visibility,
                weather: input.weather,
                waterTemp: input.waterTemp,

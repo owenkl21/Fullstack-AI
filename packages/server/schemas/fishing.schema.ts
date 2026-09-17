@@ -58,6 +58,8 @@ const catchPayloadSchema = z.object({
    siteId: z.string().trim().min(1).optional().nullable(),
    speciesId: z.string().trim().min(1).optional().nullable(),
    released: z.coerce.boolean().optional(),
+   /* Show the fish, withhold the gully it came from. */
+   hideLocation: z.coerce.boolean().optional(),
    visibility: z.enum(['PRIVATE', 'GROUPS', 'PUBLIC']).optional(),
    weight: z.coerce.number().positive().optional().nullable(),
    length: z.coerce.number().positive().optional().nullable(),

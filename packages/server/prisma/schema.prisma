@@ -270,6 +270,37 @@ model Catch {
   weatherVisibilityDistanceUnit           String?
   weatherIsDaytime                        Boolean?
   weatherRelativeHumidity                 Int?
+
+  /*
+   * The rest of the reading. These were being fetched and shown and then
+   * dropped on save, so a catch could tell you the air pressure at the time and
+   * not the water temperature, which is the one a shore angler would ask about
+   * first. A record that cannot answer that is not a record of the conditions.
+   */
+  weatherSeaSurfaceTemperatureC           Float?
+  weatherWaveHeightM                      Float?
+  weatherSwellHeightM                     Float?
+  weatherSwellPeriodS                     Float?
+  weatherSunrise                          DateTime?
+  weatherSunset                           DateTime?
+  /* Worked out from the date rather than fetched, and kept so the record does
+   * not have to recompute it against a changing definition later. */
+  weatherMoonPhase                        String?
+  weatherMoonIllumination                 Float?
+  weatherMoonSpringTide                   Boolean?
+
+  /*
+   * Show the catch, hide where it came from.
+   *
+   * Separate from visibility on purpose. Visibility asks who may see the catch
+   * at all; this asks whether its position travels with it. An angler will
+   * happily show a fish and not the gully it came out of, and forcing that
+   * choice to be all or nothing is how a log stops being used.
+   *
+   * The position is still stored. It is withheld from other anglers, not
+   * discarded, so the record stays complete.
+   */
+  hideLocation                            Boolean  @default(false)
   weatherUvIndex                          Int?
   weatherThunderstormProbability          Int?
   weatherCloudCover                       Int?
