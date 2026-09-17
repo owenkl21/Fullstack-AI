@@ -7,6 +7,7 @@
 | [HANDOFF.md](HANDOFF.md) | Current state, decisions, the work queue in order, the rules, the gotchas |
 | [08-stack-decisions.md](08-stack-decisions.md) | Hosting, weather, auth, maps, competitions and seed decisions with their evidence |
 | [09-deploy.md](09-deploy.md) | The Vercel and Railway deploy runbook, in order, with what still needs the owner |
+| [10-audit.md](10-audit.md) | The browser audit, how to run it, and the four things it deliberately ignores |
 | [00-prompt.md](00-prompt.md) | The design brief: visual language, every surface, copy voice, acceptance checks |
 | [FULL-PROMPT.md](FULL-PROMPT.md) | The brief plus appendices A to E bundled for pasting into an agent |
 | [01-reference-design-language.md](01-reference-design-language.md) | Measured design language of the agreed reference site |
