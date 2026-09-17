@@ -26,14 +26,8 @@ import {
    type ConditionsStatus,
 } from '@/components/fishing/home/Readouts';
 import { RecentRows } from '@/components/fishing/home/RecentRows';
-import { SeasonStrip } from '@/components/fishing/home/SeasonStrip';
 import { SpotHeader } from '@/components/fishing/home/SpotHeader';
-import {
-   logSentence,
-   seasonCount,
-   seasonItems,
-   sortByNewest,
-} from '@/components/fishing/home/summary';
+import { logSentence, sortByNewest } from '@/components/fishing/home/summary';
 import { usePosition } from '@/lib/position';
 import { namePlace } from '@/components/forecast/forecast-api';
 
@@ -260,7 +254,6 @@ function LoadedHome({ catches }: { catches: CatchSummary[] }) {
    useRevealIn(root);
 
    const sentence = logSentence(catches);
-   const season = seasonItems(catches);
    const recent = catches.slice(0, 5);
 
    return (
@@ -270,12 +263,7 @@ function LoadedHome({ catches }: { catches: CatchSummary[] }) {
                <LogSays sentence={sentence} />
             </div>
          ) : null}
-         {season.length > 0 ? (
-            <div className="rv" style={{ '--i': 1 } as CSSProperties}>
-               <SeasonStrip items={season} count={seasonCount(catches)} />
-            </div>
-         ) : null}
-         <div className="rv" style={{ '--i': 2 } as CSSProperties}>
+         <div className="rv" style={{ '--i': 1 } as CSSProperties}>
             <RecentRows catches={recent} total={catches.length} />
          </div>
       </div>

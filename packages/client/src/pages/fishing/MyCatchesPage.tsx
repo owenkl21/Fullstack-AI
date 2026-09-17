@@ -1,3 +1,4 @@
+import { Contours } from '@/components/brand/Contours';
 import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -170,8 +171,9 @@ function MyCatchesList() {
    return (
       <section
          ref={root}
-         className="mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14"
+         className="relative mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14"
       >
+         <Contours seed={21} className="inset-x-0 top-0 h-[380px] w-full" />
          <header className="rv">
             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
                <h1 className="g text-[44px] md:text-[56px]">My catches</h1>

@@ -1,3 +1,4 @@
+import { Contours } from '@/components/brand/Contours';
 import axios from 'axios';
 import {
    useCallback,
@@ -581,8 +582,9 @@ export function FeedPage() {
    return (
       <div
          ref={pageRef}
-         className="mx-auto w-[min(1320px,100%-32px)] py-8 md:py-12"
+         className="relative mx-auto w-[min(1320px,100%-32px)] py-8 md:py-12"
       >
+         <Contours seed={5} className="inset-x-0 top-0 h-[380px] w-full" />
          <header className="rv flex flex-col gap-3">
             <h1 className="g text-[44px] md:text-[56px]">Feed</h1>
             <p className="hidden sm:block max-w-[46ch] text-[17px] text-ink-2">

@@ -1,8 +1,8 @@
 import { LandingPage } from '@/components/landing/LandingPage';
-import { HomeNowPage } from '@/pages/fishing/HomeNowPage';
+import { FeedPage } from '@/pages/fishing/FeedPage';
 import { SignedIn, SignedOut } from '@/components/shell/Signed';
 
-/** Signed out: the landing page. Signed in: the log, never the marketing page. */
+/** Signed out: the landing page. Signed in: the feed, never the marketing page. */
 export function HomePage() {
    return (
       <>
@@ -10,7 +10,7 @@ export function HomePage() {
             <LandingPage />
          </SignedOut>
          <SignedIn>
-            <HomeNowPage />
+            <FeedPage />
          </SignedIn>
       </>
    );

@@ -20,7 +20,7 @@ type Slot = {
 /* Catches gets the house fish rather than a stock icon: it is the one slot the
  * product is actually about. */
 const left: Slot[] = [
-   { to: '/feed', label: 'Feed', Icon: NewspaperIcon },
+   { to: '/', label: 'Feed', Icon: NewspaperIcon },
    { to: '/catches/me', label: 'Catches', Icon: FishMark },
 ];
 
@@ -62,6 +62,7 @@ export function BottomBar() {
       <NavLink
          key={to}
          to={to}
+         end={to === '/'}
          className={({ isActive }) => cn(slot, isActive && active)}
       >
          {({ isActive }) => (

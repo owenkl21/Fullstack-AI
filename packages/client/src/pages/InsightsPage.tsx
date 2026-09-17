@@ -1,3 +1,5 @@
+import { Contours } from '@/components/brand/Contours';
+import { SeasonStrip } from '@/components/insights/SeasonStrip';
 import axios from 'axios';
 import {
    useEffect,
@@ -380,8 +382,9 @@ function Insights() {
    const bestWind = charts.wind.reduce((a, b) => (b.count > a.count ? b : a));
 
    return (
-      <section className="mx-auto w-[min(1680px,100%-32px)] py-8 md:py-12">
-         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
+      <section className="relative mx-auto w-[min(1680px,100%-32px)] py-8 md:py-12">
+         <Contours seed={7} className="inset-x-0 top-0 h-[420px] w-full" />
+         <div className="relative flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
             <div>
                <p className="lab text-ink-3">Your log, counted</p>
                <h1 className="g mt-1 text-[44px] leading-none md:text-[56px]">
@@ -607,6 +610,11 @@ function Insights() {
                />
                <Table title="By gear" rows={tables.gear} system={system} />
             </div>
+         </Section>
+
+         {/* ---- The season, by month ---- */}
+         <Section title="The season">
+            <SeasonStrip catches={catches} />
          </Section>
       </section>
    );

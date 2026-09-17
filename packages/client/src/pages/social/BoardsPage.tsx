@@ -1,3 +1,4 @@
+import { Contours } from '@/components/brand/Contours';
 import { useEffect, useRef, useState } from 'react';
 import { useRevealIn } from '@/components/brand/Reveal';
 import { InlineError } from '@/components/states/InlineError';
@@ -90,8 +91,9 @@ export function BoardsPage() {
    return (
       <section
          ref={root}
-         className="mx-auto w-full max-w-[1320px] px-4 py-10 md:px-8"
+         className="relative mx-auto w-full max-w-[1320px] px-4 py-10 md:px-8"
       >
+         <Contours seed={13} className="inset-x-0 top-0 h-[380px] w-full" />
          <h1
             className="g rv text-[40px] md:text-[56px]"
             style={{ '--i': 1 } as React.CSSProperties}

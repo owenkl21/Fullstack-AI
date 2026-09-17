@@ -31,7 +31,12 @@ export function formatStamp(value?: string | null): string | null {
    const date = toDate(value);
    if (!date) return null;
    const parts = STAMP.formatToParts(date);
-   return `${part(parts, 'weekday')} ${part(parts, 'day')} ${part(parts, 'month')}, ${part(parts, 'hour')}:${part(parts, 'minute')}`;
+   /* The year is written only when it is not this one. */
+   const year =
+      date.getFullYear() === new Date().getFullYear()
+         ? ''
+         : ` ${date.getFullYear()}`;
+   return `${part(parts, 'weekday')} ${part(parts, 'day')} ${part(parts, 'month')}${year}, ${part(parts, 'hour')}:${part(parts, 'minute')}`;
 }
 
 /**

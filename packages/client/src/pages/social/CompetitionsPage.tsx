@@ -1,3 +1,4 @@
+import { Contours } from '@/components/brand/Contours';
 import { PlusIcon, TrophyIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useState } from 'react';
 import { Picker } from '@/components/ui/picker';
@@ -135,7 +136,8 @@ function CompetitionsScreen() {
    }, []);
 
    return (
-      <section className="mx-auto w-[min(1320px,100%-32px)] py-10 md:py-14">
+      <section className="relative mx-auto w-[min(1320px,100%-32px)] py-10 md:py-14">
+         <Contours seed={17} className="inset-x-0 top-0 h-[380px] w-full" />
          <div className="flex flex-wrap items-baseline justify-between gap-4">
             <h1 className="g text-[44px] md:text-[56px]">Competitions</h1>
             {!starting ? (

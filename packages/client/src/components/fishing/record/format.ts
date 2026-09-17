@@ -38,19 +38,27 @@ export function formatClock(value: string | number | Date | null | undefined) {
    return date ? `${pad(date.getHours())}:${pad(date.getMinutes())}` : null;
 }
 
-/** `15 Sep` */
+/* The year is written only when it is not this one; then it always is. */
+const yearOf = (date: Date) =>
+   date.getFullYear() === new Date().getFullYear()
+      ? ''
+      : ` ${date.getFullYear()}`;
+
+/** `15 Sep`, or `15 Sep 2025` for another year */
 export function formatDayMonth(
    value: string | number | Date | null | undefined
 ) {
    const date = toDate(value);
-   return date ? `${date.getDate()} ${MONTHS[date.getMonth()]}` : null;
+   return date
+      ? `${date.getDate()} ${MONTHS[date.getMonth()]}${yearOf(date)}`
+      : null;
 }
 
-/** `Tue 15 Sep` */
+/** `Tue 15 Sep`, or `Tue 15 Sep 2025` for another year */
 export function formatDay(value: string | number | Date | null | undefined) {
    const date = toDate(value);
    return date
-      ? `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]}`
+      ? `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]}${yearOf(date)}`
       : null;
 }
 

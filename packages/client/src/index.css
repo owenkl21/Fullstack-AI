@@ -1043,6 +1043,35 @@ td.fact {
    }
 }
 
+/* ---- A section that folds -------------------------------------------------- */
+.fold-body {
+   display: grid;
+   grid-template-rows: 0fr;
+   transition: grid-template-rows 360ms var(--ease);
+}
+.fold-open .fold-body {
+   grid-template-rows: 1fr;
+}
+.fold-inner {
+   overflow: hidden;
+   opacity: 0;
+   transform: translateY(-4px);
+   transition:
+      opacity 240ms var(--ease),
+      transform 320ms var(--ease);
+}
+.fold-open .fold-inner {
+   opacity: 1;
+   transform: none;
+   transition-delay: 80ms;
+}
+@media (prefers-reduced-motion: reduce) {
+   .fold-body,
+   .fold-inner {
+      transition: none;
+   }
+}
+
 /* ---- The fader ------------------------------------------------------------- */
 .fader-track {
    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 18%, transparent);

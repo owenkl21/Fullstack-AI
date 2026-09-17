@@ -7,7 +7,8 @@ import { SignedIn, SignedOut } from '@/components/shell/Signed';
 import { AccountMenu } from '@/components/shell/AccountMenu';
 
 const destinations = [
-   { to: '/feed', label: 'Feed' },
+   { to: '/', label: 'Feed', end: true },
+   { to: '/now', label: 'Now' },
    { to: '/catches/me', label: 'Catches' },
    { to: '/map', label: 'Map' },
    { to: '/forecast', label: 'Forecast' },
@@ -42,6 +43,7 @@ export function AppHeader() {
                      <NavLink
                         key={d.to}
                         to={d.to}
+                        end={'end' in d && d.end}
                         className={({ isActive }) =>
                            cn(
                               'g-tracked inline-flex min-h-11 items-center text-[19px] text-paper-2 transition-colors hover:text-teal',

@@ -1,3 +1,4 @@
+import { Fold } from '@/components/ui/fold';
 import { type CSSProperties, type ReactNode, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { CameraIcon } from '@heroicons/react/24/outline';
@@ -123,72 +124,79 @@ export function ProfileView({
 
          {figures}
 
-         <section className="rv mt-10" style={{ '--i': 2 } as CSSProperties}>
-            <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-               <h2 className="g text-[30px] md:text-[36px]">Photographs</h2>
-               {profile.galleryImages.length > 0 ? (
-                  <p className="lab num">
-                     {plural(profile.galleryImages.length, 'photo')}
-                  </p>
-               ) : null}
-            </div>
-
-            {profile.galleryImages.length === 0 ? (
-               /*
-                * An empty shelf, drawn rather than described. The frames show
-                * what will sit here, so the gap reads as room for photographs
-                * rather than as something that failed to load.
-                */
-               <div className="mt-5">
-                  <ul
-                     aria-hidden="true"
-                     className="grid max-w-[420px] grid-cols-4 gap-2"
-                  >
-                     {[0, 1, 2, 3].map((frame) => (
+         <section
+            className="rv mt-10 border-t border-line pt-2"
+            style={{ '--i': 2 } as CSSProperties}
+         >
+            <Fold
+               title="Photographs"
+               aside={
+                  profile.galleryImages.length > 0
+                     ? plural(profile.galleryImages.length, 'photo')
+                     : null
+               }
+            >
+               {profile.galleryImages.length === 0 ? (
+                  /*
+                   * An empty shelf, drawn rather than described. The frames show
+                   * what will sit here, so the gap reads as room for photographs
+                   * rather than as something that failed to load.
+                   */
+                  <div className="mt-5">
+                     <ul
+                        aria-hidden="true"
+                        className="grid max-w-[420px] grid-cols-4 gap-2"
+                     >
+                        {[0, 1, 2, 3].map((frame) => (
+                           <li
+                              key={frame}
+                              className="flex h-[72px] items-center justify-center border border-dashed border-line"
+                           >
+                              <FishMark className="h-6 w-10 text-ink-3/45" />
+                           </li>
+                        ))}
+                     </ul>
+                     <p className="mt-4 max-w-[60ch] text-base text-ink-2">
+                        Photographs you attach to a catch or a spot collect
+                        here.
+                     </p>
+                     <Link
+                        to="/log"
+                        className="g-tracked mt-4 inline-flex min-h-11 items-center gap-2 border border-line px-4 text-[15px] transition-colors duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2"
+                     >
+                        <CameraIcon
+                           aria-hidden="true"
+                           className="size-[18px]"
+                        />
+                        Log a catch with a photo
+                     </Link>
+                  </div>
+               ) : (
+                  <ul className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                     {profile.galleryImages.map((entry) => (
                         <li
-                           key={frame}
-                           className="flex h-[72px] items-center justify-center border border-dashed border-line"
+                           key={`${entry.sourceType}-${entry.sourceId}-${entry.id}`}
                         >
-                           <FishMark className="h-6 w-10 text-ink-3/45" />
+                           <Link
+                              to={
+                                 entry.sourceType === 'CATCH'
+                                    ? `/catches/${entry.sourceId}`
+                                    : `/sites/${entry.sourceId}`
+                              }
+                              className="group block aspect-square w-full overflow-hidden bg-bg-2"
+                           >
+                              <img
+                                 src={entry.url}
+                                 alt={entry.sourceTitle}
+                                 loading="lazy"
+                                 className="size-full object-cover transition-transform duration-[600ms] [transition-timing-function:var(--ease)] group-hover:scale-[1.04]"
+                              />
+                           </Link>
                         </li>
                      ))}
                   </ul>
-                  <p className="mt-4 max-w-[60ch] text-base text-ink-2">
-                     Photographs you attach to a catch or a spot collect here.
-                  </p>
-                  <Link
-                     to="/log"
-                     className="g-tracked mt-4 inline-flex min-h-11 items-center gap-2 border border-line px-4 text-[15px] transition-colors duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2"
-                  >
-                     <CameraIcon aria-hidden="true" className="size-[18px]" />
-                     Log a catch with a photo
-                  </Link>
-               </div>
-            ) : (
-               <ul className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-4">
-                  {profile.galleryImages.map((entry) => (
-                     <li
-                        key={`${entry.sourceType}-${entry.sourceId}-${entry.id}`}
-                     >
-                        <Link
-                           to={
-                              entry.sourceType === 'CATCH'
-                                 ? `/catches/${entry.sourceId}`
-                                 : `/sites/${entry.sourceId}`
-                           }
-                           className="group block aspect-square w-full overflow-hidden bg-bg-2"
-                        >
-                           <img
-                              src={entry.url}
-                              alt={entry.sourceTitle}
-                              loading="lazy"
-                              className="size-full object-cover transition-transform duration-[600ms] [transition-timing-function:var(--ease)] group-hover:scale-[1.04]"
-                           />
-                        </Link>
-                     </li>
-                  ))}
-               </ul>
-            )}
+               )}
+            </Fold>
          </section>
       </div>
    );

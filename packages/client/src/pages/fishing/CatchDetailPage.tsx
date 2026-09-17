@@ -1,3 +1,4 @@
+import { Contours } from '@/components/brand/Contours';
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Link, useParams } from 'react-router-dom';
@@ -251,7 +252,8 @@ function CatchRecord({
 
    if (state.status === 'error' || !data) {
       return (
-         <section className="mx-auto w-[min(1400px,100%-32px)] py-16">
+         <section className="relative mx-auto w-[min(1400px,100%-32px)] py-16">
+            <Contours seed={23} className="inset-x-0 top-0 h-[380px] w-full" />
             <h1 className="g text-[44px]">Could not load this catch</h1>
             <p className="mt-3 text-ink-2">
                The record is there, the connection was not. Try again.

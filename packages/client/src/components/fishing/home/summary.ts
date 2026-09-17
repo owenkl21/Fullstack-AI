@@ -202,3 +202,77 @@ export function seasonCount(catches: CatchSummary[]) {
       (entry) => new Date(entry.caughtAt).getTime() >= cutoff
    ).length;
 }
+
+/* ---- The season, read by month ------------------------------------------- */
+
+export type SeasonDay = {
+   key: string;
+   entry: CatchSummary;
+   measured: boolean;
+   /* Fish, not records: one log can carry three of the same species. */
+   count: number;
+};
+
+export type SeasonMonth = {
+   key: string;
+   label: string;
+   days: SeasonDay[];
+   fish: number;
+};
+
+/** The years with a catch in them, newest first. */
+export function seasonYears(catches: CatchSummary[]): number[] {
+   const years = new Set<number>();
+   for (const entry of catches) {
+      const y = new Date(entry.caughtAt).getFullYear();
+      if (!Number.isNaN(y)) years.add(y);
+   }
+   return [...years].sort((a, b) => b - a);
+}
+
+/**
+ * One year of the log as months, each month its days, oldest first. The
+ * tile is the day and its face is the best fish of that day, so a three fish
+ * morning is one tile with a count on it rather than three outings.
+ */
+export function seasonMonths(
+   catches: CatchSummary[],
+   year: number
+): SeasonMonth[] {
+   const inYear = sortByNewest(catches)
+      .filter((entry) => new Date(entry.caughtAt).getFullYear() === year)
+      .reverse();
+
+   const byDay = new Map<string, CatchSummary[]>();
+   for (const entry of inYear) {
+      const d = new Date(entry.caughtAt);
+      const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const list = byDay.get(day) ?? [];
+      list.push(entry);
+      byDay.set(day, list);
+   }
+
+   const months = new Map<string, SeasonMonth>();
+   for (const [day, entries] of byDay) {
+      const best = entries.reduce((a, b) =>
+         (b.length ?? -1) > (a.length ?? -1) ? b : a
+      );
+      const key = monthKey(best.caughtAt) ?? day.slice(0, 7);
+      const month = months.get(key) ?? {
+         key,
+         label: monthLabel(best.caughtAt) ?? key,
+         days: [],
+         fish: 0,
+      };
+      const count = entries.reduce((n, entry) => n + (entry.count ?? 1), 0);
+      month.days.push({
+         key: `day-${day}`,
+         entry: best,
+         measured: best.length !== null,
+         count,
+      });
+      month.fish += count;
+      months.set(key, month);
+   }
+   return [...months.values()];
+}

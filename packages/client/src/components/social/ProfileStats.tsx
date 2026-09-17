@@ -1,3 +1,4 @@
+import { Fold } from '@/components/ui/fold';
 import {
    MapPinIcon,
    SparklesIcon,
@@ -171,9 +172,12 @@ export function ProfileStatsPanel() {
          ) : null}
 
          {bests.length ? (
-            <>
-               <h2 className="lab lab-rule mt-10">Personal bests</h2>
-               <ul className="mt-4 grid gap-0">
+            <Fold
+               className="mt-10 border-t border-line pt-2"
+               title="Personal bests"
+               aside={`${bests.length} species`}
+            >
+               <ul className="mt-2 grid gap-0">
                   {bests.map((b) => (
                      <li
                         key={b.speciesId}
@@ -189,7 +193,7 @@ export function ProfileStatsPanel() {
                      </li>
                   ))}
                </ul>
-            </>
+            </Fold>
          ) : null}
       </section>
    );
