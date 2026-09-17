@@ -207,21 +207,30 @@ async function seedFeed() {
          id: true,
          createdById: true,
          title: true,
+         notes: true,
          createdAt: true,
          site: { select: { id: true, latitude: true, longitude: true } },
       },
    });
 
    for (const row of rows) {
+      /*
+       * The body is the angler's note, which is what a real post carries.
+       * It used to be the title, so every seeded card printed its own heading
+       * again in body type directly underneath it.
+       *
+       * The update is no longer empty, so re-running the seed repairs rows
+       * written by the old version rather than leaving them as they were.
+       */
       await prisma.feedPost.upsert({
          where: { id: `${row.id}_post` },
-         update: {},
+         update: { content: row.notes ?? null },
          create: {
             id: `${row.id}_post`,
             authorId: row.createdById,
             type: 'CATCH',
             scope: 'GLOBAL',
-            content: row.title,
+            content: row.notes ?? null,
             catchId: row.id,
             siteId: row.site?.id ?? null,
             latitude: row.site?.latitude ?? null,
