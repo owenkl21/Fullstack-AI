@@ -44,10 +44,10 @@ Two commits on `redesign-theme`, neither pushed:
 | Queue item | State |
 |---|---|
 | 5.0 Off the deprecated Railway config | **Done.** Deploys from `.railway/railway.ts`; `railway.json` deleted |
-| 5.1 Railway and deploy wiring | **Backend live.** Server online, schema pushed, species seeded. Vercel still waiting on the account |
-| 5.2 better-auth replacing Clerk | Not started. Needs a verified Resend domain first |
+| 5.1 Railway and deploy wiring | **Done.** Backend on Railway, frontend on Vercel at fishlogger-client.vercel.app, R2 CORS set |
+| 5.2 better-auth replacing Clerk | **Done.** Clerk gone from both packages. Mail is mocked to the server log until Resend has a verified domain |
 | 5.3 Species and Open-Meteo | **Done.** Species wired and seeded, conditions read at the hour of the catch |
-| 5.4 Seed data | Not started |
+| 5.4 Seed data | **Done.** 8 anglers, 15 spots, 12 gear, 50 catches, 50 feed posts, guarded and idempotent |
 | 5.5 The social layer | **Done.** Scoring, per-species boards, rivalry board, profile stats, groups, privacy switch |
 | 5.6 Leaflet, off Google | **Done.** Picker, both record maps and the all-spots map. No iframes left |
 
