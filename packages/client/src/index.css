@@ -366,6 +366,14 @@
       min-height: 7rem;
       resize: vertical;
    }
+   /*
+    * A single line field does not want the whole column. At 16px, 32rem is
+    * roughly sixty characters, which is past any name, title or handle anyone
+    * will type. A textarea is exempt: prose wants the full measure.
+    */
+   input.input-line {
+      max-width: 32rem;
+   }
    /* The fix line inside the capture receipt */
    .fixline {
       height: 3px;
