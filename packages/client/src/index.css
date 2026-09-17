@@ -921,6 +921,102 @@
    }
 }
 
+/* ---- Forecast tones -------------------------------------------------------- */
+/*
+ * Tints sit behind the theme's own ink, so they read in day and night. The
+ * loud bands are solid with their own paper text, in both themes.
+ */
+.tone {
+   border-radius: 0;
+}
+.tone-wind-1 {
+   background: color-mix(in srgb, var(--teal) 18%, transparent);
+}
+.tone-wind-2 {
+   background: color-mix(in srgb, #c97b1c 32%, transparent);
+}
+.tone-wind-3 {
+   background: #c0392b;
+   color: #f4f1ec;
+}
+.tone-wind-3 * {
+   color: #f4f1ec;
+}
+.tone-rain-1 {
+   background: color-mix(in srgb, #1f6fb2 14%, transparent);
+}
+.tone-rain-2 {
+   background: color-mix(in srgb, #1f6fb2 32%, transparent);
+}
+.tone-rain-3 {
+   background: #1f6fb2;
+   color: #f4f1ec;
+}
+.tone-rain-3 * {
+   color: #f4f1ec;
+}
+.tone-uv-1 {
+   background: color-mix(in srgb, #d99a1a 20%, transparent);
+}
+.tone-uv-2 {
+   background: color-mix(in srgb, #e67e22 38%, transparent);
+}
+.tone-uv-3 {
+   background: #c0392b;
+   color: #f4f1ec;
+}
+.tone-water-cold {
+   background: color-mix(in srgb, #1f6fb2 16%, transparent);
+}
+.tone-water-warm {
+   background: color-mix(in srgb, #c97b1c 18%, transparent);
+}
+.tone-sky-clear {
+   background: color-mix(in srgb, #d99a1a 12%, transparent);
+}
+.tone-sky-grey {
+   background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.tone-sky-rain {
+   background: color-mix(in srgb, #1f6fb2 22%, transparent);
+}
+.tone-sky-storm {
+   background: #8e44ad;
+   color: #f4f1ec;
+}
+.tone-sky-storm * {
+   color: #f4f1ec;
+}
+
+/* ---- A shimmer for anything still loading ---------------------------------- */
+.shimmer {
+   position: relative;
+   overflow: hidden;
+}
+.shimmer::after {
+   content: '';
+   position: absolute;
+   inset: 0;
+   transform: translateX(-100%);
+   background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--background) 55%, transparent) 50%,
+      transparent 100%
+   );
+   animation: shimmer 1.4s var(--ease) infinite;
+}
+@keyframes shimmer {
+   to {
+      transform: translateX(100%);
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .shimmer::after {
+      animation: none;
+   }
+}
+
 /* ---- A reading landing ----------------------------------------------------- */
 .fact {
    animation: fact-in 520ms var(--ease) both;
@@ -943,6 +1039,32 @@ td.fact {
 }
 @media (prefers-reduced-motion: reduce) {
    .fact {
+      animation: none;
+   }
+}
+
+/* ---- A reply arriving ------------------------------------------------------ */
+.comment-in {
+   animation: comment-in 360ms var(--ease) both;
+   animation-delay: calc(var(--i, 0) * 40ms);
+}
+@keyframes comment-in {
+   from {
+      opacity: 0;
+      transform: translateY(6px);
+   }
+   to {
+      opacity: 1;
+      transform: none;
+   }
+}
+/* Rows of a table landing one after another. */
+tr.fact {
+   animation-duration: 420ms;
+   animation-delay: calc(var(--i, 0) * 45ms);
+}
+@media (prefers-reduced-motion: reduce) {
+   .comment-in {
       animation: none;
    }
 }

@@ -354,7 +354,20 @@ function Insights() {
             <h1 className="g text-[44px] md:text-[56px]">Insights</h1>
             <div className="mt-8 grid gap-6 md:grid-cols-2">
                {[0, 1, 2, 3].map((i) => (
-                  <span key={i} className="h-40 bg-bg-2" />
+                  <span
+                     key={i}
+                     className="shimmer fact h-40 bg-bg-2"
+                     style={{ '--i': i } as React.CSSProperties}
+                  />
+               ))}
+            </div>
+            <div className="mt-8 grid gap-x-8 gap-y-2 md:grid-cols-2">
+               {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <span
+                     key={i}
+                     className="shimmer fact h-8 bg-bg-2"
+                     style={{ '--i': i + 4 } as React.CSSProperties}
+                  />
                ))}
             </div>
          </section>
@@ -715,10 +728,11 @@ function Table({
                   </tr>
                </thead>
                <tbody>
-                  {rows.slice(0, 12).map((row) => (
+                  {rows.slice(0, 12).map((row, i) => (
                      <tr
                         key={row.id ?? row.name}
-                        className="border-b border-line"
+                        className="fact border-b border-line"
+                        style={{ '--i': i } as React.CSSProperties}
                      >
                         <td className="max-w-0 truncate py-2 pr-2">
                            {href && row.id ? (

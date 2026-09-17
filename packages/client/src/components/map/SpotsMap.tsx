@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { LeafletMouseEvent, Map as LeafletMap, Marker } from 'leaflet';
 import { ViewfinderCircleIcon } from '@heroicons/react/24/outline';
 import {
@@ -135,6 +136,7 @@ export function SpotsMap({
    const [discovered, setDiscovered] = useState<PublicSpot[]>([]);
    const [showOthers, setShowOthers] = useState(true);
    const [species, setSpecies] = useState<string[]>([]);
+   const navigate = useNavigate();
    const [base, setBase] = useState<BaseLayer>('satellite');
    /*
     * Bumped when the map is built. Every layer's draw effect depends on it,
@@ -594,10 +596,15 @@ export function SpotsMap({
                dropping={armed}
                onDrop={() => setArmed((was) => !was)}
                onLogHere={() => {
+                  /*
+                   * The quick log, with the pin already where the map is
+                   * looking. The full form was the wrong landing: a long page
+                   * that did not even read the pin.
+                   */
                   const centre = map.current?.getCenter();
                   if (centre)
-                     window.location.assign(
-                        `/catches/new?lat=${centre.lat.toFixed(5)}&lng=${centre.lng.toFixed(5)}`
+                     navigate(
+                        `/log?lat=${centre.lat.toFixed(5)}&lng=${centre.lng.toFixed(5)}`
                      );
                }}
             />

@@ -27,11 +27,10 @@ type SpotImage = { storageKey: string; url: string };
 
 type SpotFieldName = 'name' | 'description' | 'accessNotes' | 'position';
 
+/* Salt or fresh. A river mouth is fished as one or the other on the day. */
 const WATER_TYPES: { value: WaterType; word: string }[] = [
-   { value: 'FRESHWATER', word: 'Fresh' },
    { value: 'SALTWATER', word: 'Salt' },
-   { value: 'BRACKISH', word: 'Brackish' },
-   { value: 'OTHER', word: 'Other' },
+   { value: 'FRESHWATER', word: 'Fresh' },
 ];
 
 const NAME_MAX = 120;

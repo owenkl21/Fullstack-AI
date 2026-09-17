@@ -13,7 +13,15 @@ import {
 } from '@/lib/units';
 import { cn } from '@/lib/utils';
 import { thunderRisk, type ForecastHour } from './forecast-api';
-import { skyTone, windTone } from './tones';
+import {
+   rainCell,
+   skyCell,
+   skyTone,
+   uvCell,
+   waterCell,
+   windCell,
+   windTone,
+} from './tones';
 
 /*
  * The day, hour by hour, laid out like a tide table.
@@ -32,6 +40,8 @@ type Row = {
    unit?: string;
    cell: (hour: ForecastHour) => ReactNode;
    has: (hour: ForecastHour) => boolean;
+   /* The tint behind the cell, where the figure has a band. */
+   tone?: (hour: ForecastHour) => string;
 };
 
 const num = (n: number | null) => (n === null ? '' : String(n));
@@ -49,6 +59,7 @@ export function HourGrid({
    const all: Row[] = [
       {
          key: 'sky',
+         tone: (h) => skyCell(h.conditionText),
          label: 'Sky',
          has: (h) => h.conditionText !== null,
          cell: (h) => {
@@ -71,6 +82,7 @@ export function HourGrid({
       },
       {
          key: 'wind',
+         tone: (h) => windCell(h.windSpeedKph),
          label: 'Wind',
          unit: unitOf('speed', system),
          has: (h) => h.windSpeedKph !== null,
@@ -96,6 +108,7 @@ export function HourGrid({
       },
       {
          key: 'gust',
+         tone: (h) => windCell(h.windGustKph),
          label: 'Gust',
          unit: unitOf('speed', system),
          has: (h) => h.windGustKph !== null,
@@ -107,6 +120,7 @@ export function HourGrid({
       },
       {
          key: 'rain',
+         tone: (h) => rainCell(h.precipitationProbability),
          label: 'Rain',
          unit: '%',
          has: (h) => h.precipitationProbability !== null,
@@ -178,6 +192,7 @@ export function HourGrid({
       },
       {
          key: 'water',
+         tone: (h) => waterCell(h.seaSurfaceTemperatureC),
          label: 'Water',
          unit: unitOf('temp', system),
          has: (h) => h.seaSurfaceTemperatureC !== null,
@@ -185,6 +200,7 @@ export function HourGrid({
       },
       {
          key: 'uv',
+         tone: (h) => uvCell(h.uvIndex),
          label: 'UV',
          has: (h) => h.uvIndex !== null && h.uvIndex > 0,
          cell: (h) =>
@@ -248,7 +264,8 @@ export function HourGrid({
                            className={cn(
                               'fact num px-1 py-2.5 text-center align-middle',
                               h.local === nowLocal && 'bg-bg-2',
-                              h.isDaytime === false && 'text-ink-2'
+                              h.isDaytime === false && 'text-ink-2',
+                              row.tone?.(h)
                            )}
                         >
                            {row.cell(h)}

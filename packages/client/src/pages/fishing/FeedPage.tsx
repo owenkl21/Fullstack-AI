@@ -581,7 +581,7 @@ export function FeedPage() {
    return (
       <div
          ref={pageRef}
-         className="mx-auto w-[min(720px,100%-32px)] py-8 md:py-12"
+         className="mx-auto w-[min(800px,100%-32px)] py-8 md:py-12"
       >
          <header className="rv flex flex-col gap-3">
             <h1 className="g text-[44px] md:text-[56px]">Feed</h1>

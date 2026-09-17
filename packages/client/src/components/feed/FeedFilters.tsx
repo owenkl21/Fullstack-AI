@@ -1,5 +1,6 @@
 import type { ChipOption } from '@/components/feed/ChipRadioGroup';
 import { ChoiceGroup } from '@/components/ui/field';
+import { cn } from '@/lib/utils';
 import { Picker } from '@/components/ui/picker';
 import { StopSlider } from '@/components/ui/slider';
 import { plural } from '@/components/feed/format';
@@ -13,8 +14,8 @@ export type LocationState =
    | 'unsupported';
 
 const SCOPE_OPTIONS: ReadonlyArray<ChipOption<ScopeFilter>> = [
-   { value: 'everywhere', label: 'Everywhere' },
-   { value: 'near-me', label: 'Near me' },
+   { value: 'everywhere', label: 'Global' },
+   { value: 'near-me', label: 'Local' },
 ];
 
 const SHOW_OPTIONS: ReadonlyArray<ChipOption<ShowFilter>> = [
@@ -67,49 +68,59 @@ export function FeedFilters({
           * rows here cost the first post its place above the fold.
           */}
          {/*
-          * On a phone, two pickers side by side: they fit one row without
-          * scrolling and open a panel each. On a wider screen the chips are
-          * back, because there is room and a chip is one tap fewer.
+          * Global or local first, as one two-way switch, then everything
+          * else. The switch is the question the whole feed turns on; the
+          * rest are refinements.
           */}
-         <div className="grid grid-cols-2 gap-3 sm:hidden">
-            <Picker
-               size="sm"
-               label="Scope"
-               value={scope}
-               options={SCOPE_OPTIONS.map((o) => ({
-                  value: o.value,
-                  label: o.label,
-               }))}
-               onChange={(next) => onScopeChange(next as ScopeFilter)}
-            />
-            <Picker
-               size="sm"
-               label="Show"
-               value={show}
-               options={SHOW_OPTIONS.map((o) => ({
-                  value: o.value,
-                  label: o.label,
-               }))}
-               onChange={(next) => onShowChange(next as ShowFilter)}
-            />
-         </div>
-         <div className="hidden gap-10 sm:flex">
-            <ChoiceGroup
-               inline
-               size="sm"
-               label="Scope"
-               value={scope}
-               options={SCOPE_OPTIONS}
-               onChange={onScopeChange}
-            />
-            <ChoiceGroup
-               inline
-               size="sm"
-               label="Show"
-               value={show}
-               options={SHOW_OPTIONS}
-               onChange={onShowChange}
-            />
+         <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+            <div
+               role="radiogroup"
+               aria-label="Scope"
+               className="grid w-full max-w-[320px] grid-cols-2 border border-ink"
+            >
+               {SCOPE_OPTIONS.map((option) => {
+                  const on = scope === option.value;
+                  return (
+                     <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => onScopeChange(option.value)}
+                        className={cn(
+                           'g-tracked h-11 text-[17px] transition-colors duration-150 [transition-timing-function:var(--ease)]',
+                           on
+                              ? 'bg-ink text-background'
+                              : 'text-ink-2 hover:text-ink'
+                        )}
+                     >
+                        {option.label}
+                     </button>
+                  );
+               })}
+            </div>
+            <div className="sm:hidden">
+               <Picker
+                  size="sm"
+                  label="Show"
+                  value={show}
+                  options={SHOW_OPTIONS.map((o) => ({
+                     value: o.value,
+                     label: o.label,
+                  }))}
+                  onChange={(next) => onShowChange(next as ShowFilter)}
+               />
+            </div>
+            <div className="hidden sm:block">
+               <ChoiceGroup
+                  inline
+                  size="sm"
+                  label="Show"
+                  value={show}
+                  options={SHOW_OPTIONS}
+                  onChange={onShowChange}
+               />
+            </div>
          </div>
 
          {scope === 'near-me' ? (
@@ -133,8 +144,10 @@ export function FeedFilters({
                               : 25
                         }
                         format={(km) => `${km} km`}
-                        onChange={onRadiusChange}
-                        onCommit={onRadiusCommit}
+                        onCommit={(km) => {
+                           onRadiusChange(km);
+                           onRadiusCommit(km);
+                        }}
                         className="max-w-[420px]"
                      />
                      <p className="text-[15px] text-ink-2" aria-live="polite">

@@ -22,6 +22,7 @@ import {
 } from '@/components/fishing/quicklog/species';
 import { AddGearInline } from '@/components/fishing/AddGearInline';
 import { readTakenAt } from '@/lib/exif';
+import { formatMetres, nearestSpot } from '@/lib/geo';
 import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
 import {
    CompetitionEntry,
@@ -653,6 +654,16 @@ export function CatchForm({
       }
       return { latitude, longitude };
    }, [spotMode, herePosition, selectedSite, newLatitude, newLongitude]);
+
+   /*
+    * A position on top of a spot you already have is that spot. Offered, not
+    * forced: the same beach can be two spots to the angler who fishes it.
+    */
+   const nearSaved = useMemo(
+      () =>
+         spotMode === 'saved' ? null : nearestSpot(sites, activeCoordinates),
+      [spotMode, sites, activeCoordinates]
+   );
 
    const spotLabel = useMemo(() => {
       if (spotMode === 'saved') {
@@ -1475,11 +1486,9 @@ export function CatchForm({
                            Get a fix
                         </Button>
                      ) : null}
-                     {/* TODO(api): appendix E item 3. The catch has no coordinates of
-                      its own yet, so this position reads the conditions only. */}
                      <p className="mt-3 text-[14px] text-ink-3">
-                        Your position sets the conditions. It is not stored on
-                        the catch yet.
+                        Your position sets the conditions and is kept on the
+                        catch.
                      </p>
                      {isEdit && initial?.siteId ? (
                         <p className="mt-2 text-[14px] text-ink-3">
@@ -1487,6 +1496,33 @@ export function CatchForm({
                            chosen leaves it with no spot.
                         </p>
                      ) : null}
+                  </div>
+               ) : null}
+
+               {nearSaved ? (
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border border-teal px-4 py-3">
+                     <p className="text-[15px]">
+                        <span className="lab mr-2 text-ink-3">
+                           You have fished here
+                        </span>
+                        <span className="g-tracked text-[19px]">
+                           {nearSaved.spot.name}
+                        </span>
+                        <span className="ml-2 text-ink-3">
+                           is {formatMetres(nearSaved.metres)} away
+                        </span>
+                     </p>
+                     <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                           setSavedSiteId(nearSaved.spot.id);
+                           chooseSpotMode('saved');
+                        }}
+                     >
+                        File it there
+                     </Button>
                   </div>
                ) : null}
 
@@ -1964,7 +2000,7 @@ export function LogCatchPage() {
 
    return (
       <RequireSignIn what="your log">
-         <section className="mx-auto w-[min(720px,100%-32px)] py-8 md:py-12">
+         <section className="mx-auto w-[min(1120px,100%-32px)] py-8 md:py-12">
             <h1 className="g text-[44px] md:text-[56px]">Log a catch</h1>
             <p className="mt-3 max-w-[52ch] text-ink-2">
                Everything here is optional except the fish and the time.

@@ -14,12 +14,7 @@ import {
 
 type LoadState = 'loading' | 'ready' | 'missing' | 'error';
 
-const WATER_VALUES: WaterType[] = [
-   'FRESHWATER',
-   'SALTWATER',
-   'BRACKISH',
-   'OTHER',
-];
+const WATER_VALUES: WaterType[] = ['SALTWATER', 'FRESHWATER'];
 
 const asWaterType = (value: unknown): WaterType | '' =>
    WATER_VALUES.find((water) => water === value) ?? '';

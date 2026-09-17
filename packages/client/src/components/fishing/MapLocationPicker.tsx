@@ -1,67 +1,115 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { ViewfinderCircleIcon } from '@heroicons/react/24/outline';
-import type { Map as LeafletMap, Marker } from 'leaflet';
+import {
+   MagnifyingGlassIcon,
+   ViewfinderCircleIcon,
+} from '@heroicons/react/24/outline';
+import type { Map as LeafletMap } from 'leaflet';
 import { Button } from '@/components/ui/button';
-import { L, createMap, kindPin, refreshSize } from '@/lib/leaflet';
+import {
+   BASE_LAYERS,
+   createMap,
+   refreshSize,
+   setBaseLayer,
+   type BaseLayer,
+} from '@/lib/leaflet';
 import {
    formatCoordinate,
    parseGoogleMapsCoordinates,
    readPosition,
    type MapPosition,
 } from '@/lib/maps';
+import { cn } from '@/lib/utils';
 
 type MapLocationPickerProps = {
    latitude: string;
    longitude: string;
    onChange: (latitude: number, longitude: number) => void;
+   className?: string;
 };
 
 /* The country the first anglers fish, rather than a continent they do not. */
 const DEFAULT_CENTER: MapPosition = { lat: -30.5595, lng: 22.9375 };
 const DEFAULT_ZOOM = 5;
-const FOCUSED_ZOOM = 14;
+const FOCUSED_ZOOM = 15;
 /* About a tenth of a metre: closer than this is the same pin. */
 const SAME_POSITION = 0.000001;
 
+type Found = { label: string; lat: number; lng: number };
+
+/*
+ * Free, keyless place search. Rate limited to about one a second, which a
+ * search box that only asks on Enter never reaches.
+ */
+const searchPlaces = async (
+   q: string,
+   signal: AbortSignal
+): Promise<Found[]> => {
+   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`;
+   const res = await fetch(url, {
+      signal,
+      headers: { Accept: 'application/json' },
+   });
+   if (!res.ok) return [];
+   const list = (await res.json()) as {
+      display_name: string;
+      lat: string;
+      lon: string;
+   }[];
+   return list
+      .map((p) => ({
+         label: p.display_name,
+         lat: Number(p.lat),
+         lng: Number(p.lon),
+      }))
+      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+};
+
+/* A typed pair, "-34.1275, 18.4487", in either order of care. */
+const readPair = (text: string): MapPosition | null => {
+   const m = text
+      .trim()
+      .match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
+   return m ? readPosition(m[1] ?? '', m[2] ?? '') : null;
+};
+
 /**
- * One pin, four ways to set it: tap the map, drag the pin, paste a link from Maps,
- * or ask for your own position. The map never asks for a position on its own, and
- * where it cannot be drawn the two coordinate fields take over.
+ * The pin is fixed and the map moves under it.
  *
- * Day and night need no work here: the tile pane is filtered by a :root rule, so
- * the map follows the theme without JavaScript watching for it.
+ * Dropping a pin by tapping a small map on a phone is a game of skill, and
+ * dragging one with a mouse is fiddly. Moving the map until the crosshair
+ * sits on the water is neither: pan, pinch, scroll, and the position is
+ * wherever the map came to rest. Search, a pasted Maps link, a typed pair
+ * or your own position all just move the map.
  */
 export function MapLocationPicker({
    latitude,
    longitude,
    onChange,
+   className,
 }: MapLocationPickerProps) {
    const fieldId = useId();
    const mapContainerRef = useRef<HTMLDivElement | null>(null);
    const mapRef = useRef<LeafletMap | null>(null);
-   const markerRef = useRef<Marker | null>(null);
    const lastSentRef = useRef<MapPosition | null>(null);
    const onChangeRef = useRef(onChange);
    const startRef = useRef<MapPosition | null>(
       readPosition(latitude, longitude)
    );
+   const searchRequest = useRef<AbortController | null>(null);
 
-   /*
-    * Leaflet needs no script, no key and no network to draw, so there is no
-    * loading state to show. This only ever flips if constructing the map
-    * throws, and then the typed fields take over.
-    */
    const [mapFailed, setMapFailed] = useState(false);
+   const [moving, setMoving] = useState(false);
+   const [base, setBase] = useState<BaseLayer>('satellite');
    const [isLocating, setIsLocating] = useState(false);
-   const [locationError, setLocationError] = useState<string | null>(null);
-   const [link, setLink] = useState('');
-   const [linkError, setLinkError] = useState<string | null>(null);
-   const [linkNote, setLinkNote] = useState<string | null>(null);
+   const [note, setNote] = useState<string | null>(null);
+   const [problem, setProblem] = useState<string | null>(null);
+   const [query, setQuery] = useState('');
+   const [found, setFound] = useState<Found[] | null>(null);
+   const [searching, setSearching] = useState(false);
    /* The typed fields hold a draft only while they are being typed in. */
    const [draft, setDraft] = useState<{ lat: string; lng: string } | null>(
       null
    );
-   const [typedError, setTypedError] = useState<string | null>(null);
 
    useEffect(() => {
       onChangeRef.current = onChange;
@@ -74,48 +122,23 @@ export function MapLocationPicker({
       onChangeRef.current(next.lat, next.lng);
    }, []);
 
-   const setPin = useCallback((next: MapPosition, recentre = true) => {
+   /* Fly the map so its centre is the position; moveend then sends it. */
+   const goTo = useCallback((next: MapPosition, zoomIn = true) => {
       const map = mapRef.current;
-
       if (!map) {
+         lastSentRef.current = next;
+         onChangeRef.current(next.lat, next.lng);
          return;
       }
-
-      if (markerRef.current) {
-         markerRef.current.setLatLng([next.lat, next.lng]);
-      } else {
-         const marker = L.marker([next.lat, next.lng], {
-            icon: kindPin('spot'),
-            draggable: true,
-            title: 'The pin for this spot',
-            keyboard: true,
-         }).addTo(map);
-
-         marker.on('dragend', () => {
-            const moved = marker.getLatLng();
-
-            lastSentRef.current = { lat: moved.lat, lng: moved.lng };
-            onChangeRef.current(moved.lat, moved.lng);
-         });
-
-         markerRef.current = marker;
-      }
-
-      if (recentre) {
-         map.panTo([next.lat, next.lng]);
-
-         if (map.getZoom() < FOCUSED_ZOOM) {
-            map.setZoom(FOCUSED_ZOOM);
-         }
-      }
+      const zoom = zoomIn
+         ? Math.max(map.getZoom(), FOCUSED_ZOOM)
+         : map.getZoom();
+      map.setView([next.lat, next.lng], zoom, { animate: true });
    }, []);
 
    useEffect(() => {
       const node = mapContainerRef.current;
-
-      if (!node || mapRef.current) {
-         return;
-      }
+      if (!node || mapRef.current) return;
 
       let observer: ResizeObserver | null = null;
 
@@ -124,18 +147,22 @@ export function MapLocationPicker({
          const map = createMap(node, {
             centre: start ?? DEFAULT_CENTER,
             zoom: start ? FOCUSED_ZOOM : DEFAULT_ZOOM,
+            wheelZoom: true,
          });
-
          mapRef.current = map;
 
-         if (start) {
-            setPin(start, false);
-         }
-
-         map.on('click', (event) => {
-            const next = { lat: event.latlng.lat, lng: event.latlng.lng };
-
-            setPin(next);
+         map.on('movestart', () => setMoving(true));
+         map.on('moveend', () => {
+            setMoving(false);
+            const c = map.getCenter();
+            const next = { lat: c.lat, lng: c.lng };
+            const last = lastSentRef.current;
+            if (
+               last &&
+               Math.abs(last.lat - next.lat) < SAME_POSITION &&
+               Math.abs(last.lng - next.lng) < SAME_POSITION
+            )
+               return;
             send(next);
          });
 
@@ -143,154 +170,283 @@ export function MapLocationPicker({
          observer.observe(node);
       } catch (error) {
          console.error(error);
-         // Deferred: setting state straight from an effect body cascades a
-         // render, and this is a report from an external system, not a value
-         // React already knows.
          queueMicrotask(() => setMapFailed(true));
       }
 
       return () => {
          observer?.disconnect();
-         markerRef.current = null;
          mapRef.current?.remove();
          mapRef.current = null;
       };
-   }, [send, setPin]);
+   }, [send]);
 
-   /* The pin follows the form, but not the keystroke it just sent itself. */
+   /* The map follows the form, but not the move it just reported itself. */
    useEffect(() => {
-      if (mapFailed) {
-         return;
-      }
-
+      if (mapFailed) return;
       const next = readPosition(latitude, longitude);
-
-      if (!next) {
-         return;
-      }
-
+      if (!next) return;
       const last = lastSentRef.current;
-
       if (
          last &&
          Math.abs(last.lat - next.lat) < SAME_POSITION &&
          Math.abs(last.lng - next.lng) < SAME_POSITION
-      ) {
+      )
          return;
-      }
-
-      setPin(next);
-   }, [latitude, longitude, mapFailed, setPin]);
+      lastSentRef.current = next;
+      mapRef.current?.setView(
+         [next.lat, next.lng],
+         Math.max(mapRef.current.getZoom(), FOCUSED_ZOOM),
+         { animate: false }
+      );
+   }, [latitude, longitude, mapFailed]);
 
    const useMyPosition = () => {
       if (!navigator.geolocation) {
-         setLocationError(
-            'This browser will not share your position. Tap the map to place the pin instead.'
-         );
+         setProblem('This browser will not share your position.');
          return;
       }
-
       setIsLocating(true);
-      setLocationError(null);
-
+      setProblem(null);
       navigator.geolocation.getCurrentPosition(
          ({ coords }) => {
-            const next = { lat: coords.latitude, lng: coords.longitude };
-            setPin(next);
-            send(next);
+            goTo({ lat: coords.latitude, lng: coords.longitude });
             setIsLocating(false);
+            setNote('Centred on your position.');
          },
          () => {
             setIsLocating(false);
-            setLocationError(
-               'Could not get your position. Allow location in your browser, or tap the map to place the pin.'
+            setProblem(
+               'Could not get your position. Allow location in your browser, or move the map yourself.'
             );
          },
          { enableHighAccuracy: true, timeout: 10000 }
       );
    };
 
-   const applyLink = (value: string) => {
-      if (!value.trim()) {
-         setLinkError(null);
-         setLinkNote(null);
+   const runSearch = async (text: string) => {
+      const q = text.trim();
+      setNote(null);
+      setProblem(null);
+      setFound(null);
+      if (!q) return;
+
+      const link = parseGoogleMapsCoordinates(q);
+      if (link) {
+         goTo({ lat: link.parsedLatitude, lng: link.parsedLongitude });
+         setNote('Position taken from the link.');
+         setQuery('');
+         return;
+      }
+      const pair = readPair(q);
+      if (pair) {
+         goTo(pair);
+         setQuery('');
          return;
       }
 
-      const parsed = parseGoogleMapsCoordinates(value);
-
-      if (!parsed) {
-         setLinkNote(null);
-         setLinkError(
-            'That link carries no position. Open the spot in Maps and copy the link from there.'
-         );
-         return;
+      searchRequest.current?.abort();
+      const controller = new AbortController();
+      searchRequest.current = controller;
+      setSearching(true);
+      try {
+         const places = await searchPlaces(q, controller.signal);
+         if (controller.signal.aborted) return;
+         if (places.length === 0) {
+            setProblem('Nothing found by that name. Try the nearest town.');
+         } else if (places.length === 1 && places[0]) {
+            goTo(places[0]);
+            setQuery('');
+         } else {
+            setFound(places);
+         }
+      } catch (error) {
+         if (!controller.signal.aborted) {
+            console.error(error);
+            setProblem('The search did not answer. Move the map by hand.');
+         }
+      } finally {
+         if (!controller.signal.aborted) setSearching(false);
       }
+   };
 
-      const next = { lat: parsed.parsedLatitude, lng: parsed.parsedLongitude };
-      setPin(next);
-      send(next);
-      setLinkError(null);
-      setLinkNote('Position taken from the link.');
+   const cycleBase = () => {
+      const order: BaseLayer[] = ['satellite', 'terrain', 'plain'];
+      const next =
+         order[(order.indexOf(base) + 1) % order.length] ?? 'satellite';
+      setBase(next);
+      if (mapRef.current) setBaseLayer(mapRef.current, next);
    };
 
    const applyTyped = (lat: string, lng: string) => {
       setDraft(null);
-
       if (!lat.trim() && !lng.trim()) {
-         setTypedError(null);
+         setProblem(null);
          return;
       }
-
       const next = readPosition(lat, lng);
-
       if (!next) {
          setDraft({ lat, lng });
-         setTypedError(
+         setProblem(
             'Latitude runs from -90 to 90 and longitude from -180 to 180. Both are needed.'
          );
          return;
       }
-
-      setTypedError(null);
-      setPin(next);
+      setProblem(null);
       send(next);
    };
 
    const typed = draft ?? { lat: latitude, lng: longitude };
-
    const readout = position
       ? `${formatCoordinate(position.lat)}, ${formatCoordinate(position.lng)}`
-      : 'No position recorded';
+      : 'Move the map to set it';
+   const baseLabel =
+      BASE_LAYERS.find((b) => b.value === base)?.label ?? 'Satellite';
+   const control =
+      'grid h-11 place-items-center border border-line bg-background text-ink shadow-[0_1px_0_var(--line)] transition-[transform,background-color] duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2 active:scale-[0.96] disabled:opacity-50';
 
    return (
-      <div className="grid gap-4">
+      <div className={cn('grid gap-3', className)}>
          {mapFailed ? (
             <p className="text-[15px] text-ink-2">
-               The map cannot be drawn here. Type the position, paste a link
-               from Maps, or use your own position.
+               The map cannot be drawn here. Type the position or use your own.
             </p>
          ) : (
-            <div className="map-surface relative aspect-[3/2] w-full border border-line">
+            <div className="map-surface relative h-[340px] w-full overflow-hidden border border-line sm:h-[440px]">
                <div ref={mapContainerRef} className="absolute inset-0" />
-               <button
-                  type="button"
-                  onClick={useMyPosition}
-                  disabled={isLocating}
-                  aria-label={
-                     isLocating ? 'Finding your position' : 'Use my position'
-                  }
-                  title={
-                     isLocating ? 'Finding your position' : 'Use my position'
-                  }
-                  className="absolute bottom-3 left-3 z-[400] grid size-11 place-items-center rounded-full border border-line bg-background text-ink transition-transform duration-150 [transition-timing-function:var(--ease)] active:scale-[0.96] disabled:opacity-50"
+
+               {/* Search across the top. Enter asks; a link or a pair goes straight there. */}
+               <form
+                  role="search"
+                  className="absolute top-3 right-3 left-3 z-[400]"
+                  onSubmit={(event) => {
+                     event.preventDefault();
+                     void runSearch(query);
+                  }}
                >
-                  <ViewfinderCircleIcon
-                     className="size-6"
-                     strokeWidth={1.5}
-                     aria-hidden="true"
+                  <div className="flex h-11 items-center border border-line bg-background shadow-[0_1px_0_var(--line)] focus-within:border-ink">
+                     <MagnifyingGlassIcon
+                        aria-hidden="true"
+                        className="ml-3 size-5 shrink-0 text-ink-3"
+                     />
+                     <input
+                        id={`${fieldId}-search`}
+                        type="search"
+                        value={query}
+                        onChange={(event) => {
+                           setQuery(event.target.value);
+                           setFound(null);
+                        }}
+                        onPaste={(event) => {
+                           const pasted = event.clipboardData.getData('text');
+                           if (
+                              pasted &&
+                              (parseGoogleMapsCoordinates(pasted) ||
+                                 readPair(pasted))
+                           ) {
+                              event.preventDefault();
+                              void runSearch(pasted);
+                           }
+                        }}
+                        autoComplete="off"
+                        aria-label="Search a place, or paste a link from Maps"
+                        placeholder="Search a place, or paste a Maps link"
+                        className="h-full min-w-0 flex-1 bg-transparent px-3 text-[16px] text-ink outline-none placeholder:text-ink-3"
+                     />
+                     <button
+                        type="submit"
+                        disabled={searching || !query.trim()}
+                        className="g-tracked h-full shrink-0 px-3 text-[16px] text-ink-2 hover:text-ink disabled:opacity-40"
+                     >
+                        {searching ? 'Looking' : 'Go'}
+                     </button>
+                  </div>
+                  {found ? (
+                     <ul
+                        role="listbox"
+                        aria-label="Places found"
+                        className="mt-1 max-h-[180px] overflow-auto border border-line bg-background shadow-[0_1px_0_var(--line)]"
+                     >
+                        {found.map((place) => (
+                           <li key={`${place.lat},${place.lng}`}>
+                              <button
+                                 type="button"
+                                 role="option"
+                                 aria-selected={false}
+                                 onClick={() => {
+                                    goTo(place);
+                                    setFound(null);
+                                    setQuery('');
+                                 }}
+                                 className="block w-full truncate border-t border-line px-3 py-2 text-left text-[15px] text-ink first:border-t-0 hover:bg-bg-2"
+                              >
+                                 {place.label}
+                              </button>
+                           </li>
+                        ))}
+                     </ul>
+                  ) : null}
+               </form>
+
+               {/* The pin. Fixed at the centre; the map moves under it. */}
+               <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 left-1/2 z-[400]"
+               >
+                  <span
+                     className={cn(
+                        'absolute top-0 left-0 block size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/45 blur-[1.5px] transition-transform duration-200 [transition-timing-function:var(--ease)]',
+                        moving ? 'scale-[1.6]' : 'scale-100'
+                     )}
                   />
-               </button>
+                  <svg
+                     width="36"
+                     height="46"
+                     viewBox="0 0 36 46"
+                     className={cn(
+                        'absolute top-0 left-0 -translate-x-1/2 -translate-y-full transition-transform duration-200 [transition-timing-function:var(--ease)] drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]',
+                        moving && '-translate-y-[calc(100%+10px)]'
+                     )}
+                  >
+                     <path
+                        d="M18 45C18 45 3.5 28.6 3.5 18a14.5 14.5 0 1 1 29 0C32.5 28.6 18 45 18 45Z"
+                        fill="var(--teal)"
+                        stroke="#f4f1ec"
+                        strokeWidth="2.5"
+                        strokeLinejoin="round"
+                     />
+                     <circle cx="18" cy="18" r="4" fill="#06232a" />
+                  </svg>
+                  <span className="absolute top-0 left-0 block h-px w-10 -translate-x-1/2 bg-white/70 mix-blend-difference" />
+                  <span className="absolute top-0 left-0 block h-10 w-px -translate-y-1/2 bg-white/70 mix-blend-difference" />
+               </div>
+
+               {/* Locate and the base, bottom left, out of the attribution's way. */}
+               <div className="absolute bottom-3 left-3 z-[400] flex gap-2">
+                  <button
+                     type="button"
+                     onClick={useMyPosition}
+                     disabled={isLocating}
+                     aria-label={
+                        isLocating ? 'Finding your position' : 'Use my position'
+                     }
+                     title="Use my position"
+                     className={cn(control, 'w-11')}
+                  >
+                     <ViewfinderCircleIcon
+                        className="size-6"
+                        strokeWidth={1.5}
+                        aria-hidden="true"
+                     />
+                  </button>
+                  <button
+                     type="button"
+                     onClick={cycleBase}
+                     aria-label={`Base map: ${baseLabel}. Change`}
+                     className={cn(control, 'g-tracked px-3 text-[15px]')}
+                  >
+                     {baseLabel}
+                  </button>
+               </div>
             </div>
          )}
 
@@ -333,66 +489,33 @@ export function MapLocationPicker({
                   />
                </div>
             </div>
-         ) : (
-            <p className="text-[15px] text-ink-2">
-               Tap the map to place the pin, then drag it onto the water you
-               fish. On a phone, move the map with two fingers.
-            </p>
-         )}
-
-         {typedError ? (
-            <p className="text-[15px] text-destructive">{typedError}</p>
          ) : null}
 
-         <div className="grid gap-2">
-            <label className="lab" htmlFor={`${fieldId}-link`}>
-               Or paste a link from Maps
-            </label>
-            <input
-               id={`${fieldId}-link`}
-               className="input-line text-[16px]"
-               type="url"
-               inputMode="url"
-               value={link}
-               placeholder="https://maps.google.com/..."
-               onChange={(event) => {
-                  setLink(event.target.value);
-                  setLinkError(null);
-               }}
-               onBlur={(event) => applyLink(event.target.value)}
-               onPaste={(event) => {
-                  const pasted = event.clipboardData.getData('text');
-
-                  if (!pasted) {
-                     return;
-                  }
-
-                  event.preventDefault();
-                  setLink(pasted);
-                  applyLink(pasted);
-               }}
-            />
-            {linkError ? (
-               <p className="text-[15px] text-destructive">{linkError}</p>
-            ) : null}
-            {linkNote ? (
-               <p className="text-[15px] text-ink-2">{linkNote}</p>
+         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <p className="flex flex-wrap items-baseline gap-x-3">
+               <span className="lab">Pin</span>
+               <span
+                  className={cn(
+                     'num text-[15px]',
+                     position ? 'text-ink' : 'text-ink-3'
+                  )}
+               >
+                  {readout}
+               </span>
+            </p>
+            {!mapFailed ? (
+               <p className="text-[14px] text-ink-3">
+                  Move the map until the pin sits on the water. Scroll or pinch
+                  to zoom.
+               </p>
             ) : null}
          </div>
-
-         <div className="rule-dashed pt-3">
-            <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-               <span className="lab">Position</span>
-               <span className="num text-[15px] text-ink">{readout}</span>
-            </p>
-            <p aria-live="polite" className="text-[15px] text-ink-2">
-               {isLocating ? 'Finding your position.' : null}
-            </p>
-            {locationError ? (
-               <p className="text-[15px] text-destructive">{locationError}</p>
-            ) : null}
-         </div>
-
+         <p aria-live="polite" className="text-[15px] text-ink-2 empty:hidden">
+            {isLocating ? 'Finding your position.' : note}
+         </p>
+         {problem ? (
+            <p className="text-[15px] text-destructive">{problem}</p>
+         ) : null}
          {mapFailed ? (
             <Button
                type="button"

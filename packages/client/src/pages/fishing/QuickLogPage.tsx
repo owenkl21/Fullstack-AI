@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
@@ -36,6 +36,7 @@ import {
 import { MapLocationPicker } from '@/components/fishing/MapLocationPicker';
 import { ChoiceGroup, TextField } from '@/components/ui/field';
 import { readPhotoMeta } from '@/lib/exif';
+import { formatMetres, nearestSpot, type SpotLike } from '@/lib/geo';
 import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
 import { SpeciesField } from '@/components/fishing/quicklog/SpeciesField';
 import {
@@ -76,8 +77,36 @@ function QuickLog() {
     * fix, and a pin the angler drops beats both. The phone's fix arrives on
     * its own and only fills in while nothing better is known.
     */
-   const [where, setWhere] = useState<Where | null>(null);
+   const [params] = useSearchParams();
+   const [where, setWhere] = useState<Where | null>(() => {
+      /* Arriving from the map: the pin is where the map was looking. */
+      const lat = Number(params.get('lat'));
+      const lng = Number(params.get('lng'));
+      return params.has('lat') && Number.isFinite(lat) && Number.isFinite(lng)
+         ? { latitude: lat, longitude: lng, source: 'pin' }
+         : null;
+   });
    const [pinOpen, setPinOpen] = useState(false);
+
+   /*
+    * The spots you already have. A position within a few hundred metres of
+    * one is that spot, and the catch is filed there rather than as a new
+    * pin, unless you say it is not.
+    */
+   const [spots, setSpots] = useState<SpotLike[]>([]);
+   useEffect(() => {
+      const controller = new AbortController();
+      axios
+         .get<{ sites?: SpotLike[] }>('/api/sites', {
+            signal: controller.signal,
+         })
+         .then(({ data }) => setSpots(data.sites ?? []))
+         .catch(() => undefined);
+      return () => controller.abort();
+   }, []);
+   const near = useMemo(() => nearestSpot(spots, where), [spots, where]);
+   const [notThatSpot, setNotThatSpot] = useState<string | null>(null);
+   const filedUnder = near && notThatSpot !== near.spot.id ? near.spot : null;
    useEffect(() => {
       if (fix && (!where || where.source === 'phone')) {
          setWhere({
@@ -270,8 +299,8 @@ function QuickLog() {
           * spot takes the angler's choice of public or private. Unnamed, the
           * catch keeps the pin on its own.
           */
-         let siteId: string | null = null;
-         if (spotName.trim() && where) {
+         let siteId: string | null = filedUnder?.id ?? null;
+         if (!siteId && spotName.trim() && where) {
             const { data: made } = await axios.post<{
                site?: { id: string };
                id?: string;
@@ -337,7 +366,7 @@ function QuickLog() {
    return (
       <section
          className={cn(
-            'mx-auto flex min-h-[calc(100dvh-124px)] w-full max-w-[560px] flex-col transition-[transform,opacity] duration-[460ms] [transition-timing-function:cubic-bezier(0.2,0,0,1)] md:my-10 md:min-h-0 md:border md:border-line',
+            'mx-auto flex min-h-[calc(100dvh-124px)] w-full max-w-[560px] flex-col lg:max-w-[1080px] transition-[transform,opacity] duration-[460ms] [transition-timing-function:cubic-bezier(0.2,0,0,1)] md:my-10 md:min-h-0 md:border md:border-line',
             entered ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'
          )}
       >
@@ -358,166 +387,204 @@ function QuickLog() {
             </div>
          </div>
 
-         <div className="flex flex-1 flex-col gap-4 px-4 py-4">
-            <Receipt
-               at={stampedAt}
-               timeSource={timeSource}
-               onTime={(next) => {
-                  setStampedAt(next);
-                  setTimeSource('typed');
-               }}
-               where={where}
-               fixStatus={fixStatus}
-               pinOpen={pinOpen}
-               onTogglePin={() => setPinOpen((open) => !open)}
-            >
-               <MapLocationPicker
-                  latitude={where ? String(where.latitude) : ''}
-                  longitude={where ? String(where.longitude) : ''}
-                  onChange={(latitude, longitude) =>
-                     setWhere({ latitude, longitude, source: 'pin' })
-                  }
-               />
-            </Receipt>
+         <div className="flex flex-1 flex-col gap-4 px-4 py-4 lg:grid lg:grid-cols-2 lg:gap-x-10 lg:px-8 lg:py-6">
+            <div className="flex min-w-0 flex-col gap-4">
+               <Receipt
+                  at={stampedAt}
+                  timeSource={timeSource}
+                  onTime={(next) => {
+                     setStampedAt(next);
+                     setTimeSource('typed');
+                  }}
+                  where={where}
+                  fixStatus={fixStatus}
+                  pinOpen={pinOpen}
+                  onTogglePin={() => setPinOpen((open) => !open)}
+               >
+                  <MapLocationPicker
+                     latitude={where ? String(where.latitude) : ''}
+                     longitude={where ? String(where.longitude) : ''}
+                     onChange={(latitude, longitude) =>
+                        setWhere({ latitude, longitude, source: 'pin' })
+                     }
+                  />
+               </Receipt>
 
-            <Conditions
-               phase={phase}
-               lines={lines}
-               takenAt={conditions?.at ?? null}
-            />
+               {near ? (
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border border-line px-4 py-3">
+                     <p className="text-[15px]">
+                        {filedUnder ? (
+                           <>
+                              <span className="lab mr-2 text-ink-3">Spot</span>
+                              <span className="g-tracked text-[19px]">
+                                 {near.spot.name}
+                              </span>
+                              <span className="ml-2 text-ink-3">
+                                 {formatMetres(near.metres)} away, you have
+                                 fished here before
+                              </span>
+                           </>
+                        ) : (
+                           <span className="text-ink-2">
+                              Not filed under {near.spot.name}.
+                           </span>
+                        )}
+                     </p>
+                     <button
+                        type="button"
+                        onClick={() =>
+                           setNotThatSpot(filedUnder ? near.spot.id : null)
+                        }
+                        className="g-tracked text-[17px] text-teal-text hover:opacity-80"
+                     >
+                        {filedUnder ? 'Not this spot' : 'File it there'}
+                     </button>
+                  </div>
+               ) : null}
 
-            <PhotoBlock
-               onChange={setPhoto}
-               onBusyChange={setPhotoBusy}
-               onFile={onPhotoFile}
-            />
-
-            <SpeciesGuess
-               imageUrl={photo?.url ?? null}
-               current={typed || chosen || ''}
-               onPick={(candidate) => {
-                  if (!candidate) {
-                     speciesInput.current?.focus();
-                     return;
-                  }
-                  setTyped(candidate.commonName);
-                  setChosen(null);
-                  setSpeciesError(null);
-               }}
-            />
-
-            <SpeciesField
-               options={options}
-               chosen={chosen}
-               typed={typed}
-               error={speciesError}
-               inputRef={speciesInput}
-               onChoose={(species) => {
-                  setChosen(species);
-                  setTyped('');
-                  setSpeciesError(null);
-               }}
-               onType={(value) => {
-                  setTyped(value);
-                  setChosen(null);
-                  setSpeciesError(null);
-               }}
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-               <MeasureField
-                  id="length"
-                  label="Length"
-                  units={['cm', 'in']}
-                  unit={lengthUnit}
-                  value={length}
-                  onChange={setLength}
-                  onUnitChange={setLengthUnit}
-                  sources={[
-                     { value: 'EYE', label: 'By eye' },
-                     { value: 'TAPE', label: 'On a tape' },
-                  ]}
-                  source={lengthSource}
-                  onSourceChange={(next) =>
-                     setLengthSource(next as 'EYE' | 'TAPE')
-                  }
-                  placeholder="0"
-               />
-               <MeasureField
-                  id="weight"
-                  label="Weight"
-                  units={['kg', 'lb']}
-                  unit={weightUnit}
-                  value={weight}
-                  onChange={setWeight}
-                  onUnitChange={setWeightUnit}
-                  sources={[
-                     { value: 'EYE', label: 'By eye' },
-                     { value: 'SCALE', label: 'On a scale' },
-                  ]}
-                  source={weightSource}
-                  onSourceChange={(next) =>
-                     setWeightSource(next as 'EYE' | 'SCALE')
-                  }
-                  placeholder="0"
+               <Conditions
+                  phase={phase}
+                  lines={lines}
+                  takenAt={conditions?.at ?? null}
                />
             </div>
 
-            {/* Who sees it, and whether the place travels with it. */}
-            <div className="flex flex-col gap-4 border-t border-line pt-4">
-               <ChoiceGroup
-                  inline
-                  size="sm"
-                  label="Who sees it"
-                  value={visibility}
-                  onChange={setVisibility}
-                  options={[
-                     { value: 'PUBLIC', label: 'Everyone' },
-                     { value: 'PRIVATE', label: 'Only me' },
-                  ]}
+            <div className="flex min-w-0 flex-col gap-4">
+               <PhotoBlock
+                  onChange={setPhoto}
+                  onBusyChange={setPhotoBusy}
+                  onFile={onPhotoFile}
                />
-               {visibility === 'PUBLIC' && where ? (
+
+               <SpeciesGuess
+                  imageUrl={photo?.url ?? null}
+                  current={typed || chosen || ''}
+                  onPick={(candidate) => {
+                     if (!candidate) {
+                        speciesInput.current?.focus();
+                        return;
+                     }
+                     setTyped(candidate.commonName);
+                     setChosen(null);
+                     setSpeciesError(null);
+                  }}
+               />
+
+               <SpeciesField
+                  options={options}
+                  chosen={chosen}
+                  typed={typed}
+                  error={speciesError}
+                  inputRef={speciesInput}
+                  onChoose={(species) => {
+                     setChosen(species);
+                     setTyped('');
+                     setSpeciesError(null);
+                  }}
+                  onType={(value) => {
+                     setTyped(value);
+                     setChosen(null);
+                     setSpeciesError(null);
+                  }}
+               />
+
+               <div className="grid grid-cols-2 gap-3">
+                  <MeasureField
+                     id="length"
+                     label="Length"
+                     units={['cm', 'in']}
+                     unit={lengthUnit}
+                     value={length}
+                     onChange={setLength}
+                     onUnitChange={setLengthUnit}
+                     sources={[
+                        { value: 'EYE', label: 'By eye' },
+                        { value: 'TAPE', label: 'On a tape' },
+                     ]}
+                     source={lengthSource}
+                     onSourceChange={(next) =>
+                        setLengthSource(next as 'EYE' | 'TAPE')
+                     }
+                     placeholder="0"
+                  />
+                  <MeasureField
+                     id="weight"
+                     label="Weight"
+                     units={['kg', 'lb']}
+                     unit={weightUnit}
+                     value={weight}
+                     onChange={setWeight}
+                     onUnitChange={setWeightUnit}
+                     sources={[
+                        { value: 'EYE', label: 'By eye' },
+                        { value: 'SCALE', label: 'On a scale' },
+                     ]}
+                     source={weightSource}
+                     onSourceChange={(next) =>
+                        setWeightSource(next as 'EYE' | 'SCALE')
+                     }
+                     placeholder="0"
+                  />
+               </div>
+
+               {/* Who sees it, and whether the place travels with it. */}
+               <div className="flex flex-col gap-4 border-t border-line pt-4">
                   <ChoiceGroup
                      inline
                      size="sm"
-                     label="The spot"
-                     value={hideLocation ? 'HIDE' : 'SHOW'}
-                     onChange={(next) => setHideLocation(next === 'HIDE')}
+                     label="Who sees it"
+                     value={visibility}
+                     onChange={setVisibility}
                      options={[
-                        { value: 'SHOW', label: 'Show it' },
-                        { value: 'HIDE', label: 'Keep it to myself' },
+                        { value: 'PUBLIC', label: 'Everyone' },
+                        { value: 'PRIVATE', label: 'Only me' },
                      ]}
-                     hint={
-                        hideLocation
-                           ? 'The fish shows on the feed, the pin does not.'
-                           : 'Other anglers see where this came from.'
-                     }
                   />
-               ) : null}
-               {where ? (
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                     <TextField
-                        label="Save this place as a spot"
-                        value={spotName}
-                        maxLength={120}
-                        autoComplete="off"
-                        placeholder="Leave blank to keep only the pin"
-                        onChange={(event) => setSpotName(event.target.value)}
+                  {visibility === 'PUBLIC' && where ? (
+                     <ChoiceGroup
+                        inline
+                        size="sm"
+                        label="The spot"
+                        value={hideLocation ? 'HIDE' : 'SHOW'}
+                        onChange={(next) => setHideLocation(next === 'HIDE')}
+                        options={[
+                           { value: 'SHOW', label: 'Show it' },
+                           { value: 'HIDE', label: 'Keep it to myself' },
+                        ]}
+                        hint={
+                           hideLocation
+                              ? 'The fish shows on the feed, the pin does not.'
+                              : 'Other anglers see where this came from.'
+                        }
                      />
-                     {spotName.trim() ? (
-                        <ChoiceGroup
-                           size="sm"
-                           label="The spot is"
-                           value={spotPublic ? 'PUBLIC' : 'PRIVATE'}
-                           onChange={(next) => setSpotPublic(next === 'PUBLIC')}
-                           options={[
-                              { value: 'PRIVATE', label: 'Private' },
-                              { value: 'PUBLIC', label: 'Public' },
-                           ]}
+                  ) : null}
+                  {where && !filedUnder ? (
+                     <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                        <TextField
+                           label="Save this place as a spot"
+                           value={spotName}
+                           maxLength={120}
+                           autoComplete="off"
+                           placeholder="Leave blank to keep only the pin"
+                           onChange={(event) => setSpotName(event.target.value)}
                         />
-                     ) : null}
-                  </div>
-               ) : null}
+                        {spotName.trim() ? (
+                           <ChoiceGroup
+                              size="sm"
+                              label="The spot is"
+                              value={spotPublic ? 'PUBLIC' : 'PRIVATE'}
+                              onChange={(next) =>
+                                 setSpotPublic(next === 'PUBLIC')
+                              }
+                              options={[
+                                 { value: 'PRIVATE', label: 'Private' },
+                                 { value: 'PUBLIC', label: 'Public' },
+                              ]}
+                           />
+                        ) : null}
+                     </div>
+                  ) : null}
+               </div>
             </div>
          </div>
 

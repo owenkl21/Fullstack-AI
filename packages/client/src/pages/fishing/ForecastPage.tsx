@@ -209,10 +209,11 @@ export function ForecastPage() {
                   aria-labelledby={`day-${day.date}`}
                   className="mt-8"
                >
-                  <DayFacts day={day} system={system} />
+                  <DayFacts key={day.date} day={day} system={system} />
 
                   <div className="mt-8">
                      <HourGrid
+                        key={day.date}
                         hours={dayHours}
                         nowLocal={day.date === today ? nowLocal : null}
                         system={system}
@@ -352,18 +353,18 @@ function ForecastSkeleton() {
             {[0, 1, 2, 3, 4, 5, 6].map((i) => (
                <span
                   key={i}
-                  className="h-[132px] min-w-[96px] flex-1 bg-bg-2"
+                  className="shimmer h-[132px] min-w-[96px] flex-1 bg-bg-2"
                />
             ))}
          </div>
          <div className="mt-8 grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
             {[0, 1, 2, 3, 4].map((i) => (
-               <span key={i} className="h-10 bg-bg-2" />
+               <span key={i} className="shimmer h-10 bg-bg-2" />
             ))}
          </div>
          <div className="mt-8 flex flex-col gap-px">
             {[0, 1, 2, 3, 4, 5].map((i) => (
-               <span key={i} className="h-10 w-full bg-bg-2" />
+               <span key={i} className="shimmer h-10 w-full bg-bg-2" />
             ))}
          </div>
       </div>
