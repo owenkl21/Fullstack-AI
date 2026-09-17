@@ -6,7 +6,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-type UploadScope = 'catch' | 'site' | 'avatar' | 'gear';
+type UploadScope = 'catch' | 'site' | 'avatar' | 'banner' | 'gear';
 
 type SignUploadInput = {
    storagePrefixId: string;
@@ -103,8 +103,10 @@ const buildStorageKey = ({
    const extension = extensionByMime[contentType];
    const randomSuffix = randomUUID().slice(0, 8);
 
-   if (scope === 'avatar') {
-      return `users/${storagePrefixId}/avatar/${timestamp}-${randomSuffix}-${safeSlug}.${extension}`;
+   /* The two pictures of the angler live beside each other, not in a temp
+    * folder: they are kept until replaced, never promoted from a draft. */
+   if (scope === 'avatar' || scope === 'banner') {
+      return `users/${storagePrefixId}/${scope}/${timestamp}-${randomSuffix}-${safeSlug}.${extension}`;
    }
 
    const pathSegment =
@@ -167,6 +169,7 @@ const inferScopeFromStorageKey = (
    const catchPrefix = `users/${storagePrefixId}/catches/temp/`;
    const sitePrefix = `users/${storagePrefixId}/sites/temp/`;
    const avatarPrefix = `users/${storagePrefixId}/avatar/`;
+   const bannerPrefix = `users/${storagePrefixId}/banner/`;
    const gearPrefix = `users/${storagePrefixId}/gear/temp/`;
 
    if (storageKey.startsWith(catchPrefix)) {
@@ -179,6 +182,10 @@ const inferScopeFromStorageKey = (
 
    if (storageKey.startsWith(avatarPrefix)) {
       return 'avatar';
+   }
+
+   if (storageKey.startsWith(bannerPrefix)) {
+      return 'banner';
    }
 
    if (storageKey.startsWith(gearPrefix)) {
@@ -245,8 +252,8 @@ export const uploadsService = {
       contentType: SignUploadInput['contentType'];
    }) {
       const expectedPathSegment =
-         input.scope === 'avatar'
-            ? 'avatar'
+         input.scope === 'avatar' || input.scope === 'banner'
+            ? input.scope
             : input.scope === 'catch'
               ? 'catches/temp'
               : input.scope === 'site'
@@ -279,8 +286,8 @@ export const uploadsService = {
       body: Buffer;
    }) {
       const expectedPathSegment =
-         input.scope === 'avatar'
-            ? 'avatar'
+         input.scope === 'avatar' || input.scope === 'banner'
+            ? input.scope
             : input.scope === 'catch'
               ? 'catches/temp'
               : input.scope === 'site'

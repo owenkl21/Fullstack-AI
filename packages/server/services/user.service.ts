@@ -96,6 +96,7 @@ const withResolvedAvatar = async (
 ): Promise<ProfileShape> => ({
    ...profile,
    avatarUrl: await maybeResolveAvatarReadUrl(profile.avatarUrl),
+   bannerUrl: await maybeResolveAvatarReadUrl(profile.bannerUrl ?? null),
 });
 
 const getErrorCode = (error: unknown) => {

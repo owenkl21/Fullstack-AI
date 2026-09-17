@@ -58,6 +58,17 @@ const avatarValueOf = (profile: UserProfile) =>
         ]
       : [];
 
+const bannerValueOf = (profile: UserProfile) =>
+   profile.bannerUrl
+      ? [
+           {
+              storageKey:
+                 extractStorageKey(profile.bannerUrl) ?? profile.bannerUrl,
+              url: profile.bannerUrl,
+           },
+        ]
+      : [];
+
 const nameProblem = (value: string) => {
    const trimmed = value.trim();
 
@@ -110,6 +121,7 @@ export function ProfileSettingsPanel({
    const [username, setUsername] = useState(profile.username ?? '');
    const [bio, setBio] = useState(profile.bio ?? '');
    const [avatarImages, setAvatarImages] = useState(avatarValueOf(profile));
+   const [bannerImages, setBannerImages] = useState(bannerValueOf(profile));
 
    const [nameError, setNameError] = useState('');
    const [handleError, setHandleError] = useState('');
@@ -125,6 +137,7 @@ export function ProfileSettingsPanel({
       setUsername(profile.username ?? '');
       setBio(profile.bio ?? '');
       setAvatarImages(avatarValueOf(profile));
+      setBannerImages(bannerValueOf(profile));
    }, [profile]);
 
    const save = async (event: FormEvent<HTMLFormElement>) => {
@@ -165,6 +178,7 @@ export function ProfileSettingsPanel({
             username: username.trim(),
             bio: trimmedBio ? trimmedBio : null,
             avatarUrl: avatarImages[0]?.storageKey ?? null,
+            bannerUrl: bannerImages[0]?.storageKey ?? null,
          });
 
          onSaved(data.profile);
@@ -239,19 +253,44 @@ export function ProfileSettingsPanel({
             />
          </FieldStack>
 
-         <div className="mt-8">
-            <span className="lab">Your photograph</span>
-            <div className="mt-2 max-w-[420px]">
-               <R2ImagePicker
-                  scope="avatar"
-                  label="Your photograph"
-                  multiple={false}
-                  maxItems={1}
-                  value={avatarImages}
-                  onChange={setAvatarImages}
-                  onUploadingChange={setIsUploading}
-                  disabled={isSaving}
-               />
+         <div className="mt-8 grid gap-8 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div>
+               <span className="lab">Your photograph</span>
+               <p className="mt-1 text-[14px] text-ink-3">
+                  Round, small, beside your name everywhere.
+               </p>
+               <div className="mt-2 max-w-[420px]">
+                  <R2ImagePicker
+                     scope="avatar"
+                     label="Your photograph"
+                     multiple={false}
+                     maxItems={1}
+                     value={avatarImages}
+                     onChange={setAvatarImages}
+                     onUploadingChange={setIsUploading}
+                     disabled={isSaving}
+                  />
+               </div>
+            </div>
+
+            <div>
+               <span className="lab">Your banner</span>
+               <p className="mt-1 text-[14px] text-ink-3">
+                  Wide, behind your name on your page. A stretch of coast works
+                  best.
+               </p>
+               <div className="mt-2 max-w-[420px]">
+                  <R2ImagePicker
+                     scope="banner"
+                     label="Your banner"
+                     multiple={false}
+                     maxItems={1}
+                     value={bannerImages}
+                     onChange={setBannerImages}
+                     onUploadingChange={setIsUploading}
+                     disabled={isSaving}
+                  />
+               </div>
             </div>
          </div>
 

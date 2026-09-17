@@ -1,6 +1,7 @@
 import { type CSSProperties, type ReactNode, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { CameraIcon } from '@heroicons/react/24/outline';
+import { Banner } from '@/components/profile/Banner';
 import { FollowCounts } from '@/components/profile/FollowCounts';
 import { FishMark } from '@/components/brand/FishMark';
 import { useRevealIn } from '@/components/brand/Reveal';
@@ -41,19 +42,22 @@ export function ProfileView({
    return (
       <div ref={root}>
          <header className="rv">
-            <div className="flex items-center gap-4">
+            <Banner url={profile.bannerUrl} />
+            {/* The photograph sits over the banner's bottom edge, which is
+                what makes the two read as one picture of a person. */}
+            <div className="-mt-8 flex items-end gap-4">
                {profile.avatarUrl ? (
                   <img
                      src={profile.avatarUrl}
                      alt=""
-                     width={64}
-                     height={64}
-                     className="size-16 shrink-0 rounded-full object-cover"
+                     width={80}
+                     height={80}
+                     className="size-20 shrink-0 rounded-full object-cover ring-4 ring-background"
                   />
                ) : (
                   <span
                      aria-hidden="true"
-                     className="g flex size-16 shrink-0 items-center justify-center rounded-full bg-bg-2 text-[30px] text-ink-2"
+                     className="g flex size-20 shrink-0 items-center justify-center rounded-full bg-bg-2 text-[30px] text-ink-2 ring-4 ring-background"
                   >
                      {initialOf(profile.displayName)}
                   </span>

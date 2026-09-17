@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { ImageUploader, type RejectedFile } from '@/components/ImageUploader';
 
-type Scope = 'catch' | 'site' | 'avatar' | 'gear';
+type Scope = 'catch' | 'site' | 'avatar' | 'banner' | 'gear';
 
 type UploadedImage = {
    storageKey: string;

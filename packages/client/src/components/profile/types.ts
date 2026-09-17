@@ -17,6 +17,8 @@ export type UserProfile = {
    bio: string | null;
    email: string;
    avatarUrl: string | null;
+   /* The wide photograph behind the name. */
+   bannerUrl: string | null;
    followersCount: number;
    followingCount: number;
    galleryImages: GalleryImage[];

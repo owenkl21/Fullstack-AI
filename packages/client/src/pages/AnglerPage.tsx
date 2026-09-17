@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { FishMark } from '@/components/brand/FishMark';
+import { Banner } from '@/components/profile/Banner';
 import { FollowCounts } from '@/components/profile/FollowCounts';
 import {
    initialOf,
@@ -156,19 +157,20 @@ function AnglerScreen() {
    return (
       <section className="mx-auto w-[min(820px,100%-32px)] py-10 md:py-14">
          <header>
-            <div className="flex flex-wrap items-center gap-4">
+            <Banner url={profile.bannerUrl} />
+            <div className="-mt-8 flex flex-wrap items-end gap-4">
                {profile.avatarUrl ? (
                   <img
                      src={profile.avatarUrl}
                      alt=""
-                     width={64}
-                     height={64}
-                     className="size-16 shrink-0 rounded-full object-cover"
+                     width={80}
+                     height={80}
+                     className="size-20 shrink-0 rounded-full object-cover ring-4 ring-background"
                   />
                ) : (
                   <span
                      aria-hidden="true"
-                     className="g flex size-16 shrink-0 items-center justify-center rounded-full bg-bg-2 text-[26px] text-ink-2"
+                     className="g flex size-20 shrink-0 items-center justify-center rounded-full bg-bg-2 text-[26px] text-ink-2 ring-4 ring-background"
                   >
                      {initialOf(profile.displayName)}
                   </span>
