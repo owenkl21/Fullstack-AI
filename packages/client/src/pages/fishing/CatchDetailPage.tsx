@@ -316,7 +316,8 @@ function CatchRecord({
       .join(' ');
 
    return (
-      <article className="mx-auto w-full max-w-[1680px] pb-4">
+      <article className="relative mx-auto w-full max-w-[1680px] pb-4">
+         <Contours seed={23} className="inset-x-0 top-0 h-[380px] w-full" />
          <RecordHero
             images={images}
             index={index}
