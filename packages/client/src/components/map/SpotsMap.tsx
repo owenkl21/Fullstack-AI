@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LeafletMouseEvent, Map as LeafletMap, Marker } from 'leaflet';
 import { L, createMap, kindPin, refreshSize } from '@/lib/leaflet';
 import { fetchPois, type Poi } from '@/lib/overpass';
+import { usePosition } from '@/lib/position';
 import {
    createWaypoint,
    deleteWaypoint,
@@ -60,6 +61,10 @@ export function SpotsMap({
    const waypointLayer = useRef<L.LayerGroup | null>(null);
    const poiLayer = useRef<L.LayerGroup | null>(null);
 
+   /* Only to decide where to open, never to ask for a position: the map is
+    * not a reason to put a permission prompt in front of somebody. */
+   const { fix } = usePosition({ auto: false });
+
    const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
    const [pois, setPois] = useState<Poi[]>([]);
    const [showPois, setShowPois] = useState(true);
@@ -99,12 +104,26 @@ export function SpotsMap({
          return;
       }
 
-      const created = createMap(node, {
-         centre: spots[0]
-            ? { lat: spots[0].latitude, lng: spots[0].longitude }
-            : DEFAULT_CENTER,
-         zoom: spots.length === 1 ? SINGLE_PIN_ZOOM : DEFAULT_ZOOM,
-      });
+      /*
+       * Where to open. A saved spot wins, because that is what the reader
+       * asked to see. Failing that, where the angler is standing: opening on
+       * the whole country shows nothing useful and sits below the zoom at
+       * which ramps and shops load, so a new angler would meet an empty map
+       * of South Africa. Only then the country.
+       */
+      const opening = spots[0]
+         ? {
+              centre: { lat: spots[0].latitude, lng: spots[0].longitude },
+              zoom: spots.length === 1 ? SINGLE_PIN_ZOOM : DEFAULT_ZOOM,
+           }
+         : fix
+           ? {
+                centre: { lat: fix.latitude, lng: fix.longitude },
+                zoom: SINGLE_PIN_ZOOM,
+             }
+           : { centre: DEFAULT_CENTER, zoom: DEFAULT_ZOOM };
+
+      const created = createMap(node, opening);
       map.current = created;
 
       spotLayer.current = L.layerGroup().addTo(created);
@@ -165,7 +184,10 @@ export function SpotsMap({
       // `key` stands in for the positions; `spots` itself changes identity on
       // every keystroke in the search field above.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [key]);
+      // The opening position is read once, when the map is built. A fix that
+      // lands later pans it rather than rebuilding the whole map.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [key, Boolean(fix)]);
 
    /* Points of interest follow the view, because panning somewhere new is
     * exactly when you want to know what is there. */
