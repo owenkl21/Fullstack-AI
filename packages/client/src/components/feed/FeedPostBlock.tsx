@@ -231,6 +231,14 @@ export function FeedPostBlock({
                </span>
             )}
 
+            {/*
+             * The fish itself. A title is whatever the angler called the
+             * morning, so without this the card never said what was caught.
+             */}
+            {post.catch?.species ? (
+               <p className="text-[15px] text-paper-2">{post.catch.species}</p>
+            ) : null}
+
             {measurement ? (
                /* League Gothic for the figures, but not uppercased: `cm` and `lb`
                   are units and are never shouted. */

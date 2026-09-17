@@ -38,9 +38,9 @@ export type FeedPost = {
       id: string;
       title: string;
       images: FeedImage[];
-      /* TODO(api): appendix E A1 (species on every catch) and B5 (both units on
-         the record) would let the block print the species and the measurement
-         line. Until then only the title and the photos are available. */
+      /* The species and both measurements now come down with the post. B5 of
+         appendix E (both units on the record) is still open, so the source of a
+         weight is reported rather than converted. */
       species?: string | null;
       lengthCm?: number | null;
       weightKg?: number | null;

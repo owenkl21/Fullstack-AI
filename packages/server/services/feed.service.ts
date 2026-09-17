@@ -13,6 +13,16 @@ const feedInclude = {
       select: {
          id: true,
          title: true,
+         /*
+          * The facts about the fish. Without these the feed sent a title and a
+          * photograph and nothing else, so the card's measurement line could
+          * never render: most catches carry no photograph, and those posts were
+          * a headline over a link with nothing in between.
+          */
+         length: true,
+         weight: true,
+         weightSource: true,
+         species: { select: { commonName: true } },
          images: {
             orderBy: { position: 'asc' as const },
             select: {
@@ -96,9 +106,29 @@ const withResolvedFeedImageUrls = async <
       post.site ? resolvePostImages(post.site.images) : null,
    ]);
 
+   /* The screen names these lengthCm and weightKg, so the units travel with
+    * the numbers rather than living only in a comment. */
+   const fish = post.catch as
+      | (T['catch'] & {
+           length?: number | null;
+           weight?: number | null;
+           weightSource?: string | null;
+           species?: { commonName: string } | null;
+        })
+      | null;
+
    return {
       ...post,
-      catch: post.catch ? { ...post.catch, images: catchImages ?? [] } : null,
+      catch: fish
+         ? {
+              ...fish,
+              images: catchImages ?? [],
+              species: fish.species?.commonName ?? null,
+              lengthCm: fish.length ?? null,
+              weightKg: fish.weight ?? null,
+              weightSource: fish.weightSource ?? null,
+           }
+         : null,
       site: post.site ? { ...post.site, images: siteImages ?? [] } : null,
    };
 };
