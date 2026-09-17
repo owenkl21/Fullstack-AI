@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { FishMark } from '@/components/brand/FishMark';
+import { FollowCounts } from '@/components/profile/FollowCounts';
 import {
    initialOf,
    monthAndYear,
@@ -209,12 +210,11 @@ function AnglerScreen() {
                <p className="lab num mt-4">Fishing since {since}</p>
             ) : null}
 
-            <p className="num mt-4 text-base text-ink-2">
-               {profile.followersCount === 1
-                  ? '1 follower'
-                  : `${profile.followersCount} followers`}
-               , following {profile.followingCount}.
-            </p>
+            <FollowCounts
+               className="mt-4"
+               followers={profile.followersCount}
+               following={profile.followingCount}
+            />
          </header>
 
          <section className="mt-10 border-t border-line pt-6">

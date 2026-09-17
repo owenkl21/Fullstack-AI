@@ -1,6 +1,7 @@
 import { type CSSProperties, type ReactNode, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { CameraIcon } from '@heroicons/react/24/outline';
+import { FollowCounts } from '@/components/profile/FollowCounts';
 import { FishMark } from '@/components/brand/FishMark';
 import { useRevealIn } from '@/components/brand/Reveal';
 import type { ConnectionsKind } from '@/components/profile/ConnectionsDialog';
@@ -37,14 +38,6 @@ export function ProfileView({
 
    const since = monthAndYear(profile.createdAt);
    const bio = profile.bio?.trim();
-   /*
-    * These sit inside a sentence, so the 44px target goes around the words
-    * rather than being the words. As an h-11 inline-flex box each one opened a
-    * gap in the middle of the line it was part of.
-    */
-   const control =
-      'tap-inline text-teal-text underline-offset-4 transition-colors duration-150 [transition-timing-function:var(--ease)] hover:underline';
-
    return (
       <div ref={root}>
          <header className="rv">
@@ -116,24 +109,12 @@ export function ProfileView({
                </p>
             ) : null}
 
-            <p className="num mt-1 text-base text-ink-2">
-               <button
-                  type="button"
-                  className={control}
-                  onClick={() => onOpenConnections('followers')}
-               >
-                  {plural(profile.followersCount, 'follower')}
-               </button>
-               , following{' '}
-               <button
-                  type="button"
-                  className={control}
-                  onClick={() => onOpenConnections('following')}
-               >
-                  {profile.followingCount}
-               </button>
-               .
-            </p>
+            <FollowCounts
+               className="mt-4"
+               followers={profile.followersCount}
+               following={profile.followingCount}
+               onOpen={onOpenConnections}
+            />
          </section>
 
          {figures}
