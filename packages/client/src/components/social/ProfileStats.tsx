@@ -1,0 +1,112 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { fetchMyStats, type PersonalBest, type ProfileStats } from './api';
+
+/*
+ * The numbers a profile can stand behind. Every one is counted, and anything
+ * that cannot be known is a sentence rather than an invented zero: "no species
+ * recorded" is not the same fact as "zero species".
+ */
+export function ProfileStatsPanel() {
+   const [stats, setStats] = useState<ProfileStats | null>(null);
+   const [bests, setBests] = useState<PersonalBest[]>([]);
+   const [failed, setFailed] = useState(false);
+
+   useEffect(() => {
+      const controller = new AbortController();
+
+      fetchMyStats(controller.signal)
+         .then((data) => {
+            setStats(data.stats);
+            setBests(data.personalBests);
+         })
+         .catch(() => {
+            if (!controller.signal.aborted) {
+               setFailed(true);
+            }
+         });
+
+      return () => controller.abort();
+   }, []);
+
+   if (failed) {
+      return (
+         <p className="text-[15px] text-ink-2">
+            Could not load your numbers just now.
+         </p>
+      );
+   }
+
+   if (!stats) {
+      return null;
+   }
+
+   const figures: { label: string; value: string }[] = [
+      { label: 'Catches', value: String(stats.catches) },
+      {
+         label: 'Species',
+         value:
+            stats.distinctSpecies === null
+               ? 'None recorded'
+               : String(stats.distinctSpecies),
+      },
+      { label: 'Days on the water', value: String(stats.daysOnTheWater) },
+      { label: 'Released', value: String(stats.releasedCount) },
+      {
+         label: 'Longest',
+         value: stats.longestCm ? `${stats.longestCm} cm` : 'Not measured',
+      },
+      { label: 'Points', value: String(stats.points) },
+   ];
+
+   return (
+      <section className="mt-10">
+         <h2 className="lab lab-rule">Your season</h2>
+
+         <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-3">
+            {figures.map((f) => (
+               <div key={f.label}>
+                  <dt className="lab text-ink-3">{f.label}</dt>
+                  <dd className="num mt-1 text-[28px] leading-none">
+                     {f.value}
+                  </dd>
+               </div>
+            ))}
+         </dl>
+
+         {stats.unscored ? (
+            <p className="mt-5 max-w-[56ch] text-[14px] text-ink-3">
+               {stats.unscored}{' '}
+               {stats.unscored === 1 ? 'catch does' : 'catches do'} not score
+               yet. A catch needs a species, a length, and published figures for
+               that species before it can be ranked.{' '}
+               <Link to="/boards" className="text-teal-text">
+                  See the boards
+               </Link>
+            </p>
+         ) : null}
+
+         {bests.length ? (
+            <>
+               <h2 className="lab lab-rule mt-10">Personal bests</h2>
+               <ul className="mt-4 grid gap-0">
+                  {bests.map((b) => (
+                     <li
+                        key={b.speciesId}
+                        className="flex items-baseline justify-between gap-4 border-b border-line/60 py-3"
+                     >
+                        <Link
+                           to={`/catches/${b.catchId}`}
+                           className="text-[17px] hover:text-teal-text"
+                        >
+                           {b.commonName}
+                        </Link>
+                        <span className="num text-[17px]">{b.lengthCm} cm</span>
+                     </li>
+                  ))}
+               </ul>
+            </>
+         ) : null}
+      </section>
+   );
+}

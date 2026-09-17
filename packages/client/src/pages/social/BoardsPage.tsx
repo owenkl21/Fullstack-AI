@@ -1,0 +1,208 @@
+import { useEffect, useState } from 'react';
+import { Chip } from '@/components/fishing/rows/Chip';
+import { InlineError } from '@/components/states/InlineError';
+import { ListSkeleton } from '@/components/states/ListSkeleton';
+import { StandingsTable } from '@/components/social/StandingsTable';
+import {
+   fetchRivals,
+   fetchSpeciesBoards,
+   type RivalStanding,
+   type SpeciesBoard,
+} from '@/components/social/api';
+import { useIsSignedIn } from '@/lib/auth-client';
+import { useDocumentTitle } from '@/lib/title';
+
+const LOAD_FAILED = 'Could not load the boards.';
+
+/*
+ * Two views of the same fish. Species is the default because "who has the best
+ * kob" is the question a shore angler actually asks; a combined table never
+ * really compared a galjoen specialist with a kob specialist.
+ */
+export function BoardsPage() {
+   useDocumentTitle('Boards');
+   const { isSignedIn } = useIsSignedIn();
+   const [view, setView] = useState<'species' | 'rivals'>('species');
+   const [boards, setBoards] = useState<SpeciesBoard[] | null>(null);
+   const [rivals, setRivals] = useState<RivalStanding[] | null>(null);
+   const [mutualCount, setMutualCount] = useState(0);
+   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
+      'loading'
+   );
+   const [attempt, setAttempt] = useState(0);
+
+   useEffect(() => {
+      const controller = new AbortController();
+
+      const load = async () => {
+         /*
+          * Inside the async body, not the effect body: setting state straight
+          * from an effect cascades a render.
+          */
+         setStatus('loading');
+
+         try {
+            const list = await fetchSpeciesBoards(controller.signal);
+            setBoards(list);
+
+            if (isSignedIn) {
+               const board = await fetchRivals(controller.signal);
+               setRivals(board.standings);
+               setMutualCount(board.mutualCount);
+            }
+
+            setStatus('ready');
+         } catch {
+            if (!controller.signal.aborted) {
+               setStatus('error');
+            }
+         }
+      };
+
+      void load();
+      return () => controller.abort();
+   }, [isSignedIn, attempt]);
+
+   return (
+      <section className="mx-auto w-full max-w-[1000px] px-4 py-10 md:px-8">
+         <span className="lab lab-rule text-ink-2">Boards</span>
+         <h1 className="g mt-5 text-[40px] md:text-[56px]">
+            Who is catching what
+         </h1>
+         <p className="mt-3 max-w-[56ch] text-[17px] text-ink-2">
+            Length becomes mass with published figures, and points are awarded
+            per kilogram. The fish never has to be weighed, or kept.
+         </p>
+
+         <div
+            className="mt-7 flex flex-wrap gap-2"
+            role="group"
+            aria-label="Which board"
+         >
+            <Chip
+               pressed={view === 'species'}
+               onClick={() => setView('species')}
+            >
+               By species
+            </Chip>
+            <Chip pressed={view === 'rivals'} onClick={() => setView('rivals')}>
+               Your rivals
+            </Chip>
+         </div>
+
+         <div className="mt-8">
+            {status === 'loading' ? (
+               <ListSkeleton
+                  key={attempt}
+                  label="Loading the boards"
+                  errorMessage={LOAD_FAILED}
+                  onRetry={() => setAttempt((a) => a + 1)}
+               />
+            ) : status === 'error' ? (
+               <InlineError
+                  message={LOAD_FAILED}
+                  onRetry={() => setAttempt((a) => a + 1)}
+               />
+            ) : view === 'rivals' ? (
+               <RivalsView
+                  standings={rivals}
+                  mutualCount={mutualCount}
+                  isSignedIn={isSignedIn}
+               />
+            ) : (
+               <SpeciesView boards={boards ?? []} />
+            )}
+         </div>
+      </section>
+   );
+}
+
+function RivalsView({
+   standings,
+   mutualCount,
+   isSignedIn,
+}: {
+   standings: RivalStanding[] | null;
+   mutualCount: number;
+   isSignedIn: boolean;
+}) {
+   if (!isSignedIn) {
+      return (
+         <p className="max-w-[52ch] text-[17px] text-ink-2">
+            Sign in to see how you stand against the anglers you follow.
+         </p>
+      );
+   }
+
+   if (!standings?.length || mutualCount === 0) {
+      return (
+         <p className="max-w-[52ch] text-[17px] text-ink-2">
+            Your board fills up when you and another angler follow each other.
+            Following someone on its own does not put either of you on the
+            other&apos;s board.
+         </p>
+      );
+   }
+
+   return (
+      <>
+         <p className="mb-4 text-[15px] text-ink-2">
+            You and the {mutualCount} {mutualCount === 1 ? 'angler' : 'anglers'}{' '}
+            you follow each other with.
+         </p>
+         <StandingsTable
+            standings={standings}
+            emptyLine="Nobody on this board has a qualifying catch yet."
+         />
+      </>
+   );
+}
+
+function SpeciesView({ boards }: { boards: SpeciesBoard[] }) {
+   if (!boards.length) {
+      return (
+         <p className="max-w-[52ch] text-[17px] text-ink-2">
+            No catch has a species on it yet, so there is nothing to rank.
+         </p>
+      );
+   }
+
+   return (
+      <div className="grid gap-12">
+         {boards.map((board) => (
+            <section key={board.speciesId}>
+               <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+                  <h2 className="g text-[30px]">{board.commonName}</h2>
+                  {board.longestCm && board.longestByName ? (
+                     <p className="text-[15px] text-ink-2">
+                        Biggest:{' '}
+                        <span className="num text-ink">
+                           {board.longestCm} cm
+                        </span>{' '}
+                        by {board.longestByName}
+                     </p>
+                  ) : null}
+               </div>
+
+               <div className="mt-4">
+                  <StandingsTable
+                     standings={board.standings}
+                     emptyLine={
+                        board.unscoredReason ??
+                        'Nobody has a qualifying catch of this yet.'
+                     }
+                  />
+               </div>
+
+               {board.loggedButUnscored && board.standings.length ? (
+                  <p className="mt-2 text-[14px] text-ink-3">
+                     {board.loggedButUnscored}{' '}
+                     {board.loggedButUnscored === 1 ? 'catch' : 'catches'} of
+                     this did not score. {board.unscoredReason}
+                  </p>
+               ) : null}
+            </section>
+         ))}
+      </div>
+   );
+}

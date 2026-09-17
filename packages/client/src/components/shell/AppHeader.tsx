@@ -11,6 +11,7 @@ const destinations = [
    { to: '/catches/me', label: 'Catches' },
    { to: '/sites/me', label: 'Spots' },
    { to: '/gear/me', label: 'Gear' },
+   { to: '/boards', label: 'Boards' },
 ];
 
 /*

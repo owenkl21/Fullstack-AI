@@ -5,6 +5,7 @@ import {
    type ConnectionsKind,
 } from '@/components/profile/ConnectionsDialog';
 import { ProfileSettingsPanel } from '@/components/profile/ProfileSettingsPanel';
+import { ProfileStatsPanel } from '@/components/social/ProfileStats';
 import { ProfileView } from '@/components/profile/ProfileView';
 import type {
    ProfileResponse,
@@ -207,6 +208,8 @@ function ProfileScreen() {
                      />
                   </div>
                </div>
+
+               <ProfileStatsPanel />
             </>
          )}
 
