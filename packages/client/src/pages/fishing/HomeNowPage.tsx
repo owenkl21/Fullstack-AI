@@ -209,7 +209,8 @@ function HomeNow() {
             lastFished={
                recent ? `Last fished ${formatDay(recent.caughtAt)}` : null
             }
-            lastSpot={recent?.site?.name ?? null}
+            /* The latest catch that was at a spot; a pin-only catch has no name to give. */
+            lastSpot={sorted.find((entry) => entry.site)?.site?.name ?? null}
          />
          <div className="mx-auto w-full max-w-[860px]">
             <Readouts

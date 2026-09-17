@@ -279,7 +279,7 @@ export const progressService = {
             key: 'big',
             label: 'Big fish',
             points: big * WORTH.bigFish + great * WORTH.greatFish,
-            detail: `${plural(big, 'fish')} over 60 cm, ${great} over 90`,
+            detail: `${plural(big, 'fish', 'fish')} over 60 cm, ${great} over 90`,
          },
          {
             key: 'competitions',

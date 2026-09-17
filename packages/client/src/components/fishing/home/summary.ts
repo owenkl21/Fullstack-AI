@@ -34,7 +34,13 @@ export function logSentence(catches: CatchSummary[]): LogSentence | null {
       return null;
    }
 
-   const spot = recent.site;
+   /*
+    * The latest catch that was at a spot. A fish logged on a pin alone has
+    * no spot to talk about, and letting it lead made the sentence claim that
+    * none of forty catches were at a saved spot.
+    */
+   const atSpot = sorted.find((entry) => entry.site) ?? recent;
+   const spot = atSpot.site;
    if (spot) {
       const here = sorted.filter((entry) => entry.site?.id === spot.id);
       const minutes = here
@@ -63,8 +69,8 @@ export function logSentence(catches: CatchSummary[]): LogSentence | null {
       }
 
       return {
-         text: `Your only catch at ${spot.name} came at ${formatClock(recent.caughtAt)} on ${formatDay(
-            recent.caughtAt
+         text: `Your only catch at ${spot.name} came at ${formatClock(atSpot.caughtAt)} on ${formatDay(
+            atSpot.caughtAt
          )}.`,
          link: { to: `/sites/${spot.id}`, label: `Open ${spot.name}` },
       };

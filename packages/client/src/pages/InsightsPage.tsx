@@ -385,7 +385,7 @@ function Insights() {
          {/* ---- The rank ---- */}
          <Section title="Your rank" first>
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-               <div className="blk p-6 text-paper">
+               <div className="blk self-start p-6 text-paper">
                   <div className="flex items-baseline gap-3">
                      <span className="lab text-paper-2">Level</span>
                      <span className="g num text-[64px] leading-none">
