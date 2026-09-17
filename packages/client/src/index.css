@@ -431,15 +431,16 @@
       fill: none;
       stroke: var(--contour);
       stroke-width: 1;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+      /* Drawn on slowly, once, when the sheet first comes into view. */
+      transition: stroke-dashoffset 4.2s cubic-bezier(0.2, 0, 0, 1);
    }
    .contour-fine path {
       stroke-width: 0.7;
    }
    .contour-bold path {
       stroke-width: 1.6;
-      stroke-linejoin: round;
-      stroke-linecap: round;
-      transition: stroke-dashoffset 4.2s cubic-bezier(0.2, 0, 0, 1);
    }
    /* Reveal on scroll: <Reveal/> adds .in when in view */
    .rv {
