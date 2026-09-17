@@ -180,15 +180,17 @@ function MyCatchesList() {
                ) : null}
             </div>
 
-            <div className="mt-8">
-               <SearchField
-                  id="catch-search"
-                  label="Search your catches"
-                  placeholder="Species, spot or note"
-                  value={query}
-                  onChange={(next) => setParam('q', next)}
-               />
-            </div>
+            {status === 'ready' && items.length > 0 ? (
+               <div className="mt-8">
+                  <SearchField
+                     id="catch-search"
+                     label="Search your catches"
+                     placeholder="Species, spot or note"
+                     value={query}
+                     onChange={(next) => setParam('q', next)}
+                  />
+               </div>
+            ) : null}
 
             {years.length > 1 ? (
                <div

@@ -212,15 +212,17 @@ function MyGearList() {
                ) : null}
             </div>
 
-            <div className="mt-8">
-               <SearchField
-                  id="gear-search"
-                  label="Search your gear"
-                  placeholder="Rod, reel or line"
-                  value={query}
-                  onChange={(next) => setQuery(next)}
-               />
-            </div>
+            {status === 'ready' && items.length > 0 ? (
+               <div className="mt-8">
+                  <SearchField
+                     id="gear-search"
+                     label="Search your gear"
+                     placeholder="Rod, reel or line"
+                     value={query}
+                     onChange={(next) => setQuery(next)}
+                  />
+               </div>
+            ) : null}
          </header>
 
          <div className="mt-8">

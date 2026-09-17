@@ -168,7 +168,7 @@ function MySitesList() {
                ) : null}
             </div>
 
-            {onMap ? null : (
+            {onMap || status !== 'ready' || items.length === 0 ? null : (
                <div className="mt-8">
                   <SearchField
                      id="spot-search"

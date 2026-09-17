@@ -45,17 +45,22 @@ export function ProfileStatsPanel() {
     * The count and the longest fish are not here: the sentences directly above
     * already say both, and repeating them two lines later reads as padding.
     */
-   const figures: { label: string; value: string }[] = [
+   const figures: { label: string; value: string; counted?: boolean }[] = [
       {
          label: 'Species',
          value:
             stats.distinctSpecies === null
                ? 'None recorded'
                : String(stats.distinctSpecies),
+         counted: stats.distinctSpecies !== null,
       },
-      { label: 'Days on the water', value: String(stats.daysOnTheWater) },
-      { label: 'Released', value: String(stats.releasedCount) },
-      { label: 'Points', value: String(stats.points) },
+      {
+         label: 'Days on the water',
+         value: String(stats.daysOnTheWater),
+         counted: true,
+      },
+      { label: 'Released', value: String(stats.releasedCount), counted: true },
+      { label: 'Points', value: String(stats.points), counted: true },
    ];
 
    return (
@@ -66,7 +71,19 @@ export function ProfileStatsPanel() {
             {figures.map((f) => (
                <div key={f.label}>
                   <dt className="lab text-ink-3">{f.label}</dt>
-                  <dd className="num mt-1 text-[28px] leading-none">
+                  {/*
+                   * A figure is set at 28px; a sentence standing in for one is
+                   * not. "None recorded" at 28px wrapped to two lines in a
+                   * phone's two column grid and made that cell twice the height
+                   * of the numbers beside it.
+                   */}
+                  <dd
+                     className={
+                        f.counted
+                           ? 'num mt-1 text-[28px] leading-none'
+                           : 'mt-1 text-[17px] leading-snug text-ink-2'
+                     }
+                  >
                      {f.value}
                   </dd>
                </div>
