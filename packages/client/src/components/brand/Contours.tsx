@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { smoothPath } from './path';
 
@@ -122,20 +122,58 @@ function buildPaths(W: number, H: number, seedIn: number) {
 
 export function Contours({
    seed = 1,
-   width = 720,
-   height = 460,
+   width,
+   height,
    className,
 }: {
    seed?: number;
+   /** Fixed dimensions. Leave both out and the art matches the box it sits in. */
    width?: number;
    height?: number;
    className?: string;
 }) {
    const ref = useRef<SVGSVGElement>(null);
+
+   /*
+    * Contours are generated at the shape they will be drawn at.
+    *
+    * They used to be built in a fixed 460 by 240 box and then stretched across
+    * whatever they landed in. On a phone that box is about the right shape and
+    * it looked like a survey sheet; on a desktop it was stretched across 1440
+    * by 300, nearly five to one, so the lines came out smeared sideways and
+    * the pattern visibly repeated. Measuring the box first is the fix: the
+    * field is sampled at the real aspect, so the lines are the same weight and
+    * the same spacing at every width.
+    */
+   const [box, setBox] = useState<{ w: number; h: number } | null>(null);
+
    useEffect(() => {
+      if (width && height) {
+         setBox({ w: width, h: height });
+         return;
+      }
+
       const svg = ref.current;
       if (!svg) return;
-      const paths = buildPaths(width, height, seed);
+
+      const observer = new ResizeObserver(([entry]) => {
+         const rect = entry?.contentRect;
+         if (!rect || rect.width < 8 || rect.height < 8) return;
+         /* Rounded, so a pixel of resize does not rebuild the whole field. */
+         setBox({
+            w: Math.round(rect.width / 20) * 20,
+            h: Math.round(rect.height / 20) * 20,
+         });
+      });
+
+      observer.observe(svg);
+      return () => observer.disconnect();
+   }, [width, height]);
+
+   useEffect(() => {
+      const svg = ref.current;
+      if (!svg || !box) return;
+      const paths = buildPaths(box.w, box.h, seed);
       svg.innerHTML = paths
          .map(
             (d, i) =>
@@ -156,12 +194,14 @@ export function Contours({
       );
       io.observe(svg);
       return () => io.disconnect();
-   }, [seed, width, height]);
+   }, [seed, box]);
+
    return (
       <svg
          ref={ref}
          className={cn('contour', className)}
-         viewBox={`0 0 ${width} ${height}`}
+         viewBox={box ? `0 0 ${box.w} ${box.h}` : undefined}
+         preserveAspectRatio="none"
          aria-hidden="true"
       />
    );

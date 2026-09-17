@@ -50,12 +50,9 @@ export function Readouts({
           * than decoration.
           */}
          <Underwater seed={3} />
-         <Contours
-            seed={3}
-            width={460}
-            height={240}
-            className="top-[-30%] left-[-10%] h-[160%] w-[120%]"
-         />
+         {/* No fixed size: the art is generated at whatever shape this section
+             is, so it does not smear on a wide screen. */}
+         <Contours seed={3} className="inset-0 h-full w-full" />
          <h2 id="conditions-heading" className="sr-only">
             Conditions
          </h2>
