@@ -7,10 +7,10 @@ import { R2ImagePicker } from '@/components/r2-image-picker';
 import { useRevealIn } from '@/components/brand/Reveal';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
+import { ChoiceGroup, TextArea, TextField } from '@/components/ui/field';
 import { toast } from '@/components/ui/use-toast';
 import { readPosition } from '@/lib/maps';
 import { useDocumentTitle } from '@/lib/title';
-import { cn } from '@/lib/utils';
 
 export type WaterType = 'FRESHWATER' | 'SALTWATER' | 'BRACKISH' | 'OTHER';
 
@@ -88,37 +88,6 @@ const refusedFields = (
    return refused;
 };
 
-function Field({
-   id,
-   label,
-   count,
-   error,
-   children,
-}: {
-   id: string;
-   label: string;
-   count?: string;
-   error?: string;
-   children: ReactNode;
-}) {
-   return (
-      <div className="grid gap-2">
-         <div className="flex items-baseline justify-between gap-4">
-            <label className="lab" htmlFor={id}>
-               {label}
-            </label>
-            {count ? <span className="lab num">{count}</span> : null}
-         </div>
-         {children}
-         {error ? (
-            <p id={`${id}-error`} className="text-[15px] text-destructive">
-               {error}
-            </p>
-         ) : null}
-      </div>
-   );
-}
-
 function Group({ title, children }: { title: string; children: ReactNode }) {
    const headingId = useId();
 
@@ -169,7 +138,6 @@ export function SpotForm({
    const navigate = useNavigate();
    const formRef = useRef<HTMLFormElement | null>(null);
    const nameRef = useRef<HTMLInputElement | null>(null);
-   const fieldId = useId();
    useRevealIn(formRef);
 
    const [values, setValues] = useState<SpotValues>(initial ?? EMPTY_SPOT);
@@ -279,68 +247,34 @@ export function SpotForm({
          className="grid max-w-[680px] gap-10"
       >
          <Group title="The spot">
-            <Field
-               id={`${fieldId}-name`}
+            <TextField
+               ref={nameRef}
                label="Name"
+               value={values.name}
+               maxLength={NAME_MAX}
+               autoComplete="off"
                error={errors.name}
-               count={
+               hint={
                   values.name.length
                      ? `${values.name.length} / ${NAME_MAX}`
                      : undefined
                }
-            >
-               <input
-                  ref={nameRef}
-                  id={`${fieldId}-name`}
-                  className="input-line text-[16px]"
-                  value={values.name}
-                  maxLength={NAME_MAX}
-                  autoComplete="off"
-                  aria-invalid={Boolean(errors.name)}
-                  aria-describedby={
-                     errors.name ? `${fieldId}-name-error` : undefined
-                  }
-                  onChange={(event) => {
-                     clearError('name');
-                     change('name', event.target.value);
-                  }}
-                  onBlur={(event) => checkName(event.target.value)}
-               />
-            </Field>
+               onChange={(event) => {
+                  clearError('name');
+                  change('name', event.target.value);
+               }}
+               onBlur={(event) => checkName(event.target.value)}
+            />
 
-            <div className="grid gap-2">
-               <span className="lab" id={`${fieldId}-water`}>
-                  Water
-               </span>
-               <div
-                  className="flex flex-wrap gap-2"
-                  role="group"
-                  aria-labelledby={`${fieldId}-water`}
-               >
-                  {WATER_TYPES.map((water) => {
-                     const isOn = values.waterType === water.value;
-
-                     return (
-                        <button
-                           key={water.value}
-                           type="button"
-                           aria-pressed={isOn}
-                           onClick={() =>
-                              change('waterType', isOn ? '' : water.value)
-                           }
-                           className={cn(
-                              'g-tracked inline-flex h-11 items-center border px-4 text-[19px] transition-colors duration-150 [transition-timing-function:var(--ease)]',
-                              isOn
-                                 ? 'border-ink bg-ink text-background'
-                                 : 'border-line-2 text-ink hover:bg-bg-2'
-                           )}
-                        >
-                           {water.word}
-                        </button>
-                     );
-                  })}
-               </div>
-            </div>
+            <ChoiceGroup
+               label="Water"
+               value={values.waterType}
+               options={WATER_TYPES.map((water) => ({
+                  value: water.value,
+                  label: water.word,
+               }))}
+               onChange={(next) => change('waterType', next)}
+            />
          </Group>
 
          <Group title="Where it is">
@@ -355,51 +289,39 @@ export function SpotForm({
          </Group>
 
          <Group title="What it is like">
-            <Field
-               id={`${fieldId}-description`}
+            <TextArea
                label="Description"
+               rows={5}
+               value={values.description}
+               maxLength={DESCRIPTION_MAX}
                error={errors.description}
-               count={
+               hint={
                   values.description.length
                      ? `${values.description.length} / ${DESCRIPTION_MAX}`
-                     : undefined
+                     : 'What the ground is like, what it fishes for, when it works.'
                }
-            >
-               <textarea
-                  id={`${fieldId}-description`}
-                  className="input-line min-h-[120px] resize-y text-[16px]"
-                  value={values.description}
-                  maxLength={DESCRIPTION_MAX}
-                  aria-invalid={Boolean(errors.description)}
-                  onChange={(event) => {
-                     clearError('description');
-                     change('description', event.target.value);
-                  }}
-               />
-            </Field>
+               onChange={(event) => {
+                  clearError('description');
+                  change('description', event.target.value);
+               }}
+            />
 
-            <Field
-               id={`${fieldId}-access`}
+            <TextArea
                label="Getting there"
+               rows={4}
+               value={values.accessNotes}
+               maxLength={ACCESS_NOTES_MAX}
                error={errors.accessNotes}
-               count={
+               hint={
                   values.accessNotes.length
                      ? `${values.accessNotes.length} / ${ACCESS_NOTES_MAX}`
-                     : undefined
+                     : 'Where to park and how to get down.'
                }
-            >
-               <textarea
-                  id={`${fieldId}-access`}
-                  className="input-line min-h-[96px] resize-y text-[16px]"
-                  value={values.accessNotes}
-                  maxLength={ACCESS_NOTES_MAX}
-                  aria-invalid={Boolean(errors.accessNotes)}
-                  onChange={(event) => {
-                     clearError('accessNotes');
-                     change('accessNotes', event.target.value);
-                  }}
-               />
-            </Field>
+               onChange={(event) => {
+                  clearError('accessNotes');
+                  change('accessNotes', event.target.value);
+               }}
+            />
          </Group>
 
          <Group title="Photos">

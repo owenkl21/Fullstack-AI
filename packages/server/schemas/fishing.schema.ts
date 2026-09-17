@@ -28,6 +28,9 @@ const imageInputSchema = z.object({
    url: z.string().trim().url(),
 });
 
+/* A figure that may be absent either way: missing, or present and null. */
+const maybeNumber = z.number().optional().nullable();
+
 const weatherSnapshotSchema = z
    .object({
       weatherCondition: z.object({
@@ -46,9 +49,13 @@ const weatherSnapshotSchema = z
       }),
       precipitation: z.object({
          probability: z.object({ percent: z.coerce.number().min(0).max(100) }),
+         amountMm: maybeNumber,
       }),
       wind: z.object({
-         direction: z.object({ cardinal: z.string().trim().min(1).max(40) }),
+         direction: z.object({
+            cardinal: z.string().trim().min(1).max(40),
+            degrees: maybeNumber,
+         }),
          speed: z.object({
             value: z.coerce.number(),
             unit: z.string().trim().min(1).max(60),
@@ -59,6 +66,51 @@ const weatherSnapshotSchema = z
          }),
       }),
       cloudCover: z.coerce.number(),
+
+      /*
+       * The rest of a reading, all optional. The block above is what every
+       * client has always sent; this is what a client sends when it read
+       * Open-Meteo itself because the server could not, so the record still
+       * gets the sea, the moon and the pressure. `observedAt` is the hour it
+       * read, and is what marks the snapshot as a full reading.
+       */
+      observedAt: z.string().trim().max(40).optional().nullable(),
+      thunder: z.object({ cape: maybeNumber }).optional().nullable(),
+      airPressure: z
+         .object({ meanSeaLevelMillibars: maybeNumber })
+         .optional()
+         .nullable(),
+      feelsLike: z.object({ degrees: maybeNumber }).optional().nullable(),
+      dewPoint: z.object({ degrees: maybeNumber }).optional().nullable(),
+      relativeHumidity: maybeNumber,
+      visibilityM: maybeNumber,
+      uvIndex: maybeNumber,
+      isDaytime: z.boolean().optional().nullable(),
+      sun: z
+         .object({
+            rise: z.string().trim().max(40).optional().nullable(),
+            set: z.string().trim().max(40).optional().nullable(),
+         })
+         .optional()
+         .nullable(),
+      moon: z
+         .object({
+            fraction: z.number(),
+            illumination: z.number(),
+            name: z.string().trim().max(40),
+            spring: z.boolean(),
+         })
+         .optional()
+         .nullable(),
+      sea: z
+         .object({
+            surfaceTemperatureC: maybeNumber,
+            waveHeightM: maybeNumber,
+            swellHeightM: maybeNumber,
+            swellPeriodS: maybeNumber,
+         })
+         .optional()
+         .nullable(),
    })
    .optional()
    .nullable();

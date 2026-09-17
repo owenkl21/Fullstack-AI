@@ -6,9 +6,9 @@ import { useRevealIn } from '@/components/brand/Reveal';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
+import { ChoiceGroup, TextField } from '@/components/ui/field';
 import { toast } from '@/components/ui/use-toast';
 import { useDocumentTitle } from '@/lib/title';
-import { cn } from '@/lib/utils';
 
 export type GearType =
    | 'ROD'
@@ -81,32 +81,6 @@ const refusedFields = (
    return refused;
 };
 
-function Field({
-   id,
-   label,
-   error,
-   children,
-}: {
-   id: string;
-   label: string;
-   error?: string;
-   children: ReactNode;
-}) {
-   return (
-      <div className="grid gap-2">
-         <label className="lab" htmlFor={id}>
-            {label}
-         </label>
-         {children}
-         {error ? (
-            <p id={`${id}-error`} className="text-[15px] text-destructive">
-               {error}
-            </p>
-         ) : null}
-      </div>
-   );
-}
-
 function Group({ title, children }: { title: string; children: ReactNode }) {
    const headingId = useId();
 
@@ -155,7 +129,6 @@ export function GearForm({
    const formRef = useRef<HTMLFormElement | null>(null);
    const nameRef = useRef<HTMLInputElement | null>(null);
    const brandRef = useRef<HTMLInputElement | null>(null);
-   const fieldId = useId();
    useRevealIn(formRef);
 
    const [values, setValues] = useState<GearValues>(initial ?? EMPTY_GEAR);
@@ -251,77 +224,44 @@ export function GearForm({
    return (
       <form ref={formRef} onSubmit={save} noValidate className="grid gap-10">
          <Group title="The gear">
-            <Field id={`${fieldId}-name`} label="Name" error={errors.name}>
-               <input
-                  ref={nameRef}
-                  id={`${fieldId}-name`}
-                  className="input-line text-[16px]"
-                  value={values.name}
-                  maxLength={TEXT_MAX}
-                  autoComplete="off"
-                  aria-invalid={Boolean(errors.name)}
-                  aria-describedby={
-                     errors.name ? `${fieldId}-name-error` : undefined
-                  }
-                  onChange={(event) => {
-                     clearError('name');
-                     change('name', event.target.value);
-                  }}
-                  onBlur={(event) => checkText('name', event.target.value)}
-               />
-            </Field>
+            <TextField
+               ref={nameRef}
+               label="Name"
+               value={values.name}
+               maxLength={TEXT_MAX}
+               autoComplete="off"
+               error={errors.name}
+               hint="The model, or what you call it."
+               onChange={(event) => {
+                  clearError('name');
+                  change('name', event.target.value);
+               }}
+               onBlur={(event) => checkText('name', event.target.value)}
+            />
 
-            <Field id={`${fieldId}-brand`} label="Brand" error={errors.brand}>
-               <input
-                  ref={brandRef}
-                  id={`${fieldId}-brand`}
-                  className="input-line text-[16px]"
-                  value={values.brand}
-                  maxLength={TEXT_MAX}
-                  autoComplete="off"
-                  aria-invalid={Boolean(errors.brand)}
-                  aria-describedby={
-                     errors.brand ? `${fieldId}-brand-error` : undefined
-                  }
-                  onChange={(event) => {
-                     clearError('brand');
-                     change('brand', event.target.value);
-                  }}
-                  onBlur={(event) => checkText('brand', event.target.value)}
-               />
-            </Field>
+            <TextField
+               ref={brandRef}
+               label="Brand"
+               value={values.brand}
+               maxLength={TEXT_MAX}
+               autoComplete="off"
+               error={errors.brand}
+               onChange={(event) => {
+                  clearError('brand');
+                  change('brand', event.target.value);
+               }}
+               onBlur={(event) => checkText('brand', event.target.value)}
+            />
 
-            <div className="grid gap-2">
-               <span className="lab" id={`${fieldId}-type`}>
-                  Type
-               </span>
-               <div
-                  className="flex flex-wrap gap-2"
-                  role="group"
-                  aria-labelledby={`${fieldId}-type`}
-               >
-                  {GEAR_KINDS.map((kind) => {
-                     const isOn = values.type === kind.value;
-
-                     return (
-                        <button
-                           key={kind.value}
-                           type="button"
-                           aria-pressed={isOn}
-                           onClick={() => change('type', kind.value)}
-                           className={cn(
-                              'g-tracked inline-flex h-11 items-center border px-4 text-[19px] transition-colors duration-150 [transition-timing-function:var(--ease)]',
-                              isOn
-                                 ? 'border-ink bg-ink text-background'
-                                 : 'border-line-2 text-ink hover:bg-bg-2'
-                           )}
-                        >
-                           {kind.word}
-                        </button>
-                     );
-                  })}
-               </div>
-            </div>
+            <ChoiceGroup
+               label="Type"
+               value={values.type}
+               options={GEAR_KINDS.map((kind) => ({
+                  value: kind.value,
+                  label: kind.word,
+               }))}
+               onChange={(next) => change('type', next)}
+            />
          </Group>
 
          <Group title="Photo">

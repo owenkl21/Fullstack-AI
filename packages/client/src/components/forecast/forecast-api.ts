@@ -87,11 +87,18 @@ export async function fetchForecast(
    longitude: number,
    signal?: AbortSignal
 ): Promise<Forecast | null> {
-   const { data } = await axios.get<{ forecast: Forecast | null }>(
-      '/api/forecast',
-      { params: { latitude, longitude, days: 7 }, signal }
-   );
-   return data.forecast ?? null;
+   /* The server first; the browser itself when the server is throttled. */
+   try {
+      const { data } = await axios.get<{ forecast: Forecast | null }>(
+         '/api/forecast',
+         { params: { latitude, longitude, days: 7 }, signal }
+      );
+      if (data.forecast) return data.forecast;
+   } catch (error) {
+      if (axios.isCancel(error)) throw error;
+   }
+   const { readForecast } = await import('@/lib/open-meteo');
+   return readForecast(latitude, longitude, 7, signal);
 }
 
 export async function searchPlaces(

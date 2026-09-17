@@ -24,19 +24,102 @@ const stripSignedUrlParams = (url: string) => {
    }
 };
 
+type Maybe = number | null | undefined;
+
 type WeatherSnapshotInput = {
    weatherCondition: {
       iconBaseUri: string;
       description: { text: string };
    };
    temperature: { degrees: number; unit: string };
-   precipitation: { probability: { percent: number } };
+   precipitation: { probability: { percent: number }; amountMm?: Maybe };
    wind: {
-      direction: { cardinal: string };
+      direction: { cardinal: string; degrees?: Maybe };
       speed: { value: number; unit: string };
       gust: { value: number; unit: string };
    };
    cloudCover: number;
+   /* Present only when the client read Open-Meteo itself. */
+   observedAt?: string | null;
+   thunder?: { cape?: Maybe } | null;
+   airPressure?: { meanSeaLevelMillibars?: Maybe } | null;
+   feelsLike?: { degrees?: Maybe } | null;
+   dewPoint?: { degrees?: Maybe } | null;
+   relativeHumidity?: Maybe;
+   visibilityM?: Maybe;
+   uvIndex?: Maybe;
+   isDaytime?: boolean | null;
+   sun?: { rise?: string | null; set?: string | null } | null;
+   moon?: {
+      fraction: number;
+      illumination: number;
+      name: string;
+      spring: boolean;
+   } | null;
+   sea?: {
+      surfaceTemperatureC?: Maybe;
+      waveHeightM?: Maybe;
+      swellHeightM?: Maybe;
+      swellPeriodS?: Maybe;
+   } | null;
+};
+
+const figure = (value: Maybe): number | null =>
+   typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const celsius = (degrees: number, unit: string) =>
+   /fahrenheit/i.test(unit) ? ((degrees - 32) * 5) / 9 : degrees;
+
+const kph = (value: number, unit: string) =>
+   /mile/i.test(unit) ? value * 1.609344 : value;
+
+/*
+ * A full reading the client took itself, as the server's own shape.
+ *
+ * The server reads Open-Meteo first and this is used only when that read
+ * came back empty, which on a hosted address happens whenever a stranger on
+ * the same address has used up the minute. A snapshot without `observedAt`
+ * is the old narrow one and is not a reading; it goes through the narrow
+ * mapping as before.
+ */
+const snapshotToConditions = (
+   snapshot?: WeatherSnapshotInput | null
+): Conditions | null => {
+   if (!snapshot || typeof snapshot.observedAt !== 'string') {
+      return null;
+   }
+   const direction = figure(snapshot.wind.direction.degrees);
+   return {
+      observedAt: snapshot.observedAt,
+      timeZoneId: 'UTC',
+      conditionText: snapshot.weatherCondition.description.text || null,
+      temperatureC: celsius(
+         snapshot.temperature.degrees,
+         snapshot.temperature.unit
+      ),
+      feelsLikeC: figure(snapshot.feelsLike?.degrees),
+      dewPointC: figure(snapshot.dewPoint?.degrees),
+      relativeHumidity: figure(snapshot.relativeHumidity),
+      precipitationProbability: snapshot.precipitation.probability.percent,
+      precipitationMm: figure(snapshot.precipitation.amountMm),
+      cape: figure(snapshot.thunder?.cape),
+      pressureMsl: figure(snapshot.airPressure?.meanSeaLevelMillibars),
+      cloudCover: snapshot.cloudCover,
+      visibilityM: figure(snapshot.visibilityM),
+      windSpeedKph: kph(snapshot.wind.speed.value, snapshot.wind.speed.unit),
+      windDirectionDegrees: direction,
+      windDirectionCardinal: snapshot.wind.direction.cardinal || null,
+      windGustKph: kph(snapshot.wind.gust.value, snapshot.wind.gust.unit),
+      uvIndex: figure(snapshot.uvIndex),
+      isDaytime: snapshot.isDaytime ?? null,
+      seaSurfaceTemperatureC: figure(snapshot.sea?.surfaceTemperatureC),
+      waveHeightM: figure(snapshot.sea?.waveHeightM),
+      swellHeightM: figure(snapshot.sea?.swellHeightM),
+      swellPeriodS: figure(snapshot.sea?.swellPeriodS),
+      sunrise: snapshot.sun?.rise ?? null,
+      sunset: snapshot.sun?.set ?? null,
+      moon: snapshot.moon ?? null,
+   };
 };
 
 type CreateCatchInput = {
@@ -595,7 +678,10 @@ export const fishingService = {
        * the same place and hour, so if the lookup came back with nothing that
        * one is kept rather than a row of nulls.
        */
-      const conditions = read && read.observedAt ? read : null;
+      const conditions =
+         read && read.observedAt
+            ? read
+            : snapshotToConditions(input.weatherSnapshot);
       if (where && !conditions) {
          console.warn(
             '[catch:create] no conditions for',

@@ -91,7 +91,7 @@ export type WeatherSnapshot = {
    /* Convective energy, J/kg. The nearest thing to a lightning forecast. */
    thunder?: { cape?: number | null };
    wind?: {
-      direction?: { cardinal?: string };
+      direction?: { cardinal?: string; degrees?: number | null };
       speed?: { value?: number; unit?: string };
       gust?: { value?: number; unit?: string };
    };
@@ -154,17 +154,29 @@ export async function fetchConditions(
    signal?: AbortSignal,
    at?: Date | null
 ) {
-   const { data } = await axios.get<{
-      weather: WeatherSnapshot | null;
-      weatherError?: string;
-   }>('/api/weather/current', {
-      params: {
-         latitude,
-         longitude,
-         ...(at ? { at: at.toISOString() } : {}),
-      },
-      signal,
-   });
+   /*
+    * The server first, for its shared memory of the hour. When it has no
+    * reading, which on a bad minute means Open-Meteo throttled the address
+    * the server shares, the page reads Open-Meteo itself from its own.
+    */
+   let data: { weather: WeatherSnapshot | null; weatherError?: string };
+   try {
+      ({ data } = await axios.get<typeof data>('/api/weather/current', {
+         params: {
+            latitude,
+            longitude,
+            ...(at ? { at: at.toISOString() } : {}),
+         },
+         signal,
+      }));
+   } catch (error) {
+      if (axios.isCancel(error)) throw error;
+      data = { weather: null };
+   }
+   if (!data.weather) {
+      const { readConditions } = await import('@/lib/open-meteo');
+      return readConditions(latitude, longitude, at ?? new Date(), signal);
+   }
    return data.weather ?? null;
 }
 
@@ -200,13 +212,44 @@ export function toSavableSnapshot(snapshot: WeatherSnapshot | null) {
          description: { text: condition.description.text },
       },
       temperature: { degrees: temperature.degrees, unit: temperature.unit },
-      precipitation: { probability: { percent } },
+      precipitation: {
+         probability: { percent },
+         amountMm: snapshot.precipitation?.amountMm ?? null,
+      },
       wind: {
-         direction: { cardinal: wind.direction.cardinal },
+         direction: {
+            cardinal: wind.direction.cardinal,
+            degrees: wind.direction.degrees ?? null,
+         },
          speed: { value: wind.speed.value, unit: wind.speed.unit },
          gust: { value: wind.gust.value, unit: wind.gust.unit },
       },
       cloudCover: snapshot.cloudCover,
+      /*
+       * The rest of the reading, so a save made while the server cannot reach
+       * Open-Meteo still stores the sea, the moon and the pressure. The
+       * server reads for itself first and uses this only when that fails.
+       */
+      thunder: { cape: snapshot.thunder?.cape ?? null },
+      airPressure: {
+         meanSeaLevelMillibars:
+            snapshot.airPressure?.meanSeaLevelMillibars ?? null,
+      },
+      feelsLike: { degrees: snapshot.feelsLike?.degrees ?? null },
+      dewPoint: { degrees: snapshot.dewPoint?.degrees ?? null },
+      relativeHumidity: snapshot.relativeHumidity ?? null,
+      visibilityM: snapshot.visibilityM ?? null,
+      uvIndex: snapshot.uvIndex ?? null,
+      isDaytime: snapshot.isDaytime ?? null,
+      observedAt: snapshot.observedAt ?? null,
+      sun: { rise: snapshot.sun?.rise ?? null, set: snapshot.sun?.set ?? null },
+      moon: snapshot.moon ?? null,
+      sea: {
+         surfaceTemperatureC: snapshot.sea?.surfaceTemperatureC ?? null,
+         waveHeightM: snapshot.sea?.waveHeightM ?? null,
+         swellHeightM: snapshot.sea?.swellHeightM ?? null,
+         swellPeriodS: snapshot.sea?.swellPeriodS ?? null,
+      },
    };
 }
 
