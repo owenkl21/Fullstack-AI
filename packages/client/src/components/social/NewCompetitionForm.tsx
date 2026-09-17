@@ -10,6 +10,13 @@ import {
    type CompetitionRule,
 } from '@/components/social/competitions-api';
 import { Button } from '@/components/ui/button';
+import {
+   ChoiceGroup,
+   FieldRow,
+   FieldStack,
+   SelectField,
+   TextField,
+} from '@/components/ui/field';
 
 /*
  * Starting a competition.
@@ -114,140 +121,75 @@ export function NewCompetitionForm({
       }
    };
 
-   const chip = (on: boolean) =>
-      'g-tracked inline-flex h-11 items-center border px-3.5 text-[16px] transition-colors duration-150 ' +
-      (on
-         ? 'border-ink bg-ink text-background'
-         : 'border-line text-ink-2 hover:border-ink hover:text-ink');
-
    return (
       <div className="border border-line p-5">
          <h2 className="g text-[28px] md:text-[32px]">Start a competition</h2>
 
-         <div className="mt-5 flex flex-col gap-5">
-            <div>
-               <label htmlFor="comp-name" className="lab">
-                  What it is called
-               </label>
-               <input
-                  id="comp-name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Winter galjoen"
-                  className="input-line mt-1 text-[16px]"
+         <FieldStack className="mt-5">
+            <TextField
+               label="What it is called"
+               value={name}
+               onChange={(event) => setName(event.target.value)}
+               placeholder="Winter galjoen"
+            />
+
+            <TextField
+               label="A line about it"
+               value={blurb}
+               onChange={(event) => setBlurb(event.target.value)}
+               placeholder="Club members, west coast only."
+            />
+
+            <FieldRow>
+               <TextField
+                  label="Starts"
+                  type="datetime-local"
+                  value={startsAt}
+                  onChange={(event) => setStartsAt(event.target.value)}
                />
-            </div>
-
-            <div>
-               <label htmlFor="comp-blurb" className="lab">
-                  A line about it
-               </label>
-               <input
-                  id="comp-blurb"
-                  value={blurb}
-                  onChange={(event) => setBlurb(event.target.value)}
-                  placeholder="Club members, west coast only."
-                  className="input-line mt-1 text-[16px]"
+               <TextField
+                  label="Ends"
+                  type="datetime-local"
+                  value={endsAt}
+                  onChange={(event) => setEndsAt(event.target.value)}
                />
-            </div>
+            </FieldRow>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-               <div>
-                  <label htmlFor="comp-start" className="lab">
-                     Starts
-                  </label>
-                  <input
-                     id="comp-start"
-                     type="datetime-local"
-                     value={startsAt}
-                     onChange={(event) => setStartsAt(event.target.value)}
-                     className="input-line mt-1 text-[16px]"
-                  />
-               </div>
-               <div>
-                  <label htmlFor="comp-end" className="lab">
-                     Ends
-                  </label>
-                  <input
-                     id="comp-end"
-                     type="datetime-local"
-                     value={endsAt}
-                     onChange={(event) => setEndsAt(event.target.value)}
-                     className="input-line mt-1 text-[16px]"
-                  />
-               </div>
-            </div>
-
-            <div>
-               <span className="lab">Judged on</span>
-               <div
-                  className="mt-1 flex flex-wrap gap-2"
-                  role="radiogroup"
-                  aria-label="Judged on"
-               >
-                  {(['LENGTH', 'WEIGHT'] as CompetitionMeasure[]).map((m) => (
-                     <button
-                        key={m}
-                        type="button"
-                        role="radio"
-                        aria-checked={measure === m}
-                        onClick={() => setMeasure(m)}
-                        className={chip(measure === m)}
-                     >
-                        {m === 'LENGTH' ? 'Length' : 'Weight'}
-                     </button>
-                  ))}
-               </div>
-               <p className="mt-2 max-w-[54ch] text-[14px] text-ink-3">
-                  {measure === 'LENGTH'
+            <ChoiceGroup
+               label="Judged on"
+               value={measure}
+               onChange={setMeasure}
+               options={[
+                  { value: 'LENGTH', label: 'Length' },
+                  { value: 'WEIGHT', label: 'Weight' },
+               ]}
+               hint={
+                  measure === 'LENGTH'
                      ? 'Anyone with a tape can enter, and the fish goes back.'
-                     : 'A fish with no scale reading is converted from its length, and a species with no published figures cannot be counted.'}
-               </p>
-            </div>
+                     : 'A fish with no scale reading is converted from its length, and a species with no published figures cannot be counted.'
+               }
+            />
 
-            <div>
-               <span className="lab">How it is won</span>
-               <div
-                  className="mt-1 flex flex-wrap gap-2"
-                  role="radiogroup"
-                  aria-label="How it is won"
-               >
-                  {RULES.map((option) => (
-                     <button
-                        key={option.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={rule === option.value}
-                        onClick={() => setRule(option.value)}
-                        className={chip(rule === option.value)}
-                     >
-                        {option.label}
-                     </button>
-                  ))}
-               </div>
-               <p className="mt-2 text-[14px] text-ink-3">
-                  {RULES.find((r) => r.value === rule)?.note}
-               </p>
-            </div>
+            <ChoiceGroup
+               label="How it is won"
+               value={rule}
+               onChange={setRule}
+               options={RULES.map((r) => ({ value: r.value, label: r.label }))}
+               hint={RULES.find((r) => r.value === rule)?.note}
+            />
 
-            <div>
-               <label htmlFor="comp-species" className="lab">
-                  One species only
-               </label>
-               <select
-                  id="comp-species"
-                  value={speciesId}
-                  onChange={(event) => setSpeciesId(event.target.value)}
-                  className="input-line mt-1 text-[16px]"
-               >
-                  <option value="">Any fish</option>
-                  {species.map((s) => (
-                     <option key={s.id} value={s.id}>
-                        {s.commonName}
-                     </option>
-                  ))}
-               </select>
-            </div>
+            <SelectField
+               label="One species only"
+               value={speciesId}
+               onChange={(event) => setSpeciesId(event.target.value)}
+            >
+               <option value="">Any fish</option>
+               {species.map((s) => (
+                  <option key={s.id} value={s.id}>
+                     {s.commonName}
+                  </option>
+               ))}
+            </SelectField>
 
             {error ? (
                <p role="alert" className="text-[14px] text-destructive">
@@ -272,7 +214,7 @@ export function NewCompetitionForm({
                   Cancel
                </Button>
             </div>
-         </div>
+         </FieldStack>
       </div>
    );
 }

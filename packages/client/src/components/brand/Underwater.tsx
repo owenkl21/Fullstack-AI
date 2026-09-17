@@ -9,10 +9,10 @@ import { cn } from '@/lib/utils';
  * product should be bold: it is a rock and surf log, and the water is the thing
  * it is about.
  *
- * The motion is meant to be seen. Bubbles rise continuously and a fish crosses
- * every twenty seconds or so, because an effect nobody notices is not worth the
- * frames it costs. It stays behind the words rather than over them, and the
- * conditions printed on top remain the reason anyone opened the page.
+ * Light through moving water and bubbles rising, and nothing else. A fish
+ * swimming past was tried and cut: at this size it read as a logo on a loop
+ * rather than as a fish, and it pulled the eye off the conditions, which are
+ * the reason anyone opened the page.
  *
  * All of it is decoration, so all of it is aria-hidden and none of it takes a
  * pointer. It is CSS rather than a motion library: transforms of this kind are
@@ -51,13 +51,10 @@ export function Underwater({
    className,
    seed = 7,
    count = 16,
-   fish = true,
 }: {
    className?: string;
    seed?: number;
    count?: number;
-   /** Off where the section is short enough that a fish would only fluster it. */
-   fish?: boolean;
 }) {
    const drops = useMemo(() => bubbles(seed, count), [seed, count]);
 
@@ -85,29 +82,6 @@ export function Underwater({
                }
             />
          ))}
-
-         {fish ? (
-            <span className="swimmer">
-               <svg viewBox="0 0 68 44" aria-hidden="true">
-                  <path
-                     d="M2 30c10-14 24-20 40-16 8 2 14 6 24 6-8 6-16 8-24 8-16 0-30-4-40 2Z"
-                     fill="none"
-                     stroke="currentColor"
-                     strokeWidth="2.2"
-                     strokeLinecap="round"
-                     strokeLinejoin="round"
-                  />
-                  <path
-                     d="M44 14c-4-6-10-8-16-8 4 4 8 6 14 6M22 24c4 4 8 4 12 2"
-                     fill="none"
-                     stroke="currentColor"
-                     strokeWidth="2.2"
-                     strokeLinecap="round"
-                     strokeLinejoin="round"
-                  />
-               </svg>
-            </span>
-         ) : null}
       </div>
    );
 }

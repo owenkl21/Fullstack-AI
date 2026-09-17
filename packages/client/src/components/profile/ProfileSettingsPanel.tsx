@@ -1,10 +1,16 @@
 import axios from 'axios';
-import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import type { ProfileResponse, UserProfile } from '@/components/profile/types';
 import { Link } from 'react-router-dom';
+import {
+   FieldRow,
+   FieldStack,
+   TextArea,
+   TextField,
+} from '@/components/ui/field';
 
 /*
  * The four things an angler can change about themselves. Labels above dashed
@@ -96,10 +102,6 @@ export function ProfileSettingsPanel({
    profile: UserProfile;
    onSaved: (profile: UserProfile) => void;
 }) {
-   const nameId = useId();
-   const handleId = useId();
-   const bioId = useId();
-
    const nameRef = useRef<HTMLInputElement>(null);
    const handleRef = useRef<HTMLInputElement>(null);
    const bioRef = useRef<HTMLTextAreaElement>(null);
@@ -196,91 +198,46 @@ export function ProfileSettingsPanel({
 
    return (
       <form className="mt-6 max-w-[680px]" onSubmit={save} noValidate>
-         <div className="grid gap-8 sm:grid-cols-2">
-            <div>
-               <label htmlFor={nameId} className="lab">
-                  Display name
-               </label>
-               <input
-                  id={nameId}
+         <FieldStack>
+            <FieldRow>
+               <TextField
+                  label="Display name"
                   ref={nameRef}
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
                   onBlur={() => setNameError(nameProblem(displayName))}
-                  aria-invalid={nameError ? true : undefined}
-                  aria-describedby={`${nameId}-help`}
-                  className="input-line mt-1 h-11 text-base"
+                  error={nameError}
+                  hint={`The name other anglers see. ${displayName.trim().length} of ${NAME_MAX} characters used.`}
                />
-               <p id={`${nameId}-help`} className="num mt-2 text-sm text-ink-3">
-                  The name other anglers see. {displayName.trim().length} of{' '}
-                  {NAME_MAX} characters used.
-               </p>
-               {nameError ? (
-                  <p role="alert" className="mt-1 text-sm text-destructive">
-                     {nameError}
-                  </p>
-               ) : null}
-            </div>
 
-            <div>
-               <label htmlFor={handleId} className="lab">
-                  Handle
-               </label>
-               <div className="mt-1 flex items-baseline gap-1 border-b border-dashed border-teal focus-within:border-solid">
-                  <span aria-hidden="true" className="text-base text-ink-3">
-                     @
-                  </span>
-                  <input
-                     id={handleId}
-                     ref={handleRef}
-                     value={username}
-                     onChange={(event) => setUsername(event.target.value)}
-                     onBlur={() => setHandleError(handleProblem(username))}
-                     aria-invalid={handleError ? true : undefined}
-                     aria-describedby={`${handleId}-help`}
-                     className="input-line h-11 border-b-0 text-base"
-                  />
-               </div>
-               <p
-                  id={`${handleId}-help`}
-                  className="num mt-2 text-sm text-ink-3"
-               >
-                  Letters, numbers and underscores, 3 to {HANDLE_MAX}{' '}
-                  characters, and nobody else can have it.
-               </p>
-               {handleError ? (
-                  <p role="alert" className="mt-1 text-sm text-destructive">
-                     {handleError}
-                  </p>
-               ) : null}
-            </div>
-         </div>
+               {/*
+                * The @ is part of the field rather than a label beside it, so
+                * the handle lines up with the display name next to it. It used
+                * to be a separate bordered row, which put the two controls on
+                * different baselines and at different heights.
+                */}
+               <TextField
+                  label="Handle"
+                  ref={handleRef}
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  onBlur={() => setHandleError(handleProblem(username))}
+                  error={handleError}
+                  hint={`Letters, numbers and underscores, 3 to ${HANDLE_MAX} characters, and nobody else can have it.`}
+               />
+            </FieldRow>
 
-         <div className="mt-8">
-            <label htmlFor={bioId} className="lab">
-               Bio
-            </label>
-            <textarea
-               id={bioId}
+            <TextArea
+               label="Bio"
                ref={bioRef}
                value={bio}
                onChange={(event) => setBio(event.target.value)}
                onBlur={() => setBioError(bioProblem(bio))}
                rows={4}
-               aria-invalid={bioError ? true : undefined}
-               aria-describedby={`${bioId}-help`}
-               className="input-line mt-1 max-w-[68ch] resize-y text-base"
+               error={bioError}
+               hint={`A line or two about how you fish. ${bio.trim().length} of ${BIO_MAX} characters used.`}
             />
-            <p id={`${bioId}-help`} className="num mt-2 text-sm text-ink-3">
-               A line or two about how you fish. {bio.trim().length} of{' '}
-               {BIO_MAX} characters used.
-            </p>
-            {bioError ? (
-               <p role="alert" className="mt-1 text-sm text-destructive">
-                  {bioError}
-               </p>
-            ) : null}
-         </div>
+         </FieldStack>
 
          <div className="mt-8">
             <span className="lab">Your photograph</span>

@@ -1,4 +1,5 @@
 import {
+   ArrowRightIcon,
    ChatBubbleOvalLeftIcon,
    HeartIcon,
    UserMinusIcon,
@@ -291,11 +292,17 @@ export function FeedPostBlock({
             ) : null}
 
             {recordHref ? (
+               /*
+                * The card's primary action, drawn as one. It was a bare teal
+                * link on a row of its own, which spent a whole line on the one
+                * thing the card is for and still looked like body text.
+                */
                <Link
                   to={recordHref}
-                  className={`${textControl} self-start text-teal hover:opacity-80`}
+                  className="g-tracked inline-flex min-h-11 items-center gap-2 self-start border border-paper/30 px-4 text-[15px] text-paper transition-colors duration-150 [transition-timing-function:var(--ease)] hover:border-paper hover:bg-paper/10"
                >
                   {recordLabel}
+                  <ArrowRightIcon aria-hidden="true" className="size-4" />
                </Link>
             ) : null}
 
