@@ -42,9 +42,12 @@ export default defineRailway(() => {
        *
        * Deliberately without --accept-data-loss. A change that would drop a
        * column fails the deploy instead of taking the data with it, and the
-       * previous version keeps serving.
+       * previous version keeps serving. That is not theoretical: the first
+       * attempt at this carried --skip-generate, which `db push` does not
+       * accept in Prisma 7. It printed its usage, exited non-zero, and the
+       * running version was left alone.
        */
-      preDeploy: 'cd packages/server && bunx prisma db push --skip-generate',
+      preDeploy: 'cd packages/server && bunx prisma db push',
       start: 'cd packages/server && bun run start',
 
       /*
