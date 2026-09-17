@@ -63,7 +63,8 @@ const cache = new Map<string, { at: number; places: Place[] }>();
 const keyOf = (b: Bounds) =>
    [b.south, b.west, b.north, b.east].map((n) => n.toFixed(2)).join(',');
 
-export async function fetchPlaces(bounds: Bounds): Promise<Place[]> {
+/** Null means every mirror failed; an empty list means there is nothing there. */
+export async function fetchPlaces(bounds: Bounds): Promise<Place[] | null> {
    const key = keyOf(bounds);
    const hit = cache.get(key);
    if (hit && Date.now() - hit.at < TTL_MS) {
@@ -72,7 +73,7 @@ export async function fetchPlaces(bounds: Bounds): Promise<Place[]> {
 
    const box = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
    const query = `
-      [out:json][timeout:20];
+      [out:json][timeout:12];
       (
         nwr["leisure"="slipway"](${box});
         nwr["waterway"="slipway"](${box});
@@ -92,7 +93,9 @@ export async function fetchPlaces(bounds: Bounds): Promise<Place[]> {
                'User-Agent': USER_AGENT,
             },
             body: new URLSearchParams({ data: query }).toString(),
-            signal: AbortSignal.timeout(25000),
+            /* Give up before the map has moved on. A mirror that takes longer
+             * than this is throttling us, and the second one gets its turn. */
+            signal: AbortSignal.timeout(14000),
          });
 
          if (!response.ok) continue;
@@ -123,5 +126,11 @@ export async function fetchPlaces(bounds: Bounds): Promise<Place[]> {
       }
    }
 
-   return [];
+   /*
+    * Not cached and not an empty list. Both mirrors failed, and reporting that
+    * as "nothing here" made the map wipe the places it already had every time
+    * a request timed out, so slipways appeared and then vanished on the next
+    * pan. The caller keeps what it had.
+    */
+   return null;
 }

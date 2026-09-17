@@ -1,6 +1,13 @@
 import type { ReactNode } from 'react';
 import type { WeatherSnapshot } from '@/components/fishing/record/api';
 import {
+   BoltIcon,
+   CloudIcon,
+   EyeIcon,
+   SunIcon,
+} from '@heroicons/react/24/outline';
+import {
+   CloudRainIcon,
    DaylightIcon,
    DropIcon,
    MoonPhaseIcon,
@@ -125,6 +132,74 @@ export function ConditionsDetail({
       'Humidity',
       humidity === null ? null : `${humidity}%`
    );
+
+   /*
+    * The rest of what is fetched. These were stored on every catch and shown
+    * on none of the screens, which made the panel look as though it knew less
+    * than it did.
+    */
+   const rain = whole(snapshot.precipitation?.probability?.percent);
+   push(
+      'rain',
+      <CloudRainIcon aria-hidden="true" />,
+      'Rain',
+      rain === null ? null : rain === 0 ? 'None expected' : `${rain}% chance`
+   );
+
+   const feels = whole(snapshot.feelsLike?.degrees);
+   push(
+      'feels',
+      <ThermometerIcon aria-hidden="true" />,
+      'Feels like',
+      feels === null ? null : `${feels} °C`
+   );
+
+   const cloud = whole(snapshot.cloudCover);
+   push(
+      'cloud',
+      <CloudIcon aria-hidden="true" className="size-5" />,
+      'Cloud',
+      cloud === null ? null : `${cloud}%`
+   );
+
+   const uv = one(snapshot.uvIndex);
+   push(
+      'uv',
+      <SunIcon aria-hidden="true" className="size-5" />,
+      'UV',
+      uv === null
+         ? null
+         : `${uv}${uv >= 8 ? ', very high' : uv >= 6 ? ', high' : uv >= 3 ? ', moderate' : ', low'}`
+   );
+
+   const vis = snapshot.visibilityM;
+   push(
+      'visibility',
+      <EyeIcon aria-hidden="true" className="size-5" />,
+      'Visibility',
+      typeof vis === 'number' && Number.isFinite(vis)
+         ? vis >= 1000
+            ? `${Math.round(vis / 1000)} km`
+            : `${Math.round(vis)} m`
+         : null
+   );
+
+   /*
+    * Thunder. No free source publishes lightning strikes; what the forecast
+    * does carry is a thunderstorm in the sky reading, and that is worth its
+    * own line rather than a word buried in a sentence.
+    */
+   const sky = (
+      snapshot.weatherCondition?.description?.text ?? ''
+   ).toLowerCase();
+   if (/thunder|storm/.test(sky)) {
+      push(
+         'thunder',
+         <BoltIcon aria-hidden="true" className="size-5" />,
+         'Thunder',
+         sky.includes('hail') ? 'Storms with hail' : 'Storms about'
+      );
+   }
 
    if (!facts.length) {
       return null;

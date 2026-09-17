@@ -53,6 +53,8 @@ type SiteDetail = {
    createdBy: { id: string; displayName: string; username: string } | null;
    images: { image: { id: string; url: string } }[];
    catches: SiteCatch[];
+   /* Kept on the row and returned with it, so the pin can carry it. */
+   catchCount?: number | null;
 };
 
 type LoadState =
@@ -365,7 +367,8 @@ function SiteRecord({
                         latitude={position.lat}
                         longitude={position.lng}
                         label={`Map of ${data.name}`}
-                        zoom={13}
+                        zoom={14}
+                        count={data.catchCount ?? null}
                         className="mt-5"
                      />
                      <p className="num mt-4 text-base text-ink-2">

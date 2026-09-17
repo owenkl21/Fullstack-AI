@@ -550,14 +550,30 @@ export const fishingService = {
            })
          : null;
 
-      const conditions =
-         site?.latitude != null && site.longitude != null
-            ? await getConditionsAt(
-                 site.latitude,
-                 site.longitude,
-                 input.caughtAt
-              )
-            : null;
+      /*
+       * The conditions are read here, on the server, for the hour the fish
+       * was caught and for wherever it was caught: the catch's own pin first,
+       * the spot's position otherwise. That is what makes the full reading
+       * land in the record, sea and moon included. The client's snapshot is
+       * only a fallback for a catch with no position at all, and it carries
+       * a fraction of the fields.
+       */
+      const at = new Date(input.caughtAt);
+      const where =
+         typeof input.latitude === 'number' &&
+         typeof input.longitude === 'number'
+            ? { latitude: input.latitude, longitude: input.longitude }
+            : site &&
+                typeof site.latitude === 'number' &&
+                typeof site.longitude === 'number'
+              ? { latitude: site.latitude, longitude: site.longitude }
+              : null;
+
+      const conditions = where
+         ? await getConditionsAt(where.latitude, where.longitude, at).catch(
+              () => null
+           )
+         : null;
 
       const created = await prisma.$transaction(async (tx) => {
          const catchRecord = await tx.catch.create({

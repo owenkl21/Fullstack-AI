@@ -20,7 +20,13 @@ const boundsSchema = z
  * degrees, and the map opens on a stretch of coast about eight degrees wide,
  * so every opening view was refused and nobody ever saw a slipway.
  */
-const MAX_SPAN = 6;
+/*
+ * Two degrees, not six. Every request over about a degree and a half took
+ * both mirrors past thirty seconds and came back empty, while a box of half a
+ * degree answered in a second with thirty three places. The map asks for
+ * places only from a zoom where the box is about this size anyway.
+ */
+const MAX_SPAN = 2;
 
 const clamp = (b: z.infer<typeof boundsSchema>) => {
    const midLat = (b.north + b.south) / 2;
@@ -43,6 +49,10 @@ export const placesController = {
       }
 
       const places = await fetchPlaces(clamp(parsed.data));
+      if (places === null) {
+         /* Say so, so the map keeps what it has rather than clearing it. */
+         return res.status(503).json({ places: [], failed: true });
+      }
       /* Public data, so let the browser and the CDN keep it for a bit. */
       res.setHeader('Cache-Control', 'public, max-age=300');
       return res.json({ places });

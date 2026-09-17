@@ -31,7 +31,7 @@ export type Poi = {
 export async function fetchPois(
    bounds: { south: number; west: number; north: number; east: number },
    signal?: AbortSignal
-): Promise<Poi[]> {
+): Promise<Poi[] | null> {
    /*
     * Through our own server, not straight to Overpass. Overpass refuses a
     * cross-origin request from a page, so asking from here loaded nothing,
@@ -53,12 +53,14 @@ export async function fetchPois(
          credentials: 'include',
       });
       if (!response.ok) {
-         return [];
+         /* Failed is not the same as empty: the caller keeps what it had. */
+         return null;
       }
       const data = (await response.json()) as { places?: Poi[] };
       return Array.isArray(data.places) ? data.places : [];
    } catch {
-      /* A map without a bait shop is still a map. */
-      return [];
+      /* A map without a bait shop is still a map, and one that already had
+       * a bait shop keeps it. */
+      return null;
    }
 }

@@ -53,10 +53,13 @@ const SINGLE_PIN_ZOOM = 12;
  * something. At zoom 10 you are looking at a stretch of coast rather than a
  * country.
  */
-/* Eight is the zoom the map opens at when it fits a handful of spots along a
- * coast. Ten, the old value, meant the places never appeared until somebody
- * zoomed in, and so were never seen. */
-const POI_MIN_ZOOM = 8;
+/*
+ * Ten. At eight the box across a 1440px map is about eight degrees, and every
+ * request that size took both OpenStreetMap mirrors past thirty seconds and
+ * came back empty. At ten it is about two, which answers in a second. The map
+ * says so below the layer switch rather than leaving the layer silently empty.
+ */
+const POI_MIN_ZOOM = 10;
 
 /*
  * The map as a place to read rather than a picture of pins.
@@ -110,6 +113,8 @@ export function SpotsMap({
     * request won, which is the worst kind of bug to reproduce.
     */
    const [mapReady, setMapReady] = useState(0);
+   /* Tracked so the places hint can say whether the map is close enough. */
+   const [zoomLevel, setZoomLevel] = useState<number>(0);
    const [pois, setPois] = useState<Poi[]>([]);
    const [showPois, setShowPois] = useState(true);
    const [showWaypoints, setShowWaypoints] = useState(true);
@@ -235,6 +240,9 @@ export function SpotsMap({
          created.fitBounds(L.featureGroup(markers).getBounds().pad(0.15));
       }
 
+      setZoomLevel(created.getZoom());
+      created.on('zoomend', () => setZoomLevel(created.getZoom()));
+
       /* A long press on a phone, a right click on a desktop. */
       const onLongPress = (event: LeafletMouseEvent) => {
          setDropping({ lat: event.latlng.lat, lng: event.latlng.lng });
@@ -292,8 +300,12 @@ export function SpotsMap({
             },
             controller.signal
          )
-            .then(setPois)
-            .catch(() => setPois([]));
+            /* A failed request keeps the places already drawn. Clearing them
+             * on failure is what made slipways appear and then vanish. */
+            .then((next) => {
+               if (next !== null) setPois(next);
+            })
+            .catch(() => {});
       };
 
       /* Panning fires constantly, and Overpass is community run and throttles,
@@ -547,7 +559,9 @@ export function SpotsMap({
                   Ramps and shops
                </button>
                <p className="text-[14px] text-ink-3">
-                  Press and hold the map to drop a private mark.
+                  {showPois && zoomLevel > 0 && zoomLevel < POI_MIN_ZOOM
+                     ? 'Zoom in for slipways and tackle shops. Press and hold the map to drop a private mark.'
+                     : 'Press and hold the map to drop a private mark.'}
                </p>
             </div>
          </div>

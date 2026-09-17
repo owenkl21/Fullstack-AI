@@ -31,7 +31,13 @@ const imageInputSchema = z.object({
 const weatherSnapshotSchema = z
    .object({
       weatherCondition: z.object({
-         iconBaseUri: z.string().trim().url(),
+         /*
+          * Not a URL any more. This shape dates from the Google provider,
+          * which sent an icon address; Open-Meteo sends none and the client
+          * passes an empty string, and demanding a URL here meant every catch
+          * saved with its conditions attached was refused with a 400.
+          */
+         iconBaseUri: z.string().trim().max(512),
          description: z.object({ text: z.string().trim().min(1).max(120) }),
       }),
       temperature: z.object({

@@ -93,6 +93,7 @@ export type WeatherSnapshot = {
    relativeHumidity?: number | null;
    uvIndex?: number | null;
    cloudCover?: number | null;
+   feelsLike?: { degrees?: number | null; unit?: string };
    dewPoint?: { degrees?: number | null; unit?: string };
    visibilityM?: number | null;
    isDaytime?: boolean | null;

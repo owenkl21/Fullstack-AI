@@ -177,6 +177,21 @@ export function MoonPhaseIcon({
    );
 }
 
+/** A cloud letting go, for the chance of rain. The plain drop means humidity. */
+export function CloudRainIcon({ className, ...rest }: IconProps) {
+   return (
+      <svg
+         viewBox="0 0 24 24"
+         className={cn('size-5', className)}
+         {...stroke}
+         {...rest}
+      >
+         <path d="M7 14.5a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17 8.2 3.5 3.5 0 0 1 17.5 15H7Z" />
+         <path d="M9 17.5v2.5M12.5 17.5v3M16 17.5v2.5" />
+      </svg>
+   );
+}
+
 /** Sun over a horizon, for first and last light. Distinct from the sky mark. */
 export function DaylightIcon({ className, ...rest }: IconProps) {
    return (
