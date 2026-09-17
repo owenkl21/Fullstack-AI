@@ -39,31 +39,39 @@ const SAME_POSITION = 0.000001;
 type Found = { label: string; lat: number; lng: number };
 
 /*
- * Free, keyless place search. Rate limited to about one a second, which a
- * search box that only asks on Enter never reaches.
+ * The product's own place search, the same one the forecast uses: real
+ * places, farms, dams and harbours as well as towns, the near ones first.
  */
 const searchPlaces = async (
    q: string,
-   signal: AbortSignal
+   signal: AbortSignal,
+   near: MapPosition | null
 ): Promise<Found[]> => {
-   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`;
-   const res = await fetch(url, {
+   const params = new URLSearchParams({ q });
+   if (near) {
+      params.set('lat', near.lat.toFixed(4));
+      params.set('lng', near.lng.toFixed(4));
+   }
+   const res = await fetch(`/api/places/search?${params.toString()}`, {
       signal,
       headers: { Accept: 'application/json' },
    });
    if (!res.ok) return [];
-   const list = (await res.json()) as {
-      display_name: string;
-      lat: string;
-      lon: string;
-   }[];
-   return list
-      .map((p) => ({
-         label: p.display_name,
-         lat: Number(p.lat),
-         lng: Number(p.lon),
-      }))
-      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+   const { places } = (await res.json()) as {
+      places?: {
+         name: string;
+         region: string | null;
+         country: string | null;
+         kind?: string | null;
+         latitude: number;
+         longitude: number;
+      }[];
+   };
+   return (places ?? []).map((p) => ({
+      label: [p.name, p.kind, p.region, p.country].filter(Boolean).join(' · '),
+      lat: p.latitude,
+      lng: p.longitude,
+   }));
 };
 
 /* A typed pair, "-34.1275, 18.4487", in either order of care. */
@@ -267,7 +275,12 @@ export function MapLocationPicker({
       searchRequest.current = controller;
       setSearching(true);
       try {
-         const places = await searchPlaces(q, controller.signal);
+         const centre = mapRef.current?.getCenter();
+         const places = await searchPlaces(
+            q,
+            controller.signal,
+            centre ? { lat: centre.lat, lng: centre.lng } : null
+         );
          if (controller.signal.aborted) return;
          if (places.length === 0) {
             setProblem('Nothing found by that name. Try the nearest town.');

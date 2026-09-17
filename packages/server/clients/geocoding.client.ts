@@ -31,6 +31,8 @@ export type PlaceHit = {
    country: string | null;
    latitude: number;
    longitude: number;
+   /* What kind of place: a town, a farm, a winery, a dam. */
+   kind: string | null;
 };
 
 type GeocodeRow = {
@@ -58,9 +60,102 @@ export async function getCoordinates(
 }
 
 /** Up to `count` places matching a typed name, best first. */
-export async function searchPlaces(
+type PhotonFeature = {
+   geometry?: { coordinates?: [number, number] };
+   properties?: {
+      osm_id?: number | string;
+      osm_key?: string;
+      osm_value?: string;
+      name?: string;
+      city?: string;
+      town?: string;
+      village?: string;
+      county?: string;
+      state?: string;
+      country?: string;
+   };
+};
+
+/* The kind of place in a word an angler would use. */
+const kindOf = (key?: string, value?: string): string | null => {
+   if (!value) return null;
+   const v = value.replace(/_/g, ' ');
+   if (key === 'place')
+      return v === 'city' ||
+         v === 'town' ||
+         v === 'village' ||
+         v === 'suburb' ||
+         v === 'hamlet' ||
+         v === 'locality'
+         ? v
+         : v;
+   if (key === 'natural') return v;
+   if (key === 'craft' && v === 'winery') return 'wine farm';
+   if (key === 'landuse' && v === 'vineyard') return 'wine farm';
+   if (key === 'tourism') return v;
+   if (key === 'amenity') return v;
+   if (key === 'leisure') return v;
+   if (key === 'waterway') return v;
+   if (key === 'water') return v;
+   if (key === 'landuse') return v;
+   return v;
+};
+
+/*
+ * Photon (komoot's geocoder over OpenStreetMap) answers with real places:
+ * farms, wineries, dams, beaches, harbours, not only towns. Biased towards
+ * where the reader is, when the client says. Open-Meteo's town index is the
+ * fallback when Photon is down or knows nothing by that name.
+ */
+async function searchPhoton(
    query: string,
-   count = 10
+   count: number,
+   near?: { latitude: number; longitude: number } | null
+): Promise<PlaceHit[]> {
+   const params: Record<string, string | number> = {
+      q: query,
+      limit: count,
+      lang: 'en',
+   };
+   if (near) {
+      params.lat = near.latitude;
+      params.lon = near.longitude;
+   }
+   const { data } = await axios.get<{ features?: PhotonFeature[] }>(
+      'https://photon.komoot.io/api/',
+      { params, headers: { 'User-Agent': USER_AGENT }, timeout: 8000 }
+   );
+   const seen = new Set<string>();
+   const hits: PlaceHit[] = [];
+   for (const f of data.features ?? []) {
+      const props = f.properties ?? {};
+      const coords = f.geometry?.coordinates;
+      if (!props.name || !coords) continue;
+      const [longitude, latitude] = coords;
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
+      const key = `${props.name}|${latitude.toFixed(3)}|${longitude.toFixed(3)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const locality = props.city ?? props.town ?? props.village ?? null;
+      const region = [locality, props.state ?? props.county ?? null]
+         .filter((part) => part && part !== props.name)
+         .join(', ');
+      hits.push({
+         id: String(props.osm_id ?? key),
+         name: props.name,
+         region: region || null,
+         country: props.country ?? null,
+         latitude,
+         longitude,
+         kind: kindOf(props.osm_key, props.osm_value),
+      });
+   }
+   return hits;
+}
+
+async function searchOpenMeteo(
+   query: string,
+   count: number
 ): Promise<PlaceHit[]> {
    const { data } = await axios.get<{ results?: GeocodeRow[] }>(
       'https://geocoding-api.open-meteo.com/v1/search',
@@ -78,7 +173,22 @@ export async function searchPlaces(
       country: row.country ?? null,
       latitude: row.latitude,
       longitude: row.longitude,
+      kind: null,
    }));
+}
+
+export async function searchPlaces(
+   query: string,
+   count = 10,
+   near?: { latitude: number; longitude: number } | null
+): Promise<PlaceHit[]> {
+   try {
+      const hits = await searchPhoton(query, count, near);
+      if (hits.length) return hits;
+   } catch (error) {
+      console.warn('[places] photon failed, falling back', String(error));
+   }
+   return searchOpenMeteo(query, count);
 }
 
 export type PlaceName = {

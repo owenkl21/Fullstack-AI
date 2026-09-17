@@ -1,5 +1,4 @@
 import { PageHead } from '@/components/brand/PageHead';
-import { ContourField } from '@/components/brand/ContourField';
 import axios from 'axios';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -175,7 +174,6 @@ export function ForecastPage() {
 
    return (
       <section className="relative mx-auto w-[min(1680px,100%-32px)] pb-8 md:pb-12">
-         <ContourField seed={9} />
          <PageHead
             kicker="Forecast"
             title={

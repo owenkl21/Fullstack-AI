@@ -1,6 +1,5 @@
 import { NoData } from '@/components/states/NoData';
 import { PageHead } from '@/components/brand/PageHead';
-import { ContourField } from '@/components/brand/ContourField';
 import { useEffect, useRef, useState } from 'react';
 import { useRevealIn } from '@/components/brand/Reveal';
 import { InlineError } from '@/components/states/InlineError';
@@ -95,7 +94,6 @@ export function BoardsPage() {
          ref={root}
          className="relative mx-auto w-full max-w-[1320px] px-4 pb-10 md:px-8"
       >
-         <ContourField seed={13} />
          <PageHead
             column="w-[min(1320px,100%-32px)]"
             kicker="Boards"

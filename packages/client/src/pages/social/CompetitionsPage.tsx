@@ -1,7 +1,6 @@
 import { useLoadOnScroll } from '@/lib/load-on-scroll';
 import { NoData } from '@/components/states/NoData';
 import { PageHead } from '@/components/brand/PageHead';
-import { ContourField } from '@/components/brand/ContourField';
 import { PlusIcon, TrophyIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useState } from 'react';
 import { Picker } from '@/components/ui/picker';
@@ -154,7 +153,6 @@ function CompetitionsScreen() {
 
    return (
       <section className="relative mx-auto w-[min(1320px,100%-32px)] pb-10 md:pb-14">
-         <ContourField seed={17} />
          <PageHead
             column="w-[min(1320px,100%-32px)]"
             kicker="Anglers running their own"

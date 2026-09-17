@@ -1,6 +1,5 @@
 import { NoData } from '@/components/states/NoData';
 import { PageHead } from '@/components/brand/PageHead';
-import { ContourField } from '@/components/brand/ContourField';
 import { SeasonStrip } from '@/components/insights/SeasonStrip';
 import axios from 'axios';
 import {
@@ -385,7 +384,6 @@ function Insights() {
 
    return (
       <section className="relative mx-auto w-[min(1680px,100%-32px)] pb-8 md:pb-12">
-         <ContourField seed={7} />
          <PageHead
             kicker="Your log, counted"
             title="Insights"

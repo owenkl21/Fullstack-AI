@@ -49,7 +49,7 @@ export function PlaceSearch({
       const controller = new AbortController();
       setSearching(true);
       const timer = window.setTimeout(() => {
-         searchPlaces(q, controller.signal)
+         searchPlaces(q, controller.signal, near)
             .then((found) => {
                const sorted = near
                   ? [...found].sort((a, b) => {
@@ -182,9 +182,9 @@ export function PlaceSearch({
                                  : 'text-ink-3'
                            )}
                         >
-                           {[hit.region, hit.country]
+                           {[hit.kind, hit.region, hit.country]
                               .filter(Boolean)
-                              .join(', ')}
+                              .join(' · ')}
                         </span>
                      </li>
                   ))}

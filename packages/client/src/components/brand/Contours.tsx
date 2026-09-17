@@ -185,12 +185,10 @@ export function Contours({
    const [box, setBox] = useState<{ w: number; h: number } | null>(null);
 
    /*
-    * Measured once, a frame after mounting, and never again. A sheet that
-    * followed the box's size rebuilt itself every time the page grew (more
-    * posts, more rows) and drew in again on every scroll, which was both a
-    * distraction and a cost. The height is at least two and a half screens,
-    * so a page that grows later is still covered; past that the ground is
-    * simply plain, which is what here and there means.
+    * Measured once, a frame after mounting, and never again. Art that
+    * followed the box's size rebuilt itself every time the box grew and drew
+    * in again on every scroll, which was both a distraction and a cost. The
+    * boxes it lives in now (a plate, a banner) do not grow.
     */
    useEffect(() => {
       if (width && height) {
@@ -209,10 +207,7 @@ export function Contours({
             return;
          }
          const w = Math.max(320, Math.round(rect.width / 20) * 20);
-         const h = Math.max(
-            Math.round(rect.height / 20) * 20,
-            Math.round((window.innerHeight * 2.5) / 20) * 20
-         );
+         const h = Math.max(120, Math.round(rect.height / 20) * 20);
          setBox({ w, h });
       };
       frame = requestAnimationFrame(measure);
@@ -248,10 +243,10 @@ export function Contours({
    return (
       <svg
          ref={ref}
-         style={box && !(width && height) ? { ...style, height: box.h } : style}
+         style={style}
          className={cn('contour', className)}
          viewBox={box ? `0 0 ${box.w} ${box.h}` : undefined}
-         preserveAspectRatio={width && height ? 'none' : 'xMinYMin meet'}
+         preserveAspectRatio="none"
          aria-hidden="true"
       />
    );

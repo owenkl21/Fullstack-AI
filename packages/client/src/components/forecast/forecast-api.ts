@@ -78,6 +78,8 @@ export type PlaceHit = {
    country: string | null;
    latitude: number;
    longitude: number;
+   /* A town, a farm, a winery, a dam: what the place is. */
+   kind?: string | null;
 };
 
 export type PlaceName = { name: string; region: string | null };
@@ -103,11 +105,21 @@ export async function fetchForecast(
 
 export async function searchPlaces(
    q: string,
-   signal?: AbortSignal
+   signal?: AbortSignal,
+   near?: { latitude: number; longitude: number } | null
 ): Promise<PlaceHit[]> {
    const { data } = await axios.get<{ places: PlaceHit[] }>(
       '/api/places/search',
-      { params: { q }, signal }
+      {
+         params: near
+            ? {
+                 q,
+                 lat: near.latitude.toFixed(4),
+                 lng: near.longitude.toFixed(4),
+              }
+            : { q },
+         signal,
+      }
    );
    return data.places ?? [];
 }

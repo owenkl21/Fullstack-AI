@@ -9,7 +9,6 @@ import {
    TrophyIcon,
    UserPlusIcon,
 } from '@heroicons/react/24/outline';
-import { ContourField } from '@/components/brand/ContourField';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { InlineError } from '@/components/states/InlineError';
 import { formatStamp, formatRelative } from '@/components/feed/format';
@@ -126,7 +125,6 @@ function Inbox() {
 
    return (
       <section className="relative mx-auto w-[min(1120px,100%-32px)] pb-10 md:pb-14">
-         <ContourField seed={29} />
          <PageHead
             column="w-[min(1120px,100%-32px)]"
             kicker="What happened"

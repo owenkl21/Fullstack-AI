@@ -44,6 +44,9 @@ const clamp = (b: z.infer<typeof boundsSchema>) => {
 
 const searchSchema = z.object({
    q: z.string().trim().min(2).max(80),
+   /* Where the reader is or is looking, to put the near one first. */
+   lat: z.coerce.number().min(-90).max(90).optional(),
+   lng: z.coerce.number().min(-180).max(180).optional(),
 });
 
 const pointSchema = z.object({
@@ -59,8 +62,13 @@ export const placesController = {
          return res.status(400).json(parsed.error.format());
       }
       try {
-         const places = await searchPlaces(parsed.data.q);
-         res.setHeader('Cache-Control', 'public, max-age=3600');
+         const near =
+            typeof parsed.data.lat === 'number' &&
+            typeof parsed.data.lng === 'number'
+               ? { latitude: parsed.data.lat, longitude: parsed.data.lng }
+               : null;
+         const places = await searchPlaces(parsed.data.q, 10, near);
+         res.setHeader('Cache-Control', 'public, max-age=600');
          return res.json({ places });
       } catch (error) {
          console.warn('[places] search failed', String(error));

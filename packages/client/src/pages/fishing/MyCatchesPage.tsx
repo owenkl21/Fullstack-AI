@@ -1,6 +1,5 @@
 import { useLoadOnScroll } from '@/lib/load-on-scroll';
 import { PageHead } from '@/components/brand/PageHead';
-import { ContourField } from '@/components/brand/ContourField';
 import { removeDraft, useDrafts } from '@/lib/drafts';
 import { formatStamp } from '@/components/fishing/record/format';
 import axios from 'axios';
@@ -180,7 +179,6 @@ function MyCatchesList() {
          ref={root}
          className="relative mx-auto w-[min(1680px,100%-32px)] pb-10 md:pb-14"
       >
-         <ContourField seed={21} />
          <PageHead
             kicker="Your log"
             title="My catches"

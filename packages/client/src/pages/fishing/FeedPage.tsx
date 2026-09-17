@@ -1,5 +1,4 @@
 import { PageHead } from '@/components/brand/PageHead';
-import { ContourField } from '@/components/brand/ContourField';
 import axios from 'axios';
 import { removePost, savePost } from '@/components/saved/saved-api';
 import {
@@ -601,7 +600,6 @@ export function FeedPage() {
          ref={pageRef}
          className="relative mx-auto w-[min(960px,100%-32px)] pb-8 md:pb-12"
       >
-         <ContourField seed={5} />
          <PageHead
             column="w-[min(960px,100%-32px)]"
             kicker="What other anglers logged, newest first"

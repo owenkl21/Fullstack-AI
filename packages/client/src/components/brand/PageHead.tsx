@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { TornEdge } from '@/components/brand/TornEdge';
+import { Contours } from '@/components/brand/Contours';
 import { cn } from '@/lib/utils';
 
 /*
@@ -28,8 +29,20 @@ export function PageHead({
    children?: ReactNode;
 }) {
    return (
-      <header className="relative left-1/2 z-[1] mb-[132px] w-screen -translate-x-1/2 bg-black-block text-paper md:mb-[180px]">
-         <div className={cn('mx-auto pt-7 pb-5 md:pt-10 md:pb-7', column)}>
+      <header
+         className="relative left-1/2 z-[1] mb-[132px] w-screen -translate-x-1/2 overflow-hidden bg-black-block text-paper md:mb-[180px]"
+         style={
+            { '--contour': 'rgba(244, 241, 236, 0.16)' } as React.CSSProperties
+         }
+      >
+         {/* The survey lines live on the plate, edge to edge, drawn once. */}
+         <Contours seed={17} className="inset-0 h-full w-full" />
+         <div
+            className={cn(
+               'relative mx-auto pt-7 pb-5 md:pt-10 md:pb-7',
+               column
+            )}
+         >
             <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
                <div className="min-w-0">
                   {kicker ? <p className="lab text-teal">{kicker}</p> : null}
