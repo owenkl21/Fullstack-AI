@@ -88,6 +88,27 @@ the live deploy.
 - [x] **Spots cluster at low zoom**, yours and theirs separately, as a
       doubled disc with a count that opens out on zoom or tap.
 - [x] **A terrain base** (OpenTopoMap) beside satellite, plain and streets.
+- [x] **A level system.** Ten ranks (Greenhorn to Legend of the ledges),
+      points from fish, species, spots, range, days, care taken, released, big
+      fish and competitions; fourteen badges. Counted on the server
+      (`progress.service.ts`), public view counts public catches only. Rank
+      card on both profile pages; full reckoning on `/insights`.
+- [x] **Insights page** with the log by hour, month, weekday, moon, wind
+      rose, pressure, water, sky, light, and by species, spot and gear.
+- [x] **The catch form** in two columns with numbered steps, boxed
+      measurements with the unit switch attached, a sticky side panel and a
+      phone save bar.
+- [x] **Photo times.** A log of several fish reads EXIF shutter times; the
+      earliest fills in the time, the span is stored as `caughtUntil` and
+      shown on the catch.
+- [x] **Pins as SVG teardrops**; clusters as ringed circles.
+- [x] **Feed radius as a draggable slider** drawn as the fishing line.
+- [x] **Map controls** share one label column.
+- [x] **The waterline**: plate, wet strips, shadow, foam, a slow swell;
+      nothing filled to the box's bottom (the ruled line).
+- [x] Avatar over banner; pickers aligned; no more "Ward 21"; no-photo hero
+      fixed; length and weight columns in the catch list; season tiles level
+      and counting fish.
 - [x] **Deploys.** Vercel builds `fishlogger` `main`; `git push origin` deploys
       nothing. Railway is `railway up --service server --detach`.
 
