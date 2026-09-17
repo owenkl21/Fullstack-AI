@@ -285,12 +285,31 @@ export async function getConditionsAt(
       ]);
 
       if (!weather) {
+         /*
+          * Said out loud. This used to return the empty reading in silence,
+          * so a throttled or failing upstream looked exactly like a catch with
+          * no conditions, and a whole afternoon of catches was stored with
+          * every weather column null before anyone noticed.
+          */
+         console.warn('[open-meteo] no reading came back', {
+            latitude,
+            longitude,
+            wanted,
+         });
          return EMPTY;
       }
 
       const hourly = (weather.hourly ?? {}) as HourlyBlock;
       const times = Array.isArray(hourly.time) ? hourly.time : [];
       const index = times.indexOf(wanted);
+      if (index === -1) {
+         console.warn('[open-meteo] hour not in the response', {
+            wanted,
+            first: times[0],
+            last: times[times.length - 1],
+            count: times.length,
+         });
+      }
 
       if (index === -1) {
          return { ...EMPTY, timeZoneId: weather.timezone ?? null };

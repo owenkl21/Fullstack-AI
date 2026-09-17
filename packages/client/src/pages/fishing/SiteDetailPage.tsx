@@ -585,7 +585,7 @@ function SiteHeader({
             </div>
          </div>
 
-         <TornEdge fill="bg" />
+         <TornEdge fill="black" cut />
       </header>
    );
 }

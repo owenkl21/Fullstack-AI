@@ -35,7 +35,7 @@ const HEIGHT = 90;
 /* Points along the curve. Sixty is smooth at this width and cheap to rebuild. */
 const STEPS = 60;
 
-function build(band: Band, t: number) {
+function build(band: Band, t: number, above: boolean) {
    const points: string[] = [];
 
    for (let i = 0; i <= STEPS; i++) {
@@ -52,19 +52,41 @@ function build(band: Band, t: number) {
       points.push(`${x.toFixed(1)} ${y.toFixed(1)}`);
    }
 
-   /* Down the right, across the bottom, up the left: the band is a solid. */
-   return `M${points.join(' L')} L${WIDTH} ${HEIGHT} L0 ${HEIGHT} Z`;
+   /*
+    * Either the region below the line, closed along the bottom, or the region
+    * above it, closed along the top. Which one depends on what the band is
+    * standing in for: the next section's ground, or the plate being cut.
+    */
+   return above
+      ? `M${points.join(' L')} L${WIDTH} 0 L0 0 Z`
+      : `M${points.join(' L')} L${WIDTH} ${HEIGHT} L0 ${HEIGHT} Z`;
 }
 
 export function TornEdge({
    fill = 'bg',
    flip = false,
    seed = 1,
+   cut = false,
    className,
 }: {
    fill?: Fill;
    flip?: boolean;
    seed?: number;
+   /*
+    * Cut the plate rather than paint the ground.
+    *
+    * The default paints the next section's colour below the wave line, which
+    * is right where that section is a flat colour. It is wrong the moment the
+    * section carries anything on top of its colour, such as the underwater
+    * wash on the home page: the painted band can never match a moving
+    * gradient, and the join shows as a ruled line across the whole width.
+    *
+    * With `cut`, the solid band is the plate's own colour, filled above the
+    * line, and nothing is painted below it. Hung over the top of the next
+    * section, the plate ends in a wave and whatever that section draws shows
+    * through the troughs. `fill` then names the plate, not the ground.
+    */
+   cut?: boolean;
    className?: string;
 }) {
    const host = useRef<HTMLDivElement>(null);
@@ -124,10 +146,15 @@ export function TornEdge({
 
       /* Somebody who asked for stillness gets one frame and no ticker. */
       const still = window.matchMedia('(prefers-reduced-motion: reduce)');
+      /* The last band is the solid one; in cut mode it fills above the line. */
       const draw = (t: number) =>
          paths.forEach((path, i) => {
             const band = bands[i];
-            if (band) path.setAttribute('d', build(band, t));
+            if (band)
+               path.setAttribute(
+                  'd',
+                  build(band, t, cut && i === bands.length - 1)
+               );
          });
 
       if (still.matches) {
@@ -154,7 +181,7 @@ export function TornEdge({
          tween.kill();
          el.innerHTML = '';
       };
-   }, [fill, seed, theme]);
+   }, [fill, seed, theme, cut]);
 
    return (
       <div
@@ -163,6 +190,8 @@ export function TornEdge({
          className={cn(
             'torn',
             flip && 'top-[-2px] bottom-auto -scale-y-100',
+            /* Hung over the next section rather than sitting inside this one. */
+            cut && 'torn-hang',
             className
          )}
       />

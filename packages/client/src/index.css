@@ -272,6 +272,19 @@
       height: 100%;
       display: block;
    }
+   /*
+    * A cut edge hangs over the top of the section that follows, so the plate
+    * ends in a wave and that section shows through the troughs. The section
+    * underneath pads its top by the same amount so nothing sits under it.
+    */
+   .torn-hang {
+      bottom: -88px;
+   }
+   @media (max-width: 640px) {
+      .torn-hang {
+         bottom: -54px;
+      }
+   }
 
    @media (max-width: 640px) {
       .torn {

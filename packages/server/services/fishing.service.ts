@@ -581,11 +581,28 @@ export const fishingService = {
               ? { latitude: site.latitude, longitude: site.longitude }
               : null;
 
-      const conditions = where
+      const read = where
          ? await getConditionsAt(where.latitude, where.longitude, at).catch(
-              () => null
+              (error: unknown) => {
+                 console.warn('[catch:create] conditions lookup threw', error);
+                 return null;
+              }
            )
          : null;
+
+      /*
+       * An empty reading is not a reading. The client fetched a reading for
+       * the same place and hour, so if the lookup came back with nothing that
+       * one is kept rather than a row of nulls.
+       */
+      const conditions = read && read.observedAt ? read : null;
+      if (where && !conditions) {
+         console.warn(
+            '[catch:create] no conditions for',
+            where,
+            at.toISOString()
+         );
+      }
 
       const created = await prisma.$transaction(async (tx) => {
          const catchRecord = await tx.catch.create({
