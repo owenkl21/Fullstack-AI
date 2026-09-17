@@ -87,6 +87,14 @@ export function AccountMenu() {
                   >
                      Forecast
                   </Link>
+                  <Link
+                     role="menuitem"
+                     to="/saved"
+                     onClick={() => setOpen(false)}
+                     className="g-tracked block px-2 py-2 text-[17px] hover:bg-bg-2"
+                  >
+                     Kept spots and gear
+                  </Link>
                   {/* Gear lost its phone tab slot to Boards, so it lives here. */}
                   <Link
                      role="menuitem"

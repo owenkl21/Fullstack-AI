@@ -21,6 +21,12 @@ import {
    type Waypoint,
    type WaypointKind,
 } from './waypoints-api';
+import {
+   markKept,
+   removeSpot,
+   saveSpot,
+   useKept,
+} from '@/components/saved/saved-api';
 
 export type SpotPin = {
    id: string;
@@ -88,6 +94,9 @@ export function SpotsMap({
    const holder = useRef<HTMLDivElement | null>(null);
    const map = useRef<LeafletMap | null>(null);
    const onOpenRef = useRef(onOpen);
+   const kept = useKept();
+   const keptRef = useRef(kept.spots);
+   keptRef.current = kept.spots;
 
    const spotLayer = useRef<L.LayerGroup | null>(null);
    const waypointLayer = useRef<L.LayerGroup | null>(null);
@@ -376,11 +385,40 @@ export function SpotsMap({
 
          const open = document.createElement('button');
          open.type = 'button';
-         open.className = 'g-tracked mt-1 text-[15px] text-teal-text';
+         open.className = 'g-tracked text-[15px] text-teal-text';
          open.textContent = 'Open the spot';
          open.addEventListener('click', () => onOpenRef.current(spot.id));
 
-         popup.append(title, who, fish, open);
+         /* Keep it from here, without leaving the map. The button reads
+          * the shared set each time, so it agrees with the spot page. */
+         const keep = document.createElement('button');
+         keep.type = 'button';
+         keep.className = 'g-tracked text-[15px] text-teal-text';
+         const paint = () => {
+            keep.textContent = keptRef.current.has(spot.id)
+               ? 'Kept'
+               : 'Keep this spot';
+         };
+         paint();
+         keep.addEventListener('click', () => {
+            const was = keptRef.current.has(spot.id);
+            keep.disabled = true;
+            (was ? removeSpot(spot.id) : saveSpot(spot.id))
+               .then(() => {
+                  markKept('spot', spot.id, !was);
+                  paint();
+               })
+               .catch(() => undefined)
+               .finally(() => {
+                  keep.disabled = false;
+               });
+         });
+
+         const actions = document.createElement('div');
+         actions.className = 'mt-1 flex flex-wrap gap-x-4';
+         actions.append(open, keep);
+
+         popup.append(title, who, fish, actions);
          marker.bindPopup(popup);
       }
    }, [discovered, showOthers, species, spots, mapReady]);

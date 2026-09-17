@@ -957,13 +957,23 @@ export const fishingService = {
       return withResolvedImageUrls(created);
    },
 
-   async getFishingSiteById(siteId: string) {
+   async getFishingSiteById(siteId: string, viewerId: string | null = null) {
       const site = await prisma.fishingSite.findFirst({
          where: { id: siteId, deletedAt: null },
          include: siteDetailInclude,
       });
 
       if (!site) {
+         return null;
+      }
+
+      /*
+       * A private spot is private by id as well as by list. The list already
+       * hid it; the page did not, so anyone with the address could read a
+       * spot its owner had chosen to keep. Not found, rather than forbidden,
+       * so the address gives nothing away either.
+       */
+      if (site.visibility !== 'PUBLIC' && site.createdById !== viewerId) {
          return null;
       }
 

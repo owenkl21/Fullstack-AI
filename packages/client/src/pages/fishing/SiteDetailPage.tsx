@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/use-toast';
 import { useDocumentTitle } from '@/lib/title';
+import { SaveButton } from '@/components/saved/SaveButton';
+import { useKept } from '@/components/saved/saved-api';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { StaticMap } from '@/components/map/StaticMap';
 import { useIsSignedIn } from '@/lib/auth-client';
@@ -214,6 +216,7 @@ function SiteRecord({
 
    const { isSignedIn } = useIsSignedIn();
    const isOwner = useIsOwner(data?.createdBy?.id);
+   const kept = useKept(isSignedIn && !isOwner);
    const navigate = useNavigate();
 
    const [page, setPage] = useState(1);
@@ -469,8 +472,18 @@ function SiteRecord({
                      </>
                   ) : null}
 
+                  {isSignedIn && !isOwner ? (
+                     <SaveButton
+                        kind="spot"
+                        id={data.id}
+                        saved={kept.spots.has(data.id)}
+                     />
+                  ) : null}
+
                   <Button asChild variant="ghost">
-                     <Link to="/sites/me">Back to my spots</Link>
+                     <Link to={isOwner ? '/sites/me' : '/map'}>
+                        {isOwner ? 'Back to my spots' : 'Back to the map'}
+                     </Link>
                   </Button>
                </div>
             </section>

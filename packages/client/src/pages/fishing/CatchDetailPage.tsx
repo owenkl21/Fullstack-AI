@@ -28,6 +28,8 @@ import {
    weightMetric,
 } from '@/components/fishing/record/format';
 import { useIsSignedIn } from '@/lib/auth-client';
+import { SaveButton } from '@/components/saved/SaveButton';
+import { useKept } from '@/components/saved/saved-api';
 import { useGoBack } from '@/lib/go-back';
 
 type LoadState =
@@ -151,6 +153,8 @@ function CatchRecord({
    const data = state.data;
    const built = useBuilt();
    const isOwner = useIsOwner(data?.createdBy?.id);
+   const { isSignedIn } = useIsSignedIn();
+   const kept = useKept(isSignedIn && !isOwner);
 
    // The gallery is pinned to the record it belongs to, so moving between catches
    // can never leave the index pointing at a photo that is not there.
@@ -504,7 +508,7 @@ function CatchRecord({
                   {data.gears.map((gear) => (
                      <li
                         key={gear.id}
-                        className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-3.5 border-t border-line py-3"
+                        className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3.5 border-t border-line py-3"
                      >
                         {gear.imageUrl ? (
                            <img
@@ -527,6 +531,15 @@ function CatchRecord({
                                  .join(' · ')}
                            </span>
                         </span>
+                        {isSignedIn && !isOwner ? (
+                           <SaveButton
+                              kind="gear"
+                              id={gear.id}
+                              saved={kept.gear.has(gear.id)}
+                              size="sm"
+                              variant="ghost"
+                           />
+                        ) : null}
                      </li>
                   ))}
                </ul>

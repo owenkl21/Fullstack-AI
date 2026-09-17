@@ -347,7 +347,10 @@ export const fishingController = {
          });
       }
 
-      const site = await fishingService.getFishingSiteById(siteId);
+      const site = await fishingService.getFishingSiteById(
+         siteId,
+         getAuth(req).userId
+      );
 
       if (!site) {
          return res.status(404).json({
