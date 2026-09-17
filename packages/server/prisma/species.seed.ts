@@ -15,7 +15,23 @@ type SeedSpecies = {
    scientificName: string;
    aliases: string[];
    regionTags: string[];
+   /*
+    * Regulation data, from the DFFE recreational limits the social research
+    * cites. Seeded because it is published and checkable.
+    *
+    * lwA and lwB are deliberately NOT seeded. FishBase publishes them per
+    * species and the research does not carry the values; a guessed coefficient
+    * would put invented mass on a leaderboard and call it arithmetic. A species
+    * without them simply does not score, and says so.
+    */
+   sizeClass?: 'EDIBLE' | 'NON_EDIBLE';
+   minLegalCm?: number;
+   closedFrom?: string;
+   closedTo?: string;
 };
+
+const LIMITS_SOURCE =
+   'DFFE recreational fishing limits, via docs/redesign/research/social.md';
 
 const SPECIES: SeedSpecies[] = [
    // Saltwater, shore
@@ -24,24 +40,32 @@ const SPECIES: SeedSpecies[] = [
       scientificName: 'Argyrosomus japonicus',
       aliases: ['kob', 'kabeljou', 'daga salmon', 'salmon'],
       regionTags: ['saltwater', 'shore', 'estuary'],
+      minLegalCm: 40,
    },
    {
       commonName: 'Galjoen',
       scientificName: 'Dichistius capensis',
       aliases: ['blackfish', 'damba'],
       regionTags: ['saltwater', 'shore'],
+      minLegalCm: 35,
+      closedFrom: '10-15',
+      closedTo: '02-28',
    },
    {
       commonName: 'Garrick',
       scientificName: 'Lichia amia',
       aliases: ['leervis', 'leerfish', 'leerie'],
       regionTags: ['saltwater', 'shore'],
+      minLegalCm: 70,
    },
    {
       commonName: 'Elf',
       scientificName: 'Pomatomus saltatrix',
       aliases: ['shad', 'bluefish', 'tailor'],
       regionTags: ['saltwater', 'shore'],
+      minLegalCm: 30,
+      closedFrom: '09-01',
+      closedTo: '11-30',
    },
    {
       commonName: 'Yellowtail',
@@ -54,6 +78,7 @@ const SPECIES: SeedSpecies[] = [
       scientificName: 'Lithognathus lithognathus',
       aliases: ['witsteenbras', 'pignose grunter', 'steenbras'],
       regionTags: ['saltwater', 'shore', 'estuary'],
+      minLegalCm: 40,
    },
    {
       commonName: 'Blacktail',
@@ -126,6 +151,7 @@ const SPECIES: SeedSpecies[] = [
       scientificName: 'Mustelus mustelus',
       aliases: ['houndshark', 'smoothhound'],
       regionTags: ['saltwater', 'shore'],
+      sizeClass: 'NON_EDIBLE',
    },
 
    // Freshwater
@@ -186,6 +212,11 @@ export async function seedSpecies() {
                commonName: entry.commonName,
                aliases: entry.aliases,
                regionTags: entry.regionTags,
+               sizeClass: entry.sizeClass ?? 'EDIBLE',
+               minLegalCm: entry.minLegalCm ?? null,
+               closedFrom: entry.closedFrom ?? null,
+               closedTo: entry.closedTo ?? null,
+               limitsSource: LIMITS_SOURCE,
             },
          });
          continue;
@@ -197,6 +228,11 @@ export async function seedSpecies() {
             scientificName: entry.scientificName,
             aliases: entry.aliases,
             regionTags: entry.regionTags,
+            sizeClass: entry.sizeClass ?? 'EDIBLE',
+            minLegalCm: entry.minLegalCm ?? null,
+            closedFrom: entry.closedFrom ?? null,
+            closedTo: entry.closedTo ?? null,
+            limitsSource: LIMITS_SOURCE,
          },
       });
    }
