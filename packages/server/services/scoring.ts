@@ -299,3 +299,116 @@ export const isJoint = (a: Standing, b: Standing) =>
    a.points === b.points &&
    a.qualifyingCount === b.qualifyingCount &&
    a.totalMassKg === b.totalMassKg;
+
+/* ---------- Per species boards ---------- */
+
+export type SpeciesBoard = {
+   speciesId: string;
+   commonName: string;
+   /** The leaderboard for this species alone. */
+   standings: Standing[];
+   /** Longest qualifying fish, which is the target-species rule. */
+   longestCm: number;
+   /*
+    * Who holds that longest fish. On a per species board this is usually the
+    * answer people actually want: "who has the best kob" means the biggest
+    * one, not whoever logged the most of them. The points table is still the
+    * standing; this sits beside it.
+    */
+   longestBy: string | null;
+   /** How many anglers have a qualifying entry for it. */
+   anglers: number;
+   /*
+    * Entries that were logged for this species but could not score, and the
+    * single most common reason. A board that is empty because nobody caught
+    * anything and one that is empty because the species has no published
+    * length to weight figures are different facts, and the interface should be
+    * able to say which.
+    */
+   loggedButUnscored: number;
+   unscoredReason: string | null;
+};
+
+/**
+ * One board per species, rather than one board over everything.
+ *
+ * "Who has the best kob" is a different question from "who has the most
+ * points", and for a shore angler it is usually the more interesting one: a
+ * galjoen specialist and a kob specialist never really compete on a combined
+ * table.
+ *
+ * Species with no qualifying entries are still returned when something was
+ * logged against them, so the board can explain itself rather than vanish.
+ */
+export function buildSpeciesBoards(
+   entries: ScoredEntry[],
+   speciesNames: Map<string, string>
+): SpeciesBoard[] {
+   const bySpecies = new Map<string, ScoredEntry[]>();
+
+   for (const entry of entries) {
+      if (!entry.speciesId) {
+         continue;
+      }
+
+      const list = bySpecies.get(entry.speciesId) ?? [];
+      list.push(entry);
+      bySpecies.set(entry.speciesId, list);
+   }
+
+   const boards: SpeciesBoard[] = [];
+
+   for (const [speciesId, list] of bySpecies) {
+      const standings = buildStandings(list);
+      const unscored = list.filter((e) => !e.qualifies);
+
+      /* The reason that accounts for most of the failures, not just the first. */
+      const tally = new Map<string, number>();
+      for (const e of unscored) {
+         if (e.reason) {
+            tally.set(e.reason, (tally.get(e.reason) ?? 0) + 1);
+         }
+      }
+      const commonest =
+         [...tally.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+      /* Earliest wins a tie on length, same as the standings tie-break. */
+      const longest = list
+         .filter((e) => e.qualifies && e.lengthCm != null)
+         .sort(
+            (a, b) =>
+               (b.lengthCm ?? 0) - (a.lengthCm ?? 0) ||
+               a.caughtAt.getTime() - b.caughtAt.getTime()
+         )[0];
+
+      boards.push({
+         speciesId,
+         commonName: speciesNames.get(speciesId) ?? 'Unknown species',
+         standings,
+         longestCm: longest?.lengthCm ? Math.floor(longest.lengthCm) : 0,
+         longestBy: longest?.anglerId ?? null,
+         anglers: standings.length,
+         loggedButUnscored: unscored.length,
+         unscoredReason: commonest,
+      });
+   }
+
+   /*
+    * Busiest board first, then alphabetically, so the order is stable rather
+    * than whatever the map happened to iterate.
+    */
+   return boards.sort(
+      (a, b) =>
+         b.anglers - a.anglers ||
+         b.standings.length - a.standings.length ||
+         a.commonName.localeCompare(b.commonName)
+   );
+}
+
+/** The leaderboard for one species, when that is all the caller wants. */
+export function buildStandingsForSpecies(
+   entries: ScoredEntry[],
+   speciesId: string
+): Standing[] {
+   return buildStandings(entries.filter((e) => e.speciesId === speciesId));
+}
