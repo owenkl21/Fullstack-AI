@@ -730,62 +730,98 @@
 /*
  * The pin vocabulary.
  *
- * Shape carries the kind and colour reinforces it, never the other way round,
- * so the map still reads for anyone who cannot separate teal from grey. The
- * count rides on the pin because "how many fish came out of here" is the
- * question the map is being asked, and hiding it inside a popup means opening
- * every pin to answer it.
+ * A disc on a short stem. Shape carries the kind and colour reinforces it,
+ * never the other way round, so the map still reads for anyone who cannot
+ * separate teal from grey. Where a spot has produced fish the count sits inside
+ * the disc: it is the most useful thing about a spot, and a badge stuck on the
+ * corner reads as a notification rather than a map marker.
  */
-.map-pin-kind .map-pin-body {
+.map-pin-kind {
+   /* Leaflet positions the box; everything inside hangs off its centre. */
    position: relative;
-   display: block;
-   line-height: 0;
 }
-.map-pin-kind .map-pin-drop {
-   fill: var(--ink);
-   stroke: var(--paper);
-   stroke-width: 1.5;
-}
-.map-pin-kind .map-pin-glyph {
+.map-pin-kind .map-pin-disc {
+   position: absolute;
+   top: 0;
+   left: 50%;
+   transform: translateX(-50%);
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 34px;
+   height: 34px;
+   border-radius: 999px;
+   border: 2px solid var(--paper);
+   background: var(--ink);
    color: var(--paper);
+   box-shadow: 0 2px 6px rgba(11, 9, 9, 0.35);
+   transition: transform 140ms var(--ease);
 }
-.map-pin-spot .map-pin-drop {
-   fill: var(--teal);
+.map-pin-kind:hover .map-pin-disc {
+   transform: translateX(-50%) scale(1.08);
 }
-.map-pin-spot .map-pin-glyph {
+/* The stem, drawn as a triangle under the disc so the point is the position. */
+.map-pin-kind .map-pin-stem {
+   position: absolute;
+   top: 30px;
+   left: 50%;
+   transform: translateX(-50%);
+   width: 0;
+   height: 0;
+   border-left: 6px solid transparent;
+   border-right: 6px solid transparent;
+   border-top: 14px solid var(--ink);
+   filter: drop-shadow(0 2px 2px rgba(11, 9, 9, 0.28));
+}
+.map-pin-n {
+   font-family: var(--font-display), sans-serif;
+   font-size: 17px;
+   line-height: 1;
+   letter-spacing: 0.02em;
+   font-variant-numeric: tabular-nums;
+   padding-top: 2px;
+}
+.map-pin-g {
+   width: 18px;
+   height: 18px;
+}
+
+/* A spot of your own is the teal one: it is yours. */
+.map-pin-spot .map-pin-disc {
+   background: var(--teal);
    color: var(--teal-ink);
 }
-/* A waypoint is yours alone, so it is drawn as an outline rather than a solid
- * mark: it is a note to self, not a place anyone else can see. */
-.map-pin-waypoint .map-pin-drop {
-   fill: var(--bg);
-   stroke: var(--ink);
-   stroke-width: 2;
+.map-pin-spot .map-pin-stem {
+   border-top-color: var(--teal);
 }
-.map-pin-waypoint .map-pin-glyph {
+
+/* Somebody else's spot: the same shape as yours, a quieter colour, so your own
+ * marks stay the loudest thing on your own map. */
+.map-pin-other .map-pin-disc {
+   background: var(--ink-2);
+   color: var(--paper);
+}
+.map-pin-other .map-pin-stem {
+   border-top-color: var(--ink-2);
+}
+
+/* A private mark is an outline: a note to self, not a place anyone else sees. */
+.map-pin-waypoint .map-pin-disc {
+   background: var(--bg);
+   border-color: var(--ink);
    color: var(--ink);
 }
-.map-pin-poi .map-pin-drop {
-   fill: var(--ink-3);
-   stroke: var(--paper);
+.map-pin-waypoint .map-pin-stem {
+   border-top-color: var(--ink);
 }
-.map-pin-count {
-   position: absolute;
-   top: -4px;
-   right: -6px;
-   min-width: 20px;
-   padding: 0 5px;
-   border-radius: 999px;
-   background: var(--ink);
+
+/* Somebody else's facts about the world sit back. */
+.map-pin-poi .map-pin-disc {
+   background: var(--ink-3);
    color: var(--paper);
-   font-size: 11px;
-   line-height: 18px;
-   text-align: center;
-   font-variant-numeric: tabular-nums;
-   box-shadow: 0 0 0 2px var(--bg);
 }
-.map-pin-spot .map-pin-count {
-   background: var(--ink);
+.map-pin-poi .map-pin-stem {
+   border-top-color: var(--ink-3);
 }
 
 /*

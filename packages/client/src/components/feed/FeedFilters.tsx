@@ -1,6 +1,3 @@
-import { useId } from 'react';
-
-import { Slider } from '@/components/ui/slider';
 import type { ChipOption } from '@/components/feed/ChipRadioGroup';
 import { ChoiceGroup } from '@/components/ui/field';
 import { plural } from '@/components/feed/format';
@@ -27,6 +24,9 @@ const SHOW_OPTIONS: ReadonlyArray<ChipOption<ShowFilter>> = [
 export const MIN_RADIUS_KM = 5;
 export const MAX_RADIUS_KM = 250;
 
+/* The distances anyone actually means, rather than every value in between. */
+const RADIUS_STEPS = [5, 10, 25, 50, 100, 250] as const;
+
 export function FeedFilters({
    scope,
    onScopeChange,
@@ -50,8 +50,6 @@ export function FeedFilters({
    locationState: LocationState;
    onRetryLocation: () => void;
 }) {
-   const radiusLabelId = useId();
-
    return (
       <section aria-label="Filters" className="flex flex-col gap-6">
          {/*
@@ -83,26 +81,27 @@ export function FeedFilters({
             <div className="rule-dashed pt-4">
                {locationState === 'ready' ? (
                   <div className="flex flex-col gap-2">
-                     <div className="flex items-baseline justify-between gap-4">
-                        <span id={radiusLabelId} className="lab">
-                           Search radius
-                        </span>
-                        <span className="num font-display text-[24px] tracking-[0.02em] text-ink">
-                           {radiusKm} km
-                        </span>
-                     </div>
-                     <Slider
-                        aria-labelledby={radiusLabelId}
-                        min={MIN_RADIUS_KM}
-                        max={MAX_RADIUS_KM}
-                        step={5}
-                        value={[radiusKm]}
-                        onValueChange={(value) =>
-                           onRadiusChange(value[0] ?? MIN_RADIUS_KM)
-                        }
-                        onValueCommit={(value) =>
-                           onRadiusCommit(value[0] ?? MIN_RADIUS_KM)
-                        }
+                     {/*
+                      * Distances rather than a dial. A radius is a decision,
+                      * not a dimmer: nobody wants 63 km, they want "round
+                      * here" or "the whole coast". The slider it replaces was
+                      * a dashed hairline with a block on it, fiddly on a phone
+                      * and cheap to look at, and it needed its own component.
+                      */}
+                     <ChoiceGroup
+                        inline
+                        size="sm"
+                        label="Within"
+                        value={String(radiusKm)}
+                        onChange={(next) => {
+                           const km = Number(next);
+                           onRadiusChange(km);
+                           onRadiusCommit(km);
+                        }}
+                        options={RADIUS_STEPS.map((km) => ({
+                           value: String(km),
+                           label: `${km} km`,
+                        }))}
                      />
                      <p className="text-[15px] text-ink-2" aria-live="polite">
                         {matchCount === null

@@ -28,6 +28,55 @@ const SEAMARK_ATTRIBUTION =
    '<a href="https://www.openseamap.org">OpenSeaMap</a>';
 
 /*
+ * Bases to choose between.
+ *
+ * The standard OpenStreetMap raster is a road map. It is busy with things a
+ * shore angler does not care about and quiet about the only thing they do,
+ * which is what the water and the rock actually look like. That is why the map
+ * read as cheap, and it is a tile problem rather than a library one: Mapbox
+ * would cost real money per map load and fix none of it that this does not.
+ *
+ * Satellite is the default here on purpose. From the air you can see the
+ * gullies, the reef and the ledges, which is how anyone picks a mark.
+ *
+ * All three are keyless and free to use with attribution, which is a licence
+ * condition rather than a courtesy, so it is always on.
+ */
+export type BaseLayer = 'satellite' | 'plain' | 'streets';
+
+const BASES: Record<
+   BaseLayer,
+   { url: string; attribution: string; maxZoom: number; label: string }
+> = {
+   satellite: {
+      label: 'Satellite',
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      attribution:
+         'Imagery &copy; <a href="https://www.esri.com">Esri</a>, Maxar, Earthstar Geographics',
+      maxZoom: 19,
+   },
+   plain: {
+      label: 'Plain',
+      /* CARTO Positron: no road clutter, so the pins are the loudest thing. */
+      url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      attribution:
+         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      maxZoom: 20,
+   },
+   streets: {
+      label: 'Streets',
+      url: OSM_TILES,
+      attribution: OSM_ATTRIBUTION,
+      maxZoom: 19,
+   },
+};
+
+export const BASE_LAYERS = (Object.keys(BASES) as BaseLayer[]).map((value) => ({
+   value,
+   label: BASES[value].label,
+}));
+
+/*
  * The product's own pin: the Heroicons map-pin outline in --teal, as DOM we
  * control. Leaflet's shipped default icon is deliberately never touched, since
  * it resolves image URLs relative to the CSS and breaks under a bundler.
@@ -54,6 +103,8 @@ export const pinIcon = (): L.DivIcon =>
  */
 export type PinKind =
    | 'spot'
+   /* Somebody else's public spot: the same shape, a quieter colour. */
+   | 'other'
    | 'waypoint'
    | 'ramp'
    | 'marina'
@@ -64,6 +115,7 @@ export type PinKind =
 const GLYPHS: Record<PinKind, string> = {
    /* The house fish. */
    spot: '<path d="M4 12.5c2.6-3.6 6.2-5.2 10.4-4.2 2 .5 3.6 1.6 6.2 1.6-2 1.6-4.2 2-6.2 2-4.2 0-7.8-1-10.4.6Z"/>',
+   other: '<path d="M4 12.5c2.6-3.6 6.2-5.2 10.4-4.2 2 .5 3.6 1.6 6.2 1.6-2 1.6-4.2 2-6.2 2-4.2 0-7.8-1-10.4.6Z"/>',
    /* A flag: something you marked for yourself. */
    waypoint: '<path d="M8 20V5"/><path d="M8 6h9l-2 3 2 3H8"/>',
    /* A slipway: a ramp running into water. */
@@ -79,6 +131,7 @@ const GLYPHS: Record<PinKind, string> = {
 
 const TONE: Record<PinKind, string> = {
    spot: 'map-pin-spot',
+   other: 'map-pin-other',
    waypoint: 'map-pin-waypoint',
    ramp: 'map-pin-poi',
    marina: 'map-pin-poi',
@@ -87,35 +140,43 @@ const TONE: Record<PinKind, string> = {
 };
 
 /**
- * A pin of a given kind, optionally carrying a count.
+ * A pin.
  *
- * The count sits on the pin rather than inside the popup, because "how many
- * fish have come out of here" is the question the map is being asked, and
- * making someone open every pin to answer it defeats the map.
+ * The first version was a teardrop with a small glyph in it and the count stuck
+ * on the corner in a separate black circle, which is the shape of a notification
+ * badge rather than a map marker and looked bolted on.
+ *
+ * This is a disc on a short stem. Where a spot has produced fish the number sits
+ * inside the disc in the display face, because the count is the most useful
+ * thing about a spot and it belongs in the pin rather than beside it. Where
+ * there is no number the mark goes in instead. One shape, two contents.
+ *
+ * Drawn as DOM rather than an image so it takes the theme's own colours and
+ * stays crisp at any density.
  */
 export const kindPin = (kind: PinKind, count?: number | null): L.DivIcon => {
-   const badge =
-      typeof count === 'number' && count > 0
-         ? `<span class="map-pin-count">${count > 99 ? '99+' : count}</span>`
-         : '';
+   const n = typeof count === 'number' && count > 0 ? count : null;
+   const face = n
+      ? `<span class="map-pin-n">${n > 99 ? '99+' : n}</span>`
+      : `<svg viewBox="0 0 24 24" class="map-pin-g" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[kind]}</svg>`;
 
    return L.divIcon({
       html:
-         `<span class="map-pin-body">` +
-         `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 34" width="34" height="42" aria-hidden="true">` +
-         `<path class="map-pin-drop" d="M12 33S1.5 20.8 1.5 12.5a10.5 10.5 0 1 1 21 0C22.5 20.8 12 33 12 33Z"/>` +
-         `<g class="map-pin-glyph" transform="translate(3.6 2.2) scale(0.7)" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[kind]}</g>` +
-         `</svg>${badge}</span>`,
+         `<span class="map-pin-disc">${face}</span>` +
+         `<span class="map-pin-stem"></span>`,
       className: `map-pin map-pin-kind ${TONE[kind]}`,
-      iconSize: [34, 42],
-      iconAnchor: [17, 41],
-      popupAnchor: [0, -38],
+      iconSize: [38, 46],
+      /* The tip of the stem is what sits on the coordinate, not the disc. */
+      iconAnchor: [19, 45],
+      popupAnchor: [0, -42],
    });
 };
 
 export type CreateMapOptions = {
    centre: MapPosition;
    zoom: number;
+   /** Which base to draw. Satellite unless a reader has said otherwise. */
+   base?: BaseLayer;
    /** False for the read-only embeds, which should not be panned or zoomed. */
    interactive?: boolean;
 };
@@ -130,8 +191,10 @@ export type CreateMapOptions = {
  */
 export const createMap = (
    container: HTMLElement,
-   { centre, zoom, interactive = true }: CreateMapOptions
+   options: CreateMapOptions
 ): L.Map => {
+   const { centre, zoom, interactive = true } = options;
+
    const map = L.map(container, {
       center: [centre.lat, centre.lng],
       zoom,
@@ -145,10 +208,15 @@ export const createMap = (
       attributionControl: true,
    });
 
-   L.tileLayer(OSM_TILES, {
-      attribution: OSM_ATTRIBUTION,
-      maxZoom: 19,
+   const base = BASES[options.base ?? 'satellite'];
+   const baseLayer = L.tileLayer(base.url, {
+      attribution: base.attribution,
+      maxZoom: base.maxZoom,
    }).addTo(map);
+
+   /* Kept on the map object so the caller can change base without rebuilding
+    * everything that has been added to it. */
+   (map as L.Map & { __base?: L.TileLayer }).__base = baseLayer;
 
    L.tileLayer(SEAMARK_TILES, {
       attribution: SEAMARK_ATTRIBUTION,
@@ -162,6 +230,19 @@ export const createMap = (
    }).addTo(map);
 
    return map;
+};
+
+/** Swap the base without disturbing the pins already on the map. */
+export const setBaseLayer = (map: L.Map, base: BaseLayer) => {
+   const holder = map as L.Map & { __base?: L.TileLayer };
+   holder.__base?.remove();
+   const next = BASES[base];
+   holder.__base = L.tileLayer(next.url, {
+      attribution: next.attribution,
+      maxZoom: next.maxZoom,
+   }).addTo(map);
+   /* Under everything else, so pins and the seamark overlay stay on top. */
+   holder.__base.bringToBack();
 };
 
 /** Leaflet measures its container once; anything that resizes it must say so. */

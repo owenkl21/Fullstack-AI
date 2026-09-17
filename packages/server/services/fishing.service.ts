@@ -419,16 +419,70 @@ const withResolvedImageUrls = async <
 };
 
 export const fishingService = {
+   /**
+    * Spots anyone may see, for the map.
+    *
+    * This used to select every spot in the table regardless of visibility, so a
+    * mark somebody had deliberately kept private was handed to anyone who asked
+    * for the list. The filter is the point of the endpoint now, not a detail of
+    * it.
+    *
+    * It carries what makes a map worth reading: how many fish have come out of
+    * each spot, and which species, so the map can be filtered by the fish you
+    * are actually after.
+    */
    async listFishingSites() {
-      return prisma.fishingSite.findMany({
-         where: { deletedAt: null },
+      const sites = await prisma.fishingSite.findMany({
+         where: { deletedAt: null, visibility: 'PUBLIC' },
          orderBy: { name: 'asc' },
+         take: 500,
          select: {
             id: true,
             name: true,
             latitude: true,
             longitude: true,
+            waterType: true,
+            createdById: true,
+            createdBy: { select: { displayName: true } },
+            catches: {
+               where: { deletedAt: null, visibility: 'PUBLIC' },
+               select: {
+                  speciesId: true,
+                  species: { select: { commonName: true } },
+               },
+            },
          },
+      });
+
+      return sites.map((site) => {
+         /* Which fish this spot is known for, most caught first. */
+         const counts = new Map<string, { name: string; count: number }>();
+         for (const entry of site.catches) {
+            if (!entry.speciesId || !entry.species) continue;
+            const seen = counts.get(entry.speciesId);
+            if (seen) seen.count += 1;
+            else
+               counts.set(entry.speciesId, {
+                  name: entry.species.commonName,
+                  count: 1,
+               });
+         }
+
+         const species = [...counts.entries()]
+            .map(([id, v]) => ({ id, name: v.name, count: v.count }))
+            .sort((a, b) => b.count - a.count);
+
+         return {
+            id: site.id,
+            name: site.name,
+            latitude: site.latitude,
+            longitude: site.longitude,
+            waterType: site.waterType,
+            createdById: site.createdById,
+            createdByName: site.createdBy?.displayName ?? null,
+            catchCount: site.catches.length,
+            species,
+         };
       });
    },
 

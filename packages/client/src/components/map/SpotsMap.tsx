@@ -1,8 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LeafletMouseEvent, Map as LeafletMap, Marker } from 'leaflet';
-import { L, createMap, kindPin, refreshSize } from '@/lib/leaflet';
+import { ViewfinderCircleIcon } from '@heroicons/react/24/outline';
+import {
+   BASE_LAYERS,
+   L,
+   createMap,
+   kindPin,
+   refreshSize,
+   setBaseLayer,
+   type BaseLayer,
+} from '@/lib/leaflet';
+import { ChoiceGroup } from '@/components/ui/field';
 import { fetchPois, type Poi } from '@/lib/overpass';
-import { usePosition } from '@/lib/position';
+import { requestPosition, usePosition } from '@/lib/position';
 import {
    createWaypoint,
    deleteWaypoint,
@@ -18,6 +28,18 @@ export type SpotPin = {
    latitude: number;
    longitude: number;
    catchCount: number;
+};
+
+/* A spot anyone may see, from the discovery endpoint. */
+type PublicSpot = {
+   id: string;
+   name: string;
+   latitude: number | null;
+   longitude: number | null;
+   catchCount: number;
+   createdById: string;
+   createdByName: string | null;
+   species: { id: string; name: string; count: number }[];
 };
 
 /* The country the first anglers fish, rather than a continent they do not. */
@@ -60,12 +82,19 @@ export function SpotsMap({
    const spotLayer = useRef<L.LayerGroup | null>(null);
    const waypointLayer = useRef<L.LayerGroup | null>(null);
    const poiLayer = useRef<L.LayerGroup | null>(null);
+   const othersLayer = useRef<L.LayerGroup | null>(null);
 
    /* Only to decide where to open, never to ask for a position: the map is
     * not a reason to put a permission prompt in front of somebody. */
    const { fix } = usePosition({ auto: false });
 
    const [waypoints, setWaypoints] = useState<Waypoint[]>([]);
+   /* Spots other anglers have made public. The map is worth opening before you
+    * have saved anything of your own, which is the whole point of a map. */
+   const [discovered, setDiscovered] = useState<PublicSpot[]>([]);
+   const [showOthers, setShowOthers] = useState(true);
+   const [species, setSpecies] = useState<string>('');
+   const [base, setBase] = useState<BaseLayer>('satellite');
    const [pois, setPois] = useState<Poi[]>([]);
    const [showPois, setShowPois] = useState(true);
    const [showWaypoints, setShowWaypoints] = useState(true);
@@ -85,6 +114,28 @@ export function SpotsMap({
          .catch(() => setWaypoints([]));
       return () => controller.abort();
    }, []);
+
+   useEffect(() => {
+      const controller = new AbortController();
+      fetch('/api/sites', { signal: controller.signal, credentials: 'include' })
+         .then((r) => (r.ok ? r.json() : []))
+         .then((rows: PublicSpot[]) =>
+            setDiscovered(Array.isArray(rows) ? rows : [])
+         )
+         .catch(() => setDiscovered([]));
+      return () => controller.abort();
+   }, []);
+
+   /* The fish these spots are known for, so the filter offers real options. */
+   const speciesOptions = useMemo(() => {
+      const seen = new Map<string, string>();
+      for (const spot of discovered) {
+         for (const s of spot.species) seen.set(s.id, s.name);
+      }
+      return [...seen.entries()]
+         .map(([id, name]) => ({ id, name }))
+         .sort((a, b) => a.name.localeCompare(b.name));
+   }, [discovered]);
 
    // Rebuild the pins only when the positions actually change, not on every
    // parent render, since the list above re-filters as you type.
@@ -123,12 +174,13 @@ export function SpotsMap({
              }
            : { centre: DEFAULT_CENTER, zoom: DEFAULT_ZOOM };
 
-      const created = createMap(node, opening);
+      const created = createMap(node, { ...opening, base });
       map.current = created;
 
       spotLayer.current = L.layerGroup().addTo(created);
       waypointLayer.current = L.layerGroup().addTo(created);
       poiLayer.current = L.layerGroup().addTo(created);
+      othersLayer.current = L.layerGroup().addTo(created);
 
       const markers: Marker[] = spots.map((spot) => {
          const marker = L.marker([spot.latitude, spot.longitude], {
@@ -180,6 +232,7 @@ export function SpotsMap({
          spotLayer.current = null;
          waypointLayer.current = null;
          poiLayer.current = null;
+         othersLayer.current = null;
       };
       // `key` stands in for the positions; `spots` itself changes identity on
       // every keystroke in the search field above.
@@ -239,6 +292,61 @@ export function SpotsMap({
          controller?.abort();
       };
    }, [showPois, key]);
+
+   /*
+    * Other anglers' spots, filtered by the fish you are after.
+    *
+    * Drawn in the neutral tone rather than teal, so your own marks stay the
+    * loudest thing on your own map.
+    */
+   useEffect(() => {
+      const layer = othersLayer.current;
+      if (!layer) return;
+
+      layer.clearLayers();
+      if (!showOthers) return;
+
+      const mine = new Set(spots.map((s) => s.id));
+
+      for (const spot of discovered) {
+         if (mine.has(spot.id)) continue;
+         if (spot.latitude == null || spot.longitude == null) continue;
+         if (species && !spot.species.some((s) => s.id === species)) continue;
+
+         const marker = L.marker([spot.latitude, spot.longitude], {
+            icon: kindPin('other', spot.catchCount),
+            title: spot.name,
+         }).addTo(layer);
+
+         const popup = document.createElement('div');
+         const title = document.createElement('p');
+         title.className = 'lab';
+         title.textContent = spot.name;
+
+         const who = document.createElement('p');
+         who.className = 'text-[14px] text-ink-2';
+         who.textContent = spot.createdByName
+            ? `Saved by ${spot.createdByName}`
+            : 'Saved by another angler';
+
+         const fish = document.createElement('p');
+         fish.className = 'num text-[15px]';
+         /* What it is known for, which is the reason to go. */
+         const top = spot.species.slice(0, 3).map((s) => s.name);
+         fish.textContent = spot.catchCount
+            ? `${spot.catchCount} public ${spot.catchCount === 1 ? 'catch' : 'catches'}${top.length ? `: ${top.join(', ')}` : ''}`
+            : 'No public catches yet';
+
+         const open = document.createElement('button');
+         open.type = 'button';
+         open.className = 'g-tracked mt-1 text-[15px] text-teal-text';
+         open.textContent = 'Open the spot';
+         open.addEventListener('click', () => onOpenRef.current(spot.id));
+
+         popup.append(title, who, fish, open);
+         marker.bindPopup(popup);
+      }
+   }, [discovered, showOthers, species, spots]);
 
    /* Draw the waypoints. */
    useEffect(() => {
@@ -330,31 +438,95 @@ export function SpotsMap({
 
    return (
       <div className="flex flex-col gap-3">
-         <div
-            ref={holder}
-            className="map-surface aspect-[3/2] w-full border border-line md:aspect-[2/1]"
-         />
+         {/*
+          * Taller than it was. The old box was a two to one strip, which is a
+          * picture of a map rather than a map: you could not pan without losing
+          * your place. It takes real height now and the controls sit under it.
+          */}
+         <div className="relative">
+            <div
+               ref={holder}
+               className="map-surface h-[62vh] min-h-[380px] w-full border border-line"
+            />
 
-         <div className="flex flex-wrap items-center gap-2">
+            {/* Over the map, where a locate control belongs. */}
             <button
                type="button"
-               onClick={() => setShowWaypoints((was) => !was)}
-               aria-pressed={showWaypoints}
-               className={`${toggle} ${showWaypoints ? 'border-ink bg-ink text-background' : 'border-line text-ink-2'}`}
+               onClick={() => {
+                  void requestPosition().then((next) => {
+                     if (next && map.current) {
+                        map.current.setView(
+                           [next.latitude, next.longitude],
+                           13
+                        );
+                     }
+                  });
+               }}
+               aria-label="Go to where I am"
+               className="absolute right-3 bottom-8 z-[500] grid size-11 place-items-center border border-line bg-background text-ink shadow-[0_2px_8px_rgba(11,9,9,0.25)] transition-transform duration-150 active:scale-[0.96]"
             >
-               My marks
+               <ViewfinderCircleIcon aria-hidden="true" className="size-6" />
             </button>
-            <button
-               type="button"
-               onClick={() => setShowPois((was) => !was)}
-               aria-pressed={showPois}
-               className={`${toggle} ${showPois ? 'border-ink bg-ink text-background' : 'border-line text-ink-2'}`}
-            >
-               Ramps and shops
-            </button>
-            <p className="text-[14px] text-ink-3">
-               Press and hold the map to drop a private mark.
-            </p>
+         </div>
+
+         <div className="flex flex-col gap-3">
+            <ChoiceGroup
+               inline
+               size="sm"
+               label="Base"
+               value={base}
+               onChange={(next) => {
+                  setBase(next);
+                  if (map.current) setBaseLayer(map.current, next);
+               }}
+               options={BASE_LAYERS}
+            />
+
+            {speciesOptions.length ? (
+               <ChoiceGroup
+                  inline
+                  size="sm"
+                  label="Fish"
+                  value={species}
+                  onChange={setSpecies}
+                  options={[
+                     { value: '', label: 'Any' },
+                     ...speciesOptions
+                        .slice(0, 8)
+                        .map((s) => ({ value: s.id, label: s.name })),
+                  ]}
+               />
+            ) : null}
+
+            <div className="flex flex-wrap items-center gap-2">
+               <button
+                  type="button"
+                  onClick={() => setShowOthers((was) => !was)}
+                  aria-pressed={showOthers}
+                  className={`${toggle} ${showOthers ? 'border-ink bg-ink text-background' : 'border-line text-ink-2'}`}
+               >
+                  Other anglers
+               </button>
+               <button
+                  type="button"
+                  onClick={() => setShowWaypoints((was) => !was)}
+                  aria-pressed={showWaypoints}
+                  className={`${toggle} ${showWaypoints ? 'border-ink bg-ink text-background' : 'border-line text-ink-2'}`}
+               >
+                  My marks
+               </button>
+               <button
+                  type="button"
+                  onClick={() => setShowPois((was) => !was)}
+                  aria-pressed={showPois}
+                  className={`${toggle} ${showPois ? 'border-ink bg-ink text-background' : 'border-line text-ink-2'}`}
+               >
+                  Ramps and shops
+               </button>
+               <p className="text-[14px] text-ink-3">
+                  Press and hold the map to drop a private mark.
+               </p>
+            </div>
          </div>
 
          {dropping ? (
