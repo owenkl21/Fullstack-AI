@@ -56,7 +56,16 @@ export function SeasonStrip({
                               'flex w-[88px] overflow-hidden',
                               item.entry.images[0]?.image.url
                                  ? 'bg-bg-2'
-                                 : 'items-end bg-ink/85'
+                                 : item.measured
+                                   ? 'items-end bg-ink/85'
+                                   : /*
+                                      * No figure was taken, so the tile is
+                                      * outlined rather than filled. A solid bar
+                                      * at the floor would read as the shortest
+                                      * fish of the season instead of as one
+                                      * nobody measured.
+                                      */
+                                     'items-end border border-dashed border-ink/35'
                            )}
                         >
                            {item.entry.images[0]?.image.url ? (
@@ -69,7 +78,10 @@ export function SeasonStrip({
                            ) : (
                               <span
                                  aria-hidden="true"
-                                 className="block h-1.5 w-full bg-teal"
+                                 className={cn(
+                                    'block h-1.5 w-full',
+                                    item.measured ? 'bg-teal' : 'bg-ink/25'
+                                 )}
                               />
                            )}
                         </span>

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { FishMark } from '@/components/brand/FishMark';
 
 /*
  * Holds the first paint until the page is actually ready to be looked at.
@@ -90,13 +91,12 @@ export function BootGate({ children }: { children: ReactNode }) {
                className="fixed inset-0 z-[9999] grid place-items-center bg-background"
             >
                {/*
-                * The wordmark rather than a spinner, because the house rule is
-                * no spinners, and because the first thing you should see is
-                * whose app this is.
+                * The mark rather than a spinner, because the house rule is no
+                * spinners, and because the first thing you should see is whose
+                * app this is. The word is not set here either, for the same
+                * reason it is not set in the header.
                 */}
-               <span className="g text-[32px] tracking-[0.06em] text-ink-3">
-                  Name
-               </span>
+               <FishMark className="h-[34px] w-[54px] text-ink-3" />
             </div>
          )}
       </>

@@ -1,6 +1,7 @@
 import { Contours } from '@/components/brand/Contours';
 import { cn } from '@/lib/utils';
 import { WRAP } from './layout';
+import { FishMark } from '@/components/brand/FishMark';
 
 const columns = [
    [
@@ -32,7 +33,7 @@ export function LandingFooter() {
             )}
          >
             <div>
-               <span className="g block text-[30px] text-paper">Name</span>
+               <FishMark className="h-[30px] w-[46px] text-paper" />
                <p className="mt-3 max-w-[36ch] text-[14px]">
                   A fishing log for the South African coast and its dams. Sample
                   data and Unsplash photographs on this page.

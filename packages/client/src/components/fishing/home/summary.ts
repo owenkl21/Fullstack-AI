@@ -82,7 +82,15 @@ export function logSentence(catches: CatchSummary[]): LogSentence | null {
 
 export type SeasonItem =
    | { kind: 'month'; key: string; label: string }
-   | { kind: 'catch'; key: string; entry: CatchSummary; height: number };
+   | {
+        kind: 'catch';
+        key: string;
+        entry: CatchSummary;
+        height: number;
+        /* False when the fish was never measured, so the strip can say so
+         * rather than drawing a bar that stands for a length nobody took. */
+        measured: boolean;
+     };
 
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const MIN_TILE = 88;
@@ -112,12 +120,18 @@ export function seasonItems(catches: CatchSummary[]): SeasonItem[] {
    const longest = lengths.length > 0 ? Math.max(...lengths) : null;
 
    const height = (length: number | null) => {
-      if (
-         length === null ||
-         shortest === null ||
-         longest === null ||
-         longest === shortest
-      ) {
+      /*
+       * An unmeasured fish sits at the floor. It used to be given 124, between
+       * the 88 floor and the 178 ceiling, so a fish nobody measured stood
+       * taller than a measured 41cm galjoen next to it and the row of bars
+       * stopped telling the truth about the season.
+       */
+      if (length === null) {
+         return MIN_TILE;
+      }
+
+      if (shortest === null || longest === null || longest === shortest) {
+         /* One length, or all the same: there is no scale to place it on. */
          return 124;
       }
       const ratio = (length - shortest) / (longest - shortest);
@@ -142,6 +156,7 @@ export function seasonItems(catches: CatchSummary[]): SeasonItem[] {
          key: entry.id,
          entry,
          height: height(entry.length),
+         measured: entry.length !== null,
       });
    });
 

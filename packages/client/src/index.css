@@ -320,6 +320,21 @@
          rgba(11, 9, 9, 0.9) 100%
       );
    }
+   /*
+    * For a photograph nothing is read through. It only seats the picture
+    * against the ink plate below it, so the sky is left alone. The full
+    * .scrim-photo ramp was built to carry words and, with the words gone, its
+    * dark top and bright middle banded the sky for no one's benefit.
+    */
+   .scrim-seat {
+      background: linear-gradient(
+         180deg,
+         rgba(11, 9, 9, 0) 0%,
+         rgba(11, 9, 9, 0) 58%,
+         rgba(11, 9, 9, 0.16) 78%,
+         rgba(11, 9, 9, 0.42) 100%
+      );
+   }
    .scrim-photo {
       /*
        * Dark enough where words go. The old ramp was still at 0.1 more than

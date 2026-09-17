@@ -30,6 +30,13 @@ export function SpotHeader({
 }) {
    const [settled, setSettled] = useState(false);
 
+   /* Both are already formatted for display, so compare what is on the page. */
+   const sameDay = Boolean(
+      lastFished &&
+      today &&
+      lastFished.toLowerCase().includes(today.toLowerCase())
+   );
+
    useEffect(() => {
       const frame = requestAnimationFrame(() => setSettled(true));
       return () => cancelAnimationFrame(frame);
@@ -58,20 +65,27 @@ export function SpotHeader({
              * fight the sky.
              */}
             <div
-               className="pointer-events-none absolute inset-0 scrim-photo"
+               className="scrim-seat pointer-events-none absolute inset-0"
                aria-hidden="true"
             />
          </div>
 
          <div className="relative z-[2] pt-5 pb-11 md:pt-7 md:pb-16">
             <div className="mx-auto flex w-full max-w-[860px] flex-col gap-2.5 px-4 md:px-8">
+               {/*
+                * Today's date is dropped when the last trip was today, because
+                * the plate was printing the same date twice on one line with
+                * only one of them labelled.
+                */}
                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   {lastFished ? (
                      <span className="lab text-teal">{lastFished}</span>
                   ) : (
                      <span />
                   )}
-                  <span className="lab text-paper-2">{today}</span>
+                  {sameDay ? null : (
+                     <span className="lab text-paper-2">{today}</span>
+                  )}
                </div>
                <h1 className="g text-[52px] text-paper md:text-[72px]">
                   {spotName}
