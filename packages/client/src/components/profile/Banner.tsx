@@ -19,7 +19,10 @@ export function Banner({
       <div
          aria-hidden="true"
          className={cn(
-            'relative h-[140px] w-full overflow-hidden bg-black-block md:h-[220px]',
+            /* The contour ink is a faint version of the page's own ink, so the
+             * ground has to be the page's second surface, not the black block,
+             * or the strokes vanish into it. */
+            'relative h-[140px] w-full overflow-hidden bg-bg-2 md:h-[220px]',
             className
          )}
       >
@@ -31,7 +34,7 @@ export function Banner({
                loading="eager"
             />
          ) : (
-            <Contours seed={11} className="inset-0 h-full w-full opacity-70" />
+            <Contours seed={11} className="inset-0 h-full w-full" />
          )}
       </div>
    );

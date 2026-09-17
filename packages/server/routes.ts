@@ -46,6 +46,28 @@ async function requireApiAuth(
    return next();
 }
 
+/*
+ * The same read, without the refusal. For a route anyone may call whose
+ * answer still depends on who is asking: a private spot is not found for a
+ * stranger and is found for its owner, and the owner is only known if the
+ * session was read. Without this the owner was a stranger to their own spot.
+ */
+async function attachApiAuth(
+   req: Request,
+   _res: Response,
+   next: express.NextFunction
+) {
+   const session = await auth.api.getSession({
+      headers: fromNodeHeaders(req.headers),
+   });
+
+   if (session?.user) {
+      setAuthContext(req, session.user);
+   }
+
+   return next();
+}
+
 router.get('/', (_req: Request, res: Response) => {
    res.send('Hello World!');
 });
@@ -194,7 +216,11 @@ router.delete(
    fishingController.deleteFishingSite
 );
 router.post('/api/sites', requireApiAuth, fishingController.createFishingSite);
-router.get('/api/sites/:siteId', fishingController.getFishingSiteById);
+router.get(
+   '/api/sites/:siteId',
+   attachApiAuth,
+   fishingController.getFishingSiteById
+);
 
 router.get('/api/feed', feedController.listFeed);
 router.post('/api/feed', requireApiAuth, feedController.createFeedPost);
