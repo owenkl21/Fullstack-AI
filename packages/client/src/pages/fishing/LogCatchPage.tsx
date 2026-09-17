@@ -21,7 +21,7 @@ import {
    type Species,
 } from '@/components/fishing/quicklog/species';
 import { AddGearInline } from '@/components/fishing/AddGearInline';
-import { ChoiceGroup } from '@/components/ui/field';
+import { ChoiceGroup, TextArea, TextField } from '@/components/ui/field';
 
 type SiteOption = {
    id: string;
@@ -958,25 +958,17 @@ export function CatchForm({
             )}
 
             <div>
-               <label htmlFor="species" className="lab block">
-                  Species
-               </label>
-               <input
-                  id="species"
+               <TextField
+                  label="Species"
                   data-field="species"
-                  className="input-line mt-2 text-[16px]"
                   value={species}
                   maxLength={TITLE_LIMIT}
                   autoComplete="off"
-                  aria-invalid={errors.species ? true : undefined}
-                  aria-describedby={
-                     errors.species ? 'species-error' : undefined
-                  }
+                  error={errors.species}
                   onChange={(event) => setSpecies(event.target.value)}
                   onBlur={() => markTouched('species')}
                   placeholder="Kob"
                />
-               <FieldError id="species-error" message={errors.species} />
                {recentSpecies.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                      {recentSpecies.map((name) => (
@@ -1102,24 +1094,18 @@ export function CatchForm({
                </div>
             </div>
 
-            <div>
-               <label htmlFor="count" className="lab block">
-                  How many
-               </label>
-               <input
-                  id="count"
-                  data-field="count"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  className="input-line num mt-2 max-w-[120px] text-[16px]"
-                  value={countValue}
-                  aria-invalid={errors.count ? true : undefined}
-                  aria-describedby={errors.count ? 'count-error' : undefined}
-                  onChange={(event) => setCountValue(event.target.value)}
-                  onBlur={() => markTouched('count')}
-               />
-               <FieldError id="count-error" message={errors.count} />
-            </div>
+            <TextField
+               label="How many"
+               data-field="count"
+               inputMode="numeric"
+               autoComplete="off"
+               numeric
+               className="max-w-[160px]"
+               value={countValue}
+               error={errors.count}
+               onChange={(event) => setCountValue(event.target.value)}
+               onBlur={() => markTouched('count')}
+            />
 
             <div>
                <Button
@@ -1135,58 +1121,33 @@ export function CatchForm({
                </Button>
                <div id="more-fish" hidden={!showMore}>
                   <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
-                     <div>
-                        <label htmlFor="depth" className="lab block">
-                           Depth in metres
-                        </label>
-                        <input
-                           id="depth"
-                           data-field="depth"
-                           inputMode="decimal"
-                           autoComplete="off"
-                           className="input-line num mt-2 text-[16px]"
-                           value={depthValue}
-                           aria-invalid={errors.depth ? true : undefined}
-                           aria-describedby={
-                              errors.depth ? 'depth-error' : undefined
-                           }
-                           onChange={(event) =>
-                              setDepthValue(event.target.value)
-                           }
-                           onBlur={() => markTouched('depth')}
-                           placeholder="Not recorded"
-                        />
-                        <FieldError id="depth-error" message={errors.depth} />
-                     </div>
-                     <div>
-                        <label htmlFor="water-temp" className="lab block">
-                           Water temperature in °C
-                        </label>
-                        <input
-                           id="water-temp"
-                           data-field="waterTemp"
-                           inputMode="decimal"
-                           autoComplete="off"
-                           className="input-line num mt-2 text-[16px]"
-                           value={waterTempValue}
-                           aria-invalid={errors.waterTemp ? true : undefined}
-                           aria-describedby={
-                              errors.waterTemp ? 'water-temp-error' : undefined
-                           }
-                           onChange={(event) =>
-                              setWaterTempValue(event.target.value)
-                           }
-                           onBlur={() => markTouched('waterTemp')}
-                           placeholder="Not recorded"
-                        />
-                        <FieldError
-                           id="water-temp-error"
-                           message={errors.waterTemp}
-                        />
-                        <p className="mt-2 text-[14px] text-ink-3">
-                           Water temperature is not kept on the record yet.
-                        </p>
-                     </div>
+                     <TextField
+                        label="Depth in metres"
+                        data-field="depth"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        numeric
+                        value={depthValue}
+                        error={errors.depth}
+                        onChange={(event) => setDepthValue(event.target.value)}
+                        onBlur={() => markTouched('depth')}
+                        placeholder="Not recorded"
+                     />
+                     <TextField
+                        label="Water temperature in °C"
+                        data-field="waterTemp"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        numeric
+                        value={waterTempValue}
+                        error={errors.waterTemp}
+                        hint="Left blank, the sea model's reading for the hour is kept instead."
+                        onChange={(event) =>
+                           setWaterTempValue(event.target.value)
+                        }
+                        onBlur={() => markTouched('waterTemp')}
+                        placeholder="Not recorded"
+                     />
                   </div>
                </div>
             </div>
@@ -1280,13 +1241,9 @@ export function CatchForm({
 
             {spotMode === 'saved' ? (
                <div className="flex flex-col gap-3">
-                  <label htmlFor="spot-search" className="lab block">
-                     Search your spots
-                  </label>
-                  <input
-                     id="spot-search"
+                  <TextField
+                     label="Search your spots"
                      type="search"
-                     className="input-line text-[16px]"
                      value={siteSearch}
                      onChange={(event) => setSiteSearch(event.target.value)}
                      placeholder="Kalk Bay"
@@ -1366,31 +1323,17 @@ export function CatchForm({
             {spotMode === 'new' ? (
                <div className="flex flex-col gap-4">
                   <div>
-                     <label htmlFor="new-spot" className="lab block">
-                        Name this spot
-                     </label>
-                     <p className="mt-1 text-[14px] text-ink-3">
-                        Name it and it is saved as a spot to go back to. Leave
-                        it blank and only this catch keeps the pin.
-                     </p>
-                     <input
-                        id="new-spot"
+                     <TextField
+                        label="Name this spot"
                         data-field="newSpotName"
-                        className="input-line mt-2 text-[16px]"
                         value={newSpotName}
                         maxLength={TITLE_LIMIT}
                         autoComplete="off"
-                        aria-invalid={errors.newSpotName ? true : undefined}
-                        aria-describedby={
-                           errors.newSpotName ? 'new-spot-error' : undefined
-                        }
+                        error={errors.newSpotName}
+                        hint="Name it and it is saved as a spot to go back to. Leave it blank and only this catch keeps the pin."
                         onChange={(event) => setNewSpotName(event.target.value)}
                         onBlur={() => markTouched('newSpotName')}
                         placeholder="Rooi-Els"
-                     />
-                     <FieldError
-                        id="new-spot-error"
-                        message={errors.newSpotName}
                      />
                   </div>
                   <div data-field="spot" tabIndex={-1}>
@@ -1412,28 +1355,25 @@ export function CatchForm({
             <GroupHeading>When and conditions</GroupHeading>
 
             <div>
-               <label htmlFor="caught-at" className="lab block">
-                  Caught at
-               </label>
-               <input
-                  id="caught-at"
+               <TextField
+                  label="Caught at"
                   data-field="caughtAt"
                   type="datetime-local"
-                  className="input-line num mt-2 text-[16px]"
+                  numeric
                   value={caughtAt}
-                  aria-invalid={errors.caughtAt ? true : undefined}
-                  aria-describedby="caught-at-zone"
+                  error={errors.caughtAt}
+                  hint={
+                     <>
+                        {caughtAtDate ? `${dateSentence(caughtAtDate)}. ` : ''}
+                        {zone ? `Your time, ${zone}.` : 'Your own time.'} The
+                        conditions below are read for this hour, wherever the
+                        pin is, so a fish logged tonight still gets the weather
+                        it was caught in.
+                     </>
+                  }
                   onChange={(event) => setCaughtAt(event.target.value)}
                   onBlur={() => markTouched('caughtAt')}
                />
-               <p id="caught-at-zone" className="mt-2 text-[14px] text-ink-3">
-                  {caughtAtDate ? `${dateSentence(caughtAtDate)}. ` : ''}
-                  {zone ? `Your time, ${zone}.` : 'Your own time.'} The
-                  conditions below are read for this hour, wherever the pin is,
-                  so a fish logged tonight still gets the weather it was caught
-                  in.
-               </p>
-               <FieldError id="caught-at-error" message={errors.caughtAt} />
             </div>
 
             <div className="bg-bg-2 p-4">
@@ -1513,13 +1453,9 @@ export function CatchForm({
             <GroupHeading>Gear and notes</GroupHeading>
 
             <div className="flex flex-col gap-3">
-               <label htmlFor="gear-search" className="lab block">
-                  Search your gear
-               </label>
-               <input
-                  id="gear-search"
+               <TextField
+                  label="Search your gear"
                   type="search"
-                  className="input-line text-[16px]"
                   value={gearSearch}
                   onChange={(event) => setGearSearch(event.target.value)}
                   placeholder="Daiwa"
@@ -1599,23 +1535,15 @@ export function CatchForm({
                ) : null}
             </div>
 
-            <div>
-               <label htmlFor="notes" className="lab block">
-                  Notes
-               </label>
-               <textarea
-                  id="notes"
-                  rows={4}
-                  maxLength={NOTES_LIMIT}
-                  className="input-line mt-2 resize-y text-[16px]"
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  placeholder="What the water was doing, what it took."
-               />
-               <p className="num mt-2 text-[14px] text-ink-3">
-                  {notes.length} of {NOTES_LIMIT}
-               </p>
-            </div>
+            <TextArea
+               label="Notes"
+               rows={4}
+               maxLength={NOTES_LIMIT}
+               value={notes}
+               hint={`${notes.length} of ${NOTES_LIMIT}`}
+               onChange={(event) => setNotes(event.target.value)}
+               placeholder="What the water was doing, what it took."
+            />
          </section>
 
          <section className="flex flex-col gap-5">
