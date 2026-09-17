@@ -184,27 +184,39 @@ export function Contours({
     */
    const [box, setBox] = useState<{ w: number; h: number } | null>(null);
 
+   /*
+    * Measured once, a frame after mounting, and never again. A sheet that
+    * followed the box's size rebuilt itself every time the page grew (more
+    * posts, more rows) and drew in again on every scroll, which was both a
+    * distraction and a cost. The height is at least two and a half screens,
+    * so a page that grows later is still covered; past that the ground is
+    * simply plain, which is what here and there means.
+    */
    useEffect(() => {
       if (width && height) {
          setBox({ w: width, h: height });
          return;
       }
-
       const svg = ref.current;
       if (!svg) return;
-
-      const observer = new ResizeObserver(([entry]) => {
-         const rect = entry?.contentRect;
-         if (!rect || rect.width < 8 || rect.height < 8) return;
-         /* Rounded, so a pixel of resize does not rebuild the whole field. */
-         setBox({
-            w: Math.round(rect.width / 20) * 20,
-            h: Math.round(rect.height / 20) * 20,
-         });
-      });
-
-      observer.observe(svg);
-      return () => observer.disconnect();
+      let tries = 0;
+      let frame = 0;
+      const measure = () => {
+         const rect = svg.getBoundingClientRect();
+         if (rect.width < 8 && tries < 10) {
+            tries += 1;
+            frame = requestAnimationFrame(measure);
+            return;
+         }
+         const w = Math.max(320, Math.round(rect.width / 20) * 20);
+         const h = Math.max(
+            Math.round(rect.height / 20) * 20,
+            Math.round((window.innerHeight * 2.5) / 20) * 20
+         );
+         setBox({ w, h });
+      };
+      frame = requestAnimationFrame(measure);
+      return () => cancelAnimationFrame(frame);
    }, [width, height]);
 
    useEffect(() => {
@@ -214,7 +226,7 @@ export function Contours({
       svg.innerHTML = paths
          .map(
             (d, i) =>
-               `<path d="${d}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" style="transition-delay:${((i % 12) * 0.09).toFixed(2)}s"/>`
+               `<path d="${d}" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" style="transition-delay:${((i % 24) * 0.14).toFixed(2)}s"/>`
          )
          .join('');
       const io = new IntersectionObserver(
@@ -236,10 +248,10 @@ export function Contours({
    return (
       <svg
          ref={ref}
-         style={style}
+         style={box && !(width && height) ? { ...style, height: box.h } : style}
          className={cn('contour', className)}
          viewBox={box ? `0 0 ${box.w} ${box.h}` : undefined}
-         preserveAspectRatio="none"
+         preserveAspectRatio={width && height ? 'none' : 'xMinYMin meet'}
          aria-hidden="true"
       />
    );
