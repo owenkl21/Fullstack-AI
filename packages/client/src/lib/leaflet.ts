@@ -229,15 +229,18 @@ export const createMap = (
       zoom,
       scrollWheelZoom: interactive && wheelZoom,
       /*
-       * Quarter-level steps rather than whole ones. The default snaps a full
-       * zoom level per notch, which lurches, and the wheel covered a level in
-       * sixty pixels of travel, which is a flick. Both are set so zooming in
-       * on a ledge is a glide rather than a series of jumps.
+       * Whole zoom levels, on purpose. Fractional zoom was tried and it draws a
+       * grid: a raster tile scaled to a non-integer size shows its edges, and
+       * on satellite imagery that is a lattice ruled across the sea. Each step
+       * is animated, the wheel needs more travel per level so a notch is not
+       * a flick, and that is what makes zooming feel smooth rather than
+       * fractional levels.
        */
-      zoomSnap: 0.25,
-      zoomDelta: 0.5,
-      wheelPxPerZoomLevel: 110,
-      wheelDebounceTime: 30,
+      zoomSnap: 1,
+      zoomDelta: 1,
+      zoomAnimation: true,
+      wheelPxPerZoomLevel: 120,
+      wheelDebounceTime: 40,
       zoomControl: interactive,
       dragging: interactive,
       doubleClickZoom: interactive,

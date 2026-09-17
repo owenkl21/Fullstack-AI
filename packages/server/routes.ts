@@ -7,6 +7,7 @@ import { fishingController } from './controllers/fishing.controller';
 import { userController } from './controllers/user.controller';
 import { uploadsController } from './controllers/uploads.controller';
 import { competitionsController } from './controllers/competitions.controller';
+import { placesController } from './controllers/places.controller';
 import { savedController } from './controllers/saved.controller';
 import { waypointsController } from './controllers/waypoints.controller';
 import { gearController } from './controllers/gear.controller';
@@ -97,6 +98,10 @@ router.get('/api/species', fishingController.searchSpecies);
 router.get('/api/stats/me', requireApiAuth, statsController.myStats);
 router.get('/api/stats/rivals', requireApiAuth, statsController.rivals);
 router.get('/api/competitions/species', statsController.speciesBoards);
+
+/* Slipways, marinas and tackle shops, proxied from OpenStreetMap because
+ * Overpass refuses a browser's cross-origin request. Public data, no auth. */
+router.get('/api/places', placesController.list);
 
 /* Keeping somebody else's spot or gear. A reference, never a copy, so what the
  * owner does with it afterwards still applies. */
