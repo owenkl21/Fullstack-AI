@@ -40,6 +40,10 @@ const HOURLY_FIELDS = [
    'wind_gusts_10m',
    'uv_index',
    'is_day',
+   /* Millimetres in the hour, next to the chance of any. */
+   'precipitation',
+   /* Convective energy, in joules per kilogram: the thunder forecast. */
+   'cape',
 ].join(',');
 
 /* The light. Most shore sessions are planned around one end of it or the other. */
@@ -186,6 +190,8 @@ export type Conditions = {
    dewPointC: number | null;
    relativeHumidity: number | null;
    precipitationProbability: number | null;
+   precipitationMm: number | null;
+   cape: number | null;
    pressureMsl: number | null;
    cloudCover: number | null;
    visibilityM: number | null;
@@ -218,6 +224,8 @@ const EMPTY: Conditions = {
    dewPointC: null,
    relativeHumidity: null,
    precipitationProbability: null,
+   precipitationMm: null,
+   cape: null,
    pressureMsl: null,
    cloudCover: null,
    visibilityM: null,
@@ -398,6 +406,8 @@ export async function getConditionsAt(
             'precipitation_probability',
             index
          ),
+         precipitationMm: readAt(hourly, 'precipitation', index),
+         cape: readAt(hourly, 'cape', index),
          pressureMsl: readAt(hourly, 'pressure_msl', index),
          cloudCover: readAt(hourly, 'cloud_cover', index),
          visibilityM: readAt(hourly, 'visibility', index),
@@ -500,7 +510,10 @@ export const toWeatherSnapshot = (conditions: Conditions) => {
       temperature: { degrees: conditions.temperatureC, unit: 'CELSIUS' },
       precipitation: {
          probability: { percent: conditions.precipitationProbability ?? 0 },
+         amountMm: conditions.precipitationMm,
       },
+      /* Convective energy. Over about 400 J/kg thunder is on the cards. */
+      thunder: { cape: conditions.cape },
       wind: {
          direction: { cardinal: conditions.windDirectionCardinal ?? '' },
          speed: {
@@ -542,3 +555,279 @@ export const toWeatherSnapshot = (conditions: Conditions) => {
       },
    };
 };
+
+/*
+ * The week ahead at one place, hour by hour.
+ *
+ * Asked in the place's own time zone rather than UTC: a forecast is read as
+ * "Saturday morning", and Saturday has to begin at local midnight for that to
+ * mean anything. Each hour carries both its local label and the real instant,
+ * so the screen can print "06:00" and still know which moment that is.
+ *
+ * Sea state comes from the marine model in the same zone and is joined on the
+ * hour. Inland it is simply absent.
+ */
+export type ForecastHour = {
+   /* The place's own clock, e.g. 2026-09-19T06:00. */
+   local: string;
+   /* The same moment as an instant with its offset. */
+   time: string;
+   conditionText: string | null;
+   weatherCode: number | null;
+   temperatureC: number | null;
+   feelsLikeC: number | null;
+   precipitationProbability: number | null;
+   precipitationMm: number | null;
+   cape: number | null;
+   pressureMsl: number | null;
+   cloudCover: number | null;
+   visibilityM: number | null;
+   windSpeedKph: number | null;
+   windGustKph: number | null;
+   windDirectionDegrees: number | null;
+   windDirectionCardinal: string | null;
+   uvIndex: number | null;
+   isDaytime: boolean | null;
+   seaSurfaceTemperatureC: number | null;
+   waveHeightM: number | null;
+   wavePeriodS: number | null;
+   waveDirectionDegrees: number | null;
+   swellHeightM: number | null;
+   swellPeriodS: number | null;
+   swellDirectionDegrees: number | null;
+};
+
+export type ForecastDay = {
+   /* 2026-09-19 */
+   date: string;
+   sunrise: string | null;
+   sunset: string | null;
+   conditionText: string | null;
+   weatherCode: number | null;
+   temperatureMaxC: number | null;
+   temperatureMinC: number | null;
+   precipitationSumMm: number | null;
+   precipitationProbabilityMax: number | null;
+   windMaxKph: number | null;
+   windGustMaxKph: number | null;
+   windDirectionDominant: number | null;
+   uvIndexMax: number | null;
+   moon: MoonPhase;
+};
+
+export type Forecast = {
+   latitude: number;
+   longitude: number;
+   timezone: string | null;
+   utcOffsetSeconds: number;
+   /* When this was fetched from the model, as an instant. */
+   issuedAt: string;
+   hours: ForecastHour[];
+   days: ForecastDay[];
+};
+
+const FORECAST_HOURLY = [
+   'temperature_2m',
+   'apparent_temperature',
+   'precipitation_probability',
+   'precipitation',
+   'weather_code',
+   'pressure_msl',
+   'cloud_cover',
+   'visibility',
+   'wind_speed_10m',
+   'wind_direction_10m',
+   'wind_gusts_10m',
+   'uv_index',
+   'is_day',
+   'cape',
+].join(',');
+
+const FORECAST_DAILY = [
+   'sunrise',
+   'sunset',
+   'weather_code',
+   'temperature_2m_max',
+   'temperature_2m_min',
+   'precipitation_sum',
+   'precipitation_probability_max',
+   'wind_speed_10m_max',
+   'wind_gusts_10m_max',
+   'wind_direction_10m_dominant',
+   'uv_index_max',
+].join(',');
+
+const FORECAST_MARINE = [
+   'sea_surface_temperature',
+   'wave_height',
+   'wave_period',
+   'wave_direction',
+   'swell_wave_height',
+   'swell_wave_period',
+   'swell_wave_direction',
+].join(',');
+
+type Block = Record<string, unknown>;
+
+type ForecastResponse = {
+   timezone?: string;
+   utc_offset_seconds?: number;
+   hourly?: Block;
+   daily?: Block;
+};
+
+const column = <T>(block: Block | undefined, field: string): (T | null)[] =>
+   Array.isArray(block?.[field]) ? (block[field] as (T | null)[]) : [];
+
+const num = (value: unknown): number | null =>
+   typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const offsetSuffix = (seconds: number) => {
+   const sign = seconds < 0 ? '-' : '+';
+   const abs = Math.abs(seconds);
+   const h = String(Math.floor(abs / 3600)).padStart(2, '0');
+   const m = String(Math.floor((abs % 3600) / 60)).padStart(2, '0');
+   return `${sign}${h}:${m}`;
+};
+
+const forecasts = new Map<string, { until: number; value: Forecast }>();
+
+export async function getForecast(
+   latitude: number,
+   longitude: number,
+   days = 7
+): Promise<Forecast | null> {
+   const key = `${latitude.toFixed(2)}|${longitude.toFixed(2)}|${days}`;
+   const hit = forecasts.get(key);
+   if (hit && hit.until > Date.now()) return hit.value;
+
+   const common = {
+      latitude: String(latitude),
+      longitude: String(longitude),
+      timezone: 'auto',
+      forecast_days: String(days),
+   };
+   const weatherParams = new URLSearchParams({
+      ...common,
+      hourly: FORECAST_HOURLY,
+      daily: FORECAST_DAILY,
+      wind_speed_unit: 'kmh',
+   });
+   const marineParams = new URLSearchParams({
+      ...common,
+      hourly: FORECAST_MARINE,
+   });
+
+   const [weather, marine] = await Promise.all([
+      getJson<ForecastResponse>(`${FORECAST_URL}?${weatherParams}`),
+      getJson<ForecastResponse>(`${MARINE_URL}?${marineParams}`),
+   ]);
+   if (!weather) return null;
+
+   const suffix = offsetSuffix(weather.utc_offset_seconds ?? 0);
+   const hourly = weather.hourly ?? {};
+   const daily = weather.daily ?? {};
+   const sea = marine?.hourly ?? {};
+   const seaAt = new Map(
+      column<string>(sea, 'time').map((t, i) => [t ?? '', i] as const)
+   );
+
+   const at = (block: Block, field: string, index: number | undefined) =>
+      index === undefined ? null : num(column(block, field)[index]);
+
+   const hours: ForecastHour[] = column<string>(hourly, 'time').flatMap(
+      (local, i) => {
+         if (!local) return [];
+         const j = seaAt.get(local);
+         const code = at(hourly, 'weather_code', i);
+         const direction = at(hourly, 'wind_direction_10m', i);
+         const isDay = at(hourly, 'is_day', i);
+         return [
+            {
+               local,
+               time: `${local}${suffix}`,
+               conditionText:
+                  code === null ? null : (WEATHER_CODES[code] ?? null),
+               weatherCode: code,
+               temperatureC: at(hourly, 'temperature_2m', i),
+               feelsLikeC: at(hourly, 'apparent_temperature', i),
+               precipitationProbability: at(
+                  hourly,
+                  'precipitation_probability',
+                  i
+               ),
+               precipitationMm: at(hourly, 'precipitation', i),
+               cape: at(hourly, 'cape', i),
+               pressureMsl: at(hourly, 'pressure_msl', i),
+               cloudCover: at(hourly, 'cloud_cover', i),
+               visibilityM: at(hourly, 'visibility', i),
+               windSpeedKph: at(hourly, 'wind_speed_10m', i),
+               windGustKph: at(hourly, 'wind_gusts_10m', i),
+               windDirectionDegrees: direction,
+               windDirectionCardinal: toCardinal(direction),
+               uvIndex: at(hourly, 'uv_index', i),
+               isDaytime: isDay === null ? null : isDay === 1,
+               seaSurfaceTemperatureC: at(sea, 'sea_surface_temperature', j),
+               waveHeightM: at(sea, 'wave_height', j),
+               wavePeriodS: at(sea, 'wave_period', j),
+               waveDirectionDegrees: at(sea, 'wave_direction', j),
+               swellHeightM: at(sea, 'swell_wave_height', j),
+               swellPeriodS: at(sea, 'swell_wave_period', j),
+               swellDirectionDegrees: at(sea, 'swell_wave_direction', j),
+            },
+         ];
+      }
+   );
+
+   const stamp = (value: unknown) =>
+      typeof value === 'string' && value ? `${value}${suffix}` : null;
+
+   const forecastDays: ForecastDay[] = column<string>(daily, 'time').flatMap(
+      (date, i) => {
+         if (!date) return [];
+         const code = at(daily, 'weather_code', i);
+         return [
+            {
+               date,
+               sunrise: stamp(column(daily, 'sunrise')[i]),
+               sunset: stamp(column(daily, 'sunset')[i]),
+               conditionText:
+                  code === null ? null : (WEATHER_CODES[code] ?? null),
+               weatherCode: code,
+               temperatureMaxC: at(daily, 'temperature_2m_max', i),
+               temperatureMinC: at(daily, 'temperature_2m_min', i),
+               precipitationSumMm: at(daily, 'precipitation_sum', i),
+               precipitationProbabilityMax: at(
+                  daily,
+                  'precipitation_probability_max',
+                  i
+               ),
+               windMaxKph: at(daily, 'wind_speed_10m_max', i),
+               windGustMaxKph: at(daily, 'wind_gusts_10m_max', i),
+               windDirectionDominant: at(
+                  daily,
+                  'wind_direction_10m_dominant',
+                  i
+               ),
+               uvIndexMax: at(daily, 'uv_index_max', i),
+               /* The moon at local noon, which is the day's phase for a calendar. */
+               moon: moonPhase(new Date(`${date}T12:00${suffix}`)),
+            },
+         ];
+      }
+   );
+
+   const value: Forecast = {
+      latitude,
+      longitude,
+      timezone: weather.timezone ?? null,
+      utcOffsetSeconds: weather.utc_offset_seconds ?? 0,
+      issuedAt: new Date().toISOString(),
+      hours,
+      days: forecastDays,
+   };
+
+   if (forecasts.size > 300) forecasts.clear();
+   forecasts.set(key, { until: Date.now() + REMEMBER_MS, value });
+   return value;
+}

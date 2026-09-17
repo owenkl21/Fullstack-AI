@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import z from 'zod';
 import { fetchPlaces } from '../services/places.service';
+import { namePlace, searchPlaces } from '../clients/geocoding.client';
 
 const boundsSchema = z
    .object({
@@ -41,7 +42,46 @@ const clamp = (b: z.infer<typeof boundsSchema>) => {
    };
 };
 
+const searchSchema = z.object({
+   q: z.string().trim().min(2).max(80),
+});
+
+const pointSchema = z.object({
+   latitude: z.coerce.number().min(-90).max(90),
+   longitude: z.coerce.number().min(-180).max(180),
+});
+
 export const placesController = {
+   /* A typed name to a short list of places, for the forecast search. */
+   async search(req: Request, res: Response) {
+      const parsed = searchSchema.safeParse(req.query);
+      if (!parsed.success) {
+         return res.status(400).json(parsed.error.format());
+      }
+      try {
+         const places = await searchPlaces(parsed.data.q);
+         res.setHeader('Cache-Control', 'public, max-age=3600');
+         return res.json({ places });
+      } catch (error) {
+         console.warn('[places] search failed', String(error));
+         return res.status(503).json({ places: [], failed: true });
+      }
+   },
+
+   /* Coordinates to the nearest named place, so a panel can say where it is. */
+   async name(req: Request, res: Response) {
+      const parsed = pointSchema.safeParse(req.query);
+      if (!parsed.success) {
+         return res.status(400).json(parsed.error.format());
+      }
+      const place = await namePlace(
+         parsed.data.latitude,
+         parsed.data.longitude
+      );
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.json({ place });
+   },
+
    async list(req: Request, res: Response) {
       const parsed = boundsSchema.safeParse(req.query);
       if (!parsed.success) {

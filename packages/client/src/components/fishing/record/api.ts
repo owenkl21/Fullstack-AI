@@ -83,7 +83,13 @@ export type WeatherSnapshot = {
    };
    temperature?: { degrees?: number; unit?: string };
    feelsLikeTemperature?: { degrees?: number; unit?: string };
-   precipitation?: { probability?: { percent?: number } };
+   precipitation?: {
+      probability?: { percent?: number };
+      /* Millimetres in the hour. */
+      amountMm?: number | null;
+   };
+   /* Convective energy, J/kg. The nearest thing to a lightning forecast. */
+   thunder?: { cape?: number | null };
    wind?: {
       direction?: { cardinal?: string };
       speed?: { value?: number; unit?: string };

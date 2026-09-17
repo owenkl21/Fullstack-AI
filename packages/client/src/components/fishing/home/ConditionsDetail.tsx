@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { WeatherSnapshot } from '@/components/fishing/record/api';
+import { thunderRisk } from '@/components/forecast/forecast-api';
 import {
    BoltIcon,
    CloudIcon,
@@ -139,11 +140,18 @@ export function ConditionsDetail({
     * than it did.
     */
    const rain = whole(snapshot.precipitation?.probability?.percent);
+   const fall = one(snapshot.precipitation?.amountMm);
    push(
       'rain',
       <CloudRainIcon aria-hidden="true" />,
       'Rain',
-      rain === null ? null : rain === 0 ? 'None expected' : `${rain}% chance`
+      rain === null
+         ? null
+         : rain === 0
+           ? 'None expected'
+           : fall
+             ? `${rain}% chance, ${fall} mm`
+             : `${rain}% chance`
    );
 
    const feels = whole(snapshot.feelsLike?.degrees);
@@ -192,14 +200,23 @@ export function ConditionsDetail({
    const sky = (
       snapshot.weatherCondition?.description?.text ?? ''
    ).toLowerCase();
-   if (/thunder|storm/.test(sky)) {
-      push(
-         'thunder',
-         <BoltIcon aria-hidden="true" className="size-5" />,
-         'Thunder',
-         sky.includes('hail') ? 'Storms with hail' : 'Storms about'
-      );
-   }
+   const risk = thunderRisk(snapshot.thunder?.cape, sky);
+   push(
+      'thunder',
+      <BoltIcon aria-hidden="true" className="size-5" />,
+      'Thunder',
+      risk === 'storms'
+         ? sky.includes('hail')
+            ? 'Storms with hail'
+            : 'Storms about'
+         : risk === 'likely'
+           ? 'Likely later'
+           : risk === 'possible'
+             ? 'Possible'
+             : typeof snapshot.thunder?.cape === 'number'
+               ? 'None expected'
+               : null
+   );
 
    if (!facts.length) {
       return null;

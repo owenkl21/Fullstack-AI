@@ -77,6 +77,16 @@ export function AccountMenu() {
                   >
                      Your profile
                   </Link>
+                  {/* The phone bar has four slots and the forecast is not one
+                      of them; the home page links to it too. */}
+                  <Link
+                     role="menuitem"
+                     to="/forecast"
+                     onClick={() => setOpen(false)}
+                     className="g-tracked block px-2 py-2 text-[17px] hover:bg-bg-2 md:hidden"
+                  >
+                     Forecast
+                  </Link>
                   {/* Gear lost its phone tab slot to Boards, so it lives here. */}
                   <Link
                      role="menuitem"

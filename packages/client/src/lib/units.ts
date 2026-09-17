@@ -83,3 +83,43 @@ export function formatMeasure(
       ? formatLength(value, system)
       : formatMass(value, system);
 }
+
+const KPH_PER_MPH = 1.609344;
+const M_PER_FOOT = 0.3048;
+
+/*
+ * Weather figures, as numbers, in the reader's units.
+ *
+ * A forecast grid prints the unit once in the row label and the bare figure in
+ * every cell, so these return numbers rather than strings.
+ */
+export function tempIn(c: number | null | undefined, system: UnitSystem) {
+   if (typeof c !== 'number' || !Number.isFinite(c)) return null;
+   return Math.round(system === 'IMPERIAL' ? (c * 9) / 5 + 32 : c);
+}
+
+export function speedIn(kph: number | null | undefined, system: UnitSystem) {
+   if (typeof kph !== 'number' || !Number.isFinite(kph)) return null;
+   return Math.round(system === 'IMPERIAL' ? kph / KPH_PER_MPH : kph);
+}
+
+export function heightIn(m: number | null | undefined, system: UnitSystem) {
+   if (typeof m !== 'number' || !Number.isFinite(m)) return null;
+   return Math.round((system === 'IMPERIAL' ? m / M_PER_FOOT : m) * 10) / 10;
+}
+
+export const unitOf = (
+   kind: 'temp' | 'speed' | 'height',
+   system: UnitSystem
+) =>
+   kind === 'temp'
+      ? system === 'IMPERIAL'
+         ? '°F'
+         : '°C'
+      : kind === 'speed'
+        ? system === 'IMPERIAL'
+           ? 'mph'
+           : 'km/h'
+        : system === 'IMPERIAL'
+          ? 'ft'
+          : 'm';

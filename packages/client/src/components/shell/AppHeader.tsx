@@ -10,6 +10,7 @@ const destinations = [
    { to: '/feed', label: 'Feed' },
    { to: '/catches/me', label: 'Catches' },
    { to: '/map', label: 'Map' },
+   { to: '/forecast', label: 'Forecast' },
    { to: '/sites/me', label: 'Spots' },
    { to: '/gear/me', label: 'Gear' },
    { to: '/boards', label: 'Boards' },

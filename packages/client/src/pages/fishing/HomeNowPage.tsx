@@ -35,6 +35,7 @@ import {
    sortByNewest,
 } from '@/components/fishing/home/summary';
 import { usePosition } from '@/lib/position';
+import { namePlace } from '@/components/forecast/forecast-api';
 
 const FALLBACK_PHOTO = '/photos/spot-rock-ocean.jpg';
 
@@ -113,6 +114,18 @@ function useConditions() {
    const [status, setStatus] = useState<ConditionsStatus>('idle');
    const [snapshot, setSnapshot] = useState<WeatherSnapshot | null>(null);
    const [takenAt, setTakenAt] = useState<string | null>(null);
+   const [place, setPlace] = useState<string | null>(null);
+
+   /* The name of where that is. Separate from the reading, and never in its
+    * way: the figures show whether or not the name comes back. */
+   useEffect(() => {
+      if (!fix) return;
+      const controller = new AbortController();
+      namePlace(fix.latitude, fix.longitude, controller.signal)
+         .then((found) => setPlace(found?.name ?? null))
+         .catch(() => undefined);
+      return () => controller.abort();
+   }, [fix?.latitude, fix?.longitude]);
 
    /* Whenever a position is known, fetch for it. A newer fix replaces the
     * reading rather than leaving a stale one on screen. */
@@ -163,6 +176,7 @@ function useConditions() {
       readouts: snapshot ? toReadouts(snapshot) : null,
       snapshot,
       takenAt,
+      place,
       request,
    };
 }
@@ -193,6 +207,7 @@ function HomeNow() {
                status={conditions.status}
                readouts={conditions.readouts}
                takenAt={conditions.takenAt}
+               place={conditions.place}
                snapshot={conditions.snapshot}
                onRequest={conditions.request}
             />

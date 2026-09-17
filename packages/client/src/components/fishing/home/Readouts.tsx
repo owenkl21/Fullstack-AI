@@ -1,5 +1,6 @@
 import { Contours } from '@/components/brand/Contours';
 import { Underwater } from '@/components/brand/Underwater';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { CountIn } from '@/components/fishing/record/CountIn';
 import type { toReadouts } from '@/components/fishing/record/api';
@@ -27,6 +28,7 @@ export function Readouts({
    readouts,
    snapshot,
    takenAt,
+   place,
    onRequest,
 }: {
    status: ConditionsStatus;
@@ -34,6 +36,8 @@ export function Readouts({
    /* The whole reading, for the detail under the three headline figures. */
    snapshot?: WeatherSnapshot | null;
    takenAt: string | null;
+   /* The nearest named place, once it is known. */
+   place?: string | null;
    onRequest: () => void;
 }) {
    const waiting = status === 'locating' || status === 'loading';
@@ -85,10 +89,19 @@ export function Readouts({
                </div>
                <ConditionsDetail snapshot={snapshot ?? null} />
 
-               <p className="relative mt-4 text-[14px] text-ink-3">
-                  {takenAt
-                     ? `Conditions at your position, taken ${takenAt}.`
-                     : 'Conditions at your position.'}
+               <p className="relative mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[14px] text-ink-3">
+                  <span>
+                     {place
+                        ? `Conditions at ${place}`
+                        : 'Conditions at your position'}
+                     {takenAt ? `, taken ${takenAt}.` : '.'}
+                  </span>
+                  <Link
+                     to="/forecast"
+                     className="g-tracked text-[16px] text-ink underline-offset-4 hover:underline"
+                  >
+                     The week ahead
+                  </Link>
                </p>
             </>
          ) : waiting ? (
@@ -122,14 +135,22 @@ export function Readouts({
                        ? 'Could not read the conditions here. Try again.'
                        : 'Tap to get conditions'}
                </p>
-               <Button
-                  type="button"
-                  variant="outline"
-                  size="lg"
-                  onClick={onRequest}
-               >
-                  {status === 'idle' ? 'Use my position' : 'Try again'}
-               </Button>
+               <div className="flex flex-wrap items-center gap-4">
+                  <Button
+                     type="button"
+                     variant="outline"
+                     size="lg"
+                     onClick={onRequest}
+                  >
+                     {status === 'idle' ? 'Use my position' : 'Try again'}
+                  </Button>
+                  <Link
+                     to="/forecast"
+                     className="g-tracked text-[17px] text-ink underline-offset-4 hover:underline"
+                  >
+                     Or look up a place
+                  </Link>
+               </div>
             </div>
          )}
       </section>

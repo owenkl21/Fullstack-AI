@@ -220,6 +220,41 @@ export function skyIcon(
    return SunIcon;
 }
 
+/*
+ * Which way the wind is going. Weather reports give the direction the wind
+ * comes from; an arrow is read as where it goes, so the mark is turned half a
+ * circle from the reported bearing. Straight up is north.
+ */
+export function WindArrowIcon({
+   degrees,
+   className,
+   ...rest
+}: IconProps & { degrees: number }) {
+   return (
+      <svg
+         viewBox="0 0 24 24"
+         className={cn('size-5', className)}
+         style={{ transform: `rotate(${(degrees + 180) % 360}deg)` }}
+         {...stroke}
+         {...rest}
+      >
+         <path d="M12 20V4M6 10l6-6 6 6" />
+      </svg>
+   );
+}
+
+/** The sky icon for a reading, as an element rather than a component. */
+export function SunIconFor({
+   text,
+   className,
+}: {
+   text: string | null | undefined;
+   className?: string;
+}) {
+   const Sky = skyIcon(text);
+   return <Sky aria-hidden="true" className={cn('size-5', className)} />;
+}
+
 /** Which way the barometer is going, once there is a previous reading to compare. */
 export function trendIcon(delta: number | null): ComponentType<IconProps> {
    if (delta === null || Math.abs(delta) < 0.5) return ArrowsRightLeftIcon;
