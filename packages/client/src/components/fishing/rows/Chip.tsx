@@ -23,7 +23,7 @@ export function Chip({
          aria-pressed={pressed}
          onClick={onClick}
          className={cn(
-            'g-tracked inline-flex h-11 items-center gap-2 border border-ink px-4 text-[19px] transition-colors duration-150 [transition-timing-function:var(--ease)]',
+            'g-tracked inline-flex h-11 items-center gap-2 border border-ink px-4 text-[19px] transition-[background-color,color,transform] duration-150 [transition-timing-function:var(--ease)] active:scale-[0.97]',
             pressed ? 'bg-ink text-background' : 'text-ink hover:bg-bg-2'
          )}
       >

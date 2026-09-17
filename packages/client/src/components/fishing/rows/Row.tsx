@@ -45,7 +45,7 @@ export function Row({
    return (
       <div
          className={cn(
-            'relative -mx-2 grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3.5 border-t border-line px-2 py-3 transition-colors duration-150 [transition-timing-function:var(--ease)]',
+            'relative -mx-2 grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3.5 border-t border-line px-2 py-3 transition-[background-color,transform] duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2 active:scale-[0.995]',
             'hover:bg-bg-2 has-[a:focus-visible]:bg-bg-2'
          )}
       >

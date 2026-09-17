@@ -541,3 +541,16 @@ h1[tabindex='-1']:focus:not(:focus-visible),
    line-height: 2.75rem;
    font-size: 1.125rem;
 }
+
+/*
+ * Arrival is motion too, so it has to answer the same preference. Without this
+ * the reveal still slides for someone who asked it not to: the transition is
+ * shortened by the global rule, but the element still starts 26px low.
+ */
+@media (prefers-reduced-motion: reduce) {
+   .rv {
+      opacity: 1;
+      transform: none;
+      transition: none;
+   }
+}

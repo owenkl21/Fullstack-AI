@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useRevealIn } from '@/components/brand/Reveal';
 import { Chip } from '@/components/fishing/rows/Chip';
 import { InlineError } from '@/components/states/InlineError';
 import { ListSkeleton } from '@/components/states/ListSkeleton';
@@ -21,6 +22,13 @@ const LOAD_FAILED = 'Could not load the boards.';
  */
 export function BoardsPage() {
    useDocumentTitle('Boards');
+   /*
+    * One arrival for the page, staggered down the column. The plugin guidance
+    * is right that a fade-up on every section is the generic tell; this is a
+    * single orchestrated moment on load and nothing moves after it.
+    */
+   const root = useRef<HTMLElement>(null);
+   useRevealIn(root);
    const { isSignedIn } = useIsSignedIn();
    const [view, setView] = useState<'species' | 'rivals'>('species');
    const [boards, setBoards] = useState<SpeciesBoard[] | null>(null);
@@ -64,18 +72,28 @@ export function BoardsPage() {
    }, [isSignedIn, attempt]);
 
    return (
-      <section className="mx-auto w-full max-w-[1000px] px-4 py-10 md:px-8">
-         <span className="lab lab-rule text-ink-2">Boards</span>
-         <h1 className="g mt-5 text-[40px] md:text-[56px]">
+      <section
+         ref={root}
+         className="mx-auto w-full max-w-[1000px] px-4 py-10 md:px-8"
+      >
+         <span className="lab lab-rule rv text-ink-2">Boards</span>
+         <h1
+            className="g rv mt-5 text-[40px] md:text-[56px]"
+            style={{ '--i': 1 } as React.CSSProperties}
+         >
             Who is catching what
          </h1>
-         <p className="mt-3 max-w-[56ch] text-[17px] text-ink-2">
+         <p
+            className="rv mt-3 max-w-[56ch] text-[17px] text-ink-2"
+            style={{ '--i': 2 } as React.CSSProperties}
+         >
             Length becomes mass with published figures, and points are awarded
             per kilogram. The fish never has to be weighed, or kept.
          </p>
 
          <div
-            className="mt-7 flex flex-wrap gap-2"
+            className="rv mt-7 flex flex-wrap gap-2"
+            style={{ '--i': 3 } as React.CSSProperties}
             role="group"
             aria-label="Which board"
          >
@@ -90,7 +108,7 @@ export function BoardsPage() {
             </Chip>
          </div>
 
-         <div className="mt-8">
+         <div className="rv mt-8" style={{ '--i': 4 } as React.CSSProperties}>
             {status === 'loading' ? (
                <ListSkeleton
                   key={attempt}

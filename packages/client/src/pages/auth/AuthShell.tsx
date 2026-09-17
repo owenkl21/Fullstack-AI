@@ -1,5 +1,6 @@
-import type { FormEvent, ReactNode } from 'react';
-import { useId } from 'react';
+import type { CSSProperties, FormEvent, ReactNode } from 'react';
+import { useId, useRef } from 'react';
+import { useRevealIn } from '@/components/brand/Reveal';
 
 /*
  * One column, the same shape on every auth screen, so signing in and resetting
@@ -20,15 +21,34 @@ export function AuthShell({
    children: ReactNode;
    footer?: ReactNode;
 }) {
+   /* One arrival, staggered down the column, and nothing moves after it. */
+   const root = useRef<HTMLElement>(null);
+   useRevealIn(root);
+
    return (
-      <section className="mx-auto w-full max-w-[720px] px-4 py-12 md:px-8">
-         <h1 className="g text-[40px] md:text-[52px]">{title}</h1>
+      <section
+         ref={root}
+         className="mx-auto w-full max-w-[720px] px-4 py-12 md:px-8"
+      >
+         <h1 className="g rv text-[40px] md:text-[52px]">{title}</h1>
          {lead ? (
-            <p className="mt-3 max-w-[52ch] text-[17px] text-ink-2">{lead}</p>
+            <p
+               className="rv mt-3 max-w-[52ch] text-[17px] text-ink-2"
+               style={{ '--i': 1 } as CSSProperties}
+            >
+               {lead}
+            </p>
          ) : null}
-         <div className="mt-8">{children}</div>
+         <div className="rv mt-8" style={{ '--i': 2 } as CSSProperties}>
+            {children}
+         </div>
          {footer ? (
-            <div className="rule-dashed mt-10 pt-4">{footer}</div>
+            <div
+               className="rule-dashed rv mt-10 pt-4"
+               style={{ '--i': 3 } as CSSProperties}
+            >
+               {footer}
+            </div>
          ) : null}
       </section>
    );

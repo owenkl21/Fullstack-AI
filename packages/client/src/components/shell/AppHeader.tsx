@@ -21,12 +21,19 @@ const destinations = [
 export function AppHeader() {
    return (
       <header className="sticky top-0 z-30 h-[60px] border-b border-paper/10 bg-black-block text-paper">
-         <div className="mx-auto flex h-[60px] w-[min(1200px,100%-32px)] items-center gap-4 md:w-[min(1200px,100%-48px)]">
+         {/*
+          * Three zones, not two. The destinations used to sit immediately
+          * after the wordmark, which left roughly 545px of dead air before the
+          * actions on a 1440 screen and read as unfinished. Centring them
+          * fills the bar deliberately and keeps the wordmark and the actions
+          * anchored to their own edges.
+          */}
+         <div className="relative mx-auto flex h-[60px] w-[min(1200px,100%-32px)] items-center gap-4 md:w-[min(1200px,100%-48px)]">
             <Wordmark />
             <SignedIn>
                <nav
                   aria-label="Main"
-                  className="hidden items-center gap-6 md:flex"
+                  className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-7 md:flex"
                >
                   {destinations.map((d) => (
                      <NavLink
