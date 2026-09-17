@@ -53,6 +53,9 @@ export type CatchFormInitial = {
    waterTemp: number | null;
    visibility?: 'PRIVATE' | 'GROUPS' | 'PUBLIC';
    hideLocation?: boolean;
+   /* A pin of the catch's own, where it had one. */
+   latitude?: number | null;
+   longitude?: number | null;
    gearIds: string[];
    gears: GearOption[];
    images: UploadedImage[];
@@ -225,14 +228,22 @@ export function CatchForm({
    const [isPhotoUploading, setIsPhotoUploading] = useState(false);
 
    const [sites, setSites] = useState<SiteOption[]>([]);
+   const startsWithPin =
+      typeof initial?.latitude === 'number' &&
+      typeof initial?.longitude === 'number';
    const [spotMode, setSpotMode] = useState<SpotMode>(
-      initial?.siteId ? 'saved' : 'here'
+      initial?.siteId ? 'saved' : startsWithPin ? 'new' : 'here'
    );
    const [savedSiteId, setSavedSiteId] = useState(initial?.siteId ?? '');
    const [siteSearch, setSiteSearch] = useState('');
    const [newSpotName, setNewSpotName] = useState('');
-   const [newLatitude, setNewLatitude] = useState('');
-   const [newLongitude, setNewLongitude] = useState('');
+   /* A catch that carried its own pin opens with that pin already placed. */
+   const [newLatitude, setNewLatitude] = useState(
+      startsWithPin ? String(initial?.latitude) : ''
+   );
+   const [newLongitude, setNewLongitude] = useState(
+      startsWithPin ? String(initial?.longitude) : ''
+   );
    const [herePosition, setHerePosition] = useState<{
       latitude: number;
       longitude: number;
@@ -462,6 +473,13 @@ export function CatchForm({
 
    /* --- conditions ------------------------------------------------- */
 
+   /* Read inside fetchConditions without making it a new function on every
+    * keystroke in the date field, which would restart the debounce. */
+   const caughtAtRef = useRef(caughtAt);
+   useEffect(() => {
+      caughtAtRef.current = caughtAt;
+   }, [caughtAt]);
+
    const fetchConditions = useCallback(
       async (
          coordinates: { latitude: number; longitude: number },
@@ -473,8 +491,17 @@ export function CatchForm({
          setConditionsMessage(null);
 
          try {
+            /*
+             * For the hour it was caught. A fish logged that evening from the
+             * couch, or a week later from a photograph, wants the weather it
+             * was caught in, and the client can read that back for weeks.
+             */
+            const at = fromLocalInputValue(caughtAtRef.current);
             const { data } = await axios.get('/api/weather/current', {
-               params: coordinates,
+               params: {
+                  ...coordinates,
+                  ...(at ? { at: at.toISOString() } : {}),
+               },
             });
 
             // A reading that arrived after a newer one was asked for is dropped.
@@ -527,7 +554,9 @@ export function CatchForm({
       }, 400);
 
       return () => window.clearTimeout(timer);
-   }, [isEdit, activeCoordinates, fetchConditions]);
+      /* caughtAt is in the list on purpose: moving the time to last night has
+       * to fetch last night's weather. */
+   }, [isEdit, activeCoordinates, fetchConditions, caughtAt]);
 
    const refreshConditions = () => {
       setIsConfirmingRefresh(false);
@@ -660,7 +689,10 @@ export function CatchForm({
          }
          case 'newSpotName': {
             if (spotMode !== 'new') return undefined;
-            if (newSpotName.trim().length < 2)
+            /* Blank is allowed: then only this catch keeps the pin and no
+             * spot is made. A name that is there has to be a name. */
+            const name = newSpotName.trim();
+            if (name.length > 0 && name.length < 2)
                return 'Give the spot a name, at least two letters.';
             return undefined;
          }
@@ -702,6 +734,17 @@ export function CatchForm({
          /* Null where the name is not one we publish figures for. The catch
           * still saves; it just cannot be ranked, and the profile says so. */
          speciesId: matchSpecies(species, speciesList)?.id ?? null,
+         /*
+          * Where exactly. Kept on the catch when the position is the device's
+          * or a dropped pin; left null when it is simply the saved spot's, so
+          * the spot stays the one place that position lives.
+          */
+         latitude:
+            spotMode !== 'saved' ? (activeCoordinates?.latitude ?? null) : null,
+         longitude:
+            spotMode !== 'saved'
+               ? (activeCoordinates?.longitude ?? null)
+               : null,
          visibility,
          /* Only meaningful on a catch anyone else can see. */
          hideLocation: visibility === 'PUBLIC' ? hideLocation : false,
@@ -781,7 +824,7 @@ export function CatchForm({
          let siteId: string | null =
             spotMode === 'saved' ? savedSiteId || null : null;
 
-         if (spotMode === 'new' && activeCoordinates) {
+         if (spotMode === 'new' && activeCoordinates && newSpotName.trim()) {
             const { data } = await axios.post('/api/sites', {
                name: newSpotName.trim(),
                latitude: activeCoordinates.latitude,
@@ -1326,6 +1369,10 @@ export function CatchForm({
                      <label htmlFor="new-spot" className="lab block">
                         Name this spot
                      </label>
+                     <p className="mt-1 text-[14px] text-ink-3">
+                        Name it and it is saved as a spot to go back to. Leave
+                        it blank and only this catch keeps the pin.
+                     </p>
                      <input
                         id="new-spot"
                         data-field="newSpotName"
@@ -1381,7 +1428,10 @@ export function CatchForm({
                />
                <p id="caught-at-zone" className="mt-2 text-[14px] text-ink-3">
                   {caughtAtDate ? `${dateSentence(caughtAtDate)}. ` : ''}
-                  {zone ? `Your time, ${zone}.` : 'Your own time.'}
+                  {zone ? `Your time, ${zone}.` : 'Your own time.'} The
+                  conditions below are read for this hour, wherever the pin is,
+                  so a fish logged tonight still gets the weather it was caught
+                  in.
                </p>
                <FieldError id="caught-at-error" message={errors.caughtAt} />
             </div>

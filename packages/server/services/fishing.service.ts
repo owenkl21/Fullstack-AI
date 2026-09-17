@@ -47,6 +47,8 @@ type CreateCatchInput = {
    speciesId?: string | null;
    released?: boolean;
    hideLocation?: boolean;
+   latitude?: number | null;
+   longitude?: number | null;
    visibility?: 'PRIVATE' | 'GROUPS' | 'PUBLIC';
    weight?: number | null;
    length?: number | null;
@@ -500,8 +502,21 @@ export const fishingService = {
       };
    },
 
-   async getCurrentWeatherByCoordinates(latitude: number, longitude: number) {
-      const conditions = await getConditionsAt(latitude, longitude, new Date());
+   /*
+    * The conditions at a place, at a moment. "Current" stays in the name for
+    * the route that already calls it; with `at` it is the hour a fish was
+    * caught, which the Open-Meteo client can read back for weeks.
+    */
+   async getCurrentWeatherByCoordinates(
+      latitude: number,
+      longitude: number,
+      at?: Date
+   ) {
+      const conditions = await getConditionsAt(
+         latitude,
+         longitude,
+         at ?? new Date()
+      );
       return toWeatherSnapshot(conditions);
    },
 
@@ -557,6 +572,8 @@ export const fishingService = {
                count: input.count ?? 1,
                released: input.released ?? false,
                hideLocation: input.hideLocation ?? false,
+               latitude: input.latitude ?? null,
+               longitude: input.longitude ?? null,
                visibility: input.visibility ?? 'PUBLIC',
                weather: input.weather,
                waterTemp:
@@ -628,6 +645,26 @@ export const fishingService = {
           * be read by something that forgets to filter.
           */
          if ((input.visibility ?? 'PUBLIC') !== 'PRIVATE') {
+            /*
+             * The post carries a position, so Near me can find a catch and not
+             * only a spot. The pin wins, the spot's position is the fallback,
+             * and neither travels when the angler asked to keep the mark to
+             * themselves: the catch still has it, the post does not.
+             */
+            const site = relations.siteId
+               ? await tx.fishingSite.findUnique({
+                    where: { id: relations.siteId },
+                    select: { latitude: true, longitude: true },
+                 })
+               : null;
+            const withhold = input.hideLocation ?? false;
+            const latitude = withhold
+               ? null
+               : (input.latitude ?? site?.latitude ?? null);
+            const longitude = withhold
+               ? null
+               : (input.longitude ?? site?.longitude ?? null);
+
             await tx.feedPost.create({
                data: {
                   authorId: user.id,
@@ -636,6 +673,9 @@ export const fishingService = {
                   visibility: input.visibility ?? 'PUBLIC',
                   content: input.notes || null,
                   catchId: catchRecord.id,
+                  siteId: withhold ? null : (relations.siteId ?? null),
+                  latitude,
+                  longitude,
                },
             });
          }
@@ -747,6 +787,8 @@ export const fishingService = {
                count: input.count,
                released: input.released,
                hideLocation: input.hideLocation,
+               latitude: input.latitude,
+               longitude: input.longitude,
                visibility: input.visibility,
                weather: input.weather,
                waterTemp: input.waterTemp,

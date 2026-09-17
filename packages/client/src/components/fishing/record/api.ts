@@ -29,6 +29,11 @@ export type CatchDetail = {
    id: string;
    title: string;
    notes: string | null;
+   /* The catch's own pin, where it had one; null when only the spot is known. */
+   latitude?: number | null;
+   longitude?: number | null;
+   visibility?: 'PRIVATE' | 'GROUPS' | 'PUBLIC';
+   hideLocation?: boolean;
    caughtAt: string;
    weather: string | null;
    weatherConditionText: string | null;
@@ -129,15 +134,30 @@ export async function fetchCatch(catchId: string, signal?: AbortSignal) {
    return data.catch;
 }
 
+/**
+ * The conditions at a place, at a moment.
+ *
+ * `at` is the hour the fish was caught. Left out, it means now, which is right
+ * for the home page and wrong for a catch logged that evening from the couch:
+ * that one wants the weather it was actually caught in.
+ */
 export async function fetchConditions(
    latitude: number,
    longitude: number,
-   signal?: AbortSignal
+   signal?: AbortSignal,
+   at?: Date | null
 ) {
    const { data } = await axios.get<{
       weather: WeatherSnapshot | null;
       weatherError?: string;
-   }>('/api/weather/current', { params: { latitude, longitude }, signal });
+   }>('/api/weather/current', {
+      params: {
+         latitude,
+         longitude,
+         ...(at ? { at: at.toISOString() } : {}),
+      },
+      signal,
+   });
    return data.weather ?? null;
 }
 

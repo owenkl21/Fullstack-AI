@@ -7,6 +7,12 @@ export const fishingRequestSchema = z.object({
 export const weatherLookupSchema = z.object({
    latitude: z.coerce.number().min(-90).max(90),
    longitude: z.coerce.number().min(-180).max(180),
+   /*
+    * The moment to read for. A catch logged from the couch that night, or a
+    * week later from a photograph, wants the conditions at the hour it was
+    * caught, not the hour it was typed in. Absent, it means now.
+    */
+   at: z.coerce.date().optional(),
 });
 
 const optionalTrimmedString = z
@@ -57,6 +63,14 @@ const catchPayloadSchema = z.object({
    caughtAt: z.coerce.date(),
    siteId: z.string().trim().min(1).optional().nullable(),
    speciesId: z.string().trim().min(1).optional().nullable(),
+   /*
+    * Where exactly, when it is not simply "the spot". A saved spot is a place
+    * you go back to; a pin is where this one fish came out, which can be a
+    * hundred metres along the ledge from it, or nowhere near any saved spot at
+    * all when a catch is logged after the fact.
+    */
+   latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
+   longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
    released: z.coerce.boolean().optional(),
    /* Show the fish, withhold the gully it came from. */
    hideLocation: z.coerce.boolean().optional(),

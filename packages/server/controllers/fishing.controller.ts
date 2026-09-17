@@ -30,7 +30,8 @@ export const fishingController = {
       try {
          const weather = await fishingService.getCurrentWeatherByCoordinates(
             parseResult.data.latitude,
-            parseResult.data.longitude
+            parseResult.data.longitude,
+            parseResult.data.at
          );
 
          return res.json({ weather });

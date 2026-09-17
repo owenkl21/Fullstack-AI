@@ -308,6 +308,16 @@ model Catch {
    * discarded, so the record stays complete.
    */
   hideLocation                            Boolean  @default(false)
+
+  /*
+   * Where exactly. A saved spot is a place you go back to; this is where this
+   * one fish came out, which can be along the ledge from the spot or nowhere
+   * near a saved spot at all when a catch is logged after the fact. Null when
+   * only the spot is known. Withheld from other anglers when hideLocation is
+   * set, never discarded.
+   */
+  latitude                                Float?
+  longitude                               Float?
   weatherUvIndex                          Int?
   weatherThunderstormProbability          Int?
   weatherCloudCover                       Int?
