@@ -51,7 +51,13 @@ export function SpotHeader({
           * also ran to the viewport edge while every section below sits in an
           * 860px column, so the page had two different left margins.
           */}
-         <div className="absolute inset-x-0 bottom-7 z-[2] md:bottom-12">
+         {/*
+          * Clear of the torn edge, which is 56px on a phone and 90px above that
+          * and paints the next section's paper at a higher layer. The headline
+          * used to sit inside that band, so its feet were washed out by the
+          * very shape that was meant to sit under it.
+          */}
+         <div className="absolute inset-x-0 bottom-[68px] z-[2] md:bottom-[104px]">
             <div className="mx-auto flex w-full max-w-[860px] flex-col gap-2.5 px-4 md:px-8">
                {lastFished ? (
                   <span className="lab text-teal">{lastFished}</span>

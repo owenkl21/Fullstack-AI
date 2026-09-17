@@ -53,7 +53,13 @@ export function ChipRadioGroup<T extends string>({
 
    return (
       <div className={cn('flex flex-col gap-2', className)}>
-         <span id={labelId} className="lab">
+         {/*
+          * On a phone the caps label above each group cost more height than the
+          * chips under it, and the chips already read Everywhere and Catches in
+          * plain words. It comes back where the column is wide enough to spend
+          * the room, and screen readers never lose it.
+          */}
+         <span id={labelId} className="lab sr-only sm:not-sr-only">
             {label}
          </span>
          <div

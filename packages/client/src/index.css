@@ -315,12 +315,19 @@
       );
    }
    .scrim-photo {
+      /*
+       * Dark enough where words go. The old ramp was still at 0.1 more than
+       * halfway down, so a teal overline landed on sunlit rock and neither the
+       * photograph nor the word won. It stays light through the middle, where
+       * the picture is doing the work, and commits below that.
+       */
       background: linear-gradient(
          180deg,
          rgba(11, 9, 9, 0.45) 0%,
-         rgba(11, 9, 9, 0.05) 35%,
-         rgba(11, 9, 9, 0.1) 55%,
-         rgba(11, 9, 9, 0.9) 100%
+         rgba(11, 9, 9, 0.05) 32%,
+         rgba(11, 9, 9, 0.34) 60%,
+         rgba(11, 9, 9, 0.72) 80%,
+         rgba(11, 9, 9, 0.92) 100%
       );
    }
    /* Dashed underline inputs */

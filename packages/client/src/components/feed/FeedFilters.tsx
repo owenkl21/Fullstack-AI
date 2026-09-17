@@ -56,7 +56,7 @@ export function FeedFilters({
 
    return (
       <section aria-label="Filters" className="flex flex-col gap-6">
-         <div className="flex flex-col gap-6 sm:flex-row sm:gap-10">
+         <div className="flex flex-col gap-3 sm:flex-row sm:gap-10">
             <ChipRadioGroup
                label="Scope"
                value={scope}

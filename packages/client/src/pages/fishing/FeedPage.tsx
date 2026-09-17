@@ -38,7 +38,6 @@ import type {
    ShowFilter,
 } from '@/components/feed/types';
 import { useDocumentTitle } from '@/lib/title';
-import { SignedIn } from '@/components/shell/Signed';
 import { useIsSignedIn, useSession } from '@/lib/auth-client';
 
 const PAGE_SIZE = 25;
@@ -589,11 +588,6 @@ export function FeedPage() {
             <p className="max-w-[46ch] text-[17px] text-ink-2">
                What other anglers logged, newest first.
             </p>
-            <SignedIn>
-               <p className="text-[15px] text-ink-3">
-                  Your own posts appear here when you log a catch or add a spot.
-               </p>
-            </SignedIn>
          </header>
 
          <div className="rv mt-8" style={{ '--i': 1 } as CSSProperties}>
