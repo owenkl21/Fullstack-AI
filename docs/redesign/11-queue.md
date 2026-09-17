@@ -187,6 +187,39 @@ all passing.
 - Contour drift sits behind insights, forecast, boards, competitions, the feed,
   the catch list and a catch.
 
+## Done on 17 Sep, late (commits 5352991, 1f7b35c and the plate tightening)
+
+Server (deployed with `railway up`; the pre-deploy `prisma db push` made the
+tables): `Notification` and `SavedPost` models; `notifications.service.ts`
+written to on follow, reply, like, invitation sent and answered; routes
+`/api/notifications`, `/api/notifications/unread`, `POST /api/notifications/read`;
+`/api/saved/posts` list, keep, let go, and `savedByMe` on feed posts;
+`POST /api/species` deduped by normalised name plus a letter or two of
+spelling; `RIG` in `GearType`; `clients/weatherkit.client.ts` used for the
+reading of the moment when `WEATHERKIT_TEAM_ID`, `WEATHERKIT_KEY_ID`,
+`WEATHERKIT_SERVICE_ID` and `WEATHERKIT_PRIVATE_KEY` are set (Open-Meteo keeps
+the sea, sun, moon and the week); feed authors' avatars are signed.
+
+Client: bell in the header (`shell/NotificationBell.tsx`, polling 45 s) and
+`pages/NotificationsPage.tsx`; Keep on every post and a Posts list on Kept;
+`fishing/SpeciesCombobox.tsx` on both forms (search, add, Not sure); kept or
+released on both forms; gear and bait pickers on the quick log; drafts in
+`lib/drafts.ts` with a list under My catches and Save as draft on both forms;
+the quick log's map open from the start, the full form's here mode on the
+same map; Right now on the forecast; place search nearest-first with a tap
+on a phone. Look: `brand/PageHead.tsx` (inverted plate with the waterline)
+on feed, insights, forecast, boards, competitions, my catches and
+notifications; `brand/ContourField.tsx` lays four patches across a page;
+the wet strip in `TornEdge` no longer draws a straight edge; feed cards
+share a row height and comments load as the thread scrolls; map pin cards
+(`map/popup.ts`) with marks; pins show the fish beside the count;
+`states/NoData.tsx` for empty lists; teal clear cross on search inputs;
+bigger profile photos; a long name wraps.
+
+Checked live by `audit/lbl4.mjs` (three of its fails were the check reading
+upper-cased text; confirmed by `a2.mjs`). The Now page (`HomeNowPage`) is
+in the code with no route and no nav word, as asked.
+
 ## Next, in order
 
 1. **Switch the readers on**: set `ANTHROPIC_API_KEY` on Railway for the

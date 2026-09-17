@@ -29,7 +29,7 @@ export function PageHead({
 }) {
    return (
       <header className="relative left-1/2 z-[1] mb-[102px] w-screen -translate-x-1/2 bg-black-block text-paper md:mb-[142px]">
-         <div className={cn('mx-auto pt-8 pb-10 md:pt-12 md:pb-14', column)}>
+         <div className={cn('mx-auto pt-7 pb-3 md:pt-10 md:pb-4', column)}>
             <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
                <div className="min-w-0">
                   {kicker ? <p className="lab text-teal">{kicker}</p> : null}
