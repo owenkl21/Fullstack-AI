@@ -43,6 +43,18 @@ enum CompetitionRule {
  * Which units an angler reads in. South Africa is metric, so that is the
  * default, but plenty of tackle and plenty of visiting anglers are not.
  */
+/*
+ * What a waypoint is for. A mark on a map means nothing six months later
+ * without knowing why it was dropped.
+ */
+enum WaypointKind {
+  MARK
+  ACCESS
+  HAZARD
+  PARKING
+  BAIT
+}
+
 enum UnitSystem {
   METRIC
   IMPERIAL
@@ -140,6 +152,7 @@ model User {
   groupMemberships    GroupMember[]
   competitionsCreated Competition[] @relation("CompetitionsCreated")
   competitionEntries  CompetitionEntrant[]
+  waypoints           Waypoint[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
@@ -552,6 +565,32 @@ model Competition {
  * this records intent to compete rather than any score: a derived board cannot
  * drift from the records it describes, and this keeps that true.
  */
+/*
+ * A private mark on the map.
+ *
+ * Never shared, with nobody, ever. There is no visibility column here on
+ * purpose: a spot has one because a spot can be shown to people, and the moment
+ * a waypoint grows one somebody will set it wrong. A fishing mark is the most
+ * closely held thing an angler has, and the promise the interface makes is that
+ * these are only ever yours.
+ */
+model Waypoint {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String       @db.VarChar(120)
+  note      String?      @db.VarChar(500)
+  kind      WaypointKind @default(MARK)
+  latitude  Float
+  longitude Float
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId, deletedAt])
+  @@map("waypoints")
+}
+
 model CompetitionEntrant {
   id            String      @id @default(cuid())
   competitionId String

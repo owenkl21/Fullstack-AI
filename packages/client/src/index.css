@@ -584,6 +584,67 @@
 }
 
 /*
+ * The pin vocabulary.
+ *
+ * Shape carries the kind and colour reinforces it, never the other way round,
+ * so the map still reads for anyone who cannot separate teal from grey. The
+ * count rides on the pin because "how many fish came out of here" is the
+ * question the map is being asked, and hiding it inside a popup means opening
+ * every pin to answer it.
+ */
+.map-pin-kind .map-pin-body {
+   position: relative;
+   display: block;
+   line-height: 0;
+}
+.map-pin-kind .map-pin-drop {
+   fill: var(--ink);
+   stroke: var(--paper);
+   stroke-width: 1.5;
+}
+.map-pin-kind .map-pin-glyph {
+   color: var(--paper);
+}
+.map-pin-spot .map-pin-drop {
+   fill: var(--teal);
+}
+.map-pin-spot .map-pin-glyph {
+   color: var(--teal-ink);
+}
+/* A waypoint is yours alone, so it is drawn as an outline rather than a solid
+ * mark: it is a note to self, not a place anyone else can see. */
+.map-pin-waypoint .map-pin-drop {
+   fill: var(--bg);
+   stroke: var(--ink);
+   stroke-width: 2;
+}
+.map-pin-waypoint .map-pin-glyph {
+   color: var(--ink);
+}
+.map-pin-poi .map-pin-drop {
+   fill: var(--ink-3);
+   stroke: var(--paper);
+}
+.map-pin-count {
+   position: absolute;
+   top: -4px;
+   right: -6px;
+   min-width: 20px;
+   padding: 0 5px;
+   border-radius: 999px;
+   background: var(--ink);
+   color: var(--paper);
+   font-size: 11px;
+   line-height: 18px;
+   text-align: center;
+   font-variant-numeric: tabular-nums;
+   box-shadow: 0 0 0 2px var(--bg);
+}
+.map-pin-spot .map-pin-count {
+   background: var(--ink);
+}
+
+/*
  * Headings are focused on navigation so a screen reader lands in the right
  * place. That focus is not a user action, so it must not paint a ring. A real
  * keyboard focus still does, through :focus-visible.

@@ -7,6 +7,7 @@ import { fishingController } from './controllers/fishing.controller';
 import { userController } from './controllers/user.controller';
 import { uploadsController } from './controllers/uploads.controller';
 import { competitionsController } from './controllers/competitions.controller';
+import { waypointsController } from './controllers/waypoints.controller';
 import { gearController } from './controllers/gear.controller';
 import { feedController } from './controllers/feed.controller';
 import { fromNodeHeaders } from 'better-auth/node';
@@ -95,6 +96,20 @@ router.get('/api/species', fishingController.searchSpecies);
 router.get('/api/stats/me', requireApiAuth, statsController.myStats);
 router.get('/api/stats/rivals', requireApiAuth, statsController.rivals);
 router.get('/api/competitions/species', statsController.speciesBoards);
+
+/* Private marks on the map. Never listed for anyone but their owner. */
+router.get('/api/waypoints', requireApiAuth, waypointsController.listMine);
+router.post('/api/waypoints', requireApiAuth, waypointsController.create);
+router.put(
+   '/api/waypoints/:waypointId',
+   requireApiAuth,
+   waypointsController.update
+);
+router.delete(
+   '/api/waypoints/:waypointId',
+   requireApiAuth,
+   waypointsController.remove
+);
 
 /* Competitions anglers run themselves. The species board above is a different
  * thing that happens to share the word, so it is registered first. */

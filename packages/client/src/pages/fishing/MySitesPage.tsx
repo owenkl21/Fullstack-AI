@@ -10,7 +10,6 @@ import { EmptyState } from '@/components/states/EmptyState';
 import { InlineError } from '@/components/states/InlineError';
 import { ListSkeleton } from '@/components/states/ListSkeleton';
 import { NoMatchState } from '@/components/states/NoMatchState';
-import { PlainState } from '@/components/states/PlainState';
 import { useShowMore } from '@/components/states/useShowMore';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
@@ -220,31 +219,26 @@ function MySitesList() {
                   to="/sites/new"
                />
             ) : onMap ? (
-               pins.length > 0 ? (
-                  <>
-                     <SpotsMap
-                        spots={pins}
-                        onOpen={(id) => navigate(`/sites/${id}`)}
-                     />
-                     {withoutPosition > 0 ? (
-                        <p className="mt-3 text-[15px] text-ink-2">
-                           {withoutPosition === 1
-                              ? 'One spot has no position saved, so it is not on the map. Edit it to drop a pin.'
-                              : `${withoutPosition} spots have no position saved, so they are not on the map. Edit them to drop a pin.`}
-                        </p>
-                     ) : null}
-                  </>
-               ) : (
-                  <PlainState sentence="None of your spots has a position saved yet, so there is nothing to map. Edit a spot to drop a pin on it.">
-                     <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setParam('view', '')}
-                     >
-                        Back to the list
-                     </Button>
-                  </PlainState>
-               )
+               /*
+                * The map is drawn whether or not a spot has a position. It
+                * carries private marks and the ramps and tackle shops around
+                * you now, so it is worth opening on its own, and refusing to
+                * draw it until somebody has pinned a spot hid all of that
+                * behind a chore.
+                */
+               <>
+                  <SpotsMap
+                     spots={pins}
+                     onOpen={(id) => navigate(`/sites/${id}`)}
+                  />
+                  {withoutPosition > 0 ? (
+                     <p className="mt-3 text-[15px] text-ink-2">
+                        {withoutPosition === 1
+                           ? 'One spot has no position saved, so it is not on the map. Edit it to drop a pin.'
+                           : `${withoutPosition} spots have no position saved, so they are not on the map. Edit them to drop a pin.`}
+                     </p>
+                  ) : null}
+               </>
             ) : filtered.length === 0 ? (
                <NoMatchState
                   sentence="No spot matches that search."

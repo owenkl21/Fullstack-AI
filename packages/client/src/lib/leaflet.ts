@@ -44,6 +44,75 @@ export const pinIcon = (): L.DivIcon =>
       popupAnchor: [0, -28],
    });
 
+/*
+ * A pin vocabulary, because one shape for everything makes a map unreadable.
+ *
+ * A saved spot, a private waypoint and a slipway are three different things and
+ * a reader should be able to tell them apart without opening any of them. Shape
+ * carries the kind and colour reinforces it, rather than colour alone, so the
+ * map still reads for anyone who cannot separate teal from grey.
+ */
+export type PinKind =
+   | 'spot'
+   | 'waypoint'
+   | 'ramp'
+   | 'marina'
+   | 'tackle'
+   | 'parking';
+
+/* Drawn inside a 24 box, sitting above the pin's point. */
+const GLYPHS: Record<PinKind, string> = {
+   /* The house fish. */
+   spot: '<path d="M4 12.5c2.6-3.6 6.2-5.2 10.4-4.2 2 .5 3.6 1.6 6.2 1.6-2 1.6-4.2 2-6.2 2-4.2 0-7.8-1-10.4.6Z"/>',
+   /* A flag: something you marked for yourself. */
+   waypoint: '<path d="M8 20V5"/><path d="M8 6h9l-2 3 2 3H8"/>',
+   /* A slipway: a ramp running into water. */
+   ramp: '<path d="M4 17h16"/><path d="M6 17 14 7h4"/><path d="M4 20.5h16"/>',
+   /* An anchor. */
+   marina:
+      '<path d="M12 8v12"/><circle cx="12" cy="5.5" r="2"/><path d="M5 13a7 7 0 0 0 14 0"/>',
+   /* A hook. */
+   tackle:
+      '<path d="M14 4v7a4 4 0 0 1-8 0V9"/><path d="M11.5 6.5 14 4l2.5 2.5"/>',
+   parking: '<path d="M9 19V6h4a3.5 3.5 0 0 1 0 7H9"/>',
+};
+
+const TONE: Record<PinKind, string> = {
+   spot: 'map-pin-spot',
+   waypoint: 'map-pin-waypoint',
+   ramp: 'map-pin-poi',
+   marina: 'map-pin-poi',
+   tackle: 'map-pin-poi',
+   parking: 'map-pin-poi',
+};
+
+/**
+ * A pin of a given kind, optionally carrying a count.
+ *
+ * The count sits on the pin rather than inside the popup, because "how many
+ * fish have come out of here" is the question the map is being asked, and
+ * making someone open every pin to answer it defeats the map.
+ */
+export const kindPin = (kind: PinKind, count?: number | null): L.DivIcon => {
+   const badge =
+      typeof count === 'number' && count > 0
+         ? `<span class="map-pin-count">${count > 99 ? '99+' : count}</span>`
+         : '';
+
+   return L.divIcon({
+      html:
+         `<span class="map-pin-body">` +
+         `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 34" width="34" height="42" aria-hidden="true">` +
+         `<path class="map-pin-drop" d="M12 33S1.5 20.8 1.5 12.5a10.5 10.5 0 1 1 21 0C22.5 20.8 12 33 12 33Z"/>` +
+         `<g class="map-pin-glyph" transform="translate(3.6 2.2) scale(0.7)" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[kind]}</g>` +
+         `</svg>${badge}</span>`,
+      className: `map-pin map-pin-kind ${TONE[kind]}`,
+      iconSize: [34, 42],
+      iconAnchor: [17, 41],
+      popupAnchor: [0, -38],
+   });
+};
+
 export type CreateMapOptions = {
    centre: MapPosition;
    zoom: number;
