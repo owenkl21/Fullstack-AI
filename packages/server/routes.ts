@@ -155,6 +155,12 @@ router.put('/api/gear/:gearId', requireApiAuth, gearController.updateGear);
 router.delete('/api/gear/:gearId', requireApiAuth, gearController.deleteGear);
 
 router.get('/api/users/me', requireApiAuth, userController.getCurrentProfile);
+/* Must sit after /me, or "me" would be read as a user id. */
+router.get(
+   '/api/users/:userId',
+   requireApiAuth,
+   userController.getPublicProfile
+);
 router.patch(
    '/api/users/me',
    requireApiAuth,

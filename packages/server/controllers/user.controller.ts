@@ -4,7 +4,54 @@ import { Prisma } from '@prisma/client';
 import { updateProfileSchema } from '../schemas/user.schema';
 import { userService } from '../services/user.service';
 
+/* Express can hand back a repeated query or route value as an array. */
+const asSingleParam = (value: string | string[] | undefined) =>
+   Array.isArray(value) ? value[0] : value;
+
 export const userController = {
+   /*
+    * Another angler's profile. Behind auth, because the whole app is, but the
+    * shape it returns is the public one: no email, and only records the owner
+    * marked PUBLIC.
+    */
+   getPublicProfile: async (req: Request, res: Response) => {
+      const auth = getAuth(req);
+      const userId = asSingleParam(req.params.userId);
+
+      if (!userId) {
+         return res.status(400).json({
+            code: 'user_id_required',
+            message: 'A user id is required.',
+         });
+      }
+
+      /* Your own id here is your own profile, so send them to the owner view
+       * rather than showing someone a stripped copy of themselves. */
+      if (auth.userId === userId) {
+         const own = await userService.getProfile(userId);
+         return own?.profile
+            ? res.json({ profile: { ...own.profile, isYou: true } })
+            : res.status(404).json({
+                 code: 'profile_not_found',
+                 message: 'That angler could not be found.',
+              });
+      }
+
+      const result = await userService.getPublicProfile(
+         userId,
+         auth.userId ?? null
+      );
+
+      if (!result?.profile) {
+         return res.status(404).json({
+            code: 'profile_not_found',
+            message: 'That angler could not be found.',
+         });
+      }
+
+      return res.json({ profile: result.profile });
+   },
+
    getCurrentProfile: async (req: Request, res: Response) => {
       const auth = getAuth(req);
 

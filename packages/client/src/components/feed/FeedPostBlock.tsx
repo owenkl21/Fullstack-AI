@@ -152,9 +152,13 @@ export function FeedPostBlock({
                </span>
             )}
             <span className="min-w-0">
-               <span className="block truncate font-semibold text-paper">
+               {/* The name is the way through to the angler who caught it. */}
+               <Link
+                  to={`/anglers/${post.author.id}`}
+                  className="block truncate font-semibold text-paper underline-offset-4 hover:underline"
+               >
                   {post.author.displayName}
-               </span>
+               </Link>
                {/*
                 * A username is optional now: better-auth creates an account
                 * before the angler has picked one. Rendering it unconditionally

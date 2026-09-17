@@ -101,6 +101,9 @@ const VerifyEmailPage = lazyRoute(() =>
       default: m.VerifyEmailPage,
    }))
 );
+const AnglerPage = lazyRoute(() =>
+   import('@/pages/AnglerPage').then((m) => ({ default: m.AnglerPage }))
+);
 const BoardsPage = lazyRoute(() =>
    import('@/pages/social/BoardsPage').then((m) => ({ default: m.BoardsPage }))
 );
@@ -133,6 +136,7 @@ function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/account" element={<AccountPage />} />
+            <Route path="/anglers/:userId" element={<AnglerPage />} />
             <Route path="/boards" element={<BoardsPage />} />
             <Route path="*" element={<NotFoundPage />} />
          </Route>

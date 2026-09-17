@@ -249,7 +249,140 @@ const buildProfileView = async (userId: string) => {
    } satisfies ProfileView;
 };
 
+/*
+ * Someone else's profile.
+ *
+ * Deliberately a separate query from buildProfileView rather than that one with
+ * a flag on it. The owner's view selects their email address and every catch
+ * they have, both of which would be a leak here, and a boolean threaded through
+ * a query that long is exactly how that kind of leak happens later.
+ *
+ * Only PUBLIC records appear. GROUPS is not PUBLIC: it means the people in that
+ * group, and this page is shown to anyone.
+ */
+const buildPublicProfileView = async (
+   userId: string,
+   viewerId: string | null
+) => {
+   const profile = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+         id: true,
+         username: true,
+         displayName: true,
+         bio: true,
+         avatarUrl: true,
+         createdAt: true,
+         /* No email. This page is public. */
+         _count: { select: { followers: true, following: true } },
+         catches: {
+            where: { deletedAt: null, visibility: 'PUBLIC' },
+            orderBy: { caughtAt: 'desc' },
+            take: 8,
+            select: {
+               id: true,
+               title: true,
+               images: {
+                  orderBy: { position: 'asc' },
+                  take: 1,
+                  select: {
+                     image: {
+                        select: { id: true, url: true, storageKey: true },
+                     },
+                  },
+               },
+            },
+         },
+         sites: {
+            where: { deletedAt: null, visibility: 'PUBLIC' },
+            orderBy: { createdAt: 'desc' },
+            take: 8,
+            select: {
+               id: true,
+               name: true,
+               images: {
+                  orderBy: { position: 'asc' },
+                  take: 1,
+                  select: {
+                     image: {
+                        select: { id: true, url: true, storageKey: true },
+                     },
+                  },
+               },
+            },
+         },
+      },
+   });
+
+   if (!profile) {
+      return null;
+   }
+
+   const catchImages = await Promise.all(
+      profile.catches
+         .filter((entry) => entry.images[0]?.image)
+         .map(async (entry) => ({
+            id: entry.images[0]!.image.id,
+            url: await maybeResolveImageReadUrl(
+               entry.images[0]!.image,
+               'user:publicCatchImage'
+            ),
+            sourceType: 'CATCH' as const,
+            sourceId: entry.id,
+            sourceTitle: entry.title,
+         }))
+   );
+
+   const siteImages = await Promise.all(
+      profile.sites
+         .filter((entry) => entry.images[0]?.image)
+         .map(async (entry) => ({
+            id: entry.images[0]!.image.id,
+            url: await maybeResolveImageReadUrl(
+               entry.images[0]!.image,
+               'user:publicSiteImage'
+            ),
+            sourceType: 'SITE' as const,
+            sourceId: entry.id,
+            sourceTitle: entry.name,
+         }))
+   );
+
+   /* Whether the reader already follows them, so the button knows what it is. */
+   const followed = viewerId
+      ? await prisma.follow.findFirst({
+           where: { followerId: viewerId, followingId: userId },
+           select: { followerId: true },
+        })
+      : null;
+
+   /*
+    * The avatar is resolved on its own rather than through withResolvedAvatar,
+    * because that takes the owner's shape and an email address is required by
+    * it. There is no email on this object at all, which is the point.
+    */
+   return {
+      id: profile.id,
+      username: profile.username,
+      displayName: profile.displayName,
+      bio: profile.bio,
+      avatarUrl: await maybeResolveAvatarReadUrl(profile.avatarUrl),
+      createdAt: profile.createdAt,
+      followersCount: profile._count.followers,
+      followingCount: profile._count.following,
+      galleryImages: [...catchImages, ...siteImages].slice(0, 12),
+      isYou: viewerId === userId,
+      followedByYou: Boolean(followed),
+   };
+};
+
 export const userService = {
+   /** Another angler's profile, as anyone is allowed to see it. */
+   async getPublicProfile(userId: string, viewerId: string | null) {
+      const profile = await buildPublicProfileView(userId, viewerId);
+      return profile ? { profile } : null;
+   },
+
    async getProfile(userId: string) {
       const profile = await buildProfileView(userId);
 
