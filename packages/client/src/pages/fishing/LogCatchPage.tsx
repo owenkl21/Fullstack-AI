@@ -70,6 +70,23 @@ type WeightUnit = 'kg' | 'lb';
 const CM_PER_INCH = 2.54;
 const KG_PER_POUND = 0.453592;
 const NOTES_LIMIT = 2000;
+/*
+ * Gear, in the order it is picked up: the rod, the reel, the line, then what
+ * goes on the end. A list of twenty items in the order they were added is a
+ * list nobody can scan; the same list under seven headings is.
+ */
+type GearKind = 'ROD' | 'REEL' | 'LINE' | 'HOOK' | 'WEIGHTS' | 'LURE' | 'BAIT';
+
+const GEAR_KINDS: { value: GearKind; word: string; plural: string }[] = [
+   { value: 'ROD', word: 'Rod', plural: 'Rods' },
+   { value: 'REEL', word: 'Reel', plural: 'Reels' },
+   { value: 'LINE', word: 'Line', plural: 'Line' },
+   { value: 'HOOK', word: 'Hook', plural: 'Hooks' },
+   { value: 'WEIGHTS', word: 'Weights', plural: 'Weights' },
+   { value: 'LURE', word: 'Lure', plural: 'Lures' },
+   { value: 'BAIT', word: 'Bait', plural: 'Bait' },
+];
+
 const TITLE_LIMIT = 120;
 const MAX_PHOTOS = 8;
 
@@ -268,6 +285,7 @@ export function CatchForm({
 
    const [gear, setGear] = useState<GearOption[]>(initial?.gears ?? []);
    const [gearSearch, setGearSearch] = useState('');
+   const [gearKind, setGearKind] = useState<GearKind | 'ANY'>('ANY');
    const [selectedGearIds, setSelectedGearIds] = useState<string[]>(
       initial?.gearIds ?? []
    );
@@ -1460,6 +1478,24 @@ export function CatchForm({
                   onChange={(event) => setGearSearch(event.target.value)}
                   placeholder="Daiwa"
                />
+               {gear.length > 6 ? (
+                  <ChoiceGroup
+                     label="Kind"
+                     inline
+                     size="sm"
+                     value={gearKind}
+                     options={[
+                        { value: 'ANY' as const, label: 'Any' },
+                        ...GEAR_KINDS.filter((kind) =>
+                           gear.some((entry) => entry.type === kind.value)
+                        ).map((kind) => ({
+                           value: kind.value,
+                           label: kind.plural,
+                        })),
+                     ]}
+                     onChange={setGearKind}
+                  />
+               ) : null}
                {gearState === 'loading' ? (
                   <p className="text-ink-2">Reading your gear.</p>
                ) : gearState === 'failed' ? (
@@ -1496,37 +1532,63 @@ export function CatchForm({
                      </Button>
                   </div>
                ) : (
-                  <ul className="max-h-[360px] overflow-y-auto">
-                     {filteredGear.map((entry) => (
-                        <li key={entry.id}>
-                           <label className="flex min-h-12 cursor-pointer items-center gap-3 border-t border-line py-3">
-                              <input
-                                 type="checkbox"
-                                 className="size-5 accent-teal"
-                                 checked={selectedGearIds.includes(entry.id)}
-                                 onChange={() => toggleGear(entry.id)}
-                              />
-                              {entry.imageUrl ? (
-                                 <img
-                                    src={entry.imageUrl}
-                                    alt=""
-                                    width={44}
-                                    height={44}
-                                    loading="lazy"
-                                    className="size-11 bg-bg-2 object-cover"
-                                 />
-                              ) : null}
-                              <span className="flex flex-col">
-                                 <span className="g text-[22px]">
-                                    {entry.name}
-                                 </span>
-                                 <span className="text-[14px] text-ink-2">
-                                    {entry.brand} · {entry.type.toLowerCase()}
-                                 </span>
+                  <ul className="max-h-[420px] overflow-y-auto">
+                     {GEAR_KINDS.flatMap((kind) => {
+                        const items = filteredGear.filter(
+                           (entry) =>
+                              entry.type === kind.value &&
+                              (gearKind === 'ANY' || gearKind === kind.value)
+                        );
+                        if (!items.length) return [];
+                        const chosen = items.filter((entry) =>
+                           selectedGearIds.includes(entry.id)
+                        ).length;
+                        return [
+                           <li
+                              key={`${kind.value}-head`}
+                              className="lab flex items-baseline justify-between pt-4 pb-1 text-ink-3"
+                           >
+                              <span>{kind.plural}</span>
+                              <span className="num">
+                                 {chosen
+                                    ? `${chosen} of ${items.length}`
+                                    : items.length}
                               </span>
-                           </label>
-                        </li>
-                     ))}
+                           </li>,
+                           ...items.map((entry) => (
+                              <li key={entry.id}>
+                                 <label className="flex min-h-12 cursor-pointer items-center gap-3 border-t border-line py-3">
+                                    <input
+                                       type="checkbox"
+                                       className="size-5 accent-teal"
+                                       checked={selectedGearIds.includes(
+                                          entry.id
+                                       )}
+                                       onChange={() => toggleGear(entry.id)}
+                                    />
+                                    {entry.imageUrl ? (
+                                       <img
+                                          src={entry.imageUrl}
+                                          alt=""
+                                          width={44}
+                                          height={44}
+                                          loading="lazy"
+                                          className="size-11 bg-bg-2 object-cover"
+                                       />
+                                    ) : null}
+                                    <span className="flex flex-col">
+                                       <span className="g text-[22px]">
+                                          {entry.name}
+                                       </span>
+                                       <span className="text-[14px] text-ink-2">
+                                          {entry.brand}
+                                       </span>
+                                    </span>
+                                 </label>
+                              </li>
+                           )),
+                        ];
+                     })}
                   </ul>
                )}
 
