@@ -599,11 +599,11 @@ export function FeedPage() {
    return (
       <div
          ref={pageRef}
-         className="relative mx-auto w-[min(1320px,100%-32px)] pb-8 md:pb-12"
+         className="relative mx-auto w-[min(960px,100%-32px)] pb-8 md:pb-12"
       >
          <ContourField seed={5} />
          <PageHead
-            column="w-[min(1320px,100%-32px)]"
+            column="w-[min(960px,100%-32px)]"
             kicker="What other anglers logged, newest first"
             title="Feed"
          />
@@ -671,7 +671,7 @@ export function FeedPage() {
                : null}
 
             {status === 'ready' && showList && visiblePosts.length > 0 ? (
-               <div className="grid gap-8 xl:grid-cols-2 xl:items-stretch">
+               <div className="grid gap-8">
                   {visiblePosts.map((post) => (
                      <FeedPostBlock
                         key={post.id}

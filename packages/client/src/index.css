@@ -425,18 +425,6 @@
       position: absolute;
       pointer-events: none;
       overflow: visible;
-      -webkit-mask-image: radial-gradient(
-         ellipse 50% 50% at 50% 50%,
-         #000 20%,
-         rgba(0, 0, 0, 0.6) 55%,
-         transparent 96%
-      );
-      mask-image: radial-gradient(
-         ellipse 50% 50% at 50% 50%,
-         #000 20%,
-         rgba(0, 0, 0, 0.6) 55%,
-         transparent 96%
-      );
       animation: contour-drift 26s ease-in-out infinite alternate;
    }
    .contour path {

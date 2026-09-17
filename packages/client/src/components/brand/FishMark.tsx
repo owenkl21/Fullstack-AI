@@ -1,3 +1,4 @@
+import type { SVGProps } from 'react';
 import { cn } from '@/lib/utils';
 
 /*
@@ -8,7 +9,12 @@ import { cn } from '@/lib/utils';
  * grey square reads as an image that failed to load; a drawn fish reads as a
  * catch nobody photographed, which is what it actually is.
  */
-export function FishMark({ className }: { className?: string }) {
+export function FishMark({
+   className,
+   ...rest
+}: SVGProps<SVGSVGElement> & { className?: string }) {
+   /* Given a size in attributes, the default size classes step aside. */
+   const sized = rest.width !== undefined || rest.height !== undefined;
    return (
       <svg
          viewBox="0 0 68 44"
@@ -18,7 +24,8 @@ export function FishMark({ className }: { className?: string }) {
          strokeLinecap="round"
          strokeLinejoin="round"
          aria-hidden="true"
-         className={cn('h-[22px] w-[34px]', className)}
+         {...rest}
+         className={cn(!sized && 'h-[22px] w-[34px]', className)}
       >
          <path d="M2 30c10-14 24-20 40-16 8 2 14 6 24 6-8 6-16 8-24 8-16 0-30-4-40 2Z" />
          <path d="M44 14c-4-6-10-8-16-8 4 4 8 6 14 6M22 24c4 4 8 4 12 2" />

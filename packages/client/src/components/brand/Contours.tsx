@@ -10,14 +10,34 @@ import { smoothPath } from './path';
  */
 function buildPaths(W: number, H: number, seedIn: number) {
    const seed = seedIn * 1.7;
-   const f = (x: number, y: number) =>
-      Math.sin(x * 3.1 + seed) * 0.55 +
+   /*
+    * Two fields, one broad and one fine, blended by a slow third so the
+    * sheet has wide sweeps in one part and tight rings in another, the way
+    * a real survey sheet does over mixed ground. The x and y scales follow
+    * the box's aspect so features are the same size across and down.
+    */
+   const ax = Math.max(1, W / Math.max(1, H));
+   const broad = (x: number, y: number) =>
+      Math.sin(x * ax * 1.9 + seed) * 0.55 +
       Math.sin(y * 2.3 + seed * 1.7) * 0.5 +
-      Math.sin((x * 2.0 + y * 1.4) * 2.2 + seed * 0.6) * 0.35 +
-      Math.sin((x * 1.3 - y * 2.6) * 3.1 + seed * 2.3) * 0.22 +
-      Math.sin((x * 0.7 + y * 0.9) * 5.3 + seed) * 0.12;
-   const nx = 72;
-   const ny = Math.round((72 * H) / W);
+      Math.sin((x * ax * 1.2 + y * 1.4) * 1.6 + seed * 0.6) * 0.35;
+   const fine = (x: number, y: number) =>
+      Math.sin(x * ax * 5.1 + seed * 2.3) * 0.5 +
+      Math.sin(y * 6.3 + seed * 0.9) * 0.45 +
+      Math.sin((x * ax * 3.7 - y * 4.1) * 1.4 + seed) * 0.3;
+   const f = (x: number, y: number) => {
+      const w =
+         0.5 +
+         0.5 *
+            Math.sin(x * ax * 1.1 + y * 0.9 + seed * 0.4) *
+            Math.cos(y * 1.3 - seed * 0.2);
+      return (
+         broad(x, y) * (0.55 + 0.45 * w) + fine(x, y) * (0.25 + 0.5 * (1 - w))
+      );
+   };
+   /* Sampled at the same spacing across and down, so rings stay round. */
+   const nx = Math.max(24, Math.round(W / 22));
+   const ny = Math.max(12, Math.round(H / 22));
    const g: number[][] = [];
    for (let j = 0; j <= ny; j++) {
       g[j] = [];
@@ -106,12 +126,21 @@ function buildPaths(W: number, H: number, seedIn: number) {
                   cur = next;
                }
                if (line.length > 6) {
+                  const first = line[0]!;
+                  const last = line[line.length - 1]!;
+                  const closed =
+                     Math.abs(first[0]! - last[0]!) < 0.6 &&
+                     Math.abs(first[1]! - last[1]!) < 0.6;
+                  const thinned = line.filter(
+                     (_, i) => i % 2 === 0 || i === line.length - 1
+                  );
+                  /*
+                   * A loop closes on itself, drawn as one. A line that is not
+                   * a loop began and ended on the edge of the sheet, because a
+                   * contour of a smooth field has nowhere else to stop.
+                   */
                   paths.push(
-                     smoothPath(
-                        line.filter(
-                           (_, i) => i % 2 === 0 || i === line.length - 1
-                        )
-                     )
+                     closed ? smoothPath(thinned, true) : smoothPath(thinned)
                   );
                }
             });

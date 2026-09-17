@@ -1,3 +1,13 @@
+import { createElement, type ComponentType, type SVGProps } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import {
+   ArrowDownRightIcon,
+   BuildingStorefrontIcon,
+   FlagIcon,
+   LifebuoyIcon,
+   TruckIcon,
+} from '@heroicons/react/24/outline';
+import { FishMark } from '@/components/brand/FishMark';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster';
@@ -125,22 +135,39 @@ export type PinKind =
    | 'tackle'
    | 'parking';
 
-/* Drawn inside a 24 box, in the head of the pin. Stroke only, round caps. */
-const GLYPHS: Record<PinKind, string> = {
-   /* The house fish. */
-   spot: '<path d="M4 12.5c2.6-3.6 6.2-5.2 10.4-4.2 2 .5 3.6 1.6 6.2 1.6-2 1.6-4.2 2-6.2 2-4.2 0-7.8-1-10.4.6Z"/>',
-   other: '<path d="M4 12.5c2.6-3.6 6.2-5.2 10.4-4.2 2 .5 3.6 1.6 6.2 1.6-2 1.6-4.2 2-6.2 2-4.2 0-7.8-1-10.4.6Z"/>',
-   /* A flag: something you marked for yourself. */
-   waypoint: '<path d="M7 20V4"/><path d="M7 5h10l-2.5 3.5L17 12H7"/>',
-   /* A slipway: a ramp running into water. */
-   ramp: '<path d="M4 17h16"/><path d="M6 17 14 7h4"/><path d="M4 20.5h16"/>',
-   /* An anchor. */
-   marina:
-      '<path d="M12 8v12"/><circle cx="12" cy="5.5" r="2"/><path d="M5 13a7 7 0 0 0 14 0"/>',
-   /* A hook. */
-   tackle:
-      '<path d="M14 4v7a4 4 0 0 1-8 0V9"/><path d="M11.5 6.5 14 4l2.5 2.5"/>',
-   parking: '<path d="M9 19V6h4a3.5 3.5 0 0 1 0 7H9"/>',
+/*
+ * The mark in the head of a pin. Heroicons for the places and the mark, the
+ * brand's own fish for a spot; rendered once to markup because Leaflet's
+ * icon is an HTML string rather than a React tree.
+ */
+const glyphMarkup = (
+   Icon: ComponentType<SVGProps<SVGSVGElement>>,
+   ink: string,
+   size: number,
+   x: number,
+   y: number,
+   strokeWidth: number
+) =>
+   renderToStaticMarkup(
+      createElement(Icon, {
+         x,
+         y,
+         width: size,
+         height: size,
+         stroke: ink,
+         strokeWidth,
+         'aria-hidden': true,
+      })
+   );
+
+const GLYPH_ICON: Record<PinKind, ComponentType<SVGProps<SVGSVGElement>>> = {
+   spot: FishMark,
+   other: FishMark,
+   waypoint: FlagIcon,
+   ramp: ArrowDownRightIcon,
+   marina: LifebuoyIcon,
+   tackle: BuildingStorefrontIcon,
+   parking: TruckIcon,
 };
 
 /*
@@ -204,9 +231,16 @@ export const kindPin = (kind: PinKind, count?: number | null): L.DivIcon => {
    const face = n
       ? wide
          ? `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-family="var(--font-display), 'League Gothic', sans-serif" font-size="${n > 99 ? 12 : 15}" letter-spacing="0.02em" fill="${body.ink}">${label}</text>`
-         : `<svg x="${cx - 12}" y="${cy - 6}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="${body.ink}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[kind]}</svg>` +
+         : glyphMarkup(GLYPH_ICON[kind], body.ink, 12, cx - 12, cy - 6, 2.4) +
            `<text x="${cx + 1}" y="${cy}" text-anchor="start" dominant-baseline="central" font-family="var(--font-display), 'League Gothic', sans-serif" font-size="16" letter-spacing="0.02em" fill="${body.ink}">${label}</text>`
-      : `<svg x="${cx - glyphSize / 2}" y="${cy - glyphSize / 2}" width="${glyphSize}" height="${glyphSize}" viewBox="0 0 24 24" fill="none" stroke="${body.ink}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[kind]}</svg>`;
+      : glyphMarkup(
+           GLYPH_ICON[kind],
+           body.ink,
+           glyphSize,
+           cx - glyphSize / 2,
+           cy - glyphSize / 2,
+           2.2
+        );
 
    const html =
       `<svg class="map-pin-svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">` +

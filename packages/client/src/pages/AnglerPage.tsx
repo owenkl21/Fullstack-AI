@@ -159,7 +159,7 @@ function AnglerScreen() {
       <section className="mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14">
          <header>
             <Banner url={profile.bannerUrl} />
-            <div className="-mt-8 flex flex-wrap items-end gap-4">
+            <div className="relative z-10 -mt-8 flex flex-wrap items-end gap-4">
                {profile.avatarUrl ? (
                   <img
                      src={profile.avatarUrl}

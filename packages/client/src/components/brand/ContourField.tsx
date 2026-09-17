@@ -1,64 +1,26 @@
-import type { CSSProperties } from 'react';
 import { Contours } from './Contours';
 
 /*
  * A survey sheet behind a page.
  *
- * One patch of contours at the top read as a watermark and vanished on a
- * wide screen. This lays several across the whole height at different
- * sizes and weights, each drifting at its own pace, so the ground under a
- * page reads as one sheet rather than a corner of one. Absolute over the
- * page's own box; the page stays `relative`.
+ * One field over the whole page, not patches: every line on it is either
+ * a ring that closes on itself or a line that runs from one edge of the
+ * page to another, because that is the only way a contour of a smooth
+ * field can end. The sheet is drawn a little larger than the page and
+ * clipped to it, so the slow drift never pulls a bare strip in from the
+ * side. The field itself has broad sweeps in one part and tight rings in
+ * another. Absolute over the page's own box; the page stays `relative`.
  */
 export function ContourField({ seed = 1 }: { seed?: number }) {
-   const patches: {
-      className: string;
-      weight: 'fine' | 'plain' | 'bold';
-      drift: number;
-      seed: number;
-   }[] = [
-      {
-         className: 'left-[-12%] top-[-40px] h-[560px] w-[72%]',
-         weight: 'plain',
-         drift: 26,
-         seed,
-      },
-      {
-         className: 'right-[-10%] top-[22%] h-[460px] w-[52%]',
-         weight: 'fine',
-         drift: 34,
-         seed: seed + 3,
-      },
-      {
-         className: 'left-[6%] top-[52%] h-[420px] w-[46%]',
-         weight: 'bold',
-         drift: 40,
-         seed: seed + 7,
-      },
-      {
-         className: 'right-[2%] bottom-[-60px] h-[380px] w-[38%]',
-         weight: 'plain',
-         drift: 30,
-         seed: seed + 11,
-      },
-   ];
    return (
       <div
          aria-hidden="true"
          className="pointer-events-none absolute inset-0 overflow-hidden"
       >
-         {patches.map((patch) => (
-            <Contours
-               key={patch.seed}
-               seed={patch.seed}
-               className={`${patch.className} contour-${patch.weight}`}
-               style={
-                  {
-                     animationDuration: `${patch.drift}s`,
-                  } as CSSProperties
-               }
-            />
-         ))}
+         <Contours
+            seed={seed}
+            className="top-[-40px] left-[-40px] h-[calc(100%+80px)] w-[calc(100%+80px)]"
+         />
       </div>
    );
 }

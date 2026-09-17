@@ -265,14 +265,14 @@ export function FeedPostBlock({
              */
             <div
                aria-hidden="true"
-               className="relative flex h-[132px] w-full items-center justify-center overflow-hidden bg-black-block-2"
+               className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-black-block-2"
             >
                <FishMark className="h-9 w-14 text-paper/20" />
                <span className="absolute inset-x-0 bottom-0 h-1 bg-teal/70" />
             </div>
          )}
 
-         <div className="flex flex-1 flex-col gap-3 px-4 pt-5 pb-6">
+         <div className="flex min-h-[236px] flex-1 flex-col gap-3 px-4 pt-5 pb-6">
             {heading ? (
                <h2 id={`post-${post.id}`} className="g text-[30px] text-paper">
                   {heading}

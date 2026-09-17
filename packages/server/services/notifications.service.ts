@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { maybeResolveAvatarReadUrl } from './user.service';
 
 export type NotificationKind =
    | 'FOLLOW'
@@ -86,7 +87,20 @@ export const notificationsService = {
          prisma.notification.count({ where: { userId } }),
          prisma.notification.count({ where: { userId, readAt: null } }),
       ]);
-      return { notifications: rows, total, unread, page, size };
+      const notifications = await Promise.all(
+         rows.map(async (row) => ({
+            ...row,
+            actor: row.actor
+               ? {
+                    ...row.actor,
+                    avatarUrl: await maybeResolveAvatarReadUrl(
+                       row.actor.avatarUrl
+                    ),
+                 }
+               : null,
+         }))
+      );
+      return { notifications, total, unread, page, size };
    },
 
    async unreadCount(userId: string) {

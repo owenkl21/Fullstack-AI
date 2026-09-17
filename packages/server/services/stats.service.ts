@@ -1,3 +1,4 @@
+import { maybeResolveAvatarReadUrl } from './user.service';
 import { prisma } from '../lib/prisma';
 import {
    buildSpeciesBoards,
@@ -304,25 +305,29 @@ export const statsService = {
 
       return {
          /* Everyone on the board, including anglers who have not scored. */
-         standings: anglerIds
-            .map((id) => {
-               const standing =
-                  standings.find((s) => s.anglerId === id) ?? null;
-               const person = byId.get(id);
+         standings: (
+            await Promise.all(
+               anglerIds.map(async (id) => {
+                  const standing =
+                     standings.find((s) => s.anglerId === id) ?? null;
+                  const person = byId.get(id);
 
-               return {
-                  anglerId: id,
-                  displayName: person?.displayName ?? 'Unknown angler',
-                  username: person?.username ?? null,
-                  avatarUrl: person?.avatarUrl ?? null,
-                  isYou: id === userId,
-                  points: standing?.points ?? 0,
-                  qualifyingCount: standing?.qualifyingCount ?? 0,
-                  longestCm: standing?.longestCm ?? 0,
-                  distinctSpecies: standing?.distinctSpecies ?? 0,
-               };
-            })
-            .sort((a, b) => b.points - a.points || b.longestCm - a.longestCm),
+                  return {
+                     anglerId: id,
+                     displayName: person?.displayName ?? 'Unknown angler',
+                     username: person?.username ?? null,
+                     avatarUrl: await maybeResolveAvatarReadUrl(
+                        person?.avatarUrl ?? null
+                     ),
+                     isYou: id === userId,
+                     points: standing?.points ?? 0,
+                     qualifyingCount: standing?.qualifyingCount ?? 0,
+                     longestCm: standing?.longestCm ?? 0,
+                     distinctSpecies: standing?.distinctSpecies ?? 0,
+                  };
+               })
+            )
+         ).sort((a, b) => b.points - a.points || b.longestCm - a.longestCm),
          mutualCount: mutual.length,
       };
    },

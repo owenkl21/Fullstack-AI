@@ -545,7 +545,7 @@ function SiteBody({ children }: { children: ReactNode }) {
    return (
       <div
          ref={root}
-         className="mx-auto w-[min(1320px,100%-32px)] pt-[102px] pb-8 md:pt-[142px] md:pb-12"
+         className="mx-auto w-[min(1320px,100%-32px)] pt-[132px] pb-8 md:pt-[180px] md:pb-12"
       >
          {children}
       </div>
@@ -653,7 +653,7 @@ function SiteSkeleton() {
    return (
       <div role="status" aria-label="Loading this spot">
          <div className="h-[300px] bg-bg-2 md:h-[420px]" />
-         <div className="mx-auto w-[min(1320px,100%-32px)] pt-[102px] pb-8 md:pt-[142px] md:pb-12">
+         <div className="mx-auto w-[min(1320px,100%-32px)] pt-[132px] pb-8 md:pt-[180px] md:pb-12">
             <span className="block h-4 w-2/5 bg-bg-2" />
             <span className="mt-6 block h-4 w-full bg-bg-2" />
             <span className="mt-2 block h-4 w-4/5 bg-bg-2" />

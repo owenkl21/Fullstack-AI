@@ -46,7 +46,7 @@ export function ProfileView({
             <Banner url={profile.bannerUrl} />
             {/* The photograph sits over the banner's bottom edge, which is
                 what makes the two read as one picture of a person. */}
-            <div className="-mt-8 flex items-end gap-4">
+            <div className="relative z-10 -mt-8 flex items-end gap-4">
                {profile.avatarUrl ? (
                   <img
                      src={profile.avatarUrl}

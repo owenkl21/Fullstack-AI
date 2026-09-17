@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signOut, useSession } from '@/lib/auth-client';
 import { initialOf } from '@/components/profile/types';
+import { useMyAvatar } from '@/components/profile/avatar-api';
 
 /*
  * What <UserButton /> used to be, in the product's own language rather than a
@@ -13,6 +14,7 @@ import { initialOf } from '@/components/profile/types';
  */
 export function AccountMenu() {
    const { data } = useSession();
+   const signedAvatar = useMyAvatar(Boolean(data?.user));
    const navigate = useNavigate();
    const [open, setOpen] = useState(false);
 
@@ -24,6 +26,10 @@ export function AccountMenu() {
    /* The same two letters the profile shows, so the header and the page agree
     * and a lone O is not read as a nought. */
    const initial = initialOf(user.name || user.email || '?');
+   /* The session's image may be a storage key; only a real address is shown. */
+   const avatar =
+      signedAvatar ??
+      (user.image && /^https?:\/\//.test(user.image) ? user.image : null);
 
    const leave = async () => {
       setOpen(false);
@@ -41,9 +47,9 @@ export function AccountMenu() {
             onClick={() => setOpen((was) => !was)}
             className="grid size-11 place-items-center rounded-full border border-paper-2 text-[15px] text-paper"
          >
-            {user.image ? (
+            {avatar ? (
                <img
-                  src={user.image}
+                  src={avatar}
                   alt=""
                   className="size-full rounded-full object-cover"
                />

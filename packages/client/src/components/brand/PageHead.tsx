@@ -28,7 +28,7 @@ export function PageHead({
    children?: ReactNode;
 }) {
    return (
-      <header className="relative left-1/2 z-[1] mb-[102px] w-screen -translate-x-1/2 bg-black-block text-paper md:mb-[142px]">
+      <header className="relative left-1/2 z-[1] mb-[132px] w-screen -translate-x-1/2 bg-black-block text-paper md:mb-[180px]">
          <div className={cn('mx-auto pt-7 pb-5 md:pt-10 md:pb-7', column)}>
             <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
                <div className="min-w-0">
