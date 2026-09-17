@@ -955,7 +955,7 @@ export function CatchForm({
                         data-field="length"
                         inputMode="decimal"
                         autoComplete="off"
-                        className="g num w-full border-0 bg-transparent p-0 text-[48px] outline-none"
+                        className="g num w-full border-0 border-b-2 border-line bg-transparent p-0 text-[48px] outline-none transition-colors duration-150 focus:border-teal"
                         value={lengthValue}
                         aria-invalid={errors.length ? true : undefined}
                         aria-describedby={
@@ -963,7 +963,6 @@ export function CatchForm({
                         }
                         onChange={(event) => setLengthValue(event.target.value)}
                         onBlur={() => markTouched('length')}
-                        placeholder="0"
                      />
                   </div>
                   <div
@@ -999,7 +998,7 @@ export function CatchForm({
                         data-field="weight"
                         inputMode="decimal"
                         autoComplete="off"
-                        className="g num w-full border-0 bg-transparent p-0 text-[48px] outline-none"
+                        className="g num w-full border-0 border-b-2 border-line bg-transparent p-0 text-[48px] outline-none transition-colors duration-150 focus:border-teal"
                         value={weightValue}
                         aria-invalid={errors.weight ? true : undefined}
                         aria-describedby={
@@ -1007,7 +1006,6 @@ export function CatchForm({
                         }
                         onChange={(event) => setWeightValue(event.target.value)}
                         onBlur={() => markTouched('weight')}
-                        placeholder="0"
                      />
                   </div>
                   <div

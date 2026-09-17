@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signOut, useSession } from '@/lib/auth-client';
+import { initialOf } from '@/components/profile/types';
 
 /*
  * What <UserButton /> used to be, in the product's own language rather than a
@@ -20,10 +21,9 @@ export function AccountMenu() {
    }
 
    const user = data.user;
-   const initial = (user.name || user.email || '?')
-      .trim()
-      .charAt(0)
-      .toUpperCase();
+   /* The same two letters the profile shows, so the header and the page agree
+    * and a lone O is not read as a nought. */
+   const initial = initialOf(user.name || user.email || '?');
 
    const leave = async () => {
       setOpen(false);

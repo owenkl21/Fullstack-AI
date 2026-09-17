@@ -62,7 +62,9 @@ function AccountPanel() {
       <AuthShell title="Account" lead={user?.email ?? undefined}>
          <div className="grid gap-10">
             <section>
-               <h2 className="lab lab-rule">Change your password</h2>
+               <h2 className="g text-[30px] md:text-[36px]">
+                  Change your password
+               </h2>
                <div className="mt-4">
                   <AuthForm onSubmit={changePassword} error={error} note={note}>
                      <Field
@@ -92,7 +94,7 @@ function AccountPanel() {
             </section>
 
             <section>
-               <h2 className="lab lab-rule">Sign out</h2>
+               <h2 className="g text-[30px] md:text-[36px]">Sign out</h2>
                <Button
                   type="button"
                   variant="outline"

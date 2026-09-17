@@ -501,6 +501,13 @@
  */
 .map-surface {
    background: var(--bg-2);
+   /*
+    * Leaflet lays its panes out from z-index 400 up, and the wrapper made no
+    * stacking context, so those panes were free to paint over the fixed
+    * navigation at z-30. The map covered the phone bar on Add a spot. Isolating
+    * here keeps Leaflet's whole ladder inside the map, whatever it does with it.
+    */
+   isolation: isolate;
 }
 .map-surface .leaflet-container {
    background: var(--bg-2);

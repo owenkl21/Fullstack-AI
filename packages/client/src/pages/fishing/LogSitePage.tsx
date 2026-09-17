@@ -124,7 +124,10 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 
    return (
       <section aria-labelledby={headingId} className="rule-dashed rv pt-6">
-         <h2 id={headingId} className="lab">
+         {/* The same voice the catch form uses. As a plain .lab this sat in
+             the same tracked caps as the NAME label under it, so a section
+             heading and a field label were indistinguishable. */}
+         <h2 id={headingId} className="g text-[30px] md:text-[36px]">
             {title}
          </h2>
          <div className="mt-6 grid gap-6">{children}</div>

@@ -67,5 +67,19 @@ export const monthAndYear = (value: string | null | undefined) => {
 };
 
 /** The first letter of a name, for the avatar when there is no photograph. */
-export const initialOf = (name: string) =>
-   name.trim().charAt(0).toUpperCase() || '?';
+/*
+ * Two initials where there are two names. A lone O set in League Gothic, which
+ * is a condensed face, is read as a zero rather than as a person: on the
+ * profile it sat in a grey circle and looked like a counter showing nought.
+ */
+export const initialOf = (name: string) => {
+   const words = name.trim().split(/\s+/).filter(Boolean);
+   if (!words.length) {
+      return '?';
+   }
+
+   const first = words[0]?.charAt(0) ?? '';
+   const last =
+      words.length > 1 ? (words[words.length - 1]?.charAt(0) ?? '') : '';
+   return (first + last).toUpperCase() || '?';
+};
