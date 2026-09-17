@@ -15,6 +15,11 @@ import {
 } from '@/pages/fishing/LogCatchPage';
 
 type LoadedCatch = StoredConditions & {
+   /* The catch's own pin and its privacy, so an edit opens on both. */
+   latitude?: number | null;
+   longitude?: number | null;
+   visibility?: 'PRIVATE' | 'GROUPS' | 'PUBLIC';
+   hideLocation?: boolean;
    id: string;
    title: string;
    notes: string | null;
