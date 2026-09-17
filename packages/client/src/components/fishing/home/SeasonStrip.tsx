@@ -53,7 +53,7 @@ export function SeasonStrip({
                         <span
                            style={{ height: `${item.height}px` }}
                            className={cn(
-                              'flex w-[88px] overflow-hidden',
+                              'relative flex w-[88px] overflow-hidden',
                               item.entry.images[0]?.image.url
                                  ? 'bg-bg-2'
                                  : item.measured
@@ -84,6 +84,13 @@ export function SeasonStrip({
                                  )}
                               />
                            )}
+                           {/* The day's tally, on the tile, so a three fish
+                               morning is legible without opening it. */}
+                           {item.count > 1 ? (
+                              <span className="absolute top-1 right-1 inline-flex min-w-[20px] justify-center bg-paper px-1 py-0.5 text-[11px] leading-none text-ink num">
+                                 {item.count}
+                              </span>
+                           ) : null}
                         </span>
                         <span className="g num text-[20px]">
                            {lengthMetric(item.entry.length) ?? (
@@ -93,9 +100,14 @@ export function SeasonStrip({
                            )}
                         </span>
                         <span className="text-[14px] text-ink-3">
+                           {/* The date and where, and on a good day how many.
+                               The figure above is the best fish of the day, so
+                               the line has to say that is what it is. */}
                            {[
                               formatDayMonth(item.entry.caughtAt),
-                              item.entry.site?.name,
+                              item.count > 1
+                                 ? `best of ${item.count}`
+                                 : item.entry.site?.name,
                            ]
                               .filter(Boolean)
                               .join(' · ')}

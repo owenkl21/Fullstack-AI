@@ -85,11 +85,14 @@ export type SeasonItem =
    | {
         kind: 'catch';
         key: string;
+        /* The best fish of that day, which is what the tile opens and shows. */
         entry: CatchSummary;
         height: number;
         /* False when the fish was never measured, so the strip can say so
          * rather than drawing a bar that stands for a length nobody took. */
         measured: boolean;
+        /* How many fish came out that day. One is the quiet case. */
+        count: number;
      };
 
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -138,27 +141,50 @@ export function seasonItems(catches: CatchSummary[]): SeasonItem[] {
       return Math.round(MIN_TILE + ratio * (MAX_TILE - MIN_TILE));
    };
 
+   /*
+    * One tile a day, not one a fish.
+    *
+    * A tile per catch meant a morning that produced three fish looked like
+    * three separate outings, and a good season scrolled sideways forever. A
+    * season is read in days on the water: the tile is the day, its height is
+    * the best fish of that day, and the count says how many came out.
+    */
+   const byDay = new Map<string, CatchSummary[]>();
+   for (const entry of season) {
+      const day = new Date(entry.caughtAt).toISOString().slice(0, 10);
+      const list = byDay.get(day) ?? [];
+      list.push(entry);
+      byDay.set(day, list);
+   }
+
    const items: SeasonItem[] = [];
    let month: string | null = null;
 
-   season.forEach((entry) => {
-      const key = monthKey(entry.caughtAt);
+   for (const [day, entries] of byDay) {
+      /* The fish the day is remembered for. An unmeasured one never wins. */
+      const best = entries.reduce((a, b) =>
+         (b.length ?? -1) > (a.length ?? -1) ? b : a
+      );
+
+      const key = monthKey(best.caughtAt);
       if (key && key !== month) {
          month = key;
          items.push({
             kind: 'month',
             key: `month-${key}`,
-            label: monthLabel(entry.caughtAt) ?? '',
+            label: monthLabel(best.caughtAt) ?? '',
          });
       }
+
       items.push({
          kind: 'catch',
-         key: entry.id,
-         entry,
-         height: height(entry.length),
-         measured: entry.length !== null,
+         key: `day-${day}`,
+         entry: best,
+         height: height(best.length),
+         measured: best.length !== null,
+         count: entries.length,
       });
-   });
+   }
 
    return items;
 }
