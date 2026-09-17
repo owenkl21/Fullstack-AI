@@ -85,13 +85,19 @@ the live deploy.
       phase, counted from the log in the browser.
 - [x] **A catch with a dropped pin shows its map.** Hidden-location catches
       have the pin withheld by the server from everyone but the angler.
+- [x] **Spots cluster at low zoom**, yours and theirs separately, as a
+      doubled disc with a count that opens out on zoom or tap.
+- [x] **A terrain base** (OpenTopoMap) beside satellite, plain and streets.
 - [x] **Deploys.** Vercel builds `fishlogger` `main`; `git push origin` deploys
       nothing. Railway is `railway up --service server --detach`.
 
 ## Next, in order
 
-1. **Pin clustering** at low zoom, and the map modes from the pin brief.
-2. **Species from a photograph.** Needs a model decision first.
+1. **Species from a photograph.** Needs a model decision first: a vision
+    call per photo costs money and needs a key, so it is Owen's call which
+    provider and whether at all.
+2. **The pin brief in Claude Design** (docs/redesign/12-design-brief-pins.md):
+    once the SVGs come back, swap them into `kindPin` and the cluster disc.
 
 ## Standing constraints
 
