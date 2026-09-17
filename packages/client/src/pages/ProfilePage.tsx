@@ -183,6 +183,8 @@ function ProfileScreen() {
                   onOpenConnections={openConnections}
                />
 
+               <ProfileStatsPanel />
+
                <div className="mt-12 border-t border-line pt-6">
                   <h2 className="g text-[30px] md:text-[36px]">Settings</h2>
                   <p className="mt-2 max-w-[60ch] text-[15px] text-ink-2">
@@ -208,8 +210,6 @@ function ProfileScreen() {
                      />
                   </div>
                </div>
-
-               <ProfileStatsPanel />
             </>
          )}
 

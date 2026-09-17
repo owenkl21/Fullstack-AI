@@ -16,6 +16,7 @@ import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
 import { useDocumentTitle } from '@/lib/title';
 import { SpotsMap } from '@/components/map/SpotsMap';
+import { SearchField } from '@/components/fishing/rows/SearchField';
 
 /*
  * The places the angler fishes, in the same row grammar as the catches, with the
@@ -168,16 +169,13 @@ function MySitesList() {
             </div>
 
             {onMap ? null : (
-               <div className="mt-8 max-w-[420px]">
-                  <label htmlFor="spot-search" className="lab lab-rule">
-                     Search your spots
-                  </label>
-                  <input
+               <div className="mt-8">
+                  <SearchField
                      id="spot-search"
-                     type="search"
+                     label="Search your spots"
+                     placeholder="Spot name or note"
                      value={query}
-                     onChange={(event) => setParam('q', event.target.value)}
-                     className="input-line mt-1 h-11 text-base"
+                     onChange={(next) => setParam('q', next)}
                   />
                </div>
             )}

@@ -6,6 +6,7 @@ import {
    plural,
    weightMetric,
 } from '@/components/fishing/record/format';
+import { NoPhoto } from '@/components/brand/FishMark';
 
 /*
  * The last few catches in the row anatomy the whole product uses: a 52px photo, the
@@ -56,10 +57,7 @@ export function RecentRows({
                               className="size-[52px] bg-bg-2 object-cover"
                            />
                         ) : (
-                           <span
-                              className="size-[52px] bg-bg-2"
-                              aria-hidden="true"
-                           />
+                           <NoPhoto className="size-[52px]" />
                         )}
                         <span className="flex min-w-0 flex-col">
                            <span className="g truncate text-[22px]">

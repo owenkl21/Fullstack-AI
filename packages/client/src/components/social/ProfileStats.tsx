@@ -41,8 +41,11 @@ export function ProfileStatsPanel() {
       return null;
    }
 
+   /*
+    * The count and the longest fish are not here: the sentences directly above
+    * already say both, and repeating them two lines later reads as padding.
+    */
    const figures: { label: string; value: string }[] = [
-      { label: 'Catches', value: String(stats.catches) },
       {
          label: 'Species',
          value:
@@ -52,18 +55,14 @@ export function ProfileStatsPanel() {
       },
       { label: 'Days on the water', value: String(stats.daysOnTheWater) },
       { label: 'Released', value: String(stats.releasedCount) },
-      {
-         label: 'Longest',
-         value: stats.longestCm ? `${stats.longestCm} cm` : 'Not measured',
-      },
       { label: 'Points', value: String(stats.points) },
    ];
 
    return (
       <section className="mt-10">
-         <h2 className="lab lab-rule">Your season</h2>
+         <h2 className="lab lab-rule">Your log</h2>
 
-         <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-3">
+         <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-4">
             {figures.map((f) => (
                <div key={f.label}>
                   <dt className="lab text-ink-3">{f.label}</dt>

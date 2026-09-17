@@ -1,5 +1,7 @@
 import { type CSSProperties, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { CameraIcon } from '@heroicons/react/24/outline';
+import { FishMark } from '@/components/brand/FishMark';
 import { useRevealIn } from '@/components/brand/Reveal';
 import type { ConnectionsKind } from '@/components/profile/ConnectionsDialog';
 import {
@@ -136,10 +138,36 @@ export function ProfileView({
             </div>
 
             {profile.galleryImages.length === 0 ? (
-               <p className="mt-4 max-w-[60ch] text-base text-ink-2">
-                  No photographs yet. Log a catch with a photo and it shows up
-                  here.
-               </p>
+               /*
+                * An empty shelf, drawn rather than described. The frames show
+                * what will sit here, so the gap reads as room for photographs
+                * rather than as something that failed to load.
+                */
+               <div className="mt-5">
+                  <ul
+                     aria-hidden="true"
+                     className="grid grid-cols-3 gap-2 sm:grid-cols-4"
+                  >
+                     {[0, 1, 2, 3].map((frame) => (
+                        <li
+                           key={frame}
+                           className="flex aspect-square items-center justify-center border border-dashed border-line"
+                        >
+                           <FishMark className="h-5 w-8 text-ink-3/50" />
+                        </li>
+                     ))}
+                  </ul>
+                  <p className="mt-5 max-w-[60ch] text-base text-ink-2">
+                     Photographs you attach to a catch or a spot collect here.
+                  </p>
+                  <Link
+                     to="/log"
+                     className="g-tracked mt-4 inline-flex min-h-11 items-center gap-2 border border-line px-4 text-[15px] transition-colors duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2"
+                  >
+                     <CameraIcon aria-hidden="true" className="size-[18px]" />
+                     Log a catch with a photo
+                  </Link>
+               </div>
             ) : (
                <ul className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {profile.galleryImages.map((entry) => (

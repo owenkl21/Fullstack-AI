@@ -17,6 +17,7 @@ import { useShowMore } from '@/components/states/useShowMore';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
 import { useDocumentTitle } from '@/lib/title';
+import { SearchField } from '@/components/fishing/rows/SearchField';
 
 /*
  * The angler's own log. One column of rows with a hairline between them, the count
@@ -179,16 +180,13 @@ function MyCatchesList() {
                ) : null}
             </div>
 
-            <div className="mt-8 max-w-[420px]">
-               <label htmlFor="catch-search" className="lab lab-rule">
-                  Search your catches
-               </label>
-               <input
+            <div className="mt-8">
+               <SearchField
                   id="catch-search"
-                  type="search"
+                  label="Search your catches"
+                  placeholder="Species, spot or note"
                   value={query}
-                  onChange={(event) => setParam('q', event.target.value)}
-                  className="input-line mt-1 h-11 text-base"
+                  onChange={(next) => setParam('q', next)}
                />
             </div>
 

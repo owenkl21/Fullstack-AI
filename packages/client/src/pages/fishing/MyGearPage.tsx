@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from '@/components/ui/use-toast';
 import { useDocumentTitle } from '@/lib/title';
+import { SearchField } from '@/components/fishing/rows/SearchField';
 
 /*
  * The tackle box, grouped the way it is stored: rods with rods, reels with reels,
@@ -211,16 +212,13 @@ function MyGearList() {
                ) : null}
             </div>
 
-            <div className="mt-8 max-w-[420px]">
-               <label htmlFor="gear-search" className="lab lab-rule">
-                  Search your gear
-               </label>
-               <input
+            <div className="mt-8">
+               <SearchField
                   id="gear-search"
-                  type="search"
+                  label="Search your gear"
+                  placeholder="Rod, reel or line"
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  className="input-line mt-1 h-11 text-base"
+                  onChange={(next) => setQuery(next)}
                />
             </div>
          </header>

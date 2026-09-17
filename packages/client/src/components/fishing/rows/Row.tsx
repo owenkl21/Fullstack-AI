@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { NoPhoto } from '@/components/brand/FishMark';
 import { cn } from '@/lib/utils';
 
 /*
@@ -70,7 +71,7 @@ export function Row({
                )}
             />
          ) : (
-            <span aria-hidden="true" className="size-[52px] shrink-0 bg-bg-2" />
+            <NoPhoto className="size-[52px]" />
          )}
 
          <div className="min-w-0">
