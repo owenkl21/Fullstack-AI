@@ -270,11 +270,23 @@ function CatchRecord({
 
    const stamp = formatStamp(data.caughtAt);
    const spot = data.site?.name ?? 'No spot recorded';
-   const coords = formatCoords(data.site?.latitude, data.site?.longitude);
+   /*
+    * Where it was caught: the catch's own pin first, the spot's position
+    * otherwise. A fish logged with a dropped pin and no saved spot had no
+    * map at all, which read as the pin having been lost. When the angler hid
+    * the location the server has already withheld both, so there is nothing
+    * to draw for anyone but them.
+    */
+   const pin =
+      data.latitude != null && data.longitude != null
+         ? { lat: data.latitude, lng: data.longitude }
+         : null;
    const sitePosition =
       data.site && data.site.latitude != null && data.site.longitude != null
          ? { lat: data.site.latitude, lng: data.site.longitude }
          : null;
+   const position = pin ?? sitePosition;
+   const coords = formatCoords(position?.lat, position?.lng);
    const lengthDecimals =
       data.length !== null && Number.isInteger(data.length) ? 0 : 1;
    const summary = `${[name, lengthText, stamp].filter(Boolean).join(', ')}.`;
@@ -467,27 +479,40 @@ function CatchRecord({
             </RecordCell>
          </RecordRail>
 
-         {coords && data.site && sitePosition ? (
+         {coords && position ? (
             <section className="px-4 pt-6 md:px-8">
-               <h2 className="g text-[30px]">Position</h2>
+               <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+                  <h2 className="g text-[30px]">Position</h2>
+                  {data.hideLocation ? (
+                     <span className="lab text-ink-3">
+                        Hidden from other anglers
+                     </span>
+                  ) : null}
+               </div>
                <StaticMap
-                  latitude={sitePosition.lat}
-                  longitude={sitePosition.lng}
-                  label={`Map of ${data.site.name}`}
+                  latitude={position.lat}
+                  longitude={position.lng}
+                  label={
+                     data.site ? `Map of ${data.site.name}` : 'Map of the catch'
+                  }
                   className="mt-3"
                />
                <p className="mt-2 flex flex-wrap items-baseline gap-x-2 text-[15px] text-ink-2">
-                  <Link
-                     to={`/sites/${data.site.id}`}
-                     className="text-teal-text"
-                  >
-                     {data.site.name}
-                  </Link>
+                  {data.site ? (
+                     <Link
+                        to={`/sites/${data.site.id}`}
+                        className="text-teal-text"
+                     >
+                        {data.site.name}
+                     </Link>
+                  ) : (
+                     <span>Pin dropped where it was caught</span>
+                  )}
                   <span className="num text-ink-3">{coords}</span>
                </p>
                <a
                   className="g-tracked mt-2 inline-flex h-11 items-center text-[19px] text-ink-2 hover:text-ink"
-                  href={`https://www.google.com/maps/search/?api=1&query=${data.site.latitude},${data.site.longitude}`}
+                  href={`https://www.google.com/maps/search/?api=1&query=${position.lat},${position.lng}`}
                   target="_blank"
                   rel="noreferrer"
                >

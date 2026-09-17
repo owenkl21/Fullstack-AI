@@ -821,7 +821,7 @@ export const fishingService = {
       return withResolvedGearImageUrls(withResolvedImages);
    },
 
-   async getCatchById(catchId: string) {
+   async getCatchById(catchId: string, viewerId: string | null = null) {
       const catchRecord = await prisma.catch.findFirst({
          where: { id: catchId, deletedAt: null },
          include: catchDetailInclude,
@@ -832,7 +832,26 @@ export const fishingService = {
       }
 
       const withResolvedImages = await withResolvedImageUrls(catchRecord);
-      return withResolvedGearImageUrls(withResolvedImages);
+      const resolved = await withResolvedGearImageUrls(withResolvedImages);
+
+      /*
+       * A catch that hides its location hides it here as well as on the feed.
+       * The pin and the spot's position are withheld from everyone but the
+       * angler who logged it; the record still says there is a spot, just not
+       * where. The owner sees the lot, because it is their own log.
+       */
+      if (resolved.hideLocation && resolved.createdById !== viewerId) {
+         return {
+            ...resolved,
+            latitude: null,
+            longitude: null,
+            site: resolved.site
+               ? { ...resolved.site, latitude: null, longitude: null }
+               : resolved.site,
+         };
+      }
+
+      return resolved;
    },
 
    async listMyCatches(userId: string) {

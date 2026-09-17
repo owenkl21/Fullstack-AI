@@ -111,7 +111,11 @@ router.get(
    requireApiAuth,
    uploadsController.getDirectUploadData
 );
-router.get('/api/catches/:catchId', fishingController.getCatchById);
+router.get(
+   '/api/catches/:catchId',
+   attachApiAuth,
+   fishingController.getCatchById
+);
 router.get('/api/sites', fishingController.listFishingSites);
 
 /* A reference table, not anyone's data, so no sign-in needed to name a fish. */

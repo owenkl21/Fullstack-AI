@@ -196,7 +196,10 @@ export const fishingController = {
          });
       }
 
-      const catchRecord = await fishingService.getCatchById(catchId);
+      const catchRecord = await fishingService.getCatchById(
+         catchId,
+         getAuth(req).userId
+      );
 
       if (!catchRecord) {
          return res.status(404).json({
