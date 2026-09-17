@@ -35,6 +35,33 @@ enum CompetitionRule {
   SPECIES_VARIETY
 }
 
+/*
+ * What a fish is judged on. Separate from the rule, which decides how the
+ * judging becomes a position: "biggest fish" has to say biggest by what.
+ */
+/*
+ * Which units an angler reads in. South Africa is metric, so that is the
+ * default, but plenty of tackle and plenty of visiting anglers are not.
+ */
+enum UnitSystem {
+  METRIC
+  IMPERIAL
+}
+
+enum CompetitionMeasure {
+  LENGTH
+  WEIGHT
+}
+
+/*
+ * Who can see and enter. A competition with no group is open to everyone and
+ * appears on the global list; GROUP keeps it to its group as before.
+ */
+enum CompetitionScope {
+  PUBLIC
+  GROUP
+}
+
 enum CompetitionState {
   DRAFT
   OPEN
@@ -92,6 +119,8 @@ model User {
   displayName  String
   bio          String?       @db.Text
   avatarUrl    String?
+  /* Figures are shown in this: kilograms and centimetres, or pounds and inches. */
+  unitSystem   UnitSystem    @default(METRIC)
   catches      Catch[]
   sites        FishingSite[]
   reviews      Review[]
@@ -110,6 +139,7 @@ model User {
   groupsCreated       Group[]       @relation("GroupsCreated")
   groupMemberships    GroupMember[]
   competitionsCreated Competition[] @relation("CompetitionsCreated")
+  competitionEntries  CompetitionEntrant[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
@@ -491,6 +521,11 @@ model Competition {
   createdById String
   createdBy   User             @relation("CompetitionsCreated", fields: [createdById], references: [id])
   rule        CompetitionRule  @default(SPECIES_POINTS)
+  measure     CompetitionMeasure @default(LENGTH)
+  scope       CompetitionScope   @default(GROUP)
+  /* What the organiser wrote about it, shown on the listing. */
+  blurb       String?            @db.VarChar(280)
+  entrants    CompetitionEntrant[]
   /* Set, and it is a target-species competition rather than a fourth rule. */
   speciesId   String?
   species     Species?         @relation(fields: [speciesId], references: [id], onDelete: SetNull)
@@ -508,5 +543,25 @@ model Competition {
   deletedAt   DateTime?
 
   @@index([groupId, startsAt(sort: Desc)])
+  @@index([scope, startsAt(sort: Desc)])
   @@map("competitions")
+}
+
+/*
+ * Who entered. Standings are still worked out from the catches themselves, so
+ * this records intent to compete rather than any score: a derived board cannot
+ * drift from the records it describes, and this keeps that true.
+ */
+model CompetitionEntrant {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt      DateTime    @default(now())
+  leftAt        DateTime?
+
+  @@unique([competitionId, userId])
+  @@index([userId, leftAt])
+  @@map("competition_entrants")
 }

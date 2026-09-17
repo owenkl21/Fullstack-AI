@@ -29,6 +29,22 @@ export default defineRailway(() => {
        * workspaces array live, so that is where bun install has to run.
        */
       build: 'bun install && cd packages/server && bun run prisma:generate',
+
+      /*
+       * The schema reaches the database here and nowhere else.
+       *
+       * This project has no migrations folder: `prisma db push` is the
+       * mechanism, and it is wired into `dev` only. Production ran `prisma
+       * generate` on boot, which rebuilds the client against the new schema
+       * without ever changing the database, so a new column existed in the
+       * types and not in MySQL. preDeploy runs inside the private network,
+       * which is the only place the database answers from.
+       *
+       * Deliberately without --accept-data-loss. A change that would drop a
+       * column fails the deploy instead of taking the data with it, and the
+       * previous version keeps serving.
+       */
+      preDeploy: 'cd packages/server && bunx prisma db push --skip-generate',
       start: 'cd packages/server && bun run start',
 
       /*

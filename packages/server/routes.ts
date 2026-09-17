@@ -6,6 +6,7 @@ import { statsController } from './controllers/stats.controller';
 import { fishingController } from './controllers/fishing.controller';
 import { userController } from './controllers/user.controller';
 import { uploadsController } from './controllers/uploads.controller';
+import { competitionsController } from './controllers/competitions.controller';
 import { gearController } from './controllers/gear.controller';
 import { feedController } from './controllers/feed.controller';
 import { fromNodeHeaders } from 'better-auth/node';
@@ -94,6 +95,26 @@ router.get('/api/species', fishingController.searchSpecies);
 router.get('/api/stats/me', requireApiAuth, statsController.myStats);
 router.get('/api/stats/rivals', requireApiAuth, statsController.rivals);
 router.get('/api/competitions/species', statsController.speciesBoards);
+
+/* Competitions anglers run themselves. The species board above is a different
+ * thing that happens to share the word, so it is registered first. */
+router.get('/api/competitions', requireApiAuth, competitionsController.list);
+router.post('/api/competitions', requireApiAuth, competitionsController.create);
+router.get(
+   '/api/competitions/:competitionId/standings',
+   requireApiAuth,
+   competitionsController.standings
+);
+router.post(
+   '/api/competitions/:competitionId/join',
+   requireApiAuth,
+   competitionsController.join
+);
+router.delete(
+   '/api/competitions/:competitionId/join',
+   requireApiAuth,
+   competitionsController.leave
+);
 
 /* Groups. Every one of these needs a session; a group board is not public. */
 router.get('/api/groups/me', requireApiAuth, groupsController.listMine);
