@@ -31,7 +31,7 @@ export function StandingsTable({
    };
 
    return (
-      <div className="overflow-x-auto">
+      <div className="w-full min-w-0 overflow-x-auto">
          <table className="w-full min-w-[420px] border-collapse text-left">
             <thead>
                <tr className="border-b border-line">

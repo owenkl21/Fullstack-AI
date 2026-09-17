@@ -168,9 +168,9 @@ function SpeciesView({ boards }: { boards: SpeciesBoard[] }) {
    }
 
    return (
-      <div className="grid gap-12">
+      <div className="grid min-w-0 gap-12">
          {boards.map((board) => (
-            <section key={board.speciesId}>
+            <section key={board.speciesId} className="min-w-0">
                <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
                   <h2 className="g text-[30px]">{board.commonName}</h2>
                   {board.longestCm && board.longestByName ? (
@@ -184,7 +184,7 @@ function SpeciesView({ boards }: { boards: SpeciesBoard[] }) {
                   ) : null}
                </div>
 
-               <div className="mt-4">
+               <div className="mt-4 min-w-0">
                   <StandingsTable
                      standings={board.standings}
                      emptyLine={
