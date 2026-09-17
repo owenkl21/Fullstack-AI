@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -28,6 +28,7 @@ import {
    weightMetric,
 } from '@/components/fishing/record/format';
 import { useIsSignedIn } from '@/lib/auth-client';
+import { useGoBack } from '@/lib/go-back';
 
 type LoadState =
    | { status: 'loading'; data: null }
@@ -145,7 +146,8 @@ function CatchRecord({
    state: LoadState;
    onRetry: () => void;
 }) {
-   const navigate = useNavigate();
+   /* Back to the feed, the list or the board you actually came from. */
+   const goBack = useGoBack('/catches/me');
    const data = state.data;
    const built = useBuilt();
    const isOwner = useIsOwner(data?.createdBy?.id);
@@ -298,7 +300,7 @@ function CatchRecord({
             images={images}
             index={index}
             onIndexChange={(next) => setGallery({ id: data.id, index: next })}
-            onBack={() => navigate('/catches/me')}
+            onBack={goBack}
             eyebrow={[stamp, spot].filter(Boolean).join(' · ')}
             title={name}
             built={built}
