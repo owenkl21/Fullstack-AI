@@ -44,7 +44,7 @@ const SEAMARK_ATTRIBUTION =
  * All three are keyless and free to use with attribution, which is a licence
  * condition rather than a courtesy, so it is always on.
  */
-export type BaseLayer = 'satellite' | 'plain' | 'streets';
+export type BaseLayer = 'satellite' | 'terrain' | 'plain' | 'streets';
 
 const BASES: Record<
    BaseLayer,
@@ -56,6 +56,18 @@ const BASES: Record<
       attribution:
          'Imagery &copy; <a href="https://www.esri.com">Esri</a>, Maxar, Earthstar Geographics',
       maxZoom: 19,
+   },
+   terrain: {
+      label: 'Terrain',
+      /*
+       * OpenTopoMap: relief and contour lines. For a rock and surf angler the
+       * question is often how steep the way down is, and a photograph of a
+       * cliff from above does not say. Its own attribution is a condition.
+       */
+      url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+      attribution:
+         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Style &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+      maxZoom: 17,
    },
    plain: {
       label: 'Plain',
