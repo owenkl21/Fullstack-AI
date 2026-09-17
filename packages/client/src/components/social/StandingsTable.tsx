@@ -32,12 +32,24 @@ const RANKS: { value: RankBy; label: string; head: string }[] = [
 export function StandingsTable({
    standings,
    emptyLine,
+   rankBy: rankByProp,
+   pageSize = 10,
+   youId = null,
 }: {
    standings: (Standing | RivalStanding)[];
    emptyLine: string;
+   /* Chosen by the page, so every board on it orders the same way. Left
+    * out, the table carries its own switch. */
+   rankBy?: RankBy;
+   /* Ten a page. The board is always the top ten first; the rest page. */
+   pageSize?: number;
+   /* The reader, so their row is pinned under the page when it is off it. */
+   youId?: string | null;
 }) {
-   const [rankBy, setRankBy] = useState<RankBy>('points');
+   const [ownRankBy, setRankBy] = useState<RankBy>('points');
+   const rankBy = rankByProp ?? ownRankBy;
    const [units] = useState(() => readUnitSystem());
+   const [page, setPage] = useState(0);
 
    if (!standings.length) {
       return <p className="text-[15px] text-ink-2">{emptyLine}</p>;
@@ -94,12 +106,23 @@ export function StandingsTable({
 
    const head = RANKS.find((r) => r.value === rankBy)?.head ?? 'Points';
 
+   const pages = Math.max(1, Math.ceil(ordered.length / pageSize));
+   const current = Math.min(page, pages - 1);
+   const shown = ordered.slice(current * pageSize, (current + 1) * pageSize);
+   const youIndex = ordered.findIndex(
+      (s) =>
+         ('isYou' in s && s.isYou) || (youId !== null && s.anglerId === youId)
+   );
+   const youOffPage =
+      youIndex >= 0 &&
+      (youIndex < current * pageSize || youIndex >= (current + 1) * pageSize);
+
    return (
       <div className="w-full min-w-0">
          <div
             role="radiogroup"
             aria-label="Order the board by"
-            className="mb-3 flex flex-wrap gap-2"
+            className={cn('mb-3 flex flex-wrap gap-2', rankByProp && 'hidden')}
          >
             {RANKS.map((option) => (
                <button
@@ -130,8 +153,11 @@ export function StandingsTable({
                   </tr>
                </thead>
                <tbody>
-                  {ordered.map((s, i) => {
-                     const you = 'isYou' in s && s.isYou;
+                  {shown.map((s, offset) => {
+                     const i = current * pageSize + offset;
+                     const you =
+                        ('isYou' in s && s.isYou) ||
+                        (youId !== null && s.anglerId === youId);
                      const joint = jointWith(i);
 
                      return (
@@ -168,6 +194,44 @@ export function StandingsTable({
                </tbody>
             </table>
          </div>
+
+         {youOffPage ? (
+            <p className="mt-2 flex items-baseline justify-between gap-4 border-t-2 border-teal pt-2 text-[15px]">
+               <span>
+                  <span className="num font-medium">
+                     #{positionOf(youIndex)}
+                  </span>{' '}
+                  <span className="text-ink-2">You, of {ordered.length}</span>
+               </span>
+               <span className="num">{written(ordered[youIndex]!)}</span>
+            </p>
+         ) : null}
+
+         {pages > 1 ? (
+            <div className="mt-3 flex items-center justify-between gap-4">
+               <button
+                  type="button"
+                  disabled={current === 0}
+                  onClick={() => setPage(current - 1)}
+                  className="g-tracked inline-flex h-10 items-center text-[15px] text-ink-2 disabled:opacity-40 hover:text-ink"
+               >
+                  Previous ten
+               </button>
+               <span className="num text-[13px] text-ink-3">
+                  {current * pageSize + 1} to{' '}
+                  {Math.min(ordered.length, (current + 1) * pageSize)} of{' '}
+                  {ordered.length}
+               </span>
+               <button
+                  type="button"
+                  disabled={current >= pages - 1}
+                  onClick={() => setPage(current + 1)}
+                  className="g-tracked inline-flex h-10 items-center text-[15px] text-ink-2 disabled:opacity-40 hover:text-ink"
+               >
+                  Next ten
+               </button>
+            </div>
+         ) : null}
       </div>
    );
 }

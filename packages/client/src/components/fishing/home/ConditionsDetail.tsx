@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { WeatherSnapshot } from '@/components/fishing/record/api';
 import { thunderRisk } from '@/components/forecast/forecast-api';
 import {
@@ -222,15 +222,26 @@ export function ConditionsDetail({
       return null;
    }
 
+   /*
+    * Tiles, three across on a phone and up to six on a desktop, the mark
+    * over the figure over its name. Two columns of icon-and-two-lines ran to
+    * seven rows on a phone, which was most of a screen of scrolling before
+    * the log. Each tile arrives a beat after the last, so the panel reads as
+    * the readings landing rather than a wall appearing.
+    */
    return (
-      <dl className="relative mt-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
-         {facts.map((fact) => (
-            <div key={fact.key} className="flex items-start gap-2.5">
-               <span className="mt-[2px] shrink-0 text-ink-3">{fact.icon}</span>
-               <span className="min-w-0">
-                  <dt className="lab text-ink-3">{fact.label}</dt>
-                  <dd className="mt-0.5 text-[15px] text-ink">{fact.value}</dd>
-               </span>
+      <dl className="relative mt-5 grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-4 md:grid-cols-6">
+         {facts.map((fact, index) => (
+            <div
+               key={fact.key}
+               className="fact flex min-w-0 flex-col items-start gap-1 border-t border-line pt-2.5"
+               style={{ '--i': index } as CSSProperties}
+            >
+               <span className="text-ink-3">{fact.icon}</span>
+               <dd className="num order-2 text-[15px] leading-tight text-ink">
+                  {fact.value}
+               </dd>
+               <dt className="lab order-1 text-ink-3">{fact.label}</dt>
             </div>
          ))}
       </dl>

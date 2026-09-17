@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LeafletMouseEvent, Map as LeafletMap, Marker } from 'leaflet';
 import { ViewfinderCircleIcon } from '@heroicons/react/24/outline';
 import {
-   BASE_LAYERS,
    L,
    clusterGroup,
    createMap,
@@ -11,7 +10,7 @@ import {
    setBaseLayer,
    type BaseLayer,
 } from '@/lib/leaflet';
-import { ChoiceGroup, ToggleGroup } from '@/components/ui/field';
+import { MapLegend, MapToolbar } from '@/components/map/MapToolbar';
 import { fetchPois, type Poi } from '@/lib/overpass';
 import { requestPosition, usePosition } from '@/lib/position';
 import {
@@ -135,7 +134,7 @@ export function SpotsMap({
     * have saved anything of your own, which is the whole point of a map. */
    const [discovered, setDiscovered] = useState<PublicSpot[]>([]);
    const [showOthers, setShowOthers] = useState(true);
-   const [species, setSpecies] = useState<string>('');
+   const [species, setSpecies] = useState<string[]>([]);
    const [base, setBase] = useState<BaseLayer>('satellite');
    /*
     * Bumped when the map is built. Every layer's draw effect depends on it,
@@ -154,6 +153,11 @@ export function SpotsMap({
       lat: number;
       lng: number;
    } | null>(null);
+   /* The pin button arms the next tap to drop a mark, for anyone who does
+    * not know about the long press. */
+   const [armed, setArmed] = useState(false);
+   const armedRef = useRef(false);
+   armedRef.current = armed;
 
    useEffect(() => {
       onOpenRef.current = onOpen;
@@ -284,6 +288,12 @@ export function SpotsMap({
          setDropping({ lat: event.latlng.lat, lng: event.latlng.lng });
       };
       created.on('contextmenu', onLongPress);
+      const onTap = (event: LeafletMouseEvent) => {
+         if (!armedRef.current) return;
+         setArmed(false);
+         setDropping({ lat: event.latlng.lat, lng: event.latlng.lng });
+      };
+      created.on('click', onTap);
 
       const observer = new ResizeObserver(() => refreshSize(created));
       observer.observe(node);
@@ -291,6 +301,7 @@ export function SpotsMap({
       return () => {
          observer.disconnect();
          created.off('contextmenu', onLongPress);
+         created.off('click', onTap);
          created.remove();
          map.current = null;
          spotLayer.current = null;
@@ -386,7 +397,11 @@ export function SpotsMap({
       for (const spot of discovered) {
          if (mine.has(spot.id)) continue;
          if (spot.latitude == null || spot.longitude == null) continue;
-         if (species && !spot.species.some((s) => s.id === species)) continue;
+         if (
+            species.length &&
+            !spot.species.some((s) => species.includes(s.id))
+         )
+            continue;
 
          const marker = L.marker([spot.latitude, spot.longitude], {
             icon: kindPin('other', spot.catchCount),
@@ -554,6 +569,40 @@ export function SpotsMap({
                className="map-surface h-[62vh] min-h-[380px] w-full border border-line"
             />
 
+            <MapToolbar
+               base={base}
+               onBase={(next) => {
+                  setBase(next);
+                  if (map.current) setBaseLayer(map.current, next);
+               }}
+               species={species}
+               onSpecies={setSpecies}
+               speciesOptions={speciesOptions.map((s) => ({
+                  value: s.id,
+                  label: s.name,
+               }))}
+               layers={{
+                  others: showOthers,
+                  marks: showWaypoints,
+                  places: showPois,
+               }}
+               onLayer={(key) => {
+                  if (key === 'others') setShowOthers((was) => !was);
+                  if (key === 'marks') setShowWaypoints((was) => !was);
+                  if (key === 'places') setShowPois((was) => !was);
+               }}
+               dropping={armed}
+               onDrop={() => setArmed((was) => !was)}
+               onLogHere={() => {
+                  const centre = map.current?.getCenter();
+                  if (centre)
+                     window.location.assign(
+                        `/catches/new?lat=${centre.lat.toFixed(5)}&lng=${centre.lng.toFixed(5)}`
+                     );
+               }}
+            />
+            <MapLegend />
+
             {/* Over the map, where a locate control belongs. */}
             <button
                type="button"
@@ -574,67 +623,13 @@ export function SpotsMap({
             </button>
          </div>
 
-         <div className="map-controls flex flex-col gap-3">
-            <ChoiceGroup
-               inline
-               size="sm"
-               label="Base"
-               value={base}
-               onChange={(next) => {
-                  setBase(next);
-                  if (map.current) setBaseLayer(map.current, next);
-               }}
-               options={BASE_LAYERS}
-            />
-
-            {speciesOptions.length ? (
-               <ChoiceGroup
-                  inline
-                  size="sm"
-                  label="Fish"
-                  value={species}
-                  onChange={setSpecies}
-                  options={[
-                     { value: '', label: 'Any' },
-                     ...speciesOptions
-                        .slice(0, 8)
-                        .map((s) => ({ value: s.id, label: s.name })),
-                  ]}
-               />
-            ) : null}
-
-            <ToggleGroup
-               inline
-               size="sm"
-               label="Show"
-               options={[
-                  {
-                     value: 'others',
-                     label: 'Other anglers',
-                     on: showOthers,
-                     onToggle: () => setShowOthers((was) => !was),
-                  },
-                  {
-                     value: 'marks',
-                     label: 'My marks',
-                     on: showWaypoints,
-                     onToggle: () => setShowWaypoints((was) => !was),
-                  },
-                  {
-                     value: 'places',
-                     label: 'Ramps and shops',
-                     on: showPois,
-                     onToggle: () => setShowPois((was) => !was),
-                  },
-               ]}
-            />
-
-            <p className="text-[14px] text-ink-3 sm:pl-[calc(var(--map-label)+12px)]">
-               {showPois && zoomLevel > 0 && zoomLevel < POI_MIN_ZOOM
-                  ? 'Zoom in for slipways and tackle shops. Press and hold the map to drop a private mark.'
-                  : 'Press and hold the map to drop a private mark.'}
-            </p>
-         </div>
+         <p className="mt-2 text-[14px] text-ink-3">
+            {showPois && zoomLevel > 0 && zoomLevel < POI_MIN_ZOOM
+               ? 'Zoom in for slipways and tackle shops.'
+               : ''}{' '}
+            Press and hold the map, or use the pin button, to drop a private
+            mark.
+         </p>
 
          {dropping ? (
             <NewWaypoint

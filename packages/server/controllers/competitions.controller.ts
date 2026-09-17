@@ -1,6 +1,10 @@
 import type { Request, Response } from 'express';
 import { getAuth } from '../lib/auth-context';
-import { createCompetitionSchema } from '../schemas/competition.schema';
+import {
+   createCompetitionSchema,
+   inviteSchema,
+   listCompetitionsSchema,
+} from '../schemas/competition.schema';
 import { competitionsService } from '../services/competitions.service';
 
 /* Express can hand back a repeated route value as an array. */
@@ -13,14 +17,71 @@ const unauthorized = {
 };
 
 export const competitionsController = {
+   async invite(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const id = asSingleParam(req.params.competitionId);
+      const parsed = inviteSchema.safeParse(req.body);
+      if (!id || !parsed.success) {
+         return res.status(400).json({ code: 'bad_invite' });
+      }
+      const result = await competitionsService.invite(
+         auth.userId,
+         id,
+         parsed.data.userIds
+      );
+      if (!result) {
+         return res.status(404).json({ code: 'competition_not_yours' });
+      }
+      return res.json(result);
+   },
+
+   async myInvites(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      return res.json({
+         invites: await competitionsService.invitesFor(auth.userId),
+      });
+   },
+
+   async answerInvite(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const id = asSingleParam(req.params.inviteId);
+      const accept = req.body?.accept === true;
+      if (!id) return res.status(400).json({ code: 'invite_id_required' });
+      const result = await competitionsService.answerInvite(
+         auth.userId,
+         id,
+         accept
+      );
+      if (!result) return res.status(404).json({ code: 'invite_not_found' });
+      return res.json(result);
+   },
+
+   async myFollowers(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      return res.json({
+         followers: await competitionsService.followersOf(auth.userId),
+      });
+   },
+
    async list(req: Request, res: Response) {
       const auth = getAuth(req);
       if (!auth.userId) {
          return res.status(401).json(unauthorized);
       }
 
-      const competitions = await competitionsService.list(auth.userId);
-      return res.json({ competitions });
+      const query = listCompetitionsSchema.safeParse(req.query);
+      const { page, size } = query.success ? query.data : { page: 1, size: 20 };
+      const result = await competitionsService.list(auth.userId, page, size);
+      return res.json({
+         competitions: result.items,
+         total: result.total,
+         page: result.page,
+         size: result.size,
+      });
    },
 
    async create(req: Request, res: Response) {
@@ -63,7 +124,7 @@ export const competitionsController = {
          });
       }
 
-      const result = await competitionsService.standings(id);
+      const result = await competitionsService.standings(id, auth.userId);
       if (!result) {
          return res.status(404).json({
             code: 'competition_not_found',

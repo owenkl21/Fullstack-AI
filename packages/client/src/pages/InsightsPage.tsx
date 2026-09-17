@@ -1,9 +1,16 @@
 import axios from 'axios';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+   useEffect,
+   useMemo,
+   useState,
+   type CSSProperties,
+   type ReactNode,
+} from 'react';
 import { Link } from 'react-router-dom';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Bars, Rose, type Bar } from '@/components/insights/Charts';
 import { WindArrowIcon } from '@/components/fishing/home/ConditionIcons';
+import { CountIn } from '@/components/fishing/record/CountIn';
 import {
    fetchMyCatches,
    type CatchSummary,
@@ -125,6 +132,14 @@ function Insights() {
    const [progress, setProgress] = useState<Progress | null>(null);
    const [failed, setFailed] = useState(false);
    const system = readUnitSystem();
+   const [grown, setGrown] = useState(false);
+   useEffect(() => {
+      if (!progress) return;
+      const frame = requestAnimationFrame(() =>
+         requestAnimationFrame(() => setGrown(true))
+      );
+      return () => cancelAnimationFrame(frame);
+   }, [progress]);
 
    useEffect(() => {
       const controller = new AbortController();
@@ -374,7 +389,10 @@ function Insights() {
                   <div className="flex items-baseline gap-3">
                      <span className="lab text-paper-2">Level</span>
                      <span className="g num text-[64px] leading-none">
-                        {progress.rank.index + 1}
+                        <CountIn
+                           value={progress.rank.index + 1}
+                           durationMs={900}
+                        />
                      </span>
                      <span className="g text-[34px] leading-none">
                         {progress.rank.name}
@@ -383,7 +401,7 @@ function Insights() {
                   <div className="rank-bar mt-5 bg-paper/15" aria-hidden="true">
                      <span
                         style={{
-                           width: `${Math.round(progress.progress * 100)}%`,
+                           width: `${grown ? Math.round(progress.progress * 100) : 0}%`,
                         }}
                      />
                   </div>
@@ -447,11 +465,12 @@ function Insights() {
                Badges, {earned.length} of {progress.badges.length}
             </h3>
             <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-               {progress.badges.map((badge) => (
+               {progress.badges.map((badge, index) => (
                   <li
                      key={badge.key}
+                     style={{ '--i': index } as CSSProperties}
                      className={cn(
-                        'relative flex flex-col gap-1 border p-3',
+                        'fact relative flex flex-col gap-1 border p-3',
                         badge.earned
                            ? 'border-ink bg-ink text-background'
                            : 'border-line text-ink'
@@ -472,9 +491,9 @@ function Insights() {
                         <span className="mt-auto pt-2" aria-hidden="true">
                            <span className="block h-1 w-full bg-line">
                               <span
-                                 className="block h-1 bg-teal"
+                                 className="block h-1 bg-teal transition-[width] duration-700 [transition-timing-function:var(--ease)]"
                                  style={{
-                                    width: `${Math.round(badge.progress * 100)}%`,
+                                    width: `${grown ? Math.round(badge.progress * 100) : 0}%`,
                                  }}
                               />
                            </span>
@@ -621,11 +640,16 @@ function Figure({
    value: string;
    unit?: string;
 }) {
+   const numeric = /^\d+$/.test(value) ? Number(value) : null;
    return (
       <div className="flex flex-col">
          <dt className="lab text-ink-3">{label}</dt>
          <dd className="g num mt-1 text-[34px] leading-none">
-            {value}
+            {numeric !== null ? (
+               <CountIn value={numeric} durationMs={900} />
+            ) : (
+               value
+            )}
             {unit ? (
                <small className="ml-1 font-sans text-[14px] tracking-normal text-ink-2">
                   {unit}

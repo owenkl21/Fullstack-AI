@@ -15,11 +15,15 @@ const MAX_BYTES = 10 * 1024 * 1024;
 export function PhotoBlock({
    onChange,
    onBusyChange,
+   onFile,
 }: {
    onChange: (photo: UploadedPhoto | null) => void;
    onBusyChange: (busy: boolean) => void;
+   /* The file as picked, before the upload, for what the camera wrote in it. */
+   onFile?: (file: File) => void;
 }) {
    const inputRef = useRef<HTMLInputElement>(null);
+   const pickRef = useRef<HTMLInputElement>(null);
    const previewRef = useRef<string | null>(null);
    const [preview, setPreview] = useState<string | null>(null);
    const [settled, setSettled] = useState(false);
@@ -102,12 +106,12 @@ export function PhotoBlock({
          setError('That photo is over 10 MB. Take it again at a smaller size.');
          return;
       }
+      onFile?.(file);
       showPreview(file);
       void upload(file);
       // Cleared so taking the same photo twice still fires a change.
-      if (inputRef.current) {
-         inputRef.current.value = '';
-      }
+      if (inputRef.current) inputRef.current.value = '';
+      if (pickRef.current) pickRef.current.value = '';
    };
 
    const clear = () => {
@@ -160,14 +164,33 @@ export function PhotoBlock({
                className="sr-only"
                onChange={(event) => onSelect(event.target.files?.[0])}
             />
+            {/* The same picker without `capture`: the camera roll, for a
+                fish photographed before the phone came out of the bag. */}
+            <input
+               ref={pickRef}
+               type="file"
+               accept={ACCEPTED.join(',')}
+               className="sr-only"
+               aria-label="Choose a photo"
+               onChange={(event) => onSelect(event.target.files?.[0])}
+            />
             {!preview ? (
-               <button
-                  type="button"
-                  className={control}
-                  onClick={() => inputRef.current?.click()}
-               >
-                  Take a photo
-               </button>
+               <div className="relative z-[1] flex flex-wrap items-center justify-center gap-3">
+                  <button
+                     type="button"
+                     className={control}
+                     onClick={() => inputRef.current?.click()}
+                  >
+                     Take a photo
+                  </button>
+                  <button
+                     type="button"
+                     className={cn(control, 'border-paper/30 bg-transparent')}
+                     onClick={() => pickRef.current?.click()}
+                  >
+                     Choose one
+                  </button>
+               </div>
             ) : null}
             {isUploading ? (
                <span
@@ -185,6 +208,13 @@ export function PhotoBlock({
                   onClick={() => inputRef.current?.click()}
                >
                   Take another
+               </button>
+               <button
+                  type="button"
+                  className="g-tracked inline-flex h-11 items-center text-[18px] text-ink-2 hover:text-ink"
+                  onClick={() => pickRef.current?.click()}
+               >
+                  Choose one
                </button>
                <button
                   type="button"

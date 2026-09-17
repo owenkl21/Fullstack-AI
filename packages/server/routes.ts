@@ -9,6 +9,7 @@ import { uploadsController } from './controllers/uploads.controller';
 import { competitionsController } from './controllers/competitions.controller';
 import { placesController } from './controllers/places.controller';
 import { forecastController } from './controllers/forecast.controller';
+import { visionController } from './controllers/vision.controller';
 import { savedController } from './controllers/saved.controller';
 import { waypointsController } from './controllers/waypoints.controller';
 import { gearController } from './controllers/gear.controller';
@@ -138,6 +139,10 @@ router.get('/api/places', placesController.list);
 router.get('/api/places/search', placesController.search);
 router.get('/api/places/name', placesController.name);
 
+/* Reading a photograph: a figure off a tape or a scale, or the fish's name. */
+router.post('/api/vision/read', requireApiAuth, visionController.readMeasure);
+router.post('/api/vision/identify', requireApiAuth, visionController.identify);
+
 /* The week ahead at a place. Public, like the places. */
 router.get('/api/forecast', forecastController.get);
 
@@ -183,6 +188,26 @@ router.delete(
 /* Competitions anglers run themselves. The species board above is a different
  * thing that happens to share the word, so it is registered first. */
 router.get('/api/competitions', requireApiAuth, competitionsController.list);
+router.get(
+   '/api/competitions/invites',
+   requireApiAuth,
+   competitionsController.myInvites
+);
+router.post(
+   '/api/competitions/invites/:inviteId',
+   requireApiAuth,
+   competitionsController.answerInvite
+);
+router.get(
+   '/api/users/me/followers',
+   requireApiAuth,
+   competitionsController.myFollowers
+);
+router.post(
+   '/api/competitions/:competitionId/invite',
+   requireApiAuth,
+   competitionsController.invite
+);
 router.post('/api/competitions', requireApiAuth, competitionsController.create);
 router.get(
    '/api/competitions/:competitionId/standings',

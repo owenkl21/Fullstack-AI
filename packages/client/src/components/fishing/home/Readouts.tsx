@@ -100,7 +100,7 @@ export function Readouts({
                </div>
                <ConditionsDetail snapshot={snapshot ?? null} />
 
-               <p className="relative mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[14px] text-ink-3">
+               <p className="relative mt-5 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[14px] text-ink-3">
                   <span>
                      {place
                         ? `Conditions at ${place}`

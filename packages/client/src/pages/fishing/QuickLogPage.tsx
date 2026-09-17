@@ -28,7 +28,15 @@ import {
    PhotoBlock,
    type UploadedPhoto,
 } from '@/components/fishing/quicklog/PhotoBlock';
-import { Receipt } from '@/components/fishing/quicklog/Receipt';
+import {
+   Receipt,
+   type TimeSource,
+   type Where,
+} from '@/components/fishing/quicklog/Receipt';
+import { MapLocationPicker } from '@/components/fishing/MapLocationPicker';
+import { ChoiceGroup, TextField } from '@/components/ui/field';
+import { readPhotoMeta } from '@/lib/exif';
+import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
 import { SpeciesField } from '@/components/fishing/quicklog/SpeciesField';
 import {
    toMetricValue,
@@ -60,8 +68,51 @@ export function QuickLogPage() {
 
 function QuickLog() {
    const navigate = useNavigate();
-   const [stampedAt] = useState(() => new Date());
-   const { status: fixStatus, fix, isSharp } = usePositionFix();
+   const [stampedAt, setStampedAt] = useState(() => new Date());
+   const [timeSource, setTimeSource] = useState<TimeSource>('clock');
+   const { status: fixStatus, fix } = usePositionFix();
+   /*
+    * Where the fish came out: the photograph's own GPS beats the phone's
+    * fix, and a pin the angler drops beats both. The phone's fix arrives on
+    * its own and only fills in while nothing better is known.
+    */
+   const [where, setWhere] = useState<Where | null>(null);
+   const [pinOpen, setPinOpen] = useState(false);
+   useEffect(() => {
+      if (fix && (!where || where.source === 'phone')) {
+         setWhere({
+            latitude: fix.latitude,
+            longitude: fix.longitude,
+            source: 'phone',
+            accuracy: fix.accuracy,
+         });
+      }
+   }, [fix]); // eslint-disable-line react-hooks/exhaustive-deps
+
+   const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
+   const [hideLocation, setHideLocation] = useState(false);
+   const [spotName, setSpotName] = useState('');
+   const [spotPublic, setSpotPublic] = useState(false);
+
+   const onPhotoFile = (file: File) => {
+      void readPhotoMeta(file).then((meta) => {
+         if (meta.takenAt && timeSource !== 'typed') {
+            setStampedAt(meta.takenAt);
+            setTimeSource('photo');
+         }
+         if (meta.latitude !== null && meta.longitude !== null) {
+            setWhere((was) =>
+               was?.source === 'pin'
+                  ? was
+                  : {
+                       latitude: meta.latitude as number,
+                       longitude: meta.longitude as number,
+                       source: 'photo',
+                    }
+            );
+         }
+      });
+   };
 
    const [entered, setEntered] = useState(false);
    const [conditions, setConditions] = useState<{
@@ -79,16 +130,15 @@ function QuickLog() {
 
    const [length, setLength] = useState('');
    const [lengthUnit, setLengthUnit] = useState<MeasureUnit>('cm');
-   const [onTape, setOnTape] = useState(false);
+   const [lengthSource, setLengthSource] = useState<'EYE' | 'TAPE'>('EYE');
    const [weight, setWeight] = useState('');
    const [weightUnit, setWeightUnit] = useState<MeasureUnit>('kg');
-   const [onScale, setOnScale] = useState(false);
+   const [weightSource, setWeightSource] = useState<'EYE' | 'SCALE'>('EYE');
 
    const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
    const [photoBusy, setPhotoBusy] = useState(false);
    const [isSaving, setIsSaving] = useState(false);
 
-   const askedForConditions = useRef(false);
    const conditionsRequest = useRef<AbortController | null>(null);
 
    useEffect(() => {
@@ -121,35 +171,38 @@ function QuickLog() {
 
    useEffect(() => () => conditionsRequest.current?.abort(), []);
 
-   // The conditions are pulled once, on the first fix of any accuracy, and a better
-   // fix arriving later never cancels the reading already on its way.
+   /*
+    * The conditions for the place and the hour, read again whenever either
+    * moves: a photograph with its own time and place replaces what the phone
+    * guessed in the car park.
+    */
+   const hourKey = `${stampedAt.toISOString().slice(0, 13)}|${where ? `${where.latitude.toFixed(3)},${where.longitude.toFixed(3)}` : ''}`;
    useEffect(() => {
-      if (!fix || askedForConditions.current) {
-         return;
-      }
-      askedForConditions.current = true;
+      if (!where) return;
+      conditionsRequest.current?.abort();
       const controller = new AbortController();
       conditionsRequest.current = controller;
+      setConditionsFailed(false);
       const load = async () => {
          try {
             const weather = await fetchConditions(
-               fix.latitude,
-               fix.longitude,
-               controller.signal
+               where.latitude,
+               where.longitude,
+               controller.signal,
+               stampedAt
             );
+            if (controller.signal.aborted) return;
             if (!weather) {
                setConditionsFailed(true);
                return;
             }
             setConditions({ snapshot: weather, at: formatClock(new Date()) });
          } catch (error) {
-            if (!axios.isCancel(error)) {
-               setConditionsFailed(true);
-            }
+            if (!axios.isCancel(error)) setConditionsFailed(true);
          }
       };
       void load();
-   }, [fix]);
+   }, [hourKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
    const phase: ConditionsPhase = conditions
       ? 'ready'
@@ -157,7 +210,7 @@ function QuickLog() {
           fixStatus === 'denied' ||
           fixStatus === 'unsupported'
         ? 'missing'
-        : fix
+        : where
           ? 'loading'
           : 'waiting';
 
@@ -209,24 +262,49 @@ function QuickLog() {
       const lengthCm = toMetricValue(length, lengthUnit);
       const weightKg = toMetricValue(weight, weightUnit);
 
-      // TODO(api): appendix E, a catch carries no position of its own and the fast
-      // path creates no spot, so the live fix is shown but not stored.
-      const payload = {
-         title,
-         caughtAt: stampedAt.toISOString(),
-         notes: null,
-         siteId: null,
-         speciesId: matched?.id ?? null,
-         weather: snapshot?.weatherCondition?.description?.text ?? null,
-         weatherSnapshot: toSavableSnapshot(snapshot),
-         length: lengthCm,
-         weight: weightKg,
-         images: photo ? [photo] : [],
-         gearIds: [],
-      };
-
       try {
          setIsSaving(true);
+
+         /*
+          * A named spot is saved first and the catch filed under it; the
+          * spot takes the angler's choice of public or private. Unnamed, the
+          * catch keeps the pin on its own.
+          */
+         let siteId: string | null = null;
+         if (spotName.trim() && where) {
+            const { data: made } = await axios.post<{
+               site?: { id: string };
+               id?: string;
+            }>('/api/sites', {
+               name: spotName.trim(),
+               latitude: where.latitude,
+               longitude: where.longitude,
+               visibility: spotPublic ? 'PUBLIC' : 'PRIVATE',
+               waterType: 'SALTWATER',
+            });
+            siteId = made.site?.id ?? made.id ?? null;
+         }
+
+         const payload = {
+            title,
+            caughtAt: stampedAt.toISOString(),
+            notes: null,
+            siteId,
+            speciesId: matched?.id ?? null,
+            latitude: where?.latitude ?? null,
+            longitude: where?.longitude ?? null,
+            visibility,
+            hideLocation,
+            weather: snapshot?.weatherCondition?.description?.text ?? null,
+            weatherSnapshot: toSavableSnapshot(snapshot),
+            length: lengthCm,
+            weight: weightKg,
+            lengthSource,
+            weightSource,
+            images: photo ? [photo] : [],
+            gearIds: [],
+         };
+
          const { data } = await axios.post<{ catch: { id: string } }>(
             '/api/catches',
             payload
@@ -282,11 +360,25 @@ function QuickLog() {
 
          <div className="flex flex-1 flex-col gap-4 px-4 py-4">
             <Receipt
-               stampedAt={stampedAt}
-               status={fixStatus}
-               fix={fix}
-               isSharp={isSharp}
-            />
+               at={stampedAt}
+               timeSource={timeSource}
+               onTime={(next) => {
+                  setStampedAt(next);
+                  setTimeSource('typed');
+               }}
+               where={where}
+               fixStatus={fixStatus}
+               pinOpen={pinOpen}
+               onTogglePin={() => setPinOpen((open) => !open)}
+            >
+               <MapLocationPicker
+                  latitude={where ? String(where.latitude) : ''}
+                  longitude={where ? String(where.longitude) : ''}
+                  onChange={(latitude, longitude) =>
+                     setWhere({ latitude, longitude, source: 'pin' })
+                  }
+               />
+            </Receipt>
 
             <Conditions
                phase={phase}
@@ -294,7 +386,25 @@ function QuickLog() {
                takenAt={conditions?.at ?? null}
             />
 
-            <PhotoBlock onChange={setPhoto} onBusyChange={setPhotoBusy} />
+            <PhotoBlock
+               onChange={setPhoto}
+               onBusyChange={setPhotoBusy}
+               onFile={onPhotoFile}
+            />
+
+            <SpeciesGuess
+               imageUrl={photo?.url ?? null}
+               current={typed || chosen || ''}
+               onPick={(candidate) => {
+                  if (!candidate) {
+                     speciesInput.current?.focus();
+                     return;
+                  }
+                  setTyped(candidate.commonName);
+                  setChosen(null);
+                  setSpeciesError(null);
+               }}
+            />
 
             <SpeciesField
                options={options}
@@ -323,10 +433,15 @@ function QuickLog() {
                   value={length}
                   onChange={setLength}
                   onUnitChange={setLengthUnit}
-                  sourceLabel={onTape ? 'on a tape' : 'by eye'}
-                  sourceAction="On a tape"
-                  sourceOn={onTape}
-                  onSourceToggle={() => setOnTape((on) => !on)}
+                  sources={[
+                     { value: 'EYE', label: 'By eye' },
+                     { value: 'TAPE', label: 'On a tape' },
+                  ]}
+                  source={lengthSource}
+                  onSourceChange={(next) =>
+                     setLengthSource(next as 'EYE' | 'TAPE')
+                  }
+                  placeholder="0"
                />
                <MeasureField
                   id="weight"
@@ -336,11 +451,73 @@ function QuickLog() {
                   value={weight}
                   onChange={setWeight}
                   onUnitChange={setWeightUnit}
-                  sourceLabel={onScale ? 'on a scale' : 'by eye'}
-                  sourceAction="On a scale"
-                  sourceOn={onScale}
-                  onSourceToggle={() => setOnScale((on) => !on)}
+                  sources={[
+                     { value: 'EYE', label: 'By eye' },
+                     { value: 'SCALE', label: 'On a scale' },
+                  ]}
+                  source={weightSource}
+                  onSourceChange={(next) =>
+                     setWeightSource(next as 'EYE' | 'SCALE')
+                  }
+                  placeholder="0"
                />
+            </div>
+
+            {/* Who sees it, and whether the place travels with it. */}
+            <div className="flex flex-col gap-4 border-t border-line pt-4">
+               <ChoiceGroup
+                  inline
+                  size="sm"
+                  label="Who sees it"
+                  value={visibility}
+                  onChange={setVisibility}
+                  options={[
+                     { value: 'PUBLIC', label: 'Everyone' },
+                     { value: 'PRIVATE', label: 'Only me' },
+                  ]}
+               />
+               {visibility === 'PUBLIC' && where ? (
+                  <ChoiceGroup
+                     inline
+                     size="sm"
+                     label="The spot"
+                     value={hideLocation ? 'HIDE' : 'SHOW'}
+                     onChange={(next) => setHideLocation(next === 'HIDE')}
+                     options={[
+                        { value: 'SHOW', label: 'Show it' },
+                        { value: 'HIDE', label: 'Keep it to myself' },
+                     ]}
+                     hint={
+                        hideLocation
+                           ? 'The fish shows on the feed, the pin does not.'
+                           : 'Other anglers see where this came from.'
+                     }
+                  />
+               ) : null}
+               {where ? (
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                     <TextField
+                        label="Save this place as a spot"
+                        value={spotName}
+                        maxLength={120}
+                        autoComplete="off"
+                        placeholder="Leave blank to keep only the pin"
+                        onChange={(event) => setSpotName(event.target.value)}
+                     />
+                     {spotName.trim() ? (
+                        <ChoiceGroup
+                           size="sm"
+                           label="The spot is"
+                           value={spotPublic ? 'PUBLIC' : 'PRIVATE'}
+                           onChange={(next) => setSpotPublic(next === 'PUBLIC')}
+                           options={[
+                              { value: 'PRIVATE', label: 'Private' },
+                              { value: 'PUBLIC', label: 'Public' },
+                           ]}
+                        />
+                     ) : null}
+                  </div>
+               ) : null}
             </div>
          </div>
 

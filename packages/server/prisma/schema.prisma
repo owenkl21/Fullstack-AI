@@ -7,7 +7,7 @@ datasource db {
   provider = "mysql"
 }
 
-/*
+/**
  * Who can see a record. PRIVATE is the floor a group feature has to respect:
  * joining a group must never be the thing that publishes an angler's mark.
  */
@@ -35,15 +35,15 @@ enum CompetitionRule {
   SPECIES_VARIETY
 }
 
-/*
+/**
  * What a fish is judged on. Separate from the rule, which decides how the
  * judging becomes a position: "biggest fish" has to say biggest by what.
  */
-/*
+/**
  * Which units an angler reads in. South Africa is metric, so that is the
  * default, but plenty of tackle and plenty of visiting anglers are not.
  */
-/*
+/**
  * What a waypoint is for. A mark on a map means nothing six months later
  * without knowing why it was dropped.
  */
@@ -65,13 +65,24 @@ enum CompetitionMeasure {
   WEIGHT
 }
 
-/*
+/**
  * Who can see and enter. A competition with no group is open to everyone and
  * appears on the global list; GROUP keeps it to its group as before.
  */
 enum CompetitionScope {
   PUBLIC
   GROUP
+  /**
+   * Invitation only: the organiser invites followers, who have a week to
+   * accept. Visible to nobody but the people in it.
+   */
+  PRIVATE
+}
+
+enum InviteState {
+  PENDING
+  ACCEPTED
+  DECLINED
 }
 
 enum CompetitionState {
@@ -85,11 +96,22 @@ enum SizeClass {
   NON_EDIBLE
 }
 
-/* Where the mass on a catch came from. Changes the word on the record, not the
-   arithmetic: scoring derives mass from length either way. */
+/**
+ * Where the mass on a catch came from. Changes the word on the record, not the
+ * arithmetic: scoring derives mass from length either way.
+ */
 enum WeightSource {
   LENGTH
   SCALE
+  EYE
+}
+
+/**
+ * How a length was taken: guessed, or read off a tape.
+ */
+enum LengthSource {
+  EYE
+  TAPE
 }
 
 enum WaterType {
@@ -120,47 +142,53 @@ enum FeedScope {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  email        String        @unique
-  emailVerified Boolean      @default(false)
+  id                         String               @id @default(cuid())
+  email                      String               @unique
+  emailVerified              Boolean              @default(false)
   // The R2 key prefix. Objects are stored under users/<storagePrefixId>/, so
   // this has to stay stable even though the auth id it used to be has gone.
-  storagePrefixId String     @unique
+  storagePrefixId            String               @unique
   // Nullable now: a new sign-up has no username until the angler picks one.
-  username     String?       @unique
-  displayName  String
-  bio          String?       @db.Text
-  avatarUrl    String?
-  /* Figures are shown in this: kilograms and centimetres, or pounds and inches. */
-  unitSystem   UnitSystem    @default(METRIC)
-  /* The photograph across the top of a profile, behind the name. Separate from
-   * the avatar: one is who you are, the other is where you fish. */
-  bannerUrl    String?
-  catches      Catch[]
-  sites        FishingSite[]
-  reviews      Review[]
-  comments     Comment[]
-  uploaded     Image[]       @relation("UploadedImages")
-  following    Follow[]      @relation("FollowerRelation")
-  followers    Follow[]      @relation("FollowingRelation")
-  catchLikes   CatchLike[]
-  siteLikes    SiteLike[]
-  gear         Gear[]
-  feedPosts    FeedPost[]
-  feedLikes    FeedLike[]
-  feedComments FeedComment[]
-  sessions     Session[]
-  accounts     Account[]
-  groupsCreated       Group[]       @relation("GroupsCreated")
-  groupMemberships    GroupMember[]
-  competitionsCreated Competition[] @relation("CompetitionsCreated")
-  competitionEntries  CompetitionEntrant[]
-  waypoints           Waypoint[]
-  savedSpots          SavedSpot[] @relation("SavedSpots")
-  savedGear           SavedGear[] @relation("SavedGear")
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  deletedAt    DateTime?
+  username                   String?              @unique
+  displayName                String
+  bio                        String?              @db.Text
+  avatarUrl                  String?
+  /**
+   * Figures are shown in this: kilograms and centimetres, or pounds and inches.
+   */
+  unitSystem                 UnitSystem           @default(METRIC)
+  /**
+   * The photograph across the top of a profile, behind the name. Separate from
+   * the avatar: one is who you are, the other is where you fish.
+   */
+  bannerUrl                  String?
+  catches                    Catch[]
+  sites                      FishingSite[]
+  reviews                    Review[]
+  comments                   Comment[]
+  uploaded                   Image[]              @relation("UploadedImages")
+  following                  Follow[]             @relation("FollowerRelation")
+  followers                  Follow[]             @relation("FollowingRelation")
+  catchLikes                 CatchLike[]
+  siteLikes                  SiteLike[]
+  gear                       Gear[]
+  feedPosts                  FeedPost[]
+  feedLikes                  FeedLike[]
+  feedComments               FeedComment[]
+  sessions                   Session[]
+  accounts                   Account[]
+  groupsCreated              Group[]              @relation("GroupsCreated")
+  groupMemberships           GroupMember[]
+  competitionsCreated        Competition[]        @relation("CompetitionsCreated")
+  competitionEntries         CompetitionEntrant[]
+  waypoints                  Waypoint[]
+  savedSpots                 SavedSpot[]          @relation("SavedSpots")
+  savedGear                  SavedGear[]          @relation("SavedGear")
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  deletedAt                  DateTime?
+  competitionInvitesReceived CompetitionInvite[]  @relation("CompetitionInvitesReceived")
+  competitionInvitesSent     CompetitionInvite[]  @relation("CompetitionInvitesSent")
 
   @@map("users")
 }
@@ -174,8 +202,10 @@ model FishingSite {
   latitude    Float?
   longitude   Float?
   waterType   WaterType?
-  /* A spot is the thing anglers most want to keep to themselves. */
-  visibility  Visibility @default(PUBLIC)
+  /**
+   * A spot is the thing anglers most want to keep to themselves.
+   */
+  visibility  Visibility  @default(PUBLIC)
   accessNotes String?     @db.Text
   likeCount   Int         @default(0)
   reviewCount Int         @default(0)
@@ -194,42 +224,42 @@ model FishingSite {
 }
 
 model Gear {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdBy   User        @relation(fields: [createdById], references: [id])
   name        String
   brand       String
   type        GearType
   imageUrl    String?
   catches     Catch[]
   savedBy     SavedGear[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   @@index([createdById])
   @@map("gear")
 }
 
 model Species {
-  id             String   @id @default(cuid())
+  id             String        @id @default(cuid())
   commonName     String
   scientificName String?
   aliases        Json?
   regionTags     Json?
   // Scoring. All optional, so a species with no parameters still logs; it
   // simply does not score, which is visible rather than guessed at.
-  lwA            Float?    // FishBase a, total length in cm to grams
-  lwB            Float?    // FishBase b
-  lwSource       String?   // where a and b came from, printed in the interface
-  sizeClass      SizeClass @default(EDIBLE)
-  minLegalCm     Int?      // DFFE minimum size
-  closedFrom     String?   // "10-15", MM-DD, no year
-  closedTo       String?   // "02-28"
-  limitsSource   String?   // the brochure and its date
+  lwA            Float? // FishBase a, total length in cm to grams
+  lwB            Float? // FishBase b
+  lwSource       String? // where a and b came from, printed in the interface
+  sizeClass      SizeClass     @default(EDIBLE)
+  minLegalCm     Int? // DFFE minimum size
+  closedFrom     String? // "10-15", MM-DD, no year
+  closedTo       String? // "02-28"
+  limitsSource   String? // the brochure and its date
   catches        Catch[]
   competitions   Competition[]
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model Catch {
@@ -248,11 +278,24 @@ model Catch {
   length                                  Float?
   // Appendix E gap B5. Until this existed the seed had to put "Released." in
   // the notes text, which no query can read.
-  /* The last fish of a log that carries several, read from the photographs
-   * where they carry a time. Null when there was one fish or one photo. */
+  /**
+   * /* The last fish of a log that carries several, read from the photographs
+   * where they carry a time. Null when there was one fish or one photo.
+   */
   caughtUntil                             DateTime?
   released                                Boolean      @default(false)
   weightSource                            WeightSource @default(LENGTH)
+  lengthSource                            LengthSource @default(EYE)
+  /**
+   * Logged for a competition. The figure was read off a photograph of the
+   * fish on a tape or a scale, so nobody has to take anyone's word for it.
+   */
+  competitionId                           String?
+  competition                             Competition? @relation(fields: [competitionId], references: [id], onDelete: SetNull)
+  readMeasure                             Float?
+  readMeasureUnit                         String?
+  readConfidence                          Float?
+  readNote                                String?      @db.VarChar(280)
   visibility                              Visibility   @default(PUBLIC)
   count                                   Int          @default(1)
   weather                                 String?
@@ -281,59 +324,59 @@ model Catch {
   weatherIsDaytime                        Boolean?
   weatherRelativeHumidity                 Int?
 
-  /*
+  /**
    * The rest of the reading. These were being fetched and shown and then
    * dropped on save, so a catch could tell you the air pressure at the time and
    * not the water temperature, which is the one a shore angler would ask about
    * first. A record that cannot answer that is not a record of the conditions.
    */
-  weatherSeaSurfaceTemperatureC           Float?
-  weatherWaveHeightM                      Float?
-  weatherSwellHeightM                     Float?
-  weatherSwellPeriodS                     Float?
-  weatherSunrise                          DateTime?
-  weatherSunset                           DateTime?
-  /* Worked out from the date rather than fetched, and kept so the record does
-   * not have to recompute it against a changing definition later. */
-  weatherMoonPhase                        String?
-  weatherMoonIllumination                 Float?
-  weatherMoonSpringTide                   Boolean?
+  weatherSeaSurfaceTemperatureC Float?
+  weatherWaveHeightM            Float?
+  weatherSwellHeightM           Float?
+  weatherSwellPeriodS           Float?
+  weatherSunrise                DateTime?
+  weatherSunset                 DateTime?
+  /**
+   * Worked out from the date rather than fetched, and kept so the record does
+   * not have to recompute it against a changing definition later.
+   */
+  weatherMoonPhase              String?
+  weatherMoonIllumination       Float?
+  weatherMoonSpringTide         Boolean?
 
-  /*
+  /**
    * Show the catch, hide where it came from.
-   *
    * Separate from visibility on purpose. Visibility asks who may see the catch
    * at all; this asks whether its position travels with it. An angler will
    * happily show a fish and not the gully it came out of, and forcing that
    * choice to be all or nothing is how a log stops being used.
-   *
    * The position is still stored. It is withheld from other anglers, not
    * discarded, so the record stays complete.
    */
-  hideLocation                            Boolean  @default(false)
+  hideLocation Boolean @default(false)
 
-  /*
+  /**
    * Where exactly. A saved spot is a place you go back to; this is where this
    * one fish came out, which can be along the ledge from the spot or nowhere
    * near a saved spot at all when a catch is logged after the fact. Null when
    * only the spot is known. Withheld from other anglers when hideLocation is
    * set, never discarded.
    */
-  latitude                                Float?
-  longitude                               Float?
-  weatherUvIndex                          Int?
-  weatherThunderstormProbability          Int?
-  weatherCloudCover                       Int?
-  depth                                   Float?
-  likeCount                               Int          @default(0)
-  commentCount                            Int          @default(0)
-  comments                                Comment[]
-  likes                                   CatchLike[]
-  images                                  CatchImage[]
-  feedPosts                               FeedPost[]
-  createdAt                               DateTime     @default(now())
-  updatedAt                               DateTime     @updatedAt
-  deletedAt                               DateTime?
+  latitude                       Float?
+  longitude                      Float?
+  weatherUvIndex                 Int?
+  weatherThunderstormProbability Int?
+  weatherCloudCover              Int?
+  depth                          Float?
+  likeCount                      Int          @default(0)
+  commentCount                   Int          @default(0)
+  comments                       Comment[]
+  likes                          CatchLike[]
+  images                         CatchImage[]
+  feedPosts                      FeedPost[]
+  createdAt                      DateTime     @default(now())
+  updatedAt                      DateTime     @updatedAt
+  deletedAt                      DateTime?
 
   @@index([createdById, caughtAt(sort: Desc)])
   @@index([siteId, caughtAt(sort: Desc)])
@@ -491,7 +534,9 @@ model FeedComment {
   @@index([postId, createdAt(sort: Desc)])
 }
 
-/* ---------- better-auth. Field names are its own, do not rename them. ---------- */
+/**
+ * ---------- better-auth. Field names are its own, do not rename them. ----------
+ */
 
 model Session {
   id        String   @id @default(cuid())
@@ -540,7 +585,9 @@ model Verification {
   @@map("verifications")
 }
 
-/* ---------- Groups and competitions ---------- */
+/**
+ * ---------- Groups and competitions ----------
+ */
 
 model Group {
   id           String        @id @default(cuid())
@@ -578,69 +625,76 @@ model GroupMember {
 }
 
 model Competition {
-  id          String           @id @default(cuid())
-  name        String
-  groupId     String?
-  group       Group?           @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdById String
-  createdBy   User             @relation("CompetitionsCreated", fields: [createdById], references: [id])
-  rule        CompetitionRule  @default(SPECIES_POINTS)
-  measure     CompetitionMeasure @default(LENGTH)
-  scope       CompetitionScope   @default(GROUP)
-  /* What the organiser wrote about it, shown on the listing. */
-  blurb       String?            @db.VarChar(280)
-  entrants    CompetitionEntrant[]
-  /* Set, and it is a target-species competition rather than a fourth rule. */
-  speciesId   String?
-  species     Species?         @relation(fields: [speciesId], references: [id], onDelete: SetNull)
-  startsAt    DateTime
-  endsAt      DateTime
-  /*
+  id                  String               @id @default(cuid())
+  name                String
+  groupId             String?
+  group               Group?               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdById         String
+  createdBy           User                 @relation("CompetitionsCreated", fields: [createdById], references: [id])
+  rule                CompetitionRule      @default(SPECIES_POINTS)
+  measure             CompetitionMeasure   @default(LENGTH)
+  scope               CompetitionScope     @default(GROUP)
+  /**
+   * What the organiser wrote about it, shown on the listing.
+   */
+  blurb               String?              @db.VarChar(280)
+  entrants            CompetitionEntrant[]
+  invites             CompetitionInvite[]
+  /**
+   * Catches logged for this competition, with a reading off a photograph.
+   */
+  catches             Catch[]
+  /**
+   * Set, and it is a target-species competition rather than a fourth rule.
+   */
+  speciesId           String?
+  species             Species?             @relation(fields: [speciesId], references: [id], onDelete: SetNull)
+  startsAt            DateTime
+  endsAt              DateTime
+  /**
    * A South African competition that ends "on Sunday" ends at 23:59 in
    * Africa/Johannesburg and nowhere else, so the zone travels with the dates.
    */
-  timeZoneId  String           @default("Africa/Johannesburg")
-  state       CompetitionState @default(DRAFT)
-  maxPerSpeciesPerDay Int      @default(3)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  deletedAt   DateTime?
+  timeZoneId          String               @default("Africa/Johannesburg")
+  state               CompetitionState     @default(DRAFT)
+  maxPerSpeciesPerDay Int                  @default(3)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
 
   @@index([groupId, startsAt(sort: Desc)])
   @@index([scope, startsAt(sort: Desc)])
   @@map("competitions")
 }
 
-/*
+/**
  * Who entered. Standings are still worked out from the catches themselves, so
  * this records intent to compete rather than any score: a derived board cannot
  * drift from the records it describes, and this keeps that true.
  */
-/*
+/**
  * A private mark on the map.
- *
  * Never shared, with nobody, ever. There is no visibility column here on
  * purpose: a spot has one because a spot can be shown to people, and the moment
  * a waypoint grows one somebody will set it wrong. A fishing mark is the most
  * closely held thing an angler has, and the promise the interface makes is that
  * these are only ever yours.
  */
-/*
+/**
  * Somebody else's spot or piece of gear, kept.
- *
  * A reference rather than a copy. Copying would freeze a name and a position
  * that the owner can still change, and would quietly turn a spot somebody later
  * made private into one you still hold. Holding the id means the moment they
  * withdraw it, it stops resolving, which is the behaviour anyone would expect.
  */
 model SavedSpot {
-  id        String       @id @default(cuid())
+  id        String      @id @default(cuid())
   userId    String
-  user      User         @relation("SavedSpots", fields: [userId], references: [id], onDelete: Cascade)
+  user      User        @relation("SavedSpots", fields: [userId], references: [id], onDelete: Cascade)
   siteId    String
-  site      FishingSite  @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  note      String?      @db.VarChar(500)
-  createdAt DateTime     @default(now())
+  site      FishingSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  note      String?     @db.VarChar(500)
+  createdAt DateTime    @default(now())
 
   @@unique([userId, siteId])
   @@index([userId])
@@ -689,4 +743,25 @@ model CompetitionEntrant {
   @@unique([competitionId, userId])
   @@index([userId, leftAt])
   @@map("competition_entrants")
+}
+
+model CompetitionInvite {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation("CompetitionInvitesReceived", fields: [userId], references: [id], onDelete: Cascade)
+  invitedById   String
+  invitedBy     User        @relation("CompetitionInvitesSent", fields: [invitedById], references: [id], onDelete: Cascade)
+  state         InviteState @default(PENDING)
+  /**
+   * After this an unanswered invitation lapses.
+   */
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+  answeredAt    DateTime?
+
+  @@unique([competitionId, userId])
+  @@index([userId, state])
+  @@map("competition_invites")
 }

@@ -22,6 +22,11 @@ import {
 } from '@/components/fishing/quicklog/species';
 import { AddGearInline } from '@/components/fishing/AddGearInline';
 import { readTakenAt } from '@/lib/exif';
+import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
+import {
+   CompetitionEntry,
+   type Reading,
+} from '@/components/fishing/CompetitionEntry';
 import { ChoiceGroup, TextArea, TextField } from '@/components/ui/field';
 
 type SiteOption = {
@@ -190,6 +195,7 @@ function MeasureField<U extends string>({
    onBlur,
    onUnit,
    placeholder,
+   readOnly = false,
 }: {
    id: string;
    label: string;
@@ -201,6 +207,8 @@ function MeasureField<U extends string>({
    onBlur: () => void;
    onUnit: (next: U) => void;
    placeholder?: string;
+   /* Set by a reading off a photograph, and not for typing over. */
+   readOnly?: boolean;
 }) {
    return (
       <div className="flex min-w-0 flex-col">
@@ -213,8 +221,12 @@ function MeasureField<U extends string>({
                data-field={id}
                inputMode="decimal"
                autoComplete="off"
-               className="input-line num min-w-0 flex-1 text-[22px]"
+               className={cn(
+                  'input-line num min-w-0 flex-1 text-[22px]',
+                  readOnly && 'bg-bg-2 text-ink-2'
+               )}
                value={value}
+               readOnly={readOnly}
                placeholder={placeholder}
                aria-invalid={error ? true : undefined}
                aria-describedby={error ? `${id}-error` : undefined}
@@ -375,6 +387,13 @@ export function CatchForm({
     * already typed one, and the span between first and last is kept on the
     * record as the stretch the fish came in over.
     */
+   /*
+    * A catch entered in a competition. The figure the competition judges
+    * is read off a photograph of the fish on a tape or a scale, and what
+    * was read is what is saved, so nobody has to take anyone's word.
+    */
+   const [competitionId, setCompetitionId] = useState<string | null>(null);
+   const [reading, setReading] = useState<Reading | null>(null);
    const [photoTimes, setPhotoTimes] = useState<Date[]>([]);
    const caughtAtEdited = useRef(isEdit);
    const photoSpan = useMemo(() => {
@@ -870,6 +889,15 @@ export function CatchForm({
       return {
          title: species.trim(),
          caughtAt: parsedCaughtAt ? parsedCaughtAt.toISOString() : '',
+         competitionId: competitionId ?? null,
+         ...(reading
+            ? {
+                 readMeasure: reading.value,
+                 readMeasureUnit: reading.unit,
+                 readConfidence: reading.confidence,
+                 readNote: reading.note,
+              }
+            : {}),
          caughtUntil:
             Number(countValue) > 1 && photoSpan
                ? photoSpan.to.toISOString()
@@ -1104,6 +1132,21 @@ export function CatchForm({
                   />
                )}
 
+               <SpeciesGuess
+                  imageUrl={images[0]?.url ?? null}
+                  current={species}
+                  onPick={(candidate) => {
+                     if (candidate) {
+                        setSpecies(candidate.commonName);
+
+                        setErrors((current) => ({
+                           ...current,
+                           species: undefined,
+                        }));
+                     }
+                  }}
+               />
+
                <div>
                   <TextField
                      label="Species"
@@ -1157,6 +1200,7 @@ export function CatchForm({
                   <MeasureField
                      id="length"
                      label="Length"
+                     readOnly={reading?.measure === 'LENGTH'}
                      value={lengthValue}
                      error={errors.length}
                      unit={lengthUnit}
@@ -1169,6 +1213,7 @@ export function CatchForm({
                   <MeasureField
                      id="weight"
                      label="Weight"
+                     readOnly={reading?.measure === 'WEIGHT'}
                      value={weightValue}
                      error={errors.weight}
                      unit={weightUnit}
@@ -1179,6 +1224,62 @@ export function CatchForm({
                      placeholder="Not weighed"
                   />
                </div>
+
+               <CompetitionEntry
+                  competitionId={competitionId}
+                  onCompetition={(id) => {
+                     setCompetitionId(id);
+
+                     if (!id) setReading(null);
+                  }}
+                  imageUrl={images[0]?.url ?? null}
+                  reading={reading}
+                  onReading={(next) => {
+                     setReading(next);
+
+                     if (!next) return;
+
+                     if (next.measure === 'LENGTH') {
+                        const cm =
+                           next.unit === 'in'
+                              ? next.value * CM_PER_INCH
+                              : next.value;
+
+                        setLengthValue(
+                           String(
+                              round(
+                                 lengthUnit === 'in' ? cm / CM_PER_INCH : cm,
+                                 1
+                              )
+                           )
+                        );
+
+                        setErrors((current) => ({
+                           ...current,
+                           length: undefined,
+                        }));
+                     } else {
+                        const kg =
+                           next.unit === 'lb'
+                              ? next.value * KG_PER_POUND
+                              : next.value;
+
+                        setWeightValue(
+                           String(
+                              round(
+                                 weightUnit === 'lb' ? kg / KG_PER_POUND : kg,
+                                 2
+                              )
+                           )
+                        );
+
+                        setErrors((current) => ({
+                           ...current,
+                           weight: undefined,
+                        }));
+                     }
+                  }}
+               />
 
                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <TextField

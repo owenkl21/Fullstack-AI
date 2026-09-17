@@ -1,5 +1,7 @@
 import type { ChipOption } from '@/components/feed/ChipRadioGroup';
-import { ChoiceGroup, RangeField } from '@/components/ui/field';
+import { ChoiceGroup } from '@/components/ui/field';
+import { Picker } from '@/components/ui/picker';
+import { StopSlider } from '@/components/ui/slider';
 import { plural } from '@/components/feed/format';
 import type { ScopeFilter, ShowFilter } from '@/components/feed/types';
 
@@ -64,26 +66,49 @@ export function FeedFilters({
           * edge so the last chip peeks in and says there is more. Two stacked
           * rows here cost the first post its place above the fold.
           */}
-         <div className="-mx-4 flex gap-8 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:gap-10 sm:overflow-visible sm:px-0">
+         {/*
+          * On a phone, two pickers side by side: they fit one row without
+          * scrolling and open a panel each. On a wider screen the chips are
+          * back, because there is room and a chip is one tap fewer.
+          */}
+         <div className="grid grid-cols-2 gap-3 sm:hidden">
+            <Picker
+               size="sm"
+               label="Scope"
+               value={scope}
+               options={SCOPE_OPTIONS.map((o) => ({
+                  value: o.value,
+                  label: o.label,
+               }))}
+               onChange={(next) => onScopeChange(next as ScopeFilter)}
+            />
+            <Picker
+               size="sm"
+               label="Show"
+               value={show}
+               options={SHOW_OPTIONS.map((o) => ({
+                  value: o.value,
+                  label: o.label,
+               }))}
+               onChange={(next) => onShowChange(next as ShowFilter)}
+            />
+         </div>
+         <div className="hidden gap-10 sm:flex">
             <ChoiceGroup
                inline
-               nowrap
                size="sm"
                label="Scope"
                value={scope}
                options={SCOPE_OPTIONS}
                onChange={onScopeChange}
-               className="shrink-0"
             />
             <ChoiceGroup
                inline
-               nowrap
                size="sm"
                label="Show"
                value={show}
                options={SHOW_OPTIONS}
                onChange={onShowChange}
-               className="shrink-0"
             />
          </div>
 
@@ -97,7 +122,7 @@ export function FeedFilters({
                       * The request goes out when the drag ends, not on every
                       * step through.
                       */}
-                     <RangeField
+                     <StopSlider
                         label="Within"
                         stops={RADIUS_STEPS}
                         value={

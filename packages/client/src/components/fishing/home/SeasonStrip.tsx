@@ -1,9 +1,5 @@
 import { Link } from 'react-router-dom';
-import {
-   formatDayMonth,
-   lengthMetric,
-   plural,
-} from '@/components/fishing/record/format';
+import { formatDayMonth, plural } from '@/components/fishing/record/format';
 import type { SeasonItem } from './summary';
 import { cn } from '@/lib/utils';
 
@@ -33,9 +29,11 @@ export function SeasonStrip({
                   <li
                      key={item.key}
                      aria-hidden="true"
-                     className="flex h-[120px] flex-none items-end border-l border-line pl-2"
+                     className="flex h-[120px] w-8 flex-none items-end justify-center bg-black-block"
                   >
-                     <span className="lab">{item.label}</span>
+                     <span className="lab [writing-mode:vertical-rl] rotate-180 pb-2 text-paper">
+                        {item.label}
+                     </span>
                   </li>
                ) : (
                   <li key={item.key} className="w-[88px] flex-none snap-start">
@@ -101,25 +99,12 @@ export function SeasonStrip({
                               </span>
                            ) : null}
                         </span>
-                        <span className="g num text-[20px]">
-                           {lengthMetric(item.entry.length) ?? (
-                              <span className="font-sans text-[14px] tracking-normal normal-case text-ink-3">
-                                 Not measured
-                              </span>
-                           )}
-                        </span>
-                        <span className="text-[14px] text-ink-3">
-                           {/* The date and where, and on a good day how many.
-                               The figure above is the best fish of the day, so
-                               the line has to say that is what it is. */}
-                           {[
-                              formatDayMonth(item.entry.caughtAt),
-                              item.count > 1
-                                 ? `best of ${item.count}`
-                                 : item.entry.site?.name,
-                           ]
-                              .filter(Boolean)
-                              .join(' · ')}
+                        {/* The date only. The length and the spot were three
+                            lines of small type under every tile, and the
+                            row stopped lining up. The tile is the day; the
+                            catch page has the rest. */}
+                        <span className="lab text-ink-2">
+                           {formatDayMonth(item.entry.caughtAt)}
                         </span>
                      </Link>
                   </li>

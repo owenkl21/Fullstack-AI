@@ -120,6 +120,14 @@ const catchPayloadSchema = z.object({
    notes: z.string().trim().min(1).max(2000).optional().nullable(),
    caughtAt: z.coerce.date(),
    caughtUntil: z.coerce.date().optional().nullable(),
+   lengthSource: z.enum(['EYE', 'TAPE']).optional(),
+   /* Logged for a competition, with the figure read off the photograph. */
+   competitionId: z.string().trim().min(1).optional().nullable(),
+   readMeasure: z.number().optional().nullable(),
+   readMeasureUnit: z.enum(['cm', 'in', 'kg', 'lb']).optional().nullable(),
+   readConfidence: z.number().min(0).max(1).optional().nullable(),
+   readNote: z.string().trim().max(280).optional().nullable(),
+   weightSource: z.enum(['LENGTH', 'SCALE', 'EYE']).optional(),
    siteId: z.string().trim().min(1).optional().nullable(),
    speciesId: z.string().trim().min(1).optional().nullable(),
    /*

@@ -5,6 +5,7 @@ import {
 import { tempIn, type UnitSystem } from '@/lib/units';
 import { cn } from '@/lib/utils';
 import type { ForecastDay } from './forecast-api';
+import { skyTone, windTone } from './tones';
 
 /*
  * Seven days in a row, one chosen.
@@ -15,6 +16,10 @@ import type { ForecastDay } from './forecast-api';
  * grid under it and nothing else.
  */
 const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/* The wind band under each day, in the same four colours as the grid. */
+const windBand = (kph: number | null) =>
+   windTone(kph).replace('text-', 'bg-') || 'bg-line';
 
 const dayLabel = (date: string, today: string) => {
    if (date === today) return 'Today';
@@ -74,7 +79,25 @@ export function DayStrip({
                   <span className="g num text-[28px] leading-none">
                      {Number(day.date.slice(8, 10))}
                   </span>
-                  <Sky aria-hidden="true" className="size-5" />
+                  <Sky
+                     aria-hidden="true"
+                     className={cn(
+                        'size-5',
+                        on ? '' : skyTone(day.conditionText)
+                     )}
+                  />
+                  <span
+                     aria-hidden="true"
+                     className={cn(
+                        'h-1 w-8',
+                        on ? 'bg-background/40' : windBand(day.windMaxKph)
+                     )}
+                     title={
+                        day.windMaxKph === null
+                           ? undefined
+                           : `Wind up to ${Math.round(day.windMaxKph)} km/h`
+                     }
+                  />
                   <span className="num text-[14px]">
                      {hi === null || lo === null ? '' : `${hi}° / ${lo}°`}
                   </span>

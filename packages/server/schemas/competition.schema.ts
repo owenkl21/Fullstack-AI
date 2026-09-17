@@ -15,7 +15,13 @@ export const createCompetitionSchema = z
          .enum(['SPECIES_POINTS', 'BIGGEST_FISH', 'SPECIES_VARIETY'])
          .default('SPECIES_POINTS'),
       measure: z.enum(['LENGTH', 'WEIGHT']).default('LENGTH'),
-      scope: z.enum(['PUBLIC', 'GROUP']).default('PUBLIC'),
+      scope: z.enum(['PUBLIC', 'GROUP', 'PRIVATE']).default('PUBLIC'),
+      /* For a private competition: the followers to invite. */
+      inviteeIds: z
+         .array(z.string().trim().min(1))
+         .max(100)
+         .optional()
+         .default([]),
       /* Set, and the competition is for that one fish. */
       speciesId: z.string().trim().min(1).optional().nullable(),
       groupId: z.string().trim().min(1).optional().nullable(),
@@ -32,3 +38,13 @@ export const createCompetitionSchema = z
       message: 'A group competition needs a group.',
       path: ['groupId'],
    });
+
+export const inviteSchema = z.object({
+   userIds: z.array(z.string().trim().min(1)).min(1).max(100),
+});
+
+export const listCompetitionsSchema = z.object({
+   page: z.coerce.number().int().min(1).default(1),
+   /* Twenty a page, newest first. */
+   size: z.coerce.number().int().min(5).max(50).default(20),
+});

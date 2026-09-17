@@ -20,7 +20,7 @@ import { massKgFor, type ScoringSpecies } from './scoring';
  */
 
 export type CompetitionMeasure = 'LENGTH' | 'WEIGHT';
-export type CompetitionScope = 'PUBLIC' | 'GROUP';
+export type CompetitionScope = 'PUBLIC' | 'GROUP' | 'PRIVATE';
 export type CompetitionRule =
    | 'SPECIES_POINTS'
    | 'BIGGEST_FISH'
@@ -37,7 +37,11 @@ export type CreateCompetitionInput = {
    startsAt: Date;
    endsAt: Date;
    maxPerSpeciesPerDay?: number;
+   inviteeIds?: string[];
 };
+
+/* A week to answer an invitation. */
+const INVITE_DAYS = 7;
 
 const COMPETITION_SELECT = {
    id: true,
@@ -165,25 +169,154 @@ export const competitionsService = {
          select: COMPETITION_SELECT,
       });
 
+      if (input.scope === 'PRIVATE' && input.inviteeIds?.length) {
+         await this.invite(userId, competition.id, input.inviteeIds);
+      }
+
       return competition;
+   },
+
+   /**
+    * Invite followers to a private competition. Only the organiser may, and
+    * only people who follow them: an invitation to a stranger is spam.
+    */
+   async invite(userId: string, competitionId: string, userIds: string[]) {
+      const competition = await prisma.competition.findFirst({
+         where: { id: competitionId, deletedAt: null, createdById: userId },
+         select: { id: true, scope: true },
+      });
+      if (!competition || competition.scope !== 'PRIVATE') return null;
+
+      const followers = await prisma.follow.findMany({
+         where: { followingId: userId, followerId: { in: userIds } },
+         select: { followerId: true },
+      });
+      const allowed = new Set(followers.map((f) => f.followerId));
+      const expiresAt = new Date(Date.now() + INVITE_DAYS * 86400000);
+
+      let sent = 0;
+      for (const inviteeId of userIds) {
+         if (!allowed.has(inviteeId) || inviteeId === userId) continue;
+         await prisma.competitionInvite.upsert({
+            where: {
+               competitionId_userId: { competitionId, userId: inviteeId },
+            },
+            update: { state: 'PENDING', expiresAt, answeredAt: null },
+            create: {
+               competitionId,
+               userId: inviteeId,
+               invitedById: userId,
+               expiresAt,
+            },
+         });
+         sent += 1;
+      }
+      return { sent };
+   },
+
+   /** The invitations waiting on an angler, newest first, unexpired. */
+   async invitesFor(userId: string) {
+      const rows = await prisma.competitionInvite.findMany({
+         where: { userId, state: 'PENDING', expiresAt: { gt: new Date() } },
+         orderBy: { createdAt: 'desc' },
+         select: {
+            id: true,
+            expiresAt: true,
+            createdAt: true,
+            invitedBy: {
+               select: { id: true, displayName: true, username: true },
+            },
+            competition: { select: COMPETITION_SELECT },
+         },
+      });
+      return rows.map((row) => ({
+         id: row.id,
+         expiresAt: row.expiresAt,
+         invitedBy: row.invitedBy,
+         competition: {
+            ...row.competition,
+            entrantCount: row.competition._count.entrants,
+         },
+      }));
+   },
+
+   async answerInvite(userId: string, inviteId: string, accept: boolean) {
+      const invite = await prisma.competitionInvite.findFirst({
+         where: { id: inviteId, userId, state: 'PENDING' },
+         select: { id: true, competitionId: true, expiresAt: true },
+      });
+      if (!invite) return null;
+      if (invite.expiresAt < new Date()) {
+         return { state: 'EXPIRED' as const };
+      }
+      await prisma.competitionInvite.update({
+         where: { id: invite.id },
+         data: {
+            state: accept ? 'ACCEPTED' : 'DECLINED',
+            answeredAt: new Date(),
+         },
+      });
+      if (accept) {
+         await prisma.competitionEntrant.upsert({
+            where: {
+               competitionId_userId: {
+                  competitionId: invite.competitionId,
+                  userId,
+               },
+            },
+            update: { leftAt: null },
+            create: { competitionId: invite.competitionId, userId },
+         });
+      }
+      return { state: accept ? ('ACCEPTED' as const) : ('DECLINED' as const) };
+   },
+
+   /** The people who follow an angler, for the invitation list. */
+   async followersOf(userId: string) {
+      const rows = await prisma.follow.findMany({
+         where: { followingId: userId },
+         orderBy: { createdAt: 'desc' },
+         take: 200,
+         select: {
+            follower: {
+               select: {
+                  id: true,
+                  displayName: true,
+                  username: true,
+                  avatarUrl: true,
+               },
+            },
+         },
+      });
+      return rows.map((r) => r.follower);
    },
 
    /**
     * The list an angler can act on: everything public, plus anything they have
     * already entered. A group competition they are not in is somebody else's.
     */
-   async list(userId: string) {
+   async list(userId: string, page = 1, size = 20) {
+      /*
+       * Everything public, plus anything this angler is in or has been
+       * invited to. A private competition is invisible to everyone else,
+       * which is the whole point of it being private. Running ones first,
+       * then upcoming, then finished, newest at the top within each.
+       */
+      const where = {
+         deletedAt: null as null,
+         state: { not: 'DRAFT' as const },
+         OR: [
+            { scope: 'PUBLIC' as const },
+            { entrants: { some: { userId, leftAt: null } } },
+            { invites: { some: { userId, state: 'PENDING' as const } } },
+         ],
+      };
+      const total = await prisma.competition.count({ where });
       const rows = await prisma.competition.findMany({
-         where: {
-            deletedAt: null,
-            state: { not: 'DRAFT' },
-            OR: [
-               { scope: 'PUBLIC' },
-               { entrants: { some: { userId, leftAt: null } } },
-            ],
-         },
+         where,
          orderBy: [{ endsAt: 'desc' }],
-         take: 50,
+         skip: (page - 1) * size,
+         take: size,
          select: COMPETITION_SELECT,
       });
 
@@ -194,10 +327,11 @@ export const competitionsService = {
       const entered = new Set(mine.map((m) => m.competitionId));
 
       const now = new Date();
-      return rows.map((row) => ({
+      const items = rows.map((row) => ({
          ...row,
          entrantCount: row._count.entrants,
          youEntered: entered.has(row.id),
+         youOrganise: row.createdById === userId,
          /* Worked out rather than stored, so it is never stale. */
          status:
             now < row.startsAt
@@ -206,6 +340,9 @@ export const competitionsService = {
                  ? ('finished' as const)
                  : ('running' as const),
       }));
+      const order = { running: 0, upcoming: 1, finished: 2 };
+      items.sort((a, b) => order[a.status] - order[b.status]);
+      return { items, total, page, size };
    },
 
    async join(userId: string, competitionId: string) {
@@ -216,6 +353,19 @@ export const competitionsService = {
 
       if (!competition) {
          return null;
+      }
+
+      /* A private competition is entered by answering the invitation. */
+      if (competition.scope === 'PRIVATE') {
+         const invite = await prisma.competitionInvite.findFirst({
+            where: { competitionId, userId, state: 'ACCEPTED' },
+            select: { id: true },
+         });
+         const organiser = await prisma.competition.findFirst({
+            where: { id: competitionId, createdById: userId },
+            select: { id: true },
+         });
+         if (!invite && !organiser) return null;
       }
 
       /* A group competition is for that group. Anyone else is not invited. */
@@ -257,7 +407,7 @@ export const competitionsService = {
     * entering, and counting people who never entered would put strangers on a
     * board they did not ask to be on.
     */
-   async standings(competitionId: string) {
+   async standings(competitionId: string, viewerId: string | null = null) {
       const competition = await prisma.competition.findFirst({
          where: { id: competitionId, deletedAt: null },
          select: COMPETITION_SELECT,
@@ -265,6 +415,18 @@ export const competitionsService = {
 
       if (!competition) {
          return null;
+      }
+
+      /* Private: the standings are for the people in it. */
+      if (competition.scope === 'PRIVATE') {
+         const inIt =
+            viewerId !== null &&
+            (competition.createdById === viewerId ||
+               (await prisma.competitionEntrant.findFirst({
+                  where: { competitionId, userId: viewerId, leftAt: null },
+                  select: { id: true },
+               })) !== null);
+         if (!inIt) return null;
       }
 
       const entrants = await prisma.competitionEntrant.findMany({

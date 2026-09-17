@@ -22,11 +22,14 @@ export function SpotHeader({
    spotName,
    today,
    lastFished,
+   lastSpot = null,
 }: {
    photoUrl: string;
    spotName: string;
    today: string;
    lastFished: string | null;
+   /* The spot of the latest catch the reader may see. */
+   lastSpot?: string | null;
 }) {
    const [settled, setSettled] = useState(false);
 
@@ -90,6 +93,11 @@ export function SpotHeader({
                <h1 className="g text-[52px] text-paper md:text-[72px]">
                   {spotName}
                </h1>
+               {lastSpot ? (
+                  <p className="text-[15px] text-paper-2">
+                     Last at <span className="text-paper">{lastSpot}</span>
+                  </p>
+               ) : null}
             </div>
          </div>
 

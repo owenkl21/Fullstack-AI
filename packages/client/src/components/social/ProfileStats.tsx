@@ -4,6 +4,7 @@ import {
    TrophyIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
+import { CountIn } from '@/components/fishing/record/CountIn';
 import { Link } from 'react-router-dom';
 import { fetchMyStats, type PersonalBest, type ProfileStats } from './api';
 
@@ -126,7 +127,11 @@ export function ProfileStatsPanel() {
                            : 'mt-1 text-[17px] leading-snug text-ink-2'
                      }
                   >
-                     {f.value}
+                     {/^\d+$/.test(f.value) ? (
+                        <CountIn value={Number(f.value)} durationMs={800} />
+                     ) : (
+                        f.value
+                     )}
                   </dd>
                </div>
             ))}

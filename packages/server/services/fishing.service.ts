@@ -127,6 +127,13 @@ type CreateCatchInput = {
    notes?: string | null;
    caughtAt: Date;
    caughtUntil?: Date | null;
+   lengthSource?: 'EYE' | 'TAPE';
+   competitionId?: string | null;
+   readMeasure?: number | null;
+   readMeasureUnit?: 'cm' | 'in' | 'kg' | 'lb' | null;
+   readConfidence?: number | null;
+   readNote?: string | null;
+   weightSource?: 'LENGTH' | 'SCALE' | 'EYE';
    siteId?: string | null;
    speciesId?: string | null;
    released?: boolean;
@@ -700,6 +707,23 @@ export const fishingService = {
                notes: input.notes,
                caughtAt: input.caughtAt,
                caughtUntil: input.caughtUntil ?? null,
+               ...(input.lengthSource
+                  ? { lengthSource: input.lengthSource }
+                  : {}),
+               ...(input.weightSource
+                  ? { weightSource: input.weightSource }
+                  : {}),
+               ...(input.competitionId !== undefined
+                  ? { competitionId: input.competitionId }
+                  : {}),
+               ...(input.readMeasure !== undefined
+                  ? {
+                       readMeasure: input.readMeasure,
+                       readMeasureUnit: input.readMeasureUnit ?? null,
+                       readConfidence: input.readConfidence ?? null,
+                       readNote: input.readNote ?? null,
+                    }
+                  : {}),
                weight: input.weight,
                length: input.length,
                count: input.count ?? 1,
@@ -959,6 +983,23 @@ export const fishingService = {
                notes: input.notes,
                caughtAt: input.caughtAt,
                caughtUntil: input.caughtUntil ?? null,
+               ...(input.lengthSource
+                  ? { lengthSource: input.lengthSource }
+                  : {}),
+               ...(input.weightSource
+                  ? { weightSource: input.weightSource }
+                  : {}),
+               ...(input.competitionId !== undefined
+                  ? { competitionId: input.competitionId }
+                  : {}),
+               ...(input.readMeasure !== undefined
+                  ? {
+                       readMeasure: input.readMeasure,
+                       readMeasureUnit: input.readMeasureUnit ?? null,
+                       readConfidence: input.readConfidence ?? null,
+                       readNote: input.readNote ?? null,
+                    }
+                  : {}),
                ...relations,
                weight: input.weight,
                length: input.length,

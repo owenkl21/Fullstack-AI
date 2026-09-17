@@ -13,6 +13,7 @@ import {
 } from '@/lib/units';
 import { cn } from '@/lib/utils';
 import { thunderRisk, type ForecastHour } from './forecast-api';
+import { skyTone, windTone } from './tones';
 
 /*
  * The day, hour by hour, laid out like a tide table.
@@ -55,7 +56,7 @@ export function HourGrid({
             return (
                <Sky
                   aria-hidden="true"
-                  className="mx-auto size-5"
+                  className={cn('mx-auto size-5', skyTone(h.conditionText))}
                   {...({ title: h.conditionText ?? undefined } as object)}
                />
             );
@@ -74,7 +75,12 @@ export function HourGrid({
          unit: unitOf('speed', system),
          has: (h) => h.windSpeedKph !== null,
          cell: (h) => (
-            <span className="flex flex-col items-center gap-0.5">
+            <span
+               className={cn(
+                  'flex flex-col items-center gap-0.5',
+                  windTone(h.windSpeedKph)
+               )}
+            >
                {h.windDirectionDegrees === null ? null : (
                   <WindArrowIcon
                      degrees={h.windDirectionDegrees}
@@ -82,7 +88,9 @@ export function HourGrid({
                      aria-label={h.windDirectionCardinal ?? undefined}
                   />
                )}
-               <span>{num(speedIn(h.windSpeedKph, system))}</span>
+               <span className="font-medium">
+                  {num(speedIn(h.windSpeedKph, system))}
+               </span>
             </span>
          ),
       },
@@ -91,7 +99,11 @@ export function HourGrid({
          label: 'Gust',
          unit: unitOf('speed', system),
          has: (h) => h.windGustKph !== null,
-         cell: (h) => num(speedIn(h.windGustKph, system)),
+         cell: (h) => (
+            <span className={windTone(h.windGustKph)}>
+               {num(speedIn(h.windGustKph, system))}
+            </span>
+         ),
       },
       {
          key: 'rain',
@@ -184,10 +196,10 @@ export function HourGrid({
    const rows = all.filter((row) => hours.some(row.has));
 
    const head =
-      'sticky left-0 z-10 bg-background pr-3 text-left whitespace-nowrap';
+      'sticky left-0 z-10 bg-background pr-3 text-left whitespace-nowrap shadow-[inset_-1px_0_0_var(--line)]';
 
    return (
-      <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+      <div className="overflow-x-auto">
          <table className="w-full border-collapse text-[14px]">
             <thead>
                <tr className="border-b border-ink">

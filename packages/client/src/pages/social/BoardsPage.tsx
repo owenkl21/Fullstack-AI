@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRevealIn } from '@/components/brand/Reveal';
-import { Chip } from '@/components/fishing/rows/Chip';
 import { InlineError } from '@/components/states/InlineError';
 import { ListSkeleton } from '@/components/states/ListSkeleton';
-import { StandingsTable } from '@/components/social/StandingsTable';
+import {
+   StandingsTable,
+   type RankBy,
+} from '@/components/social/StandingsTable';
+import { Picker } from '@/components/ui/picker';
+import { ChoiceGroup } from '@/components/ui/field';
 import {
    fetchRivals,
    fetchSpeciesBoards,
@@ -32,7 +36,17 @@ export function BoardsPage() {
    const root = useRef<HTMLElement>(null);
    useRevealIn(root);
    const { isSignedIn } = useIsSignedIn();
+   const [youId, setYouId] = useState<string | null>(null);
+   useEffect(() => {
+      if (!isSignedIn) return;
+      fetch('/api/users/me', { credentials: 'include' })
+         .then((r) => (r.ok ? r.json() : null))
+         .then((d) => setYouId(d?.profile?.id ?? d?.id ?? null))
+         .catch(() => undefined);
+   }, [isSignedIn]);
    const [view, setView] = useState<'species' | 'rivals'>('species');
+   const [chosenSpecies, setChosenSpecies] = useState<string[]>([]);
+   const [rankBy, setRankBy] = useState<RankBy>('points');
    const [boards, setBoards] = useState<SpeciesBoard[] | null>(null);
    const [rivals, setRivals] = useState<RivalStanding[] | null>(null);
    const [mutualCount, setMutualCount] = useState(0);
@@ -106,21 +120,57 @@ export function BoardsPage() {
             Competitions anglers are running
          </Link>
 
+         {/*
+          * One filter bar, one row on a desktop and two on a phone: which
+          * board, which fish, and what it is ordered by. The species used to
+          * be every board stacked down the page; now it is a picker and only
+          * the chosen boards are shown, always the top ten with paging.
+          */}
          <div
-            className="rv mt-7 flex flex-wrap gap-2"
+            className="rv mt-7 flex flex-wrap items-end gap-x-6 gap-y-3"
             style={{ '--i': 3 } as React.CSSProperties}
-            role="group"
-            aria-label="Which board"
          >
-            <Chip
-               pressed={view === 'species'}
-               onClick={() => setView('species')}
-            >
-               By species
-            </Chip>
-            <Chip pressed={view === 'rivals'} onClick={() => setView('rivals')}>
-               Your rivals
-            </Chip>
+            <ChoiceGroup
+               inline
+               size="sm"
+               label="Board"
+               value={view}
+               onChange={setView}
+               options={[
+                  { value: 'species', label: 'By species' },
+                  { value: 'rivals', label: 'Your rivals' },
+               ]}
+            />
+            {view === 'species' ? (
+               <Picker
+                  size="sm"
+                  multiple
+                  label="Fish"
+                  allLabel="Pick a species"
+                  value={chosenSpecies}
+                  onChange={(next) => setChosenSpecies(next as string[])}
+                  options={(boards ?? []).map((b) => ({
+                     value: b.speciesId,
+                     label: b.commonName,
+                     hint:
+                        b.anglers === 1 ? '1 angler' : `${b.anglers} anglers`,
+                  }))}
+                  className="min-w-[200px]"
+               />
+            ) : null}
+            <ChoiceGroup
+               inline
+               size="sm"
+               label="Order by"
+               value={rankBy}
+               onChange={setRankBy}
+               options={[
+                  { value: 'points', label: 'Points' },
+                  { value: 'weight', label: 'Weight' },
+                  { value: 'length', label: 'Longest' },
+                  { value: 'bag', label: 'Bag' },
+               ]}
+            />
          </div>
 
          <div className="rv mt-8" style={{ '--i': 4 } as React.CSSProperties}>
@@ -141,9 +191,19 @@ export function BoardsPage() {
                   standings={rivals}
                   mutualCount={mutualCount}
                   isSignedIn={isSignedIn}
+                  rankBy={rankBy}
                />
             ) : (
-               <SpeciesView boards={boards ?? []} />
+               <SpeciesView
+                  boards={(boards ?? []).filter((b) =>
+                     chosenSpecies.length === 0
+                        ? false
+                        : chosenSpecies.includes(b.speciesId)
+                  )}
+                  none={(boards ?? []).length === 0}
+                  rankBy={rankBy}
+                  youId={youId}
+               />
             )}
          </div>
       </section>
@@ -154,10 +214,12 @@ function RivalsView({
    standings,
    mutualCount,
    isSignedIn,
+   rankBy,
 }: {
    standings: RivalStanding[] | null;
    mutualCount: number;
    isSignedIn: boolean;
+   rankBy: RankBy;
 }) {
    if (!isSignedIn) {
       return (
@@ -185,17 +247,35 @@ function RivalsView({
          </p>
          <StandingsTable
             standings={standings}
+            rankBy={rankBy}
             emptyLine="Nobody on this board has a qualifying catch yet."
          />
       </>
    );
 }
 
-function SpeciesView({ boards }: { boards: SpeciesBoard[] }) {
-   if (!boards.length) {
+function SpeciesView({
+   boards,
+   none,
+   rankBy,
+   youId,
+}: {
+   boards: SpeciesBoard[];
+   none: boolean;
+   rankBy: RankBy;
+   youId: string | null;
+}) {
+   if (none) {
       return (
          <p className="max-w-[52ch] text-[17px] text-ink-2">
             No catch has a species on it yet, so there is nothing to rank.
+         </p>
+      );
+   }
+   if (!boards.length) {
+      return (
+         <p className="max-w-[52ch] text-[17px] text-ink-2">
+            Pick one or more species above to see who is catching them.
          </p>
       );
    }
@@ -220,6 +300,8 @@ function SpeciesView({ boards }: { boards: SpeciesBoard[] }) {
                <div className="mt-4 min-w-0">
                   <StandingsTable
                      standings={board.standings}
+                     rankBy={rankBy}
+                     youId={youId}
                      emptyLine={
                         board.unscoredReason ??
                         'Nobody has a qualifying catch of this yet.'

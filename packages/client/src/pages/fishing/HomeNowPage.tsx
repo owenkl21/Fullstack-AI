@@ -194,13 +194,22 @@ function HomeNow() {
 
    return (
       <>
+         {/*
+          * The plate names where you are, because that is the question the
+          * conditions under it answer. Under the name: when you last fished
+          * and where, the latest catch the reader is allowed to see.
+          */}
          <SpotHeader
             photoUrl={recent?.images[0]?.image.url ?? FALLBACK_PHOTO}
-            spotName={recent?.site?.name ?? 'Your log'}
+            spotName={
+               conditions.place ??
+               (conditions.status === 'ready' ? 'Where you are' : 'Your log')
+            }
             today={today}
             lastFished={
                recent ? `Last fished ${formatDay(recent.caughtAt)}` : null
             }
+            lastSpot={recent?.site?.name ?? null}
          />
          <div className="mx-auto w-full max-w-[860px]">
             <Readouts
