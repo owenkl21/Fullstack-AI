@@ -63,7 +63,9 @@ const lineOf = (ys: number[]) =>
  * between the plate and the section it belongs to; the SVG lets its
  * contents overflow, so the closing edge can sit where nothing shows it.
  */
-const PAST = 40;
+/* A few pixels is enough to beat the anti-aliasing; more paints over the
+ * heading when the plate above is tight. */
+const PAST = 6;
 
 /* Closed below the box: the next section's ground. */
 const below = (ys: number[]) =>
