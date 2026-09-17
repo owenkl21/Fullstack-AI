@@ -64,11 +64,11 @@ export function ProfileView({
                   </span>
                )}
                <div className="min-w-0">
-                  <h1 className="g text-[44px] break-words md:text-[56px]">
+                  <h1 className="g text-[44px] leading-none break-words hyphens-auto md:text-[56px]">
                      {profile.displayName}
                   </h1>
                   {profile.username ? (
-                     <p className="text-[15px] text-ink-2">
+                     <p className="mt-1 text-[15px] break-all text-ink-2">
                         @{profile.username}
                      </p>
                   ) : null}

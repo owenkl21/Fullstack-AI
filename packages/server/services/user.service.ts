@@ -48,7 +48,7 @@ type ConnectionUser = {
    avatarUrl: string | null;
 };
 
-const maybeResolveAvatarReadUrl = async (avatarValue: string | null) => {
+export const maybeResolveAvatarReadUrl = async (avatarValue: string | null) => {
    if (!avatarValue) {
       return null;
    }

@@ -186,7 +186,7 @@ export function FeedPostBlock({
                   </span>
                )}
                <span className="min-w-0">
-                  <span className="block truncate font-semibold text-paper underline-offset-4 group-hover:underline">
+                  <span className="line-clamp-2 block leading-tight font-semibold text-paper underline-offset-4 group-hover:underline">
                      {post.author.displayName}
                   </span>
                   {/*
@@ -195,7 +195,7 @@ export function FeedPostBlock({
                    * printed a bare "@" with nothing after it.
                    */}
                   {post.author.username ? (
-                     <span className="block truncate text-[14px] text-paper-2">
+                     <span className="block truncate text-[13px] text-paper-2">
                         @{post.author.username}
                      </span>
                   ) : null}

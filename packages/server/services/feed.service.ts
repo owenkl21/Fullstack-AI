@@ -1,7 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { notificationsService } from './notifications.service';
 import { uploadsService } from './uploads.service';
-import { userService } from './user.service';
+import { maybeResolveAvatarReadUrl, userService } from './user.service';
 
 type FeedScope = 'GLOBAL' | 'NEARBY';
 type FeedType = 'CATCH' | 'SITE';
@@ -191,7 +191,20 @@ export const feedService = {
       });
 
       const postsWithResolvedImageUrls = await Promise.all(
-         posts.map((post: any) => withResolvedFeedImageUrls(post))
+         posts.map(async (post: any) => {
+            const resolved = await withResolvedFeedImageUrls(post);
+            /* The author's photograph is a storage key too; unsigned it is
+             * a broken image on every card. */
+            return {
+               ...resolved,
+               author: {
+                  ...resolved.author,
+                  avatarUrl: await maybeResolveAvatarReadUrl(
+                     resolved.author?.avatarUrl ?? null
+                  ),
+               },
+            };
+         })
       );
 
       if (!input.userId) {
