@@ -12,6 +12,7 @@ const destinations = [
    { to: '/sites/me', label: 'Spots' },
    { to: '/gear/me', label: 'Gear' },
    { to: '/boards', label: 'Boards' },
+   { to: '/competitions', label: 'Comps' },
 ];
 
 /*

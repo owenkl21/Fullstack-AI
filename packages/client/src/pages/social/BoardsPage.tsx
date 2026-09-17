@@ -12,6 +12,8 @@ import {
 } from '@/components/social/api';
 import { useIsSignedIn } from '@/lib/auth-client';
 import { useDocumentTitle } from '@/lib/title';
+import { TrophyIcon } from '@heroicons/react/24/outline';
+import { Link } from 'react-router-dom';
 
 const LOAD_FAILED = 'Could not load the boards.';
 
@@ -89,6 +91,20 @@ export function BoardsPage() {
             Length becomes mass with published figures, and points are awarded
             per kilogram. The fish never has to be weighed, or kept.
          </p>
+
+         {/*
+          * The phone bar has four slots and they are all spoken for, so this is
+          * the way through to competitions on a phone. It belongs here anyway:
+          * anyone reading a board is already thinking about standings.
+          */}
+         <Link
+            to="/competitions"
+            className="g-tracked rv mt-4 inline-flex min-h-11 items-center gap-2 border border-line px-4 text-[15px] transition-colors duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2"
+            style={{ '--i': 3 } as React.CSSProperties}
+         >
+            <TrophyIcon aria-hidden="true" className="size-[18px]" />
+            Competitions anglers are running
+         </Link>
 
          <div
             className="rv mt-7 flex flex-wrap gap-2"
