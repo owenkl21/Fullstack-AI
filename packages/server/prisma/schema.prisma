@@ -7,6 +7,40 @@ datasource db {
   provider = "mysql"
 }
 
+/*
+ * Who can see a record. PRIVATE is the floor a group feature has to respect:
+ * joining a group must never be the thing that publishes an angler's mark.
+ */
+enum Visibility {
+  PRIVATE
+  GROUPS
+  PUBLIC
+}
+
+enum GroupRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum GroupJoinMode {
+  OPEN
+  INVITE_ONLY
+  CODE
+}
+
+enum CompetitionRule {
+  SPECIES_POINTS
+  BIGGEST_FISH
+  SPECIES_VARIETY
+}
+
+enum CompetitionState {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
 enum SizeClass {
   EDIBLE
   NON_EDIBLE
@@ -73,6 +107,9 @@ model User {
   feedComments FeedComment[]
   sessions     Session[]
   accounts     Account[]
+  groupsCreated       Group[]       @relation("GroupsCreated")
+  groupMemberships    GroupMember[]
+  competitionsCreated Competition[] @relation("CompetitionsCreated")
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
@@ -89,6 +126,8 @@ model FishingSite {
   latitude    Float?
   longitude   Float?
   waterType   WaterType?
+  /* A spot is the thing anglers most want to keep to themselves. */
+  visibility  Visibility @default(PUBLIC)
   accessNotes String?     @db.Text
   likeCount   Int         @default(0)
   reviewCount Int         @default(0)
@@ -138,6 +177,7 @@ model Species {
   closedTo       String?   // "02-28"
   limitsSource   String?   // the brochure and its date
   catches        Catch[]
+  competitions   Competition[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -160,6 +200,7 @@ model Catch {
   // the notes text, which no query can read.
   released                                Boolean      @default(false)
   weightSource                            WeightSource @default(LENGTH)
+  visibility                              Visibility   @default(PUBLIC)
   count                                   Int          @default(1)
   weather                                 String?
   waterTemp                               Float?
@@ -308,6 +349,9 @@ model FeedPost {
   author       User          @relation(fields: [authorId], references: [id])
   type         FeedPostType
   scope        FeedScope     @default(GLOBAL)
+  visibility   Visibility    @default(PUBLIC)
+  groupId      String?
+  group        Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
   content      String?       @db.Text
   catchId      String?
   catch        Catch?        @relation(fields: [catchId], references: [id], onDelete: SetNull)
@@ -400,4 +444,69 @@ model Verification {
 
   @@index([identifier])
   @@map("verifications")
+}
+
+/* ---------- Groups and competitions ---------- */
+
+model Group {
+  id           String        @id @default(cuid())
+  name         String
+  blurb        String?       @db.VarChar(280)
+  createdById  String
+  createdBy    User          @relation("GroupsCreated", fields: [createdById], references: [id])
+  joinMode     GroupJoinMode @default(INVITE_ONLY)
+  joinCode     String?       @unique
+  memberCount  Int           @default(0)
+  members      GroupMember[]
+  competitions Competition[]
+  feedPosts    FeedPost[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+
+  @@index([createdById])
+  @@map("groups")
+}
+
+model GroupMember {
+  id       String    @id @default(cuid())
+  groupId  String
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  @@unique([groupId, userId])
+  @@index([userId, leftAt])
+  @@map("group_members")
+}
+
+model Competition {
+  id          String           @id @default(cuid())
+  name        String
+  groupId     String?
+  group       Group?           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User             @relation("CompetitionsCreated", fields: [createdById], references: [id])
+  rule        CompetitionRule  @default(SPECIES_POINTS)
+  /* Set, and it is a target-species competition rather than a fourth rule. */
+  speciesId   String?
+  species     Species?         @relation(fields: [speciesId], references: [id], onDelete: SetNull)
+  startsAt    DateTime
+  endsAt      DateTime
+  /*
+   * A South African competition that ends "on Sunday" ends at 23:59 in
+   * Africa/Johannesburg and nowhere else, so the zone travels with the dates.
+   */
+  timeZoneId  String           @default("Africa/Johannesburg")
+  state       CompetitionState @default(DRAFT)
+  maxPerSpeciesPerDay Int      @default(3)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  @@index([groupId, startsAt(sort: Desc)])
+  @@map("competitions")
 }

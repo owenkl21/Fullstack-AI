@@ -147,6 +147,8 @@ export const feedService = {
       const posts = await prisma.feedPost.findMany({
          where: {
             deletedAt: null,
+            /* Belt and braces: a private post should never have been created. */
+            visibility: { not: 'PRIVATE' },
             ...scopeWhere,
             ...(input.type ? { type: input.type } : {}),
             ...nearbyWhere,

@@ -1,6 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import { chatController } from './controllers/chat.controller';
+import { groupsController } from './controllers/groups.controller';
 import { statsController } from './controllers/stats.controller';
 import { fishingController } from './controllers/fishing.controller';
 import { userController } from './controllers/user.controller';
@@ -93,6 +94,16 @@ router.get('/api/species', fishingController.searchSpecies);
 router.get('/api/stats/me', requireApiAuth, statsController.myStats);
 router.get('/api/stats/rivals', requireApiAuth, statsController.rivals);
 router.get('/api/competitions/species', statsController.speciesBoards);
+
+/* Groups. Every one of these needs a session; a group board is not public. */
+router.get('/api/groups/me', requireApiAuth, groupsController.listMine);
+router.post('/api/groups', requireApiAuth, groupsController.create);
+router.post('/api/groups/join', requireApiAuth, groupsController.join);
+router.get(
+   '/api/groups/:groupId/boards',
+   requireApiAuth,
+   groupsController.boards
+);
 
 router.get(
    '/api/sites/me',

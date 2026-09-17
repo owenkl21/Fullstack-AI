@@ -45,6 +45,8 @@ type CreateCatchInput = {
    caughtAt: Date;
    siteId?: string | null;
    speciesId?: string | null;
+   released?: boolean;
+   visibility?: 'PRIVATE' | 'GROUPS' | 'PUBLIC';
    weight?: number | null;
    length?: number | null;
    count?: number;
@@ -58,6 +60,7 @@ type CreateCatchInput = {
 
 type CreateFishingSiteInput = {
    name: string;
+   visibility?: 'PRIVATE' | 'GROUPS' | 'PUBLIC';
    description?: string | null;
    latitude?: number | null;
    longitude?: number | null;
@@ -481,6 +484,8 @@ export const fishingService = {
                weight: input.weight,
                length: input.length,
                count: input.count ?? 1,
+               released: input.released ?? false,
+               visibility: input.visibility ?? 'PUBLIC',
                weather: input.weather,
                waterTemp:
                   input.waterTemp ?? conditions?.seaSurfaceTemperatureC ?? null,
@@ -544,15 +549,24 @@ export const fishingService = {
             }
          }
 
-         await tx.feedPost.create({
-            data: {
-               authorId: user.id,
-               type: 'CATCH',
-               scope: 'GLOBAL',
-               content: input.notes || null,
-               catchId: catchRecord.id,
-            },
-         });
+         /*
+          * A private catch publishes nothing. This is the whole point of the
+          * visibility switch: it has to be checked here, on the way in, not
+          * filtered out of the feed afterwards, because a post that exists can
+          * be read by something that forgets to filter.
+          */
+         if ((input.visibility ?? 'PUBLIC') !== 'PRIVATE') {
+            await tx.feedPost.create({
+               data: {
+                  authorId: user.id,
+                  type: 'CATCH',
+                  scope: 'GLOBAL',
+                  visibility: input.visibility ?? 'PUBLIC',
+                  content: input.notes || null,
+                  catchId: catchRecord.id,
+               },
+            });
+         }
 
          return tx.catch.findUniqueOrThrow({
             where: { id: catchRecord.id },
@@ -656,6 +670,8 @@ export const fishingService = {
                weight: input.weight,
                length: input.length,
                count: input.count,
+               released: input.released,
+               visibility: input.visibility,
                weather: input.weather,
                waterTemp: input.waterTemp,
                ...mapWeatherSnapshotToCatchData(input.weatherSnapshot, {
@@ -727,6 +743,7 @@ export const fishingService = {
                latitude: input.latitude,
                longitude: input.longitude,
                waterType: input.waterType,
+               visibility: input.visibility ?? 'PUBLIC',
                accessNotes: input.accessNotes,
             },
          });
@@ -749,17 +766,24 @@ export const fishingService = {
             });
          }
 
-         await tx.feedPost.create({
-            data: {
-               authorId: user.id,
-               type: 'SITE',
-               scope: 'GLOBAL',
-               content: input.description || null,
-               siteId: site.id,
-               latitude: input.latitude,
-               longitude: input.longitude,
-            },
-         });
+         /*
+          * Same rule, and it matters more here: a spot post carries exact
+          * coordinates. A private spot never leaves the angler's own log.
+          */
+         if ((input.visibility ?? 'PUBLIC') !== 'PRIVATE') {
+            await tx.feedPost.create({
+               data: {
+                  authorId: user.id,
+                  type: 'SITE',
+                  scope: 'GLOBAL',
+                  visibility: input.visibility ?? 'PUBLIC',
+                  content: input.description || null,
+                  siteId: site.id,
+                  latitude: input.latitude,
+                  longitude: input.longitude,
+               },
+            });
+         }
 
          return tx.fishingSite.findUniqueOrThrow({
             where: { id: site.id },

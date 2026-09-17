@@ -31,6 +31,10 @@ export default defineRailway(() => {
       build: 'bun install && cd packages/server && bun run prisma:generate',
       start: 'cd packages/server && bun run start',
 
+      /* ONE-OFF: push the groups, competitions and visibility columns. */
+      preDeploy:
+         'cd packages/server && bunx prisma db push --accept-data-loss && bun run prisma/seed.ts',
+
       /*
        * /api/hello rather than /, because it exercises the same /api prefix
        * Vercel proxies. Both are trivial handlers that touch no database.

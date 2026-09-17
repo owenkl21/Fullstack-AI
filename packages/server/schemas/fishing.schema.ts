@@ -57,6 +57,8 @@ const catchPayloadSchema = z.object({
    caughtAt: z.coerce.date(),
    siteId: z.string().trim().min(1).optional().nullable(),
    speciesId: z.string().trim().min(1).optional().nullable(),
+   released: z.coerce.boolean().optional(),
+   visibility: z.enum(['PRIVATE', 'GROUPS', 'PUBLIC']).optional(),
    weight: z.coerce.number().positive().optional().nullable(),
    length: z.coerce.number().positive().optional().nullable(),
    count: z.coerce.number().int().positive().max(999).optional(),
@@ -75,6 +77,7 @@ export const updateCatchSchema = catchPayloadSchema;
 
 const fishingSitePayloadSchema = z.object({
    name: z.string().trim().min(2).max(120),
+   visibility: z.enum(['PRIVATE', 'GROUPS', 'PUBLIC']).optional(),
    description: z.string().trim().min(1).max(2000).optional().nullable(),
    latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
    longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
