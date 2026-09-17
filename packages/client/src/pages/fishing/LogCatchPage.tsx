@@ -196,6 +196,9 @@ function MeasureField<U extends string>({
    onUnit,
    placeholder,
    readOnly = false,
+   sources,
+   source,
+   onSource,
 }: {
    id: string;
    label: string;
@@ -209,6 +212,13 @@ function MeasureField<U extends string>({
    placeholder?: string;
    /* Set by a reading off a photograph, and not for typing over. */
    readOnly?: boolean;
+   /* The two ways it could have been taken, the rough one first. */
+   sources?: readonly [
+      { value: string; label: string },
+      { value: string; label: string },
+   ];
+   source?: string;
+   onSource?: (next: string) => void;
 }) {
    return (
       <div className="flex min-w-0 flex-col">
@@ -256,6 +266,35 @@ function MeasureField<U extends string>({
                ))}
             </div>
          </div>
+         {sources && onSource ? (
+            <div
+               role="radiogroup"
+               aria-label={`How the ${label.toLowerCase()} was taken`}
+               className="mt-2 grid grid-cols-2 border border-line"
+            >
+               {sources.map((option) => {
+                  const on = source === option.value;
+                  return (
+                     <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        disabled={readOnly}
+                        onClick={() => onSource(option.value)}
+                        className={cn(
+                           'g-tracked h-11 text-[16px] transition-colors duration-150 [transition-timing-function:var(--ease)] disabled:opacity-60',
+                           on
+                              ? 'bg-ink text-background'
+                              : 'text-ink-2 hover:text-ink'
+                        )}
+                     >
+                        {option.label}
+                     </button>
+                  );
+               })}
+            </div>
+         ) : null}
          <FieldError id={`${id}-error`} message={error} />
       </div>
    );
@@ -392,6 +431,8 @@ export function CatchForm({
     * is read off a photograph of the fish on a tape or a scale, and what
     * was read is what is saved, so nobody has to take anyone's word.
     */
+   const [lengthSource, setLengthSource] = useState<'EYE' | 'TAPE'>('EYE');
+   const [weightSource, setWeightSource] = useState<'EYE' | 'SCALE'>('EYE');
    const [competitionId, setCompetitionId] = useState<string | null>(null);
    const [reading, setReading] = useState<Reading | null>(null);
    const [photoTimes, setPhotoTimes] = useState<Date[]>([]);
@@ -889,6 +930,8 @@ export function CatchForm({
       return {
          title: species.trim(),
          caughtAt: parsedCaughtAt ? parsedCaughtAt.toISOString() : '',
+         lengthSource: reading?.measure === 'LENGTH' ? 'TAPE' : lengthSource,
+         weightSource: reading?.measure === 'WEIGHT' ? 'SCALE' : weightSource,
          competitionId: competitionId ?? null,
          ...(reading
             ? {
@@ -1201,6 +1244,14 @@ export function CatchForm({
                      id="length"
                      label="Length"
                      readOnly={reading?.measure === 'LENGTH'}
+                     sources={[
+                        { value: 'EYE', label: 'By eye' },
+                        { value: 'TAPE', label: 'On a tape' },
+                     ]}
+                     source={lengthSource}
+                     onSource={(next) =>
+                        setLengthSource(next as 'EYE' | 'TAPE')
+                     }
                      value={lengthValue}
                      error={errors.length}
                      unit={lengthUnit}
@@ -1214,6 +1265,14 @@ export function CatchForm({
                      id="weight"
                      label="Weight"
                      readOnly={reading?.measure === 'WEIGHT'}
+                     sources={[
+                        { value: 'EYE', label: 'By eye' },
+                        { value: 'SCALE', label: 'On a scale' },
+                     ]}
+                     source={weightSource}
+                     onSource={(next) =>
+                        setWeightSource(next as 'EYE' | 'SCALE')
+                     }
                      value={weightValue}
                      error={errors.weight}
                      unit={weightUnit}

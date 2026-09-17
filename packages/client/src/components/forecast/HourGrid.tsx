@@ -1,5 +1,5 @@
 import { BoltIcon } from '@heroicons/react/24/outline';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import {
    WindArrowIcon,
    skyIcon,
@@ -241,11 +241,12 @@ export function HourGrid({
                            </span>
                         ) : null}
                      </th>
-                     {hours.map((h) => (
+                     {hours.map((h, column) => (
                         <td
-                           key={h.local}
+                           key={`${h.local}-${row.key}`}
+                           style={{ '--i': column } as CSSProperties}
                            className={cn(
-                              'num px-1 py-2.5 text-center align-middle',
+                              'fact num px-1 py-2.5 text-center align-middle',
                               h.local === nowLocal && 'bg-bg-2',
                               h.isDaytime === false && 'text-ink-2'
                            )}

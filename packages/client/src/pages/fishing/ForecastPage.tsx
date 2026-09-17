@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
    CloudRainIcon,
@@ -328,8 +328,12 @@ function DayFacts({
 
    return (
       <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
-         {facts.map((fact) => (
-            <div key={fact.key} className="flex items-start gap-2.5">
+         {facts.map((fact, index) => (
+            <div
+               key={fact.key}
+               className="fact flex items-start gap-2.5"
+               style={{ '--i': index } as CSSProperties}
+            >
                <span className="mt-[2px] shrink-0 text-ink-3">{fact.icon}</span>
                <span className="min-w-0">
                   <dt className="lab text-ink-3">{fact.label}</dt>

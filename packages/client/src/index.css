@@ -936,6 +936,11 @@
       transform: none;
    }
 }
+/* Twenty four hours across: a quicker step, or the last hour lands late. */
+td.fact {
+   animation-duration: 380ms;
+   animation-delay: calc(var(--i, 0) * 18ms);
+}
 @media (prefers-reduced-motion: reduce) {
    .fact {
       animation: none;
