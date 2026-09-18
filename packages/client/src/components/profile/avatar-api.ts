@@ -7,6 +7,12 @@ import { useEffect, useState } from 'react';
  * The session carries the raw storage key of the avatar, which is not a
  * picture anyone can load. The profile route signs it. Read once per visit
  * and shared, so the header does not ask on every page.
+ *
+ * The thumb, never the original. This is a forty four pixel circle drawn on
+ * every page of the app, and it was loading whatever came out of the camera:
+ * one four megabyte photograph, on every route, before anything else on the
+ * screen could have it. The full size copy is still taken when there is no
+ * thumb yet, which is only true of an avatar uploaded before the variants.
  */
 let cached: string | null | undefined;
 let loading: Promise<void> | null = null;
@@ -34,8 +40,17 @@ export function useMyAvatar(enabled = true) {
    useEffect(() => {
       if (!enabled || cached !== undefined || loading) return;
       loading = axios
-         .get<{ profile?: { avatarUrl?: string | null } }>('/api/users/me')
-         .then(({ data }) => settleMyAvatar(data.profile?.avatarUrl ?? null))
+         .get<{
+            profile?: {
+               avatarUrl?: string | null;
+               avatarThumbUrl?: string | null;
+            };
+         }>('/api/users/me')
+         .then(({ data }) =>
+            settleMyAvatar(
+               data.profile?.avatarThumbUrl ?? data.profile?.avatarUrl ?? null
+            )
+         )
          .catch(() => settleMyAvatar(null))
          .finally(() => {
             loading = null;
