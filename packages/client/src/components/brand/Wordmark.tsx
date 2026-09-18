@@ -2,12 +2,13 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 /*
- * The mark on its own until the product has a name.
+ * The mark and the name.
  *
- * It used to set the literal word "Name" beside the fish, at 28px, on every
- * screen. That reads as an unfilled template and undercuts everything under it.
- * The fish alone reads as a mark. When the name is settled, put it back after
- * the svg and nothing else here has to change.
+ * The mark is Owen's own drawing, a bass with a teal dorsal fin, delivered as
+ * a raster on a black square and kept under public/brand with the black
+ * knocked out so it sits on the always-black header whatever exact black the
+ * export used. It is only ever shown on black, which is why one file does.
+ * The name follows it in the display face, tracked like the nav words.
  */
 export function Wordmark({
    className,
@@ -19,25 +20,21 @@ export function Wordmark({
    return (
       <Link
          to={to}
-         aria-label="Home"
+         aria-label="Fishtagram, home"
          className={cn(
-            'g-tracked inline-flex min-h-11 items-center gap-2.5 text-[28px] text-paper',
+            'g-tracked inline-flex min-h-11 items-center gap-2.5 text-[24px] text-paper md:text-[28px]',
             className
          )}
       >
-         <svg
-            viewBox="0 0 68 44"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            className="h-[26px] w-[40px]"
-         >
-            <path d="M2 30c10-14 24-20 40-16 8 2 14 6 24 6-8 6-16 8-24 8-16 0-30-4-40 2Z" />
-            <path d="M44 14c-4-6-10-8-16-8 4 4 8 6 14 6M22 24c4 4 8 4 12 2" />
-         </svg>
+         <img
+            src="/brand/fishtagram-mark.png"
+            alt=""
+            width={320}
+            height={158}
+            decoding="async"
+            className="h-[30px] w-auto md:h-[34px]"
+         />
+         <span>Fishtagram</span>
       </Link>
    );
 }
