@@ -291,6 +291,58 @@ in the code with no route and no nav word, as asked.
   header, which had been clipping the hanging edge.
 - Checked live by `audit/lbl8.mjs` on a phone and a desktop: five of five.
 
+## Done on 18 September (the morning list)
+
+Raised in three messages: the page heads looked cut off above the water, the
+log form needed a cleanup, the forecast wanted bars, a merging temperature
+band, tides and the sun and moon; then the name and the mark arrived.
+
+- [x] **The contour sheet reaches the waterline.** It stopped at a ruled edge
+      a hundred pixels above the water on every page head because the water's
+      own plate path was an opaque fill from the header's edge to the crest.
+      `PageHead` now carries the plate and the art in one box that reaches
+      `--hang` below the header (`.plate-art`), and `TornEdge` takes `hollow`,
+      drawing only the water, with the strips and the shadow clipped to it.
+      Checked on all seven page heads and the spot page, day and night, phone
+      and desktop (`audit/plates.mjs`).
+- [x] **The quick log, cleaned.** The map folds behind one receipt line
+      ("Phone fix, within 35 m · -34.13000, 18.33000", "Move the pin") and
+      opens only when there is no fix or the angler asks; it never opens while
+      the phone is still finding one, and the picker no longer reports its
+      first view as a dropped pin. Gone: the footer's second "Public catch ·
+      Spot shown", the "Not sure?" link (the list ends in Not sure), "Nothing
+      caught? Log a session instead" (it saved nothing), "Required" and the
+      four "Optional" tags, the grey zeros in Length and Weight, the camera
+      square, every icon beside a word, "Take photo" on a desktop. Labels:
+      Kept or released, Seen by, Exact spot, Add this as a spot. Targets to
+      44px; the wheel scrolls the page over the map; the desktop map controls
+      sit on the map instead of the card's corner; the gear fold is open.
+- [x] **The full form, cleaned.** The dashed rules between sections draw;
+      depth and water temperature live in a "More" fold; "Enter it in a
+      competition" is a button at the end of section 01; Length and Weight
+      use the quick log's `MeasureField`; one save row per width, with Save
+      draft and Save catch in the phone bar, the nav standing down on the
+      form routes and a close control in the page head; the gear and spot
+      lists run their full length. Editing a catch no longer writes By eye,
+      Kept and no competition over the record.
+- [x] **The forecast, with the inspiration worked in.** Wind is a bar per
+      hour against a 50 km/h scale, coloured by band, arrow above and gust
+      under; air and UV tints are mixed per hour so they merge; a Tide row
+      draws the sea level (Open-Meteo marine `sea_level_height_msl`) with
+      Flood and Ebb and the time of each high and low, no heights, and says
+      so in the attribution; Sun and Moon rows draw the arcs from sunrise,
+      sunset, moonrise and moonset over a dashed horizon. Signal colours are
+      tokens with night values; no hex left in `tones.ts`. The browser
+      fallback mirrors every new field.
+- [x] **Fishtagram.** The name and Owen's mark (`public/brand`,
+      `brand/Wordmark.tsx`, the favicons, `lib/title.ts`).
+- [x] **The loader is the fish leaving the water.** Owen's clip, scrubbed of
+      its watermark and shrunk to a 270 KB muted mp4 (`public/brand/loader.*`,
+      made by ffmpeg; the recipe is in the BootGate comment), multiplied onto
+      the paper by day and inverted and screened onto the dark at night.
+      `BootGate` holds the first paint for at least 1.6 s so the leap is seen,
+      never more than 2.5 s; reduced motion gets the first frame.
+
 ## Next, in order
 
 1. **Switch the readers on**: set `ANTHROPIC_API_KEY` on Railway for the
