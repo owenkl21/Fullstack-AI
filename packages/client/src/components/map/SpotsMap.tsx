@@ -7,6 +7,7 @@ import {
    L,
    clusterGroup,
    createMap,
+   dropPin,
    kindPin,
    refreshSize,
    setBaseLayer,
@@ -70,6 +71,9 @@ const SINGLE_PIN_ZOOM = 12;
  */
 const POI_MIN_ZOOM = 10;
 
+/* What the pin being dropped is called, for a screen reader and a long press. */
+const MARK_LABEL = 'The mark you are dropping. Drag it to the exact spot.';
+
 /*
  * The map as a place to read rather than a picture of pins.
  *
@@ -96,6 +100,7 @@ export function SpotsMap({
    onOpen,
    wheelZoom = false,
    focus = null,
+   fill = false,
 }: {
    spots: SpotPin[];
    onOpen: (id: string) => void;
@@ -104,6 +109,13 @@ export function SpotsMap({
    wheelZoom?: boolean;
    /** Somewhere to go: a searched place, or the angler's own position. */
    focus?: MapFocus | null;
+   /**
+    * Take the height the parent gives instead of measuring a share of the
+    * viewport. On a page that is nothing but a map this is what keeps the
+    * whole instrument, controls included, inside one screen; the map that sits
+    * in the middle of My spots still asks for its own height.
+    */
+   fill?: boolean;
 }) {
    const holder = useRef<HTMLDivElement | null>(null);
    const map = useRef<LeafletMap | null>(null);
@@ -154,15 +166,38 @@ export function SpotsMap({
    const [pois, setPois] = useState<Poi[]>([]);
    const [showPois, setShowPois] = useState(true);
    const [showWaypoints, setShowWaypoints] = useState(true);
-   const [dropping, setDropping] = useState<{
-      lat: number;
-      lng: number;
-   } | null>(null);
+   /*
+    * The mark being dropped: where it stands right now, not where it landed.
+    * It used to be read-only state under a form printed below the map, so an
+    * angler dropped a mark, lost sight of it, and named a place they could no
+    * longer see. Now it is a real draggable pin and this follows the pin.
+    */
+   const [mark, setMark] = useState<{ lat: number; lng: number } | null>(null);
+   const markRef = useRef(mark);
+   markRef.current = mark;
+   const marking = mark !== null;
+   const markingRef = useRef(marking);
+   markingRef.current = marking;
+   const markPin = useRef<Marker | null>(null);
+   const panel = useRef<HTMLDivElement | null>(null);
    /* The pin button arms the next tap to drop a mark, for anyone who does
     * not know about the long press. */
    const [armed, setArmed] = useState(false);
    const armedRef = useRef(false);
    armedRef.current = armed;
+   const [locating, setLocating] = useState(false);
+
+   /* Go to where the angler is standing, from either copy of the controls. */
+   const goToMe = useCallback(() => {
+      setLocating(true);
+      void requestPosition()
+         .then((next) => {
+            if (next && map.current) {
+               map.current.setView([next.latitude, next.longitude], 13);
+            }
+         })
+         .finally(() => setLocating(false));
+   }, []);
 
    useEffect(() => {
       onOpenRef.current = onOpen;
@@ -242,6 +277,13 @@ export function SpotsMap({
       const created = createMap(node, { ...opening, base, wheelZoom });
       map.current = created;
 
+      /*
+       * Leaflet puts the zoom in the top left, which is the exact corner the
+       * toolbar stands in on a desktop, so the two sat on top of each other.
+       * The zoom moves across; the toolbar keeps the corner it reads from.
+       */
+      created.zoomControl?.setPosition('topright');
+
       /* Spots cluster at low zoom; marks and places do not, there are never
          enough of them in one view to need it. */
       const clusters = clusterGroup().addTo(created);
@@ -313,13 +355,24 @@ export function SpotsMap({
 
       /* A long press on a phone, a right click on a desktop. */
       const onLongPress = (event: LeafletMouseEvent) => {
-         setDropping({ lat: event.latlng.lat, lng: event.latlng.lng });
+         setMark({ lat: event.latlng.lat, lng: event.latlng.lng });
       };
       created.on('contextmenu', onLongPress);
       const onTap = (event: LeafletMouseEvent) => {
+         const { lat, lng } = event.latlng;
+         /*
+          * While a mark is being named, a tap moves it. That is the third way
+          * of placing a pin, next to dragging it and arming the button, and it
+          * is the one people reach for first when the pin landed a street off.
+          */
+         if (markingRef.current) {
+            markPin.current?.setLatLng([lat, lng]);
+            setMark({ lat, lng });
+            return;
+         }
          if (!armedRef.current) return;
          setArmed(false);
-         setDropping({ lat: event.latlng.lat, lng: event.latlng.lng });
+         setMark({ lat, lng });
       };
       created.on('click', onTap);
 
@@ -602,38 +655,144 @@ export function SpotsMap({
       }
    }, [pois, mapReady]);
 
+   /*
+    * The pin you are dropping, as a real marker.
+    *
+    * It wears the same teardrop a saved spot wears, because the pin dragged
+    * here is the pin found here afterwards. The effect runs when the naming
+    * starts and when it ends, never while the pin is being moved: reading the
+    * position out of a ref rather than the dependency list is what stops the
+    * marker being torn down and rebuilt under the thumb that is dragging it.
+    */
+   useEffect(() => {
+      const created = map.current;
+      if (!created) return;
+      const at = markRef.current;
+      if (!at) return;
+
+      const pin = L.marker([at.lat, at.lng], {
+         icon: dropPin(),
+         draggable: true,
+         /* Reachable by tab, so the pin is not a mouse-only control. */
+         keyboard: true,
+         /* Dragged to the edge, the map comes along rather than stopping. */
+         autoPan: true,
+         autoPanPadding: [36, 36],
+         riseOnHover: true,
+         title: MARK_LABEL,
+      }).addTo(created);
+      pin.on('dragend', () => {
+         const to = pin.getLatLng();
+         setMark({ lat: to.lat, lng: to.lng });
+      });
+      const element = pin.getElement();
+      if (element) {
+         element.setAttribute('role', 'button');
+         element.setAttribute('aria-label', MARK_LABEL);
+      }
+      markPin.current = pin;
+
+      /*
+       * The naming panel covers the foot of the map, so the pin is lifted into
+       * the clear part above it. Without this a mark dropped low on the screen
+       * is named blind, which is the whole complaint.
+       */
+      created.panInside([at.lat, at.lng], {
+         paddingTopLeft: [40, 40],
+         paddingBottomRight: [40, 280],
+      });
+
+      /*
+       * And the panel itself is brought into the screen. On the map page it is
+       * already there; inside a scrolling page, such as My spots, the foot of
+       * the map can be anywhere, including under the fixed bar. The panel
+       * carries a scroll margin the height of that bar, so the browser stops
+       * short of it rather than parking Save underneath it.
+       */
+      panel.current?.scrollIntoView({
+         block: 'end',
+         behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? 'auto'
+            : 'smooth',
+      });
+
+      return () => {
+         pin.remove();
+         markPin.current = null;
+      };
+   }, [marking, mapReady]);
+
    const saveWaypoint = useCallback(
       async (name: string, note: string, kind: WaypointKind) => {
-         if (!dropping) return;
+         const at = markRef.current;
+         if (!at) return;
          const saved = await createWaypoint({
             name,
             note: note || null,
             kind,
-            latitude: dropping.lat,
-            longitude: dropping.lng,
+            latitude: at.lat,
+            longitude: at.lng,
          });
          setWaypoints((current) => [saved, ...current]);
-         setDropping(null);
+         setMark(null);
       },
-      [dropping]
+      []
    );
 
    return (
-      <div className="flex flex-col gap-3">
+      <div
+         className={
+            fill
+               ? /*
+                  * flex-1, not h-full. The page gives this column a
+                  * min-height rather than a height, and a percentage height
+                  * against an ancestor that has no definite height of its own
+                  * resolves to nothing: the map came out zero pixels tall and
+                  * the page rendered a heading over blank paper. Growing into
+                  * the room the flex column has left asks no such question.
+                  */
+                 'flex min-h-0 flex-1 flex-col gap-3'
+               : 'flex flex-col gap-3'
+         }
+      >
          {/*
           * Taller than it was. The old box was a two to one strip, which is a
           * picture of a map rather than a map: you could not pan without losing
           * your place. It takes real height now and the controls sit under it.
           */}
-         <div className="relative">
+         <div className={fill ? 'relative min-h-0 flex-1' : 'relative'}>
             <div
                ref={holder}
                /* The base is on the element so the night rule can leave a
                   photograph alone and only invert the drawn maps. */
                data-base={base}
-               className="map-surface h-[62vh] min-h-[380px] w-full border border-line"
+               className={
+                  'map-surface border border-line ' +
+                  (fill
+                     ? /*
+                        * Pinned to its box rather than asked for all of its
+                        * height. The box is a flex item, and a percentage
+                        * height against a parent whose own height comes from
+                        * flex resolves to nothing in the pass that lays this
+                        * out: the map came back two pixels tall, which is its
+                        * own border and no map at all.
+                        */
+                       'absolute inset-0'
+                     : 'h-[62vh] min-h-[380px] w-full')
+               }
             />
 
+            {/*
+             * Nothing floats over the map on a phone.
+             *
+             * The legend and the locate control used to sit in the map's
+             * bottom right corner, and a map that runs to the foot of the
+             * screen puts that corner underneath the fixed bar, so both were
+             * half a control with a bar through them. On a phone they move
+             * into the row under the map, where they cannot collide with
+             * anything; on a desktop there is no bar and they stay where a
+             * map reader expects to find them.
+             */}
             {!phone ? <MapLegend /> : null}
             {!phone ? (
                <MapToolbar
@@ -676,24 +835,38 @@ export function SpotsMap({
                />
             ) : null}
 
-            {/* Over the map, where a locate control belongs. */}
-            <button
-               type="button"
-               onClick={() => {
-                  void requestPosition().then((next) => {
-                     if (next && map.current) {
-                        map.current.setView(
-                           [next.latitude, next.longitude],
-                           13
-                        );
-                     }
-                  });
-               }}
-               aria-label="Go to where I am"
-               className="absolute right-3 bottom-8 z-[500] grid size-11 place-items-center border border-line bg-background text-ink shadow-[0_2px_8px_rgba(11,9,9,0.25)] transition-transform duration-150 active:scale-[0.96]"
-            >
-               <ViewfinderCircleIcon aria-hidden="true" className="size-6" />
-            </button>
+            {!phone ? (
+               <button
+                  type="button"
+                  onClick={goToMe}
+                  aria-label="Go to where I am"
+                  className="absolute right-3 bottom-8 z-[500] grid size-11 place-items-center border border-line bg-background text-ink transition-transform duration-150 [transition-timing-function:var(--ease)] active:scale-[0.96]"
+               >
+                  <ViewfinderCircleIcon aria-hidden="true" className="size-6" />
+               </button>
+            ) : null}
+
+            {/*
+             * Naming the mark, at the foot of the map rather than under it.
+             *
+             * The panel used to print below the whole map, which on a phone is
+             * a screen and a half away from the pin it is about, so the last
+             * thing an angler saw before typing a name was a map they had
+             * scrolled off. Here the pin stays in sight the whole time and the
+             * map has already lifted it clear of this panel.
+             */}
+            {mark ? (
+               <div
+                  ref={panel}
+                  className="thread-scroll absolute inset-x-0 bottom-0 z-[600] max-h-[78%] scroll-mb-[calc(64px+env(safe-area-inset-bottom))] overflow-y-auto border-t border-line bg-background md:scroll-mb-0"
+               >
+                  <NewWaypoint
+                     at={mark}
+                     onCancel={() => setMark(null)}
+                     onSave={saveWaypoint}
+                  />
+               </div>
+            ) : null}
          </div>
 
          {phone ? (
@@ -722,6 +895,8 @@ export function SpotsMap({
                }}
                dropping={armed}
                onDrop={() => setArmed((was) => !was)}
+               onLocate={goToMe}
+               locating={locating}
                onLogHere={() => {
                   /*
                    * The quick log, with the pin already where the map is
@@ -737,28 +912,24 @@ export function SpotsMap({
             />
          ) : null}
 
-         <p className="mt-2 text-[14px] text-ink-3">
+         <p className="text-[14px] text-ink-3">
             {showPois && zoomLevel > 0 && zoomLevel < POI_MIN_ZOOM
                ? 'Zoom in for slipways and tackle shops.'
                : ''}{' '}
-            Press and hold the map, or use the pin button, to drop a private
-            mark.
+            Press and hold the map, or use the mark control, to drop a private
+            mark. Drag the pin to put it exactly where you mean.
          </p>
-
-         {dropping ? (
-            <NewWaypoint
-               onCancel={() => setDropping(null)}
-               onSave={saveWaypoint}
-            />
-         ) : null}
       </div>
    );
 }
 
 function NewWaypoint({
+   at,
    onSave,
    onCancel,
 }: {
+   /* Where the pin is standing, which is what gets saved. */
+   at: { lat: number; lng: number };
    onSave: (name: string, note: string, kind: WaypointKind) => Promise<void>;
    onCancel: () => void;
 }) {
@@ -768,10 +939,14 @@ function NewWaypoint({
    const [busy, setBusy] = useState(false);
 
    return (
-      <div className="border border-line p-4">
+      <div className="p-4">
          <h3 className="g text-[22px]">Drop a mark</h3>
          <p className="mt-1 text-[14px] text-ink-3">
-            Only you will ever see this.
+            Only you will ever see this. Drag the pin if it is not quite right.
+         </p>
+         {/* What is about to be saved, in the same figures the record uses. */}
+         <p className="num mt-1 text-[14px] text-ink-2">
+            {at.lat.toFixed(5)}, {at.lng.toFixed(5)}
          </p>
 
          <div className="mt-3 flex flex-col gap-3">

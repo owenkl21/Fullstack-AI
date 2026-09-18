@@ -2,12 +2,23 @@ import axios from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { ImageUploader, type RejectedFile } from '@/components/ImageUploader';
+import { Img } from '@/components/Img';
+import {
+   makeImageVariants,
+   type ResizedVariant,
+   type VariantName,
+} from '@/lib/images';
 
 type Scope = 'catch' | 'site' | 'avatar' | 'banner' | 'gear';
 
 type UploadedImage = {
    storageKey: string;
    url: string;
+   /* The two resized copies, for anything that draws this photograph smaller
+    * than it was taken. Optional so a record loaded from an older payload
+    * still passes straight through here. */
+   cardUrl?: string | null;
+   thumbUrl?: string | null;
 };
 
 type Props = {
@@ -39,16 +50,43 @@ type QueueItem = {
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
+type SignedVariant = {
+   variant: VariantName;
+   storageKey: string;
+   contentType: string;
+   uploadUrl: string;
+};
+
 const uploadOne = async (
    scope: Scope,
    file: File,
    onProgress: (percent: number) => void
 ): Promise<UploadedImage> => {
+   /*
+    * Resize first, then ask for the keys, so a photograph the browser cannot
+    * decode fails before anything has been signed. The card and the thumb are
+    * a few tens of kilobytes between them, so the original is still all of the
+    * upload and the progress rule can go on measuring only that.
+    *
+    * lib/exif.ts has already been over the file by this point: the picker
+    * hands every picked file to its caller before it hands it here, and a
+    * canvas keeps pixels and drops tags.
+    */
+   let variants: ResizedVariant[] = [];
+   try {
+      variants = await makeImageVariants(file);
+   } catch (error) {
+      /* Not fatal. The original goes up on its own and the app reads it at
+       * full size, which is exactly what it did before any of this existed. */
+      console.warn('Could not make smaller copies of this photo', error);
+   }
+
    const { data: signed } = await axios.post('/api/uploads/sign', {
       scope,
       fileName: file.name,
       contentType: file.type,
       sizeBytes: file.size,
+      variants: variants.map((entry) => entry.variant),
    });
 
    // Straight to R2 on the presigned URL, so the bytes never pass through the
@@ -64,9 +102,35 @@ const uploadOne = async (
       },
    });
 
+   /*
+    * The small ones after the original and in parallel. If one of them does
+    * not make it the photograph is still saved and still readable: the record
+    * holds the base key, and anything missing beside it is rebuilt by
+    * audit/backfill-images.mjs.
+    */
+   const signedVariants: SignedVariant[] = signed.variants ?? [];
+   await Promise.all(
+      variants.map(async (made) => {
+         const target = signedVariants.find(
+            (entry) => entry.variant === made.variant
+         );
+         if (!target) return;
+
+         try {
+            await axios.put(target.uploadUrl, made.blob, {
+               headers: { 'Content-Type': target.contentType },
+            });
+         } catch (error) {
+            console.warn(`The ${made.variant} copy did not go up`, error);
+         }
+      })
+   );
+
    return {
       storageKey: signed.storageKey,
       url: signed.readUrl,
+      cardUrl: signed.cardReadUrl ?? null,
+      thumbUrl: signed.thumbReadUrl ?? null,
    };
 };
 
@@ -269,13 +333,13 @@ export function R2ImagePicker({
                      key={image.storageKey}
                      className="relative aspect-[4/3] bg-bg-2"
                   >
-                     <img
+                     <Img
                         src={image.url}
+                        cardSrc={image.cardUrl}
+                        thumbSrc={image.thumbUrl}
                         alt={`Photo ${index + 1}`}
-                        width={400}
-                        height={300}
-                        loading="lazy"
-                        className="h-full w-full object-cover"
+                        fill
+                        sizes="(min-width: 640px) 33vw, 50vw"
                      />
                      {takesMany && index === 0 ? (
                         <span className="g-tracked absolute top-0 left-0 bg-teal px-2 py-1 text-[15px] text-teal-ink">

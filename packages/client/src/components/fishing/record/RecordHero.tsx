@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 import { FishMark } from '@/components/brand/FishMark';
+import { Img } from '@/components/Img';
 
 /*
  * The record's photograph: native ratio on a black ground so a portrait fish is
@@ -18,7 +19,12 @@ export function RecordHero({
    headline,
    built,
 }: {
-   images: { id: string; url: string }[];
+   images: {
+      id: string;
+      url: string;
+      cardUrl?: string | null;
+      thumbUrl?: string | null;
+   }[];
    index: number;
    onIndexChange: (next: number) => void;
    onBack: () => void;
@@ -35,12 +41,30 @@ export function RecordHero({
    return (
       <div className="relative bg-black-block text-paper">
          {current ? (
-            <img
+            /*
+             * The record is the one screen where the untouched original is the
+             * point, so this is the only photograph in the product that is
+             * allowed to ask for it: eager, high priority, and the full
+             * resolution offered beside the two smaller copies so a phone on a
+             * thin signal gets something on the screen first.
+             *
+             * The box keeps a floor under it while the bytes are coming. The
+             * photograph's own ratio is not known until it arrives, and
+             * without a floor everything below the hero started at the top of
+             * the screen and was thrown down the page a moment later.
+             */
+            <Img
                src={current.url}
+               cardSrc={current.cardUrl}
+               thumbSrc={current.thumbUrl}
                alt={`${title}, photo ${Math.min(index, count - 1) + 1} of ${count}`}
-               fetchPriority="high"
-               className={cn(
-                  'mx-auto block h-auto max-h-[78dvh] w-full object-contain transition-transform duration-[1800ms] [transition-timing-function:var(--ease)]',
+               priority
+               full
+               fit="contain"
+               sizes="100vw"
+               className="min-h-[320px] bg-black-block md:min-h-[380px]"
+               imgClassName={cn(
+                  'mx-auto max-h-[78dvh] transition-[opacity,transform] duration-[1800ms] [transition-timing-function:var(--ease)]',
                   built ? 'scale-100' : 'scale-105'
                )}
             />

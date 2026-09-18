@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { FishMark } from '@/components/brand/FishMark';
+import { Img } from '@/components/Img';
 import { Banner } from '@/components/profile/Banner';
 import { RankCard } from '@/components/profile/RankCard';
 import { FollowCounts } from '@/components/profile/FollowCounts';
@@ -158,15 +159,17 @@ function AnglerScreen() {
    return (
       <section className="mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14">
          <header>
-            <Banner url={profile.bannerUrl} />
+            <Banner url={profile.bannerUrl} cardUrl={profile.bannerCardUrl} />
             <div className="relative z-10 -mt-8 flex flex-wrap items-end gap-4">
                {profile.avatarUrl ? (
-                  <img
+                  <Img
                      src={profile.avatarUrl}
+                     thumbSrc={profile.avatarThumbUrl}
                      alt=""
-                     width={80}
-                     height={80}
-                     className="relative z-10 size-20 shrink-0 rounded-full object-cover ring-4 ring-background"
+                     priority
+                     ratio="1 / 1"
+                     sizes="80px"
+                     className="relative z-10 size-20 shrink-0 rounded-full ring-4 ring-background"
                   />
                ) : (
                   <span
@@ -249,11 +252,17 @@ function AnglerScreen() {
                            }
                            className="group block aspect-square w-full overflow-hidden bg-bg-2"
                         >
-                           <img
+                           <Img
                               src={entry.url}
+                              cardSrc={entry.cardUrl}
+                              thumbSrc={entry.thumbUrl}
                               alt={entry.sourceTitle}
-                              loading="lazy"
-                              className="size-full object-cover transition-transform duration-[600ms] [transition-timing-function:var(--ease)] group-hover:scale-[1.04]"
+                              ratio="1 / 1"
+                              /* Three up on a phone, four from the small
+                                 breakpoint on. */
+                              sizes="(min-width: 640px) 25vw, 33vw"
+                              className="size-full"
+                              imgClassName="transition-transform duration-[600ms] [transition-timing-function:var(--ease)] group-hover:scale-[1.04]"
                            />
                         </Link>
                      </li>

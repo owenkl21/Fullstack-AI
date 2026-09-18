@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { TrashIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useRevealIn } from '@/components/brand/Reveal';
@@ -264,14 +265,25 @@ function MyGearList() {
                                     key={entry.id}
                                     item={entry}
                                     trailing={
+                                       /*
+                                        * The word "Delete" printed once per row
+                                        * was the loudest thing on a page of
+                                        * gear, and it read as the point of the
+                                        * list. Repeated down a list a
+                                        * destructive control is a mark, not a
+                                        * sentence; the label says which rod it
+                                        * would take, and the dialog behind it is
+                                        * unchanged.
+                                        */
                                        <Button
                                           type="button"
                                           variant="ghost"
-                                          className="px-3 text-ink-3 hover:text-ink"
+                                          size="icon"
+                                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                                           aria-label={`Delete ${entry.name}`}
                                           onClick={() => setPending(entry)}
                                        >
-                                          Delete
+                                          <TrashIcon aria-hidden="true" />
                                        </Button>
                                     }
                                  />

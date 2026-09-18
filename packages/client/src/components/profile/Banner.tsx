@@ -1,4 +1,5 @@
 import { Contours } from '@/components/brand/Contours';
+import { Img } from '@/components/Img';
 import { cn } from '@/lib/utils';
 
 /*
@@ -10,9 +11,12 @@ import { cn } from '@/lib/utils';
  */
 export function Banner({
    url,
+   cardUrl,
    className,
 }: {
    url: string | null | undefined;
+   /* 900px on the long edge, which is more than a 220px band ever needs. */
+   cardUrl?: string | null;
    className?: string;
 }) {
    return (
@@ -27,11 +31,18 @@ export function Banner({
          )}
       >
          {url ? (
-            <img
+            /*
+             * The band at the top of a profile, and the first thing on the
+             * screen, so it loads without waiting to be scrolled to. It is
+             * never more than 220px tall, so the card copy is plenty.
+             */
+            <Img
                src={url}
+               cardSrc={cardUrl}
                alt=""
-               className="absolute inset-0 size-full object-cover"
-               loading="eager"
+               priority
+               fill
+               sizes="100vw"
             />
          ) : (
             <Contours seed={11} className="inset-0 h-full w-full" />

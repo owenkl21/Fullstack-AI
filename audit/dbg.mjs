@@ -1,0 +1,14 @@
+import { launch, context, open, signIn, PHONE } from './lib.mjs';
+const b = await launch();
+const ctx = await context(b, PHONE);
+const p = await ctx.newPage();
+let feedCalls = 0; const errs = [];
+p.on('pageerror', (e) => errs.push('PAGEERROR ' + String(e).slice(0, 160)));
+p.on('console', (m) => { if (m.type() === 'error') errs.push('CONSOLE ' + m.text().slice(0, 160)); });
+p.on('response', (r) => { if (r.url().includes('/api/feed')) feedCalls++; });
+await signIn(p);
+await open(p, '/', 9000);
+const m = await p.evaluate(() => ({ articles: document.querySelectorAll('article').length, page: document.documentElement.scrollHeight, text: document.body.innerText.slice(0, 80) }));
+console.log('feed API calls:', feedCalls, JSON.stringify(m));
+console.log(errs.slice(0, 4).join('\n') || 'no errors');
+await b.close();

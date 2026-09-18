@@ -1,12 +1,4 @@
-import {
-   MapIcon,
-   PlusIcon,
-   NewspaperIcon,
-   TrophyIcon,
-} from '@heroicons/react/24/outline';
-import type { ComponentType, SVGProps } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { FishMark } from '@/components/brand/FishMark';
 import { isTaskRoute } from '@/components/shell/routes';
 import { SignedIn, SignedOut } from '@/components/shell/Signed';
 import { cn } from '@/lib/utils';
@@ -14,14 +6,11 @@ import { cn } from '@/lib/utils';
 type Slot = {
    to: string;
    label: string;
-   Icon: ComponentType<SVGProps<SVGSVGElement>>;
 };
 
-/* Catches gets the house fish rather than a stock icon: it is the one slot the
- * product is actually about. */
 const left: Slot[] = [
-   { to: '/', label: 'Feed', Icon: NewspaperIcon },
-   { to: '/catches/me', label: 'Catches', Icon: FishMark },
+   { to: '/', label: 'Feed' },
+   { to: '/catches/me', label: 'Catches' },
 ];
 
 /*
@@ -35,17 +24,21 @@ const left: Slot[] = [
  * spots anyway. Spots and gear are in the account menu.
  */
 const right: Slot[] = [
-   { to: '/map', label: 'Map', Icon: MapIcon },
-   { to: '/boards', label: 'Boards', Icon: TrophyIcon },
+   { to: '/map', label: 'Map' },
+   { to: '/boards', label: 'Boards' },
 ];
 
 /*
- * Phone navigation: four slots around one raised teal key in the middle. The key
+ * Phone navigation: four slots around one teal key in the middle. The key
  * breaks the bar's top edge so the thumb finds it without looking. Signed out the bar
  * carries Feed and Sign in only, so nobody is sent into a gated page.
  *
- * Each slot carries its mark above its word. Four bare words at this size all
- * read the same at a glance, which is the one thing a thumb bar cannot afford.
+ * Words, and only words. Each slot used to carry a stock mark above its name,
+ * which is the one thing the house rules refuse outright: an icon beside a
+ * word says the same thing twice and lands a newspaper and a trophy in a
+ * fishing log. Four names at a readable size tell each other apart perfectly
+ * well, and the active one is marked by the teal rule the product uses
+ * everywhere else for "you are here".
  */
 export function BottomBar() {
    const { pathname } = useLocation();
@@ -55,28 +48,20 @@ export function BottomBar() {
    }
 
    const slot =
-      'g-tracked flex h-16 flex-col items-center justify-center gap-1 text-[13px] text-paper-2 transition-colors duration-150 [transition-timing-function:var(--ease)] hover:text-paper';
-   const active = 'text-paper shadow-[inset_0_3px_0_var(--teal)]';
+      'g-tracked relative flex h-16 items-center justify-center text-[17px] text-paper-2 transition-colors duration-150 [transition-timing-function:var(--ease)] hover:text-paper';
+   /* A 3px teal rule across the top of the slot, drawn rather than shadowed so
+      nothing in the product carries a box shadow. */
+   const active =
+      'text-paper before:absolute before:inset-x-0 before:top-0 before:h-[3px] before:bg-teal';
 
-   const renderSlot = ({ to, label, Icon }: Slot) => (
+   const renderSlot = ({ to, label }: Slot) => (
       <NavLink
          key={to}
          to={to}
          end={to === '/'}
          className={({ isActive }) => cn(slot, isActive && active)}
       >
-         {({ isActive }) => (
-            <>
-               <Icon
-                  aria-hidden="true"
-                  className={cn(
-                     'size-[22px] shrink-0 transition-transform duration-200 [transition-timing-function:var(--ease)]',
-                     isActive && 'scale-110'
-                  )}
-               />
-               {label}
-            </>
-         )}
+         {label}
       </NavLink>
    );
 
@@ -90,21 +75,18 @@ export function BottomBar() {
                {left.map(renderSlot)}
 
                <div className="relative">
+                  {/* The one teal action, a square block: radius is zero in
+                      this product and a rounded key was the only thing in the
+                      shell still pretending otherwise. */}
                   <NavLink
                      to="/log"
-                     aria-label="Log a catch"
                      className={({ isActive }) =>
                         cn(
-                           'g-tracked absolute bottom-3 left-1/2 flex size-[72px] -translate-x-1/2 flex-col items-center justify-center gap-0.5 rounded-2xl bg-teal text-[20px] text-teal-ink shadow-[0_6px_18px_rgba(0,0,0,0.28)] transition-[filter,transform] duration-150 [transition-timing-function:var(--ease)] hover:brightness-105 active:scale-[0.97]',
+                           'g-tracked absolute bottom-3 left-1/2 flex size-[72px] -translate-x-1/2 items-center justify-center bg-teal text-[26px] text-teal-ink transition-[filter,transform] duration-150 [transition-timing-function:var(--ease)] hover:brightness-105 active:scale-[0.97]',
                            isActive && 'brightness-95'
                         )
                      }
                   >
-                     <PlusIcon
-                        aria-hidden="true"
-                        className="size-6"
-                        strokeWidth={2}
-                     />
                      Log
                   </NavLink>
                </div>

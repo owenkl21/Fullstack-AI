@@ -75,7 +75,19 @@ function MapScreen() {
    }, []);
 
    return (
-      <section className="mx-auto w-[min(1680px,100%-32px)] py-8 md:py-12">
+      /*
+       * The map page is one screen, not a page you scroll to a map on.
+       *
+       * It used to run the map at 62vh inside a scrolling column, so on a
+       * phone the controls under the map and the locate control inside it both
+       * landed in the band the fixed bar owns at the foot of the screen, and
+       * were cut in half by it. The column is now told to be exactly the room
+       * between the header and that bar, the map takes whatever the heading and
+       * the search leave, and the controls sit inside the screen by
+       * construction rather than by luck. It is a minimum rather than a fixed
+       * height, so a short phone still scrolls instead of crushing the map.
+       */
+      <section className="mx-auto flex min-h-[calc(100dvh-60px-64px-env(safe-area-inset-bottom))] w-[min(1680px,100%-32px)] flex-col gap-5 py-6 md:min-h-[calc(100dvh-60px-96px)] md:gap-8 md:py-12">
          <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
             <div>
                <h1 className="g text-[44px] md:text-[56px]">Map</h1>
@@ -115,8 +127,9 @@ function MapScreen() {
             />
          </div>
 
-         <div className="mt-6">
+         <div className="flex min-h-[380px] flex-1 flex-col">
             <SpotsMap
+               fill
                spots={mine}
                wheelZoom
                focus={focus}

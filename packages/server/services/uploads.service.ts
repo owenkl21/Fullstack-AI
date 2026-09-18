@@ -8,12 +8,48 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 type UploadScope = 'catch' | 'site' | 'avatar' | 'banner' | 'gear';
 
+/*
+ * ---------------------------------------------------------------------------
+ * The variant naming convention. This is the one place it is written down.
+ * ---------------------------------------------------------------------------
+ *
+ * A photograph is stored three times under one base key:
+ *
+ *   <key>              the original, exactly as the camera wrote it
+ *   <key>.card.jpg     900px on the long edge, for a card or a tile
+ *   <key>.thumb.jpg    160px on the long edge, for a row or an avatar
+ *
+ * Suffixes rather than a second folder, and appended rather than substituted,
+ * so the base key stays a complete key and the two others are derivable from
+ * it by a string. That is what lets the Image row keep holding one key and no
+ * column be added for this: anything that has the base can rebuild the other
+ * two without asking the database or the bucket.
+ *
+ * The browser makes the two variants at upload time (client src/lib/images.ts)
+ * and PUTs all three; audit/backfill-images.mjs makes them for photographs that
+ * were already in the bucket. Both use the names above and neither invents
+ * them: this file is the source.
+ */
+const VARIANT_SUFFIX = {
+   card: '.card.jpg',
+   thumb: '.thumb.jpg',
+} as const;
+
+export type ImageVariant = keyof typeof VARIANT_SUFFIX;
+
+/** The key a variant of `storageKey` lives under. */
+const variantKey = (storageKey: string, variant: ImageVariant) =>
+   `${storageKey}${VARIANT_SUFFIX[variant]}`;
+
 type SignUploadInput = {
    storagePrefixId: string;
    scope: UploadScope;
    fileName: string;
    contentType: 'image/jpeg' | 'image/png' | 'image/webp';
    sizeBytes: number;
+   /* Which resized copies the browser is about to send up beside the original.
+    * An old client sends none and still works; it simply has no variants. */
+   variants?: readonly ImageVariant[];
 };
 
 const requiredEnv = [
@@ -124,6 +160,44 @@ const buildUnsignedObjectUrl = (storageKey: string) => {
       .join('/')}`;
 };
 
+/*
+ * Signing is the other thing that made the feed slow.
+ *
+ * A presigned URL is an HMAC over the key and the clock, computed fresh every
+ * time it is asked for, and one feed page asked for the same angler's avatar
+ * twenty five times. Signatures live ten minutes, so holding one for eight is
+ * safe by two: a URL handed out at the end of its cached life still has two
+ * minutes of its own left, which is longer than any reader spends between the
+ * response and the picture appearing.
+ *
+ * Module level rather than per request on purpose. The whole point is that the
+ * second page of a scroll does not re-sign what the first page just signed.
+ */
+const READ_URL_TTL_MS = 8 * 60 * 1000;
+const READ_URL_CACHE_MAX = 2000;
+const readUrlCache = new Map<string, { url: string; expiresAt: number }>();
+
+const rememberReadUrl = (storageKey: string, url: string) => {
+   /* Oldest first, because a Map iterates in insertion order and a bucket of
+    * keys nobody is reading any more is the part worth dropping. */
+   if (readUrlCache.size >= READ_URL_CACHE_MAX) {
+      const now = Date.now();
+      for (const [key, entry] of readUrlCache) {
+         if (entry.expiresAt <= now) readUrlCache.delete(key);
+      }
+      while (readUrlCache.size >= READ_URL_CACHE_MAX) {
+         const oldest = readUrlCache.keys().next();
+         if (oldest.done) break;
+         readUrlCache.delete(oldest.value);
+      }
+   }
+
+   readUrlCache.set(storageKey, {
+      url,
+      expiresAt: Date.now() + READ_URL_TTL_MS,
+   });
+};
+
 const resolveReadUrl = async (storageKey: string) => {
    const { publicBaseUrl, bucket } = getConfig();
 
@@ -132,14 +206,40 @@ const resolveReadUrl = async (storageKey: string) => {
       return `${base}/${storageKey}`;
    }
 
+   const cached = readUrlCache.get(storageKey);
+   if (cached && cached.expiresAt > Date.now()) {
+      return cached.url;
+   }
+
    const command = new GetObjectCommand({
       Bucket: bucket,
       Key: storageKey,
    });
 
-   return getSignedUrl(getS3Client(), command, {
+   const url = await getSignedUrl(getS3Client(), command, {
       expiresIn: 60 * 10,
    });
+
+   rememberReadUrl(storageKey, url);
+
+   return url;
+};
+
+/*
+ * The three URLs for one photograph, signed together.
+ *
+ * `url` is kept exactly as it always was so that every reader that only knows
+ * about one picture carries on working; the other two are what a list should
+ * actually be drawing.
+ */
+const resolveReadUrls = async (storageKey: string) => {
+   const [url, cardUrl, thumbUrl] = await Promise.all([
+      resolveReadUrl(storageKey),
+      resolveReadUrl(variantKey(storageKey, 'card')),
+      resolveReadUrl(variantKey(storageKey, 'thumb')),
+   ]);
+
+   return { url, cardUrl, thumbUrl };
 };
 
 const buildSignedUploadUrl = async ({
@@ -211,19 +311,40 @@ export const uploadsService = {
       assertUploadSize(input.sizeBytes);
 
       const storageKey = buildStorageKey(input);
+      const wanted = input.variants ?? [];
 
-      const [uploadUrl, readUrl] = await Promise.all([
+      /*
+       * One base key, one upload URL per size. The variants are always JPEG,
+       * whatever the original was: a canvas writes what it is told to and a
+       * photograph has nothing to gain from PNG.
+       */
+      const [uploadUrl, readUrls, variants] = await Promise.all([
          buildSignedUploadUrl({
             storageKey,
             contentType: input.contentType,
          }),
-         resolveReadUrl(storageKey),
+         resolveReadUrls(storageKey),
+         Promise.all(
+            wanted.map(async (variant) => ({
+               variant,
+               storageKey: variantKey(storageKey, variant),
+               contentType: 'image/jpeg' as const,
+               uploadUrl: await buildSignedUploadUrl({
+                  storageKey: variantKey(storageKey, variant),
+                  contentType: 'image/jpeg',
+               }),
+            }))
+         ),
       ]);
 
       return {
          storageKey,
          uploadUrl,
-         readUrl,
+         /* Unchanged, and still the original. */
+         readUrl: readUrls.url,
+         cardReadUrl: readUrls.cardUrl,
+         thumbReadUrl: readUrls.thumbUrl,
+         variants,
       };
    },
 
@@ -233,15 +354,25 @@ export const uploadsService = {
        * not an R2 object. Presigning it hands back a signed URL for something
        * that was never uploaded, which is what broke every seeded photograph.
        * Every image resolver funnels through here, so this is the one place
-       * that needs to know.
+       * that needs to know. A file on disk has no variants either, so all
+       * three answers are the same path and the browser picks it once.
        */
       if (storageKey.startsWith('/')) {
-         return { storageKey, readUrl: storageKey };
+         return {
+            storageKey,
+            readUrl: storageKey,
+            cardReadUrl: storageKey,
+            thumbReadUrl: storageKey,
+         };
       }
+
+      const urls = await resolveReadUrls(storageKey);
 
       return {
          storageKey,
-         readUrl: await resolveReadUrl(storageKey),
+         readUrl: urls.url,
+         cardReadUrl: urls.cardUrl,
+         thumbReadUrl: urls.thumbUrl,
       };
    },
 

@@ -29,9 +29,14 @@ const buttonVariants = cva(
             sm: 'h-10 px-4 text-[17px]',
             lg: 'h-12 px-6 text-[22px]',
             xl: 'h-14 px-7 text-[24px]',
+            /*
+             * An icon-only control is 44px, and there is no smaller size to
+             * reach for. There used to be a 32 and a 40, both under the
+             * minimum this product promises and neither of them used by
+             * anything; leaving them in the variant list is how a 32px delete
+             * ends up on a row six months from now.
+             */
             icon: 'size-11 p-0',
-            'icon-xs': 'size-8 p-0',
-            'icon-sm': 'size-10 p-0',
             'icon-lg': 'size-12 p-0',
          },
       },

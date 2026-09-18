@@ -4,7 +4,11 @@
 
 export type GalleryImage = {
    id: string;
+   /* The original, and the two sizes the server signs beside it. A gallery
+    * tile is a few hundred pixels square, so it reads the 900px copy. */
    url: string;
+   cardUrl?: string | null;
+   thumbUrl?: string | null;
    sourceType: 'CATCH' | 'SITE';
    sourceId: string;
    sourceTitle: string;
@@ -17,8 +21,11 @@ export type UserProfile = {
    bio: string | null;
    email: string;
    avatarUrl: string | null;
+   /* The 160px copy, which is the only one an 80px circle should ever load. */
+   avatarThumbUrl?: string | null;
    /* The wide photograph behind the name. */
    bannerUrl: string | null;
+   bannerCardUrl?: string | null;
    followersCount: number;
    followingCount: number;
    galleryImages: GalleryImage[];
@@ -36,6 +43,7 @@ export type ConnectionUser = {
    username: string;
    displayName: string;
    avatarUrl: string | null;
+   avatarThumbUrl?: string | null;
 };
 
 /** What the angler's own log adds up to, counted from the catches endpoint. */

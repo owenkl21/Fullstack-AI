@@ -26,12 +26,20 @@ type ProfileShape = {
 type ProfileImage = {
    id: string;
    url: string;
+   /* The same photograph at 900px and at 160px. A gallery tile is a few
+    * hundred pixels square and has no business fetching a camera original. */
+   cardUrl: string;
+   thumbUrl: string;
    sourceType: 'CATCH' | 'SITE';
    sourceId: string;
    sourceTitle: string;
 };
 
 type ProfileView = ProfileShape & {
+   /* The avatar at 160px and the banner at 900px, beside the originals. Both
+    * are drawn small and neither is worth a full resolution download. */
+   avatarThumbUrl: string | null;
+   bannerCardUrl: string | null;
    followersCount: number;
    followingCount: number;
    galleryImages: ProfileImage[];
@@ -46,20 +54,44 @@ type ConnectionUser = {
    username: string;
    displayName: string;
    avatarUrl: string | null;
+   avatarThumbUrl: string | null;
 };
 
-export const maybeResolveAvatarReadUrl = async (avatarValue: string | null) => {
+type ReadUrls = {
+   url: string | null;
+   cardUrl: string | null;
+   thumbUrl: string | null;
+};
+
+/**
+ * An angler's photograph at all three sizes.
+ *
+ * A value that is not a storage key is a URL somebody else is hosting, and
+ * there are no variants of that: it is handed back as all three so the caller
+ * has nothing to branch on.
+ */
+export const resolveAvatarReadUrls = async (
+   avatarValue: string | null
+): Promise<ReadUrls> => {
    if (!avatarValue) {
-      return null;
+      return { url: null, cardUrl: null, thumbUrl: null };
    }
 
    if (!avatarValue.startsWith('users/')) {
-      return avatarValue;
+      return {
+         url: avatarValue,
+         cardUrl: avatarValue,
+         thumbUrl: avatarValue,
+      };
    }
 
    try {
       const signed = await uploadsService.getReadUrl(avatarValue);
-      return signed.readUrl;
+      return {
+         url: signed.readUrl,
+         cardUrl: signed.cardReadUrl,
+         thumbUrl: signed.thumbReadUrl,
+      };
    } catch (error) {
       console.warn(
          '[user:avatar] Failed to resolve avatar storage key to read URL.',
@@ -68,17 +100,25 @@ export const maybeResolveAvatarReadUrl = async (avatarValue: string | null) => {
             error,
          }
       );
-      return avatarValue;
+      return { url: avatarValue, cardUrl: null, thumbUrl: null };
    }
 };
+
+/* Kept as it was for the two services that only ever draw one size. */
+export const maybeResolveAvatarReadUrl = async (avatarValue: string | null) =>
+   (await resolveAvatarReadUrls(avatarValue)).url;
 
 const maybeResolveImageReadUrl = async (
    image: { id: string; url: string; storageKey: string },
    context: string
-) => {
+): Promise<{ url: string; cardUrl: string; thumbUrl: string }> => {
    try {
       const signed = await uploadsService.getReadUrl(image.storageKey);
-      return signed.readUrl;
+      return {
+         url: signed.readUrl,
+         cardUrl: signed.cardReadUrl,
+         thumbUrl: signed.thumbReadUrl,
+      };
    } catch (error) {
       console.warn(
          `[${context}] Failed to resolve image read URL, falling back to persisted URL.`,
@@ -88,17 +128,31 @@ const maybeResolveImageReadUrl = async (
             error,
          }
       );
-      return image.url;
+      return { url: image.url, cardUrl: image.url, thumbUrl: image.url };
    }
 };
 
 const withResolvedAvatar = async (
    profile: ProfileShape
-): Promise<ProfileShape> => ({
-   ...profile,
-   avatarUrl: await maybeResolveAvatarReadUrl(profile.avatarUrl),
-   bannerUrl: await maybeResolveAvatarReadUrl(profile.bannerUrl ?? null),
-});
+): Promise<
+   ProfileShape & {
+      avatarThumbUrl: string | null;
+      bannerCardUrl: string | null;
+   }
+> => {
+   const [avatar, banner] = await Promise.all([
+      resolveAvatarReadUrls(profile.avatarUrl),
+      resolveAvatarReadUrls(profile.bannerUrl ?? null),
+   ]);
+
+   return {
+      ...profile,
+      avatarUrl: avatar.url,
+      avatarThumbUrl: avatar.thumbUrl,
+      bannerUrl: banner.url,
+      bannerCardUrl: banner.cardUrl,
+   };
+};
 
 const getErrorCode = (error: unknown) => {
    if (typeof error !== 'object' || error === null || !('code' in error)) {
@@ -210,10 +264,10 @@ const buildProfileView = async (userId: string) => {
          .filter((entry) => entry.images[0]?.image)
          .map(async (entry) => ({
             id: entry.images[0]!.image.id,
-            url: await maybeResolveImageReadUrl(
+            ...(await maybeResolveImageReadUrl(
                entry.images[0]!.image,
                'user:profileCatchImage'
-            ),
+            )),
             sourceType: 'CATCH' as const,
             sourceId: entry.id,
             sourceTitle: entry.title,
@@ -225,10 +279,10 @@ const buildProfileView = async (userId: string) => {
          .filter((entry) => entry.images[0]?.image)
          .map(async (entry) => ({
             id: entry.images[0]!.image.id,
-            url: await maybeResolveImageReadUrl(
+            ...(await maybeResolveImageReadUrl(
                entry.images[0]!.image,
                'user:profileSiteImage'
-            ),
+            )),
             sourceType: 'SITE' as const,
             sourceId: entry.id,
             sourceTitle: entry.name,
@@ -330,10 +384,10 @@ const buildPublicProfileView = async (
          .filter((entry) => entry.images[0]?.image)
          .map(async (entry) => ({
             id: entry.images[0]!.image.id,
-            url: await maybeResolveImageReadUrl(
+            ...(await maybeResolveImageReadUrl(
                entry.images[0]!.image,
                'user:publicCatchImage'
-            ),
+            )),
             sourceType: 'CATCH' as const,
             sourceId: entry.id,
             sourceTitle: entry.title,
@@ -345,10 +399,10 @@ const buildPublicProfileView = async (
          .filter((entry) => entry.images[0]?.image)
          .map(async (entry) => ({
             id: entry.images[0]!.image.id,
-            url: await maybeResolveImageReadUrl(
+            ...(await maybeResolveImageReadUrl(
                entry.images[0]!.image,
                'user:publicSiteImage'
-            ),
+            )),
             sourceType: 'SITE' as const,
             sourceId: entry.id,
             sourceTitle: entry.name,
@@ -368,13 +422,20 @@ const buildPublicProfileView = async (
     * because that takes the owner's shape and an email address is required by
     * it. There is no email on this object at all, which is the point.
     */
+   const [avatar, banner] = await Promise.all([
+      resolveAvatarReadUrls(profile.avatarUrl),
+      resolveAvatarReadUrls(profile.bannerUrl),
+   ]);
+
    return {
       id: profile.id,
       username: profile.username,
       displayName: profile.displayName,
       bio: profile.bio,
-      avatarUrl: await maybeResolveAvatarReadUrl(profile.avatarUrl),
-      bannerUrl: await maybeResolveAvatarReadUrl(profile.bannerUrl),
+      avatarUrl: avatar.url,
+      avatarThumbUrl: avatar.thumbUrl,
+      bannerUrl: banner.url,
+      bannerCardUrl: banner.cardUrl,
       createdAt: profile.createdAt,
       followersCount: profile._count.followers,
       followingCount: profile._count.following,
@@ -573,7 +634,9 @@ export const userService = {
          rows.map(async (entry: any) => {
             const target =
                type === 'followers' ? entry.follower : entry.following;
-            const resolvedAvatar = await maybeResolveAvatarReadUrl(
+            /* A followers sheet is a column of 40px photographs, so it reads
+             * the thumb and never the original. */
+            const resolvedAvatar = await resolveAvatarReadUrls(
                target.avatarUrl
             );
 
@@ -581,7 +644,8 @@ export const userService = {
                id: target.id,
                username: target.username,
                displayName: target.displayName,
-               avatarUrl: resolvedAvatar,
+               avatarUrl: resolvedAvatar.url,
+               avatarThumbUrl: resolvedAvatar.thumbUrl,
             };
          })
       );

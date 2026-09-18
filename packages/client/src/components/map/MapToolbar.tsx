@@ -1,14 +1,8 @@
-import {
-   MapPinIcon,
-   PlusIcon,
-   QuestionMarkCircleIcon,
-   Squares2X2Icon,
-} from '@heroicons/react/24/outline';
+import { QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 import * as Popover from '@radix-ui/react-popover';
 import { usePhone } from '@/lib/media';
 import { Sheet } from '@/components/ui/sheet';
 import { useState } from 'react';
-import { FishMark } from '@/components/brand/FishMark';
 import { Picker } from '@/components/ui/picker';
 import { BASE_LAYERS, type BaseLayer } from '@/lib/leaflet';
 import { cn } from '@/lib/utils';
@@ -17,15 +11,22 @@ import { cn } from '@/lib/utils';
  * The controls, on the map rather than under it.
  *
  * Three rows of chips under the map meant setting a filter and scrolling
- * back up to see what it did. Now everything sits over the map's top left:
- * the base and what shows in one panel, the fish in another, a pin button
- * that arms the next tap to drop a mark, and a way to log a catch at the
- * centre. On a phone they are icons; on a desktop they carry their words.
+ * back up to see what it did. Now everything sits over the map's top left on
+ * a desktop, and in one row under the map on a phone: the base and what
+ * shows in one panel, the fish in another, a pin button that arms the next
+ * tap to drop a mark, a way back to where you are standing, and a way to log
+ * a catch at the centre.
+ *
+ * Every one of them carries its word. They used to carry a word and an icon
+ * of the same thing, which says it twice and is the one thing the house rules
+ * forbid outright; the icons are gone and the words do the work. The map's
+ * own icon-only controls are the zoom, the legend and, on a desktop, locate,
+ * each with a label a screen reader can read.
  */
 type Layers = { others: boolean; marks: boolean; places: boolean };
 
 const control =
-   'inline-flex h-11 items-center gap-2 border border-line bg-background px-3 text-ink shadow-[0_2px_8px_rgba(11,9,9,0.25)] transition-[background-color,border-color,transform] duration-150 [transition-timing-function:var(--ease)] hover:border-ink active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal data-[state=open]:border-ink';
+   'g-tracked inline-flex h-11 items-center border border-line bg-background px-3.5 text-[15px] text-ink transition-[background-color,border-color,transform] duration-150 [transition-timing-function:var(--ease)] hover:border-ink active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal data-[state=open]:border-ink';
 
 export function MapToolbar({
    base,
@@ -38,6 +39,8 @@ export function MapToolbar({
    dropping,
    onDrop,
    onLogHere,
+   onLocate,
+   locating = false,
    placement = 'overlay',
 }: {
    base: BaseLayer;
@@ -51,9 +54,16 @@ export function MapToolbar({
    onDrop: () => void;
    onLogHere: () => void;
    /*
+    * Where the angler is standing. Only the bar carries it: on a desktop the
+    * map floats its own round locate control, which has nowhere to collide.
+    */
+   onLocate?: () => void;
+   locating?: boolean;
+   /*
     * Where it sits. Over the map on a desktop; under the map on a phone,
-    * as a bar of four, so the map itself is clear for fingers and every
-    * panel rises from the bottom of the screen.
+    * as a bar, so the map itself is clear for fingers, every panel rises from
+    * the bottom of the screen, and nothing floats where the fixed bar at the
+    * foot of the screen would cut it in half.
     */
    placement?: 'overlay' | 'bar';
 }) {
@@ -61,14 +71,18 @@ export function MapToolbar({
    const shown = Object.values(layers).filter(Boolean).length;
    const phone = usePhone();
    const bar = placement === 'bar';
+   /*
+    * 14px, not 11. Nothing in this product goes under fourteen except a
+    * tracked field label, and these are controls a wet thumb has to read.
+    */
    const barButton =
-      'flex min-h-12 flex-col items-center justify-center gap-0.5 bg-background px-1 text-[11px] tracking-[0.08em] text-ink uppercase transition-colors duration-100 hover:bg-bg-2';
+      'g-tracked flex min-h-12 items-center justify-center bg-background px-1 text-center text-[14px] leading-tight text-ink transition-colors duration-100 hover:bg-bg-2';
 
    return (
       <div
          className={cn(
             bar
-               ? 'grid grid-cols-4 gap-px border border-line bg-line'
+               ? 'grid grid-cols-5 gap-px border border-line bg-line'
                : 'absolute top-3 left-3 z-[500] flex flex-wrap items-start gap-2 pr-16'
          )}
       >
@@ -78,13 +92,11 @@ export function MapToolbar({
                   onClick={phone ? () => setLayersOpen(true) : undefined}
                   type="button"
                   className={bar ? barButton : control}
-                  aria-label="Map layers"
                >
-                  <Squares2X2Icon aria-hidden="true" className="size-5" />
                   {bar ? (
                      <span>Layers</span>
                   ) : (
-                     <span className="g-tracked hidden text-[15px] sm:inline">
+                     <span>
                         {BASE_LAYERS.find((b) => b.value === base)?.label ??
                            'Layers'}
                         <span className="ml-1.5 text-ink-3">{shown} on</span>
@@ -193,16 +205,11 @@ export function MapToolbar({
          ) : (
             <Popover.Root open={layersOpen} onOpenChange={setLayersOpen}>
                <Popover.Trigger asChild>
-                  <button
-                     type="button"
-                     className={bar ? barButton : control}
-                     aria-label="Map layers"
-                  >
-                     <Squares2X2Icon aria-hidden="true" className="size-5" />
+                  <button type="button" className={bar ? barButton : control}>
                      {bar ? (
                         <span>Layers</span>
                      ) : (
-                        <span className="g-tracked hidden text-[15px] sm:inline">
+                        <span>
                            {BASE_LAYERS.find((b) => b.value === base)?.label ??
                               'Layers'}
                            <span className="ml-1.5 text-ink-3">{shown} on</span>
@@ -215,7 +222,7 @@ export function MapToolbar({
                      align="start"
                      sideOffset={6}
                      collisionPadding={12}
-                     className="z-[1000] w-[min(300px,calc(100vw-24px))] border border-line bg-background p-3 text-ink shadow-[0_10px_30px_rgba(11,9,9,0.18)]"
+                     className="z-[1000] w-[min(300px,calc(100vw-24px))] border border-line-2 bg-background p-3 text-ink"
                   >
                      <span className="lab text-ink-3">Base</span>
                      <div
@@ -321,18 +328,12 @@ export function MapToolbar({
                value={species}
                onChange={(next) => onSpecies(next as string[])}
                options={speciesOptions}
-               icon={bar ? undefined : <FishMark className="h-4 w-6" />}
-               className={
-                  bar
-                     ? 'min-h-12 border-0 px-2'
-                     : 'max-w-[200px] shadow-[0_2px_8px_rgba(11,9,9,0.25)]'
-               }
+               className={bar ? 'min-h-12 border-0 px-1' : 'max-w-[200px]'}
             />
          ) : bar ? (
-            <span className={cn(barButton, 'text-ink-3')}>
-               <FishMark className="h-4 w-6" />
-               <span>Fish</span>
-            </span>
+            /* The filter with nothing to filter yet. It keeps its cell so the
+               row does not reshuffle the moment a species arrives. */
+            <span className={cn(barButton, 'text-ink-3')}>Fish</span>
          ) : null}
 
          <button
@@ -346,32 +347,30 @@ export function MapToolbar({
                      ? 'bg-teal text-teal-ink'
                      : 'border-teal bg-teal text-teal-ink')
             )}
-            title="Drop a private mark"
          >
-            <MapPinIcon aria-hidden="true" className="size-5" />
             {bar ? (
                <span>{dropping ? 'Tap map' : 'Mark'}</span>
             ) : (
-               <span className="g-tracked hidden text-[15px] sm:inline">
-                  {dropping ? 'Tap the map' : 'Drop a mark'}
-               </span>
+               <span>{dropping ? 'Tap the map' : 'Drop a mark'}</span>
             )}
          </button>
+
+         {bar && onLocate ? (
+            <button
+               type="button"
+               onClick={onLocate}
+               className={cn(barButton, locating && 'text-teal')}
+            >
+               <span>{locating ? 'Finding' : 'Locate'}</span>
+            </button>
+         ) : null}
 
          <button
             type="button"
             onClick={onLogHere}
             className={bar ? barButton : control}
-            title="Log a catch at the centre of the map"
          >
-            <PlusIcon aria-hidden="true" className="size-5" />
-            {bar ? (
-               <span>Log here</span>
-            ) : (
-               <span className="g-tracked hidden text-[15px] sm:inline">
-                  Log here
-               </span>
-            )}
+            <span>Log here</span>
          </button>
       </div>
    );
@@ -493,7 +492,7 @@ export function MapLegend() {
             <button
                type="button"
                aria-label="What the pins mean"
-               className="absolute right-3 bottom-[88px] z-[500] grid size-11 place-items-center border border-line bg-background text-ink shadow-[0_2px_8px_rgba(11,9,9,0.25)] transition-transform duration-150 active:scale-[0.96] data-[state=open]:border-ink"
+               className="absolute right-3 bottom-[88px] z-[500] grid size-11 place-items-center border border-line bg-background text-ink transition-transform duration-150 active:scale-[0.96] data-[state=open]:border-ink"
             >
                <QuestionMarkCircleIcon aria-hidden="true" className="size-6" />
             </button>
@@ -504,7 +503,7 @@ export function MapLegend() {
                side="top"
                sideOffset={6}
                collisionPadding={12}
-               className="z-[1000] w-[min(300px,calc(100vw-24px))] border border-line bg-background p-3 text-ink shadow-[0_10px_30px_rgba(11,9,9,0.18)]"
+               className="z-[1000] w-[min(300px,calc(100vw-24px))] border border-line-2 bg-background p-3 text-ink"
             >
                <span className="lab text-ink-3">The pins</span>
                <ul className="mt-2 flex flex-col gap-1.5">
