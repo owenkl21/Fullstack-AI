@@ -1,10 +1,17 @@
 import { prisma } from '../lib/prisma';
 import { notificationsService } from './notifications.service';
 import { uploadsService } from './uploads.service';
-import { maybeResolveAvatarReadUrl, userService } from './user.service';
+import { resolveAvatarReadUrls, userService } from './user.service';
 
 type FeedScope = 'GLOBAL' | 'NEARBY';
-type FeedType = 'CATCH' | 'SITE';
+/*
+ * The feed is catches. Spots used to post themselves too, which put the same
+ * mark in front of everyone twice: once when it was added and again under every
+ * fish caught there. `SITE` stays in the column's vocabulary because the rows
+ * written before this are still in the table, but nothing writes another one
+ * and the read path below hands none of them back.
+ */
+type FeedType = 'CATCH';
 
 const feedInclude = {
    author: {
@@ -40,24 +47,15 @@ const feedInclude = {
          },
       },
    },
+   /*
+    * The spot the fish was taken at, named on the card. Its photographs are not
+    * selected any more: the card shows the fish, and signing read URLs for a
+    * gallery nothing renders cost a round trip per post.
+    */
    site: {
       select: {
          id: true,
          name: true,
-         images: {
-            orderBy: { position: 'asc' as const },
-            select: {
-               image: {
-                  select: {
-                     id: true,
-                     url: true,
-                     storageKey: true,
-                     focusX: true,
-                     focusY: true,
-                  },
-               },
-            },
-         },
       },
    },
    comments: {
@@ -77,11 +75,6 @@ const withResolvedFeedImageUrls = async <
             image: { id: string; url: string; storageKey: string };
          }>;
       } | null;
-      site: {
-         images: Array<{
-            image: { id: string; url: string; storageKey: string };
-         }>;
-      } | null;
    },
 >(
    post: T
@@ -96,11 +89,16 @@ const withResolvedFeedImageUrls = async <
                   entry.image.storageKey
                );
 
+               /* All three sizes. The card draws the 900px one and the browser
+                * never asks for the original, which is what turned a feed page
+                * from twenty eight megabytes into something a phone can hold. */
                return {
                   ...entry,
                   image: {
                      ...entry.image,
                      url: signed.readUrl,
+                     cardUrl: signed.cardReadUrl,
+                     thumbUrl: signed.thumbReadUrl,
                   },
                };
             } catch (error) {
@@ -118,10 +116,9 @@ const withResolvedFeedImageUrls = async <
       );
    };
 
-   const [catchImages, siteImages] = await Promise.all([
-      post.catch ? resolvePostImages(post.catch.images) : null,
-      post.site ? resolvePostImages(post.site.images) : null,
-   ]);
+   const catchImages = post.catch
+      ? await resolvePostImages(post.catch.images)
+      : null;
 
    /* The screen names these lengthCm and weightKg, so the units travel with
     * the numbers rather than living only in a comment. */
@@ -146,7 +143,6 @@ const withResolvedFeedImageUrls = async <
               weightSource: fish.weightSource ?? null,
            }
          : null,
-      site: post.site ? { ...post.site, images: siteImages ?? [] } : null,
    };
 };
 
@@ -167,7 +163,6 @@ export const feedService = {
    async listFeed(input: {
       userId?: string;
       scope: FeedScope;
-      type?: FeedType;
       latitude?: number;
       longitude?: number;
       limit: number;
@@ -196,8 +191,14 @@ export const feedService = {
             deletedAt: null,
             /* Belt and braces: a private post should never have been created. */
             visibility: { not: 'PRIVATE' },
+            /*
+             * Catches only, filtered here rather than at the write path alone,
+             * because the spot posts written before this rule are still in the
+             * table and a filter on the way in cannot reach them. Nothing is
+             * deleted; they simply stop being read.
+             */
+            type: 'CATCH' satisfies FeedType,
             ...scopeWhere,
-            ...(input.type ? { type: input.type } : {}),
             ...nearbyWhere,
          },
          include: feedInclude,
@@ -210,14 +211,21 @@ export const feedService = {
          posts.map(async (post: any) => {
             const resolved = await withResolvedFeedImageUrls(post);
             /* The author's photograph is a storage key too; unsigned it is
-             * a broken image on every card. */
+             * a broken image on every card. It is drawn at 40px, so the card
+             * is handed the thumb as well and reads that instead: this one
+             * line is the difference between a four megabyte avatar and a
+             * few kilobytes of it, twenty five times down a page. */
+            const avatar = await resolveAvatarReadUrls(
+               resolved.author?.avatarUrl ?? null
+            );
+
             return {
                ...resolved,
                author: {
                   ...resolved.author,
-                  avatarUrl: await maybeResolveAvatarReadUrl(
-                     resolved.author?.avatarUrl ?? null
-                  ),
+                  avatarUrl: avatar.url,
+                  avatarCardUrl: avatar.cardUrl,
+                  avatarThumbUrl: avatar.thumbUrl,
                },
             };
          })

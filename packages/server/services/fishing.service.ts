@@ -526,11 +526,16 @@ const withResolvedImageUrls = async <
                entry.image.storageKey
             );
 
+            /* All three sizes travel together. A list of catches draws these
+             * at 52px and a card at 900; only the record itself wants the
+             * original, and it is the only thing that asks for it. */
             return {
                ...entry,
                image: {
                   ...entry.image,
                   url: signed.readUrl,
+                  cardUrl: signed.cardReadUrl,
+                  thumbUrl: signed.thumbReadUrl,
                },
             };
          } catch (error) {
@@ -997,13 +1002,25 @@ export const fishingService = {
    async listMyCatches(userId: string) {
       const user = await getUserById(userId);
 
+      /*
+       * Ordered by the day the catch was logged, not the day the fish came out
+       * of the water. An angler who writes up an August fish in September wants
+       * it at the top of the log where they just put it, rather than buried a
+       * month down where the list used to file it. The record keeps its own
+       * date and the row still prints it, so nothing about the fish moves; only
+       * its place in the list does. Insights, the season strip and the boards
+       * still count a fish on the day it was caught.
+       */
       const catches = await prisma.catch.findMany({
          where: { createdById: user.id, deletedAt: null },
-         orderBy: { caughtAt: 'desc' },
+         orderBy: { createdAt: 'desc' },
          select: {
             id: true,
             title: true,
             caughtAt: true,
+            /* The row says "logged 18 Sep" when the two days disagree, so the
+             * reader knows why an August fish is sitting at the top. */
+            createdAt: true,
             caughtUntil: true,
             count: true,
             length: true,
@@ -1226,23 +1243,14 @@ export const fishingService = {
          }
 
          /*
-          * Same rule, and it matters more here: a spot post carries exact
-          * coordinates. A private spot never leaves the angler's own log.
+          * Adding a spot publishes nothing. The feed is catches, and a catch
+          * already carries the spot it was taken at, so a spot post was the
+          * same place announced twice: once when it was added and again with
+          * every fish logged there. It also meant a public post carrying exact
+          * coordinates for a mark nobody had fished yet. Old spot posts are
+          * left in the table and filtered out on the way back in
+          * (feed.service.ts), so nothing is deleted.
           */
-         if ((input.visibility ?? 'PUBLIC') !== 'PRIVATE') {
-            await tx.feedPost.create({
-               data: {
-                  authorId: user.id,
-                  type: 'SITE',
-                  scope: 'GLOBAL',
-                  visibility: input.visibility ?? 'PUBLIC',
-                  content: input.description || null,
-                  siteId: site.id,
-                  latitude: input.latitude,
-                  longitude: input.longitude,
-               },
-            });
-         }
 
          return tx.fishingSite.findUniqueOrThrow({
             where: { id: site.id },

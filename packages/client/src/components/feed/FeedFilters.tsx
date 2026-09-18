@@ -1,10 +1,7 @@
-import type { ChipOption } from '@/components/feed/ChipRadioGroup';
-import { ChoiceGroup } from '@/components/ui/field';
 import { cn } from '@/lib/utils';
-import { Picker } from '@/components/ui/picker';
 import { StopSlider } from '@/components/ui/slider';
 import { plural } from '@/components/feed/format';
-import type { ScopeFilter, ShowFilter } from '@/components/feed/types';
+import type { ScopeFilter } from '@/components/feed/types';
 
 export type LocationState =
    | 'idle'
@@ -13,15 +10,14 @@ export type LocationState =
    | 'denied'
    | 'unsupported';
 
-const SCOPE_OPTIONS: ReadonlyArray<ChipOption<ScopeFilter>> = [
+/*
+ * One question now, not two. The Show group that chose between catches and
+ * spots went with the spot posts themselves, which leaves the switch the whole
+ * feed actually turns on: everywhere, or around here.
+ */
+const SCOPE_OPTIONS: ReadonlyArray<{ value: ScopeFilter; label: string }> = [
    { value: 'everywhere', label: 'Global' },
    { value: 'near-me', label: 'Local' },
-];
-
-const SHOW_OPTIONS: ReadonlyArray<ChipOption<ShowFilter>> = [
-   { value: 'all', label: 'All' },
-   { value: 'catches', label: 'Catches' },
-   { value: 'spots', label: 'Spots' },
 ];
 
 export const MIN_RADIUS_KM = 5;
@@ -33,8 +29,6 @@ const RADIUS_STEPS = [5, 10, 25, 50, 100, 250] as const;
 export function FeedFilters({
    scope,
    onScopeChange,
-   show,
-   onShowChange,
    radiusKm,
    onRadiusChange,
    onRadiusCommit,
@@ -44,8 +38,6 @@ export function FeedFilters({
 }: {
    scope: ScopeFilter;
    onScopeChange: (next: ScopeFilter) => void;
-   show: ShowFilter;
-   onShowChange: (next: ShowFilter) => void;
    radiusKm: number;
    onRadiusChange: (next: number) => void;
    onRadiusCommit: (next: number) => void;
@@ -56,21 +48,9 @@ export function FeedFilters({
    return (
       <section aria-label="Filters" className="flex flex-col gap-6">
          {/*
-          * Label beside the chips, not above them. Two groups with a label over
-          * each cost four rows at the top of a phone, which was most of the
-          * room before the first post. Beside them it is two, and the labels
-          * stay, so the two groups still read as two.
-          */}
-         {/*
-          * On a phone, one row that scrolls sideways: the two groups side by
-          * side with their labels, and the bar itself bleeds to the screen
-          * edge so the last chip peeks in and says there is more. Two stacked
-          * rows here cost the first post its place above the fold.
-          */}
-         {/*
-          * Global or local first, as one two-way switch, then everything
-          * else. The switch is the question the whole feed turns on; the
-          * rest are refinements.
+          * Global or local, as one two-way switch and nothing beside it. It
+          * used to share the row with a Show group, and on a phone the two
+          * together took most of the room above the first post.
           */}
          <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
             <div
@@ -98,28 +78,6 @@ export function FeedFilters({
                      </button>
                   );
                })}
-            </div>
-            <div className="sm:hidden">
-               <Picker
-                  size="sm"
-                  label="Show"
-                  value={show}
-                  options={SHOW_OPTIONS.map((o) => ({
-                     value: o.value,
-                     label: o.label,
-                  }))}
-                  onChange={(next) => onShowChange(next as ShowFilter)}
-               />
-            </div>
-            <div className="hidden sm:block">
-               <ChoiceGroup
-                  inline
-                  size="sm"
-                  label="Show"
-                  value={show}
-                  options={SHOW_OPTIONS}
-                  onChange={onShowChange}
-               />
             </div>
          </div>
 

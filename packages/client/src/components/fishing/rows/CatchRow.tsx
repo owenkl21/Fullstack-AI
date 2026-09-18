@@ -1,8 +1,9 @@
-import { Row, RowNumber } from './Row';
+import { Row, RowNumber, type RowPhoto } from './Row';
 import {
    formatDateTime,
    formatLength,
    formatWeight,
+   loggedNote,
    metaLine,
    plural,
 } from './format';
@@ -17,10 +18,24 @@ export type CatchRowItem = {
    id: string;
    title: string;
    caughtAt: string;
+   /*
+    * When the catch was written up. Optional because only the angler's own log
+    * asks for it: that list is ordered by the day a catch was posted, so a row
+    * out of date order needs to say so. A list ordered by the fish itself, like
+    * the catches on a spot, leaves it out and the note never appears.
+    */
+   createdAt?: string | null;
    count: number;
    length: number | null;
    weight: number | null;
    site: { id: string; name: string } | null;
+   /*
+    * The photographs as the API sent them, so the row can take the 160px copy
+    * for its 52px square without every list page having to thread three URLs
+    * through by hand. The page still passes `photoUrl` and that stays the
+    * fallback for a catch photographed before the variants existed.
+    */
+   images?: RowPhoto[];
 };
 
 export function CatchRow({
@@ -40,7 +55,18 @@ export function CatchRow({
     */
    const where = item.site?.name ?? null;
    const fish = item.count > 1 ? plural(item.count, 'fish', 'fish') : null;
-   const subline = metaLine(when, where, fish);
+   /*
+    * Last in the line, and only when the two days disagree. The eye reads the
+    * fish, then where it came from, and only then needs to be told that this
+    * one was typed up later.
+    */
+   const logged = loggedNote(item.caughtAt, item.createdAt);
+   const subline = metaLine(when, where, fish, logged);
+
+   /* The row draws 52 square, so it wants the 160px copy. The page still
+    * passes the original as `photoUrl` and that is what a catch photographed
+    * before the variants existed falls back to. */
+   const photo = item.images?.[0]?.image;
 
    const lengthText = formatLength(item.length);
    const weightText = formatWeight(item.weight);
@@ -52,7 +78,9 @@ export function CatchRow({
          title={item.title}
          subline={subline}
          label={`${item.title}, ${subline}`}
-         photoUrl={photoUrl}
+         photoUrl={photoUrl ?? photo?.url ?? null}
+         photoCardUrl={photo?.cardUrl}
+         photoThumbUrl={photo?.thumbUrl}
          photoAlt={`Photo of ${item.title}`}
          marked={marked}
          right={

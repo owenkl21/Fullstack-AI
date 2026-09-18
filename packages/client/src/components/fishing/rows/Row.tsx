@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { NoPhoto } from '@/components/brand/FishMark';
+import { Img } from '@/components/Img';
 import { cn } from '@/lib/utils';
 
 /*
@@ -10,6 +11,15 @@ import { cn } from '@/lib/utils';
  * a trailing control sits above it so it stays separately reachable.
  */
 
+/** A photograph as any of the list endpoints hands it over. */
+export type RowPhoto = {
+   image: {
+      url?: string | null;
+      cardUrl?: string | null;
+      thumbUrl?: string | null;
+   };
+};
+
 export type RowProps = {
    to: string;
    title: string;
@@ -17,6 +27,13 @@ export type RowProps = {
    /** What the link is called to a screen reader. Defaults to the title. */
    label?: string;
    photoUrl?: string | null;
+   /*
+    * The same photograph at 900px and at 160px. The row draws 52 square, so it
+    * reads the thumb and the other two exist only so a photograph logged before
+    * the variants did still has something to fall back on.
+    */
+   photoCardUrl?: string | null;
+   photoThumbUrl?: string | null;
    photoAlt?: string;
    /** Gear is photographed on a table, so it is contained rather than cropped. */
    photoFit?: 'cover' | 'contain';
@@ -36,6 +53,8 @@ export function Row({
    subline,
    label,
    photoUrl,
+   photoCardUrl,
+   photoThumbUrl,
    photoAlt = '',
    photoFit = 'cover',
    right,
@@ -57,17 +76,18 @@ export function Row({
             />
          ) : null}
 
-         {photoUrl ? (
-            <img
+         {photoUrl || photoThumbUrl ? (
+            <Img
                src={photoUrl}
+               cardSrc={photoCardUrl}
+               thumbSrc={photoThumbUrl}
                alt={photoAlt}
-               width={52}
-               height={52}
-               loading="lazy"
-               decoding="async"
+               ratio="1 / 1"
+               sizes="52px"
+               fit={photoFit}
                className={cn(
-                  'size-[52px] shrink-0 bg-bg-2',
-                  photoFit === 'contain' ? 'object-contain p-1' : 'object-cover'
+                  'size-[52px] shrink-0',
+                  photoFit === 'contain' && 'p-1'
                )}
             />
          ) : (

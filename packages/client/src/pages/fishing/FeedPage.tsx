@@ -37,7 +37,6 @@ import type {
    FeedPost,
    FeedPostInView,
    ScopeFilter,
-   ShowFilter,
 } from '@/components/feed/types';
 import { useDocumentTitle } from '@/lib/title';
 import { useIsSignedIn, useSession } from '@/lib/auth-client';
@@ -46,12 +45,13 @@ const PAGE_SIZE = 25;
 const SLOW_LOAD_MS = 5000;
 const DEFAULT_RADIUS_KM = 50;
 
+/*
+ * The feed is catches. There was a Show control here that chose between catches
+ * and spots, and it is gone with them: a spot is already named on every catch
+ * taken there, so a spot post put the same mark in front of the reader twice.
+ */
 function readScope(value: string | null): ScopeFilter {
    return value === 'near-me' ? 'near-me' : 'everywhere';
-}
-
-function readShow(value: string | null): ShowFilter {
-   return value === 'catches' || value === 'spots' ? value : 'all';
 }
 
 function readRadius(value: string | null): number {
@@ -79,7 +79,6 @@ export function FeedPage() {
 
    const [searchParams, setSearchParams] = useSearchParams();
    const scope = readScope(searchParams.get('scope'));
-   const show = readShow(searchParams.get('show'));
    const committedRadius = readRadius(searchParams.get('radius'));
    const [radiusKm, setRadiusKm] = useState(committedRadius);
 
@@ -130,7 +129,6 @@ export function FeedPage() {
       (
          patch: Partial<{
             scope: ScopeFilter;
-            show: ShowFilter;
             radius: number;
          }>,
          options?: { replace?: boolean }
@@ -138,13 +136,12 @@ export function FeedPage() {
          setSearchParams(
             (previous) => {
                const next = new URLSearchParams(previous);
+               /* A link saved while the old Show control existed still works:
+                  the parameter is simply not read any more. */
+               next.delete('show');
                if (patch.scope) {
                   if (patch.scope === 'everywhere') next.delete('scope');
                   else next.set('scope', patch.scope);
-               }
-               if (patch.show) {
-                  if (patch.show === 'all') next.delete('show');
-                  else next.set('show', patch.show);
                }
                if (typeof patch.radius === 'number') {
                   if (patch.radius === DEFAULT_RADIUS_KM) next.delete('radius');
@@ -208,9 +205,6 @@ export function FeedPage() {
             limit: PAGE_SIZE,
             offset: from,
          };
-         if (show !== 'all') {
-            params.type = show === 'catches' ? 'CATCH' : 'SITE';
-         }
          if (scope === 'near-me' && position) {
             params.latitude = position.latitude;
             params.longitude = position.longitude;
@@ -245,7 +239,7 @@ export function FeedPage() {
             }
          }
       },
-      [position, scope, show]
+      [position, scope]
    );
 
    const awaitingPosition = scope === 'near-me' && !position;
@@ -534,20 +528,8 @@ export function FeedPage() {
          return (
             <div className="flex flex-col gap-3 py-6">
                <p className="text-[17px] text-ink-2">
-                  {show === 'catches'
-                     ? `No catches within ${radiusKm} km.`
-                     : show === 'spots'
-                       ? `No spots within ${radiusKm} km.`
-                       : `Nothing logged within ${radiusKm} km.`}
+                  {`No catches within ${radiusKm} km.`}
                </p>
-               {show !== 'spots' ? (
-                  /* TODO(api): appendix E A2.1. A catch is saved without coordinates,
-                     so it can never appear in a nearby list until the write path keeps them. */
-                  <p className="text-[15px] text-ink-3">
-                     A catch does not carry a position yet, so Near me finds
-                     spots only.
-                  </p>
-               ) : null}
                <div className="flex flex-wrap gap-6">
                   {radiusKm < MAX_RADIUS_KM ? (
                      <button
@@ -577,17 +559,10 @@ export function FeedPage() {
       return (
          <div className="flex flex-col gap-3 py-6">
             <p className="text-[17px] text-ink-2">
-               {show === 'catches'
-                  ? 'No one has logged a catch yet.'
-                  : show === 'spots'
-                    ? 'No one has added a spot yet.'
-                    : 'No one has logged a catch or added a spot yet.'}
+               No one has logged a catch yet.
             </p>
-            <Link
-               to={show === 'spots' ? '/sites/new' : '/catches/new'}
-               className={inlineControl}
-            >
-               {show === 'spots' ? 'Add a spot' : 'Log a catch'}
+            <Link to="/catches/new" className={inlineControl}>
+               Log a catch
             </Link>
          </div>
       );
@@ -602,7 +577,7 @@ export function FeedPage() {
       >
          <PageHead
             column="w-[min(960px,100%-32px)]"
-            kicker="What other anglers logged, newest first"
+            kicker="The catches other anglers logged, newest first"
             title="Feed"
          />
 
@@ -610,8 +585,6 @@ export function FeedPage() {
             <FeedFilters
                scope={scope}
                onScopeChange={(next) => setFilter({ scope: next })}
-               show={show}
-               onShowChange={(next) => setFilter({ show: next })}
                radiusKm={radiusKm}
                onRadiusChange={setRadiusKm}
                onRadiusCommit={(next) =>

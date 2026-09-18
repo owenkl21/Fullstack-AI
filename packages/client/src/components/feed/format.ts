@@ -112,17 +112,6 @@ export function countSentence(likes: number, comments: number): string | null {
    return null;
 }
 
-/** The water type as a plain word. A value we do not recognise prints nothing. */
-export function waterWord(waterType?: string | null): string | null {
-   if (!waterType) return null;
-   const key = waterType.toLowerCase();
-   if (key.includes('salt')) return 'saltwater';
-   if (key.includes('fresh')) return 'freshwater';
-   if (key.includes('brack')) return 'brackish';
-   if (key.includes('estuar')) return 'estuary';
-   return null;
-}
-
 /** `800 m away` under a kilometre, `12 km away` above it. */
 export function formatDistance(km?: number | null): string | null {
    if (typeof km !== 'number' || !Number.isFinite(km) || km < 0) return null;

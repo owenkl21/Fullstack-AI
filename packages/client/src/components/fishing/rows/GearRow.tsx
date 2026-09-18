@@ -13,6 +13,13 @@ export type GearRowItem = {
    brand: string;
    type: string;
    imageUrl: string | null;
+   /*
+    * Optional because the gear endpoint still signs one URL per item. The row
+    * reads them the moment it does, and until then it draws the original into
+    * a fixed 52px box rather than into whatever height it decides on.
+    */
+   imageCardUrl?: string | null;
+   imageThumbUrl?: string | null;
 };
 
 export function GearRow({
@@ -33,6 +40,8 @@ export function GearRow({
          subline={subline || 'Brand not recorded'}
          label={`${item.name}, ${subline}`}
          photoUrl={item.imageUrl}
+         photoCardUrl={item.imageCardUrl}
+         photoThumbUrl={item.imageThumbUrl}
          photoAlt={`Photo of ${item.name}`}
          photoFit="contain"
          trailing={trailing}

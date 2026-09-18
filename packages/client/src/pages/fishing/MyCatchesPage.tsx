@@ -27,13 +27,27 @@ import { SearchField } from '@/components/fishing/rows/SearchField';
  * beside the heading, a search and a year filter that both live in the URL so a
  * filtered log can be sent to somebody or kept in a tab. Edit and delete are not
  * here: they belong to the record, where the fish is.
+ *
+ * The list is the order things were written up, newest first, not the order the
+ * fish came out of the water. Log an August fish this morning and it is at the
+ * top where you just put it, with its own August date, time, size, spot and
+ * conditions still on it and a note in the row saying when it was logged. The
+ * year chips follow the same clock, so the whole page reads on one axis. The
+ * surfaces that count a fish rather than list it, the season strip, insights and
+ * the boards, still put it on the day it was caught.
  */
 
 type CatchSummary = CatchRowItem & {
    /* TODO(api): the row wants the species, which listMyCatches does not select
     * (appendix E, A1). Until then the title the angler typed is the row title. */
+   createdAt: string;
    images: { image: { id: string; url: string } }[];
 };
+
+/* The day a catch was posted, falling back to the day it was caught so a row
+ * from an older payload still sorts somewhere sensible rather than to 1970. */
+const postedAt = (entry: CatchSummary) =>
+   timeOf(entry.createdAt) || timeOf(entry.caughtAt);
 
 type LoadStatus = 'loading' | 'ready' | 'error';
 
@@ -137,7 +151,7 @@ function MyCatchesList() {
    const years = useMemo(() => {
       const counts = new Map<string, number>();
       items.forEach((entry) => {
-         const value = yearOf(entry.caughtAt);
+         const value = yearOf(entry.createdAt ?? entry.caughtAt);
          if (value) {
             counts.set(value, (counts.get(value) ?? 0) + 1);
          }
@@ -152,7 +166,9 @@ function MyCatchesList() {
       const needle = query.trim().toLowerCase();
 
       return items
-         .filter((entry) => (year ? yearOf(entry.caughtAt) === year : true))
+         .filter((entry) =>
+            year ? yearOf(entry.createdAt ?? entry.caughtAt) === year : true
+         )
          .filter((entry) => {
             if (!needle) {
                return true;
@@ -162,7 +178,7 @@ function MyCatchesList() {
                value.toLowerCase().includes(needle)
             );
          })
-         .sort((a, b) => timeOf(b.caughtAt) - timeOf(a.caughtAt));
+         .sort((a, b) => postedAt(b) - postedAt(a));
    }, [items, query, year]);
 
    const narrowed = Boolean(query.trim() || year);
@@ -207,7 +223,7 @@ function MyCatchesList() {
                <div
                   className="mt-6 flex flex-wrap gap-2"
                   role="group"
-                  aria-label="Filter by year"
+                  aria-label="Filter by the year you logged it"
                >
                   <Chip
                      pressed={!year}

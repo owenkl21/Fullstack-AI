@@ -5,12 +5,23 @@
  */
 
 export type FeedScope = 'GLOBAL' | 'NEARBY';
-export type FeedType = 'CATCH' | 'SITE';
+/*
+ * A post is a catch. Spots used to post themselves as well, which put the same
+ * mark in front of the reader twice: once when it was added and again under
+ * every fish taken there. The rows written before that rule are still in the
+ * table and the feed route no longer returns them.
+ */
+export type FeedType = 'CATCH';
 
 export type FeedImage = {
    image: {
       id: string;
+      /* The original, and the two sizes the server makes beside it. A card is
+       * at most 960px wide, so it reads `cardUrl` and the original is only
+       * ever fetched by the record the card points at. */
       url: string;
+      cardUrl?: string | null;
+      thumbUrl?: string | null;
       focusX?: number | null;
       focusY?: number | null;
    };
@@ -28,6 +39,10 @@ export type FeedAuthor = {
    displayName: string;
    username: string;
    avatarUrl?: string | null;
+   avatarCardUrl?: string | null;
+   /* The one an avatar is allowed to load. Forty pixels of photograph never
+    * justifies a camera original, and the feed draws twenty five of them. */
+   avatarThumbUrl?: string | null;
 };
 
 export type FeedPost = {
@@ -54,19 +69,12 @@ export type FeedPost = {
       weightKg?: number | null;
       lengthSource?: string | null;
       weightSource?: string | null;
-      /* TODO(api): appendix E A2.1 (a catch has no location of its own). Without
-         it a catch post has no spot name and no position, so `Near me` can never
-         return one. */
       site?: { id: string; name: string } | null;
    } | null;
-   site: {
-      id: string;
-      name: string;
-      images: FeedImage[];
-      /* TODO(api): the feed select omits waterType, so a spot post cannot say
-         what kind of water it is. */
-      waterType?: string | null;
-   } | null;
+   /* The spot the fish was taken at, as the post recorded it. An angler who
+      asked to keep the mark to themselves has none here: the catch still holds
+      the position, the post does not. */
+   site: { id: string; name: string } | null;
    author: FeedAuthor;
    authorFollowedByMe?: boolean;
    authorIsMe?: boolean;
@@ -77,4 +85,3 @@ export type FeedPost = {
 export type FeedPostInView = FeedPost & { distanceKm: number | null };
 
 export type ScopeFilter = 'everywhere' | 'near-me';
-export type ShowFilter = 'all' | 'catches' | 'spots';
