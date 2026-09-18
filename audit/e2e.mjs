@@ -33,9 +33,47 @@ async function inspect(p, where) {
       const bar = document.querySelector('nav, [class*="fixed"][class*="bottom-0"]');
       const barTop = bar ? bar.getBoundingClientRect().top : innerHeight;
 
+      /*
+       * Three things look like faults and are not, so they are named once here
+       * rather than argued about every run.
+       *
+       *  - Leaflet's own chrome. The attribution line is eleven pixel text by
+       *    licence and the zoom is Leaflet's, not ours to size.
+       *  - A heading only a screen reader reads, which is clipped on purpose.
+       *  - Anything inside a box that scrolls sideways on purpose: the week
+       *    table, the strip of facts. Those are read by dragging.
+       */
+      const ours = (el) => {
+         if (el.closest('.leaflet-container')) return false;
+         const cs = getComputedStyle(el);
+         if (cs.clip === 'rect(0px, 0px, 0px, 0px)' || cs.clipPath === 'inset(50%)') return false;
+         if (el.closest('.sr-only')) return false;
+         return true;
+      };
+      const inScroller = (el) => {
+         for (let node = el.parentElement; node; node = node.parentElement) {
+            const cs = getComputedStyle(node);
+            if (cs.overflowX === 'auto' || cs.overflowX === 'scroll') return true;
+         }
+         return false;
+      };
+      /* A card whose whole face is one link: the title is covered by that
+       * link on purpose, and tapping it goes exactly where the title says. */
+      const stretched = (at) => {
+         if (at.tagName === 'A' || at.tagName === 'BUTTON') return true;
+         if (at.querySelector?.('a[href], button')) return true;
+         return getComputedStyle(at).position === 'absolute';
+      };
+      /* The real target is the row, not the word inside it. */
+      const rowHeight = (el) => {
+         const card = el.closest('article, li, tr, .blk, [class*="card"]');
+         return card ? card.getBoundingClientRect().height : 0;
+      };
+
       /* Text clipped by a box that cannot scroll. */
       const cut = [];
       for (const el of document.querySelectorAll('main *')) {
+         if (!ours(el)) continue;
          const cs = getComputedStyle(el);
          if (cs.overflow === 'visible' || cs.overflowY === 'auto' || cs.overflowY === 'scroll') continue;
          if (el.scrollHeight > el.clientHeight + 2 && el.clientHeight > 0 && (el.textContent ?? '').trim()) {
@@ -46,16 +84,19 @@ async function inspect(p, where) {
       /* A control covered by something that is not its own child. */
       const covered = [];
       for (const el of document.querySelectorAll('main button, main a[href], main input, main select')) {
+         if (!ours(el)) continue;
          const r = el.getBoundingClientRect();
          if (r.height < 8 || r.top < 0 || r.bottom > innerHeight) continue;
          const at = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
          if (!at || at === el || el.contains(at) || at.contains(el)) continue;
-         covered.push(`${(el.textContent || el.getAttribute('aria-label') || el.tagName).trim().slice(0, 18)} under ${at.tagName.toLowerCase()}`);
+         if (stretched(at)) continue;
+         covered.push(`${(el.textContent || el.getAttribute('aria-label') || el.tagName).trim().slice(0, 18)} under ${at.tagName.toLowerCase()}.${String(at.className).slice(0, 20)}`);
       }
 
       /* Anything wider than the screen. */
       const wide = [];
       for (const el of document.querySelectorAll('main *')) {
+         if (!ours(el) || inScroller(el)) continue;
          const r = el.getBoundingClientRect();
          if (r.width > innerWidth + 4 && r.height > 8) {
             wide.push(`${el.tagName.toLowerCase()}.${(el.className?.toString?.() ?? '').slice(0, 26)} ${Math.round(r.width)}px`);
@@ -65,8 +106,9 @@ async function inspect(p, where) {
       /* A target too small to hit with a thumb. */
       const small = [];
       for (const el of document.querySelectorAll('main button, main a[href]')) {
+         if (!ours(el)) continue;
          const r = el.getBoundingClientRect();
-         if (r.height > 0 && r.height < 40 && (el.textContent ?? '').trim() && !el.closest('p, li')) {
+         if (r.height > 0 && r.height < 40 && (el.textContent ?? '').trim() && !el.closest('p, li') && rowHeight(el) < 44) {
             small.push(`${(el.textContent ?? '').trim().slice(0, 18)} ${Math.round(r.height)}px`);
          }
       }

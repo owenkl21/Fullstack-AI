@@ -77,9 +77,17 @@ export function AppLayout() {
             id="main"
             className={cn(
                'flex-1 overflow-x-clip md:pb-0',
+               /*
+                * 88, not 64. The bar is 64 tall and the teal Log key rises
+                * twenty pixels above it, so a full width control that came to
+                * rest in the last stretch of a page had the key sitting in its
+                * middle: tapping the centre of "Fewer readings" on the
+                * forecast opened the log instead. The page now ends above the
+                * key rather than above the bar.
+                */
                isTaskRoute(pathname)
                   ? 'pb-0'
-                  : 'pb-[calc(64px+env(safe-area-inset-bottom))]'
+                  : 'pb-[calc(88px+env(safe-area-inset-bottom))]'
             )}
          >
             {/*

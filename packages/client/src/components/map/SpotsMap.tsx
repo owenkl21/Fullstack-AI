@@ -906,16 +906,16 @@ export function SpotsMap({
 
          {phone ? (
             /*
-             * On a full screen map the bar floats on the water at the foot of
-             * it rather than sitting under it. It is opaque, it is the height
-             * of a thumb, and it stands on the map's own bottom edge, which on
-             * this page is the line above the navigation bar.
+             * On a full screen map the bar floats on the water rather than
+             * sitting under it, and it keeps a thumb's width of water around
+             * it. Flush to the foot it landed hard against the navigation bar
+             * below, whose teal marker for the current page came up directly
+             * under Locate and read as though Locate were switched on, and
+             * whose raised Log key rose twenty pixels into the Mark control.
              */
             <MapToolbar
                placement="bar"
-               className={
-                  full ? 'absolute inset-x-0 bottom-0 z-[600] border-x-0' : ''
-               }
+               className={full ? 'absolute inset-x-2 bottom-6 z-[600]' : ''}
                base={base}
                onBase={(next) => {
                   setBase(next);
@@ -966,7 +966,7 @@ export function SpotsMap({
             showPois && zoomLevel > 0 && zoomLevel < POI_MIN_ZOOM && !mark ? (
                /* Above the bar and above the attribution line, which is the
                   one thing on this screen that may not be covered. */
-               <p className="absolute inset-x-0 bottom-[70px] z-[550] bg-background/92 px-3 py-1.5 text-center text-[14px] text-ink-2">
+               <p className="absolute inset-x-2 bottom-[92px] z-[550] border border-line bg-background/95 px-3 py-1.5 text-center text-[14px] text-ink-2">
                   Zoom in for slipways and tackle shops.
                </p>
             ) : null

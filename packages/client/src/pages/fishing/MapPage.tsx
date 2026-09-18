@@ -97,7 +97,14 @@ function MapScreen() {
     */
    if (phone) {
       return (
-         <section className="relative h-[calc(100dvh-60px-64px-env(safe-area-inset-bottom))] w-full overflow-hidden">
+         /*
+          * The shell ends a page 88 pixels above the foot, so a control that
+          * lands there is clear of the raised Log key. This page has no such
+          * control: it ends in a floating bar that already gives the key its
+          * room, and the water should run to the navigation. So it takes the
+          * 24 pixels back and measures itself against the bar alone.
+          */
+         <section className="relative -mb-6 h-[calc(100dvh-60px-64px-env(safe-area-inset-bottom))] w-full overflow-hidden">
             {/* The page still names itself, for a screen reader and for the
                 focus that moves here on every navigation. The map is the
                 heading a sighted reader gets. */}
