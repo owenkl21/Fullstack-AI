@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
 import { useDocumentTitle } from '@/lib/title';
@@ -32,6 +33,15 @@ type LoadedCatch = StoredConditions & {
    count: number | null;
    depth: number | null;
    waterTemp: number | null;
+   /*
+    * How the fish was measured, whether it went back, and the competition it
+    * was entered in. The update route writes the whole record, so anything
+    * the form opens without is something saving would overwrite.
+    */
+   released?: boolean;
+   lengthSource?: 'EYE' | 'TAPE';
+   weightSource?: 'EYE' | 'SCALE';
+   competitionId?: string | null;
 };
 
 type LoadState = 'loading' | 'ready' | 'missing' | 'failed';
@@ -133,6 +143,10 @@ export function EditCatchPage() {
          count: record.count,
          depth: record.depth,
          waterTemp: record.waterTemp,
+         released: record.released ?? false,
+         lengthSource: record.lengthSource,
+         weightSource: record.weightSource,
+         competitionId: record.competitionId ?? null,
          gearIds: (record.gears ?? []).map((entry) => entry.id),
          gears: record.gears ?? [],
          images: (record.images ?? []).map((entry) => ({
@@ -147,9 +161,19 @@ export function EditCatchPage() {
    return (
       <RequireSignIn what="this catch">
          <section className="mx-auto w-[min(1400px,100%-32px)] py-8 md:py-12">
-            <h1 className="g text-[44px] md:text-[56px]">
-               {record ? record.title : 'Edit a catch'}
-            </h1>
+            {/* The phone's way out, as on the log form; the rail has Cancel. */}
+            <div className="flex items-start justify-between gap-4">
+               <h1 className="g text-[44px] md:text-[56px]">
+                  {record ? record.title : 'Edit a catch'}
+               </h1>
+               <Link
+                  to={catchId ? `/catches/${catchId}` : '/catches/me'}
+                  aria-label="Close without saving"
+                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-line text-ink hover:border-ink lg:hidden"
+               >
+                  <XMarkIcon className="size-5" aria-hidden="true" />
+               </Link>
+            </div>
 
             {state === 'loading' ? (
                <div className="mt-10">

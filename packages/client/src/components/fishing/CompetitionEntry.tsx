@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
-import { CameraIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import {
    fetchCompetitions,
    type Competition,
@@ -61,9 +60,17 @@ export function CompetitionEntry({
       const controller = new AbortController();
       fetchCompetitions(controller.signal, 1)
          .then((result) =>
+            /*
+             * Running ones, and whichever this catch is already in: an edit
+             * of a catch entered in a competition that has since closed must
+             * still show that entry, or the only control left would be the
+             * one that drops it.
+             */
             setRunning(
                result.items.filter(
-                  (c) => c.status === 'running' && c.youEntered
+                  (c) =>
+                     c.youEntered &&
+                     (c.status === 'running' || c.id === competitionId)
                )
             )
          )
@@ -117,15 +124,15 @@ export function CompetitionEntry({
    };
 
    return (
-      <div className="border-t border-line pt-4">
+      <div>
          {!open ? (
-            <button
+            <Button
                type="button"
+               variant="outline"
                onClick={() => setOpen(true)}
-               className="g-tracked inline-flex h-11 items-center gap-2 text-[17px] text-ink underline-offset-4 hover:underline"
             >
-               For a competition?
-            </button>
+               Enter it in a competition
+            </Button>
          ) : (
             <div className="flex flex-col gap-4">
                <div className="flex flex-wrap items-end gap-3">
@@ -173,17 +180,11 @@ export function CompetitionEntry({
                         , then read it off. What is read is what is entered.
                      </p>
                      {reading ? (
-                        <p className="flex items-start gap-2 text-[15px]">
-                           <CheckCircleIcon
-                              className="mt-0.5 size-5 shrink-0 text-teal-text"
-                              aria-hidden="true"
-                           />
-                           <span>
-                              Read {reading.value} {reading.unit} off the
-                              photograph, {Math.round(reading.confidence * 100)}
-                              % sure.{' '}
-                              <span className="text-ink-3">{reading.note}</span>
-                           </span>
+                        <p className="text-[15px]">
+                           Read {reading.value} {reading.unit} off the
+                           photograph, {Math.round(reading.confidence * 100)}%
+                           sure.{' '}
+                           <span className="text-ink-3">{reading.note}</span>
                         </p>
                      ) : null}
                      {problem ? (
@@ -196,9 +197,8 @@ export function CompetitionEntry({
                      ) : null}
                      {off ? (
                         <p className="text-[15px] text-ink-2">
-                           The photo reader is not switched on for this server
-                           yet. The entry still saves; the organiser will check
-                           the picture.
+                           The photo cannot be read yet. The entry still saves
+                           and the organiser checks the picture.
                         </p>
                      ) : (
                         <div>
@@ -210,7 +210,6 @@ export function CompetitionEntry({
                               onClick={() => void read()}
                               className={cn(!imageUrl && 'opacity-60')}
                            >
-                              <CameraIcon aria-hidden="true" />
                               {busy
                                  ? 'Reading'
                                  : reading

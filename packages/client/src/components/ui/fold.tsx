@@ -56,7 +56,17 @@ export function Fold({
                />
             </span>
          </button>
-         <div id={id} className="fold-body" aria-hidden={!open}>
+         {/*
+          * The body is collapsed by height, not removed, so `inert` is what
+          * keeps its fields out of the tab order and out of focus-on-error
+          * while it is shut.
+          */}
+         <div
+            id={id}
+            className="fold-body"
+            aria-hidden={!open}
+            inert={!open || undefined}
+         >
             <div className="fold-inner min-h-0">{children}</div>
          </div>
       </div>

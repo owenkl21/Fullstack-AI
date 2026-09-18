@@ -23,13 +23,21 @@ const toMetric = (value: number, unit: MeasureUnit) =>
 const fromMetric = (value: number, unit: MeasureUnit) =>
    unit === 'in' ? cmToIn(value) : unit === 'lb' ? kgToLb(value) : value;
 
+/*
+ * Mass gets a decimal more than length at every step. A tenth of a
+ * centimetre is nothing on a fish; ten grams is the difference a
+ * competition is judged on, and a kg to lb to kg round trip at one decimal
+ * turned 1.05 into 1.
+ */
+const isMass = (unit: MeasureUnit) => unit === 'kg' || unit === 'lb';
+
 /** The typed value in centimetres or kilograms, or null when there is nothing usable. */
 export function toMetricValue(raw: string, unit: MeasureUnit) {
    const value = parse(raw);
    if (value === null || value <= 0) {
       return null;
    }
-   return Number(toMetric(value, unit).toFixed(2));
+   return Number(toMetric(value, unit).toFixed(isMass(unit) ? 3 : 2));
 }
 
 /** The same measurement written in another unit. */
@@ -38,5 +46,5 @@ export function convertTyped(raw: string, from: MeasureUnit, to: MeasureUnit) {
    if (value === null) {
       return raw;
    }
-   return trimNumber(fromMetric(toMetric(value, from), to), 1);
+   return trimNumber(fromMetric(toMetric(value, from), to), isMass(to) ? 2 : 1);
 }

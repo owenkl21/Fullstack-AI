@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import { MapLocationPicker } from '@/components/fishing/MapLocationPicker';
 import { R2ImagePicker } from '@/components/r2-image-picker';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
@@ -32,6 +33,9 @@ import {
    type Reading,
 } from '@/components/fishing/CompetitionEntry';
 import { ChoiceGroup, TextArea, TextField } from '@/components/ui/field';
+import { Fold } from '@/components/ui/fold';
+import { MeasureField } from '@/components/fishing/quicklog/MeasureField';
+import { toMetricValue } from '@/components/fishing/quicklog/measure';
 
 type SiteOption = {
    id: string;
@@ -70,6 +74,14 @@ export type CatchFormInitial = {
    gears: GearOption[];
    images: UploadedImage[];
    released?: boolean;
+   /*
+    * How the two figures were taken, and the competition the catch was entered
+    * in. The update route writes back everything the form sends, so a field the
+    * edit page does not carry over is a field the save quietly rewrites.
+    */
+   lengthSource?: 'EYE' | 'TAPE';
+   weightSource?: 'EYE' | 'SCALE';
+   competitionId?: string | null;
    snapshot: WeatherSnapshot | null;
    weather: string | null;
 };
@@ -193,127 +205,6 @@ function GroupHeading({ step, children }: { step?: number; children: string }) {
    );
 }
 
-/*
- * A measurement: the figure in a proper box with its unit switch fixed to
- * the right of it. The last version was a 48px number on a hairline with the
- * units as loose chips under it, and nobody could tell it was a field.
- */
-function MeasureField<U extends string>({
-   id,
-   label,
-   value,
-   error,
-   unit,
-   units,
-   onChange,
-   onBlur,
-   onUnit,
-   placeholder,
-   readOnly = false,
-   sources,
-   source,
-   onSource,
-}: {
-   id: string;
-   label: string;
-   value: string;
-   error?: string;
-   unit: U;
-   units: ReadonlyArray<U>;
-   onChange: (next: string) => void;
-   onBlur: () => void;
-   onUnit: (next: U) => void;
-   placeholder?: string;
-   /* Set by a reading off a photograph, and not for typing over. */
-   readOnly?: boolean;
-   /* The two ways it could have been taken, the rough one first. */
-   sources?: readonly [
-      { value: string; label: string },
-      { value: string; label: string },
-   ];
-   source?: string;
-   onSource?: (next: string) => void;
-}) {
-   return (
-      <div className="flex min-w-0 flex-col">
-         <label htmlFor={id} className="lab">
-            {label}
-         </label>
-         <div className="mt-1.5 flex items-stretch">
-            <input
-               id={id}
-               data-field={id}
-               inputMode="decimal"
-               autoComplete="off"
-               className={cn(
-                  'input-line num min-w-0 flex-1 text-[22px]',
-                  readOnly && 'bg-bg-2 text-ink-2'
-               )}
-               value={value}
-               readOnly={readOnly}
-               placeholder={placeholder}
-               aria-invalid={error ? true : undefined}
-               aria-describedby={error ? `${id}-error` : undefined}
-               onChange={(event) => onChange(event.target.value)}
-               onBlur={onBlur}
-            />
-            <div
-               role="group"
-               aria-label={`${label} unit`}
-               className="flex shrink-0 border border-l-0 border-line border-b-2 border-b-line-2"
-            >
-               {units.map((option) => (
-                  <button
-                     key={option}
-                     type="button"
-                     aria-pressed={unit === option}
-                     onClick={() => onUnit(option)}
-                     className={cn(
-                        'g-tracked min-w-11 px-3 text-[16px] transition-colors duration-150 [transition-timing-function:var(--ease)]',
-                        unit === option
-                           ? 'bg-ink text-background'
-                           : 'text-ink-2 hover:text-ink'
-                     )}
-                  >
-                     {option}
-                  </button>
-               ))}
-            </div>
-         </div>
-         {sources && onSource ? (
-            <div
-               role="radiogroup"
-               aria-label={`How the ${label.toLowerCase()} was taken`}
-               className="mt-2 grid grid-cols-2 border border-line"
-            >
-               {sources.map((option) => {
-                  const on = source === option.value;
-                  return (
-                     <button
-                        key={option.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={on}
-                        disabled={readOnly}
-                        onClick={() => onSource(option.value)}
-                        className={cn(
-                           'g-tracked h-11 text-[16px] transition-colors duration-150 [transition-timing-function:var(--ease)] disabled:opacity-60',
-                           on
-                              ? 'bg-ink text-background'
-                              : 'text-ink-2 hover:text-ink'
-                        )}
-                     >
-                        {option.label}
-                     </button>
-                  );
-               })}
-            </div>
-         ) : null}
-         <FieldError id={`${id}-error`} message={error} />
-      </div>
-   );
-}
-
 function FieldError({ id, message }: { id: string; message?: string }) {
    if (!message) {
       return null;
@@ -368,10 +259,6 @@ export function CatchForm({
    const [waterTempValue, setWaterTempValue] = useState(
       initial?.waterTemp != null ? String(initial.waterTemp) : ''
    );
-   const [showMore, setShowMore] = useState(
-      initial?.depth != null || initial?.waterTemp != null
-   );
-
    const [images, setImages] = useState<UploadedImage[]>(
       isEdit ? [] : (initial?.images ?? [])
    );
@@ -420,9 +307,15 @@ export function CatchForm({
     * is read off a photograph of the fish on a tape or a scale, and what
     * was read is what is saved, so nobody has to take anyone's word.
     */
-   const [lengthSource, setLengthSource] = useState<'EYE' | 'TAPE'>('EYE');
-   const [weightSource, setWeightSource] = useState<'EYE' | 'SCALE'>('EYE');
-   const [competitionId, setCompetitionId] = useState<string | null>(null);
+   const [lengthSource, setLengthSource] = useState<'EYE' | 'TAPE'>(
+      initial?.lengthSource ?? 'EYE'
+   );
+   const [weightSource, setWeightSource] = useState<'EYE' | 'SCALE'>(
+      initial?.weightSource ?? 'EYE'
+   );
+   const [competitionId, setCompetitionId] = useState<string | null>(
+      initial?.competitionId ?? null
+   );
    const [released, setReleased] = useState<'KEPT' | 'RELEASED'>(
       initial?.released ? 'RELEASED' : 'KEPT'
    );
@@ -663,7 +556,7 @@ export function CatchForm({
       if (spotMode === 'new') {
          return newSpotName.trim() || 'the pin you dropped';
       }
-      return 'where you are';
+      return 'your position';
    }, [spotMode, selectedSite, newSpotName]);
 
    const filteredSites = useMemo(() => {
@@ -777,59 +670,13 @@ export function CatchForm({
 
    /* --- measurements ----------------------------------------------- */
 
-   const switchLengthUnit = (next: LengthUnit) => {
-      if (next === lengthUnit) {
-         return;
-      }
-      const current = numberOrNull(lengthValue);
-      if (current !== null && !Number.isNaN(current)) {
-         setLengthValue(
-            String(
-               round(
-                  next === 'in' ? current / CM_PER_INCH : current * CM_PER_INCH,
-                  1
-               )
-            )
-         );
-      }
-      setLengthUnit(next);
-   };
-
-   const switchWeightUnit = (next: WeightUnit) => {
-      if (next === weightUnit) {
-         return;
-      }
-      const current = numberOrNull(weightValue);
-      if (current !== null && !Number.isNaN(current)) {
-         setWeightValue(
-            String(
-               round(
-                  next === 'lb'
-                     ? current / KG_PER_POUND
-                     : current * KG_PER_POUND,
-                  2
-               )
-            )
-         );
-      }
-      setWeightUnit(next);
-   };
-
-   const lengthInCm = () => {
-      const raw = numberOrNull(lengthValue);
-      if (raw === null || Number.isNaN(raw)) {
-         return raw;
-      }
-      return round(lengthUnit === 'in' ? raw * CM_PER_INCH : raw, 2);
-   };
-
-   const weightInKg = () => {
-      const raw = numberOrNull(weightValue);
-      if (raw === null || Number.isNaN(raw)) {
-         return raw;
-      }
-      return round(weightUnit === 'lb' ? raw * KG_PER_POUND : raw, 3);
-   };
+   /*
+    * The figure is kept in centimetres and kilograms whatever the angler
+    * types in; MeasureField converts what is already typed when the unit
+    * changes, so the arithmetic lives in one place for both log forms.
+    */
+   const lengthInCm = () => toMetricValue(lengthValue, lengthUnit);
+   const weightInKg = () => toMetricValue(weightValue, weightUnit);
 
    /* --- validation -------------------------------------------------- */
 
@@ -1015,6 +862,9 @@ export function CatchForm({
             gears: gear.filter((entry) => selectedGearIds.includes(entry.id)),
             images,
             released: released === 'RELEASED',
+            lengthSource,
+            weightSource,
+            competitionId,
          },
          draftId
       );
@@ -1164,6 +1014,12 @@ export function CatchForm({
    const zone = zoneName();
    const caughtAtDate = fromLocalInputValue(caughtAt);
    const isBusy = isSaving || isPhotoUploading;
+   /*
+    * The first photograph, whether it went up in this sitting or came back
+    * with the catch. An edit cannot change photos yet, so the ones already on
+    * the record are the ones the namer and the competition reader work from.
+    */
+   const firstPhoto = (isEdit ? initial?.images : images)?.[0]?.url ?? null;
 
    return (
       <form
@@ -1201,8 +1057,7 @@ export function CatchForm({
                         <p className="text-ink-2">No photos on this catch.</p>
                      )}
                      <p className="text-[14px] text-ink-3">
-                        Photos stay as they were logged. Changing them comes
-                        with the next release.
+                        Photos cannot be changed here yet.
                      </p>
                   </div>
                ) : (
@@ -1219,7 +1074,7 @@ export function CatchForm({
                )}
 
                <SpeciesGuess
-                  imageUrl={images[0]?.url ?? null}
+                  imageUrl={firstPhoto}
                   current={species}
                   onPick={(candidate) => {
                      if (candidate) {
@@ -1256,13 +1111,14 @@ export function CatchForm({
                   <MeasureField
                      id="length"
                      label="Length"
+                     fieldName="length"
                      readOnly={reading?.measure === 'LENGTH'}
                      sources={[
                         { value: 'EYE', label: 'By eye' },
                         { value: 'TAPE', label: 'On a tape' },
                      ]}
                      source={lengthSource}
-                     onSource={(next) =>
+                     onSourceChange={(next) =>
                         setLengthSource(next as 'EYE' | 'TAPE')
                      }
                      value={lengthValue}
@@ -1271,18 +1127,19 @@ export function CatchForm({
                      units={['cm', 'in'] as const}
                      onChange={setLengthValue}
                      onBlur={() => markTouched('length')}
-                     onUnit={switchLengthUnit}
+                     onUnitChange={(next) => setLengthUnit(next as LengthUnit)}
                   />
                   <MeasureField
                      id="weight"
                      label="Weight"
+                     fieldName="weight"
                      readOnly={reading?.measure === 'WEIGHT'}
                      sources={[
                         { value: 'EYE', label: 'By eye' },
                         { value: 'SCALE', label: 'On a scale' },
                      ]}
                      source={weightSource}
-                     onSource={(next) =>
+                     onSourceChange={(next) =>
                         setWeightSource(next as 'EYE' | 'SCALE')
                      }
                      value={weightValue}
@@ -1291,10 +1148,80 @@ export function CatchForm({
                      units={['kg', 'lb'] as const}
                      onChange={setWeightValue}
                      onBlur={() => markTouched('weight')}
-                     onUnit={switchWeightUnit}
+                     onUnitChange={(next) => setWeightUnit(next as WeightUnit)}
                   />
                </div>
 
+               <ChoiceGroup
+                  inline
+                  label="Kept or released"
+                  value={released}
+                  onChange={setReleased}
+                  options={[
+                     { value: 'KEPT', label: 'Kept' },
+                     { value: 'RELEASED', label: 'Released' },
+                  ]}
+               />
+
+               <TextField
+                  label="How many"
+                  data-field="count"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  numeric
+                  className="max-w-[200px]"
+                  hint="Fish of this kind on this log."
+                  value={countValue}
+                  error={errors.count}
+                  onChange={(event) => setCountValue(event.target.value)}
+                  onBlur={() => markTouched('count')}
+               />
+
+               {/*
+                * The two readings an angler takes only when they have the
+                * kit for it. Behind a fold so the first screen of the form
+                * is the fish, not the instrumentation.
+                */}
+               <Fold
+                  title="More"
+                  headingClassName="text-[22px] md:text-[26px]"
+                  open={initial?.depth != null || initial?.waterTemp != null}
+               >
+                  <div className="grid grid-cols-1 gap-5 pt-4 sm:grid-cols-2">
+                     <TextField
+                        label="Depth in metres"
+                        data-field="depth"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        numeric
+                        value={depthValue}
+                        error={errors.depth}
+                        onChange={(event) => setDepthValue(event.target.value)}
+                        onBlur={() => markTouched('depth')}
+                        placeholder="6.5"
+                     />
+                     <TextField
+                        label="Water temperature in °C"
+                        data-field="waterTemp"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        numeric
+                        value={waterTempValue}
+                        error={errors.waterTemp}
+                        hint="Left blank, the sea model's reading for the hour is kept instead."
+                        onChange={(event) =>
+                           setWaterTempValue(event.target.value)
+                        }
+                        onBlur={() => markTouched('waterTemp')}
+                        placeholder="16"
+                     />
+                  </div>
+               </Fold>
+
+               {/*
+                * Last in the section, because it opens into a panel of its
+                * own: anything under it would read as its contents.
+                */}
                <CompetitionEntry
                   competitionId={competitionId}
                   onCompetition={(id) => {
@@ -1302,7 +1229,7 @@ export function CatchForm({
 
                      if (!id) setReading(null);
                   }}
-                  imageUrl={images[0]?.url ?? null}
+                  imageUrl={firstPhoto}
                   reading={reading}
                   onReading={(next) => {
                      setReading(next);
@@ -1350,86 +1277,9 @@ export function CatchForm({
                      }
                   }}
                />
-
-               <ChoiceGroup
-                  inline
-                  size="sm"
-                  label="The fish"
-                  value={released}
-                  onChange={setReleased}
-                  options={[
-                     { value: 'KEPT', label: 'Kept' },
-                     { value: 'RELEASED', label: 'Released' },
-                  ]}
-               />
-
-               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <TextField
-                     label="How many"
-                     data-field="count"
-                     inputMode="numeric"
-                     autoComplete="off"
-                     numeric
-                     className="max-w-[200px]"
-                     hint="Fish of this kind on this log."
-                     value={countValue}
-                     error={errors.count}
-                     onChange={(event) => setCountValue(event.target.value)}
-                     onBlur={() => markTouched('count')}
-                  />
-                  <div className="flex items-end pb-6">
-                     <button
-                        type="button"
-                        aria-expanded={showMore}
-                        aria-controls="more-fish"
-                        onClick={() => setShowMore((open) => !open)}
-                        className="g-tracked inline-flex h-11 items-center gap-2 text-[17px] text-ink underline-offset-4 hover:underline"
-                     >
-                        {showMore
-                           ? 'Fewer measurements'
-                           : 'Depth and water temperature'}
-                     </button>
-                  </div>
-               </div>
-
-               <div>
-                  <div id="more-fish" hidden={!showMore}>
-                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                        <TextField
-                           label="Depth in metres"
-                           data-field="depth"
-                           inputMode="decimal"
-                           autoComplete="off"
-                           numeric
-                           value={depthValue}
-                           error={errors.depth}
-                           onChange={(event) =>
-                              setDepthValue(event.target.value)
-                           }
-                           onBlur={() => markTouched('depth')}
-                           placeholder="Not recorded"
-                        />
-                        <TextField
-                           label="Water temperature in °C"
-                           data-field="waterTemp"
-                           inputMode="decimal"
-                           autoComplete="off"
-                           numeric
-                           value={waterTempValue}
-                           error={errors.waterTemp}
-                           hint="Left blank, the sea model's reading for the hour is kept instead."
-                           onChange={(event) =>
-                              setWaterTempValue(event.target.value)
-                           }
-                           onBlur={() => markTouched('waterTemp')}
-                           placeholder="Not recorded"
-                        />
-                     </div>
-                  </div>
-               </div>
             </section>
 
-            <hr className="rule-dashed border-0" />
+            <hr className="rule-dashed" />
 
             {/* ---------------- Where ---------------- */}
             <section className="flex flex-col gap-6">
@@ -1517,17 +1367,10 @@ export function CatchForm({
                ) : null}
 
                {nearSaved ? (
-                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border border-teal px-4 py-3">
+                  <div className="rule-dashed-left flex flex-wrap items-center justify-between gap-x-4 gap-y-3 py-2 pl-4">
                      <p className="text-[15px]">
-                        <span className="lab mr-2 text-ink-3">
-                           You have fished here
-                        </span>
-                        <span className="g-tracked text-[19px]">
-                           {nearSaved.spot.name}
-                        </span>
-                        <span className="ml-2 text-ink-3">
-                           is {formatMetres(nearSaved.metres)} away
-                        </span>
+                        {nearSaved.spot.name} is{' '}
+                        {formatMetres(nearSaved.metres)} away.
                      </p>
                      <Button
                         type="button"
@@ -1588,11 +1431,7 @@ export function CatchForm({
                            </Button>
                         </div>
                      ) : (
-                        <ul
-                           data-field="spot"
-                           tabIndex={-1}
-                           className="max-h-[320px] overflow-y-auto"
-                        >
+                        <ul data-field="spot" tabIndex={-1}>
                            {filteredSites.map((site) => (
                               <li key={site.id}>
                                  <label className="flex min-h-12 cursor-pointer items-center gap-3 border-t border-line py-3">
@@ -1657,7 +1496,7 @@ export function CatchForm({
                ) : null}
             </section>
 
-            <hr className="rule-dashed border-0" />
+            <hr className="rule-dashed" />
 
             {/* ---------------- When and conditions ---------------- */}
             <section className="flex flex-col gap-6">
@@ -1673,13 +1512,8 @@ export function CatchForm({
                      error={errors.caughtAt}
                      hint={
                         <>
-                           {caughtAtDate
-                              ? `${dateSentence(caughtAtDate)}. `
-                              : ''}
-                           {zone ? `Your time, ${zone}.` : 'Your own time.'} The
-                           conditions below are read for this hour, wherever the
-                           pin is, so a fish logged tonight still gets the
-                           weather it was caught in.
+                           {zone ? `Your time, ${zone}.` : 'Your own time.'}{' '}
+                           Conditions are read for this hour at the pin.
                            {photoSpan
                               ? ` The photographs run from ${clock(photoSpan.from)} to ${clock(photoSpan.to)}, so the log is kept as that stretch.`
                               : ''}
@@ -1694,7 +1528,7 @@ export function CatchForm({
                </div>
             </section>
 
-            <hr className="rule-dashed border-0" />
+            <hr className="rule-dashed" />
 
             {/* ---------------- Gear and notes ---------------- */}
             <section className="flex flex-col gap-6">
@@ -1712,7 +1546,6 @@ export function CatchForm({
                      <ChoiceGroup
                         label="Kind"
                         inline
-                        size="sm"
                         value={gearKind}
                         options={[
                            { value: 'ANY' as const, label: 'Any' },
@@ -1763,7 +1596,7 @@ export function CatchForm({
                         </Button>
                      </div>
                   ) : (
-                     <ul className="max-h-[420px] overflow-y-auto">
+                     <ul>
                         {GEAR_KINDS.flatMap((kind) => {
                            const items = filteredGear.filter(
                               (entry) =>
@@ -1846,13 +1679,13 @@ export function CatchForm({
           * it follows the form, and the save is repeated in a bar at the foot.
           */}
          <aside className="flex flex-col gap-8 lg:sticky lg:top-[84px]">
-            <div className="blk-plain border border-line p-4">
-               <span className="lab lab-rule">Conditions at that hour</span>
+            <div className="border border-line p-4">
+               <h2 className="lab lab-rule">Conditions at that hour</h2>
                {snapshot ? null : (
                   <p className="mt-3 text-[14px] text-ink-2">
                      {activeCoordinates
                         ? 'Read for the pin and the hour once both are set.'
-                        : 'Set where it was caught and the conditions are read for that hour.'}
+                        : 'Get a fix, or pick a spot, and the conditions are read for that hour.'}
                   </p>
                )}
                <dl className={cn('mt-3 flex flex-col', !snapshot && 'hidden')}>
@@ -1878,16 +1711,25 @@ export function CatchForm({
                      {conditionsMessage}
                   </p>
                ) : null}
-               <p className="mt-3 text-[14px] text-ink-3">
-                  {WEATHER_SOURCE_LINE}
-               </p>
+               {/* Nothing to credit until there is a reading to credit it for. */}
+               {snapshot ? (
+                  <p className="mt-3 text-[14px] text-ink-3">
+                     {WEATHER_SOURCE_LINE}
+                  </p>
+               ) : null}
 
-               <div className="mt-4">
+               {/*
+                * A new catch reads on its own as soon as it has a position, so
+                * the control is only worth showing once there is a reading it
+                * could replace.
+                */}
+               <div className={cn('mt-4', !isEdit && !snapshot && 'hidden')}>
                   {isConfirmingRefresh ? (
                      <div className="flex flex-col items-start gap-3">
                         <p className="text-[15px] text-ink-2">
                            This replaces the wind, air, cloud and rain kept with
-                           this catch with the conditions right now at{' '}
+                           this catch with a fresh reading for{' '}
+                           {caughtAtDate ? clock(caughtAtDate) : 'that hour'} at{' '}
                            {spotLabel}.
                         </p>
                         <div className="flex flex-wrap gap-3">
@@ -1925,7 +1767,9 @@ export function CatchForm({
             <section className="flex flex-col gap-5">
                <h2 className="lab lab-rule">Who sees this</h2>
 
+               {/* The heading above is the label; naming it twice named nothing. */}
                <ChoiceGroup
+                  hideLabel
                   label="Who can see the catch"
                   value={visibility}
                   onChange={setVisibility}
@@ -1965,7 +1809,8 @@ export function CatchForm({
                ) : null}
             </section>
 
-            <div className="flex flex-wrap items-center gap-4">
+            {/* On a phone the same three live in the bar at the foot. */}
+            <div className="hidden flex-wrap items-center gap-4 lg:flex">
                <Button type="submit" size="xl" disabled={isBusy}>
                   {isEdit ? 'Save changes' : 'Save catch'}
                </Button>
@@ -1976,7 +1821,7 @@ export function CatchForm({
                      size="lg"
                      onClick={saveAsDraft}
                   >
-                     Save as draft
+                     Save draft
                   </Button>
                ) : null}
                <Button
@@ -2001,20 +1846,36 @@ export function CatchForm({
             </div>
          </aside>
 
-         {/* The save, within a thumb's reach, on a phone. */}
-         <div className="sticky bottom-0 -mx-4 flex items-center justify-between gap-4 border-t border-line bg-background px-4 py-3 lg:hidden">
-            <span className="min-w-0 truncate text-[14px] text-ink-2">
-               {[
-                  species.trim() || null,
-                  lengthValue ? `${lengthValue} ${lengthUnit}` : null,
-                  spotLabel,
-               ]
-                  .filter(Boolean)
-                  .join(' · ')}
-            </span>
-            <Button type="submit" size="lg" disabled={isBusy}>
-               {isEdit ? 'Save' : 'Save catch'}
-            </Button>
+         {/*
+          * The save, within a thumb's reach, on a phone. The phone navigation
+          * stands down on this route, so the bar has the foot to itself and
+          * carries both ways out of a half-written catch.
+          */}
+         <div className="sticky bottom-0 -mx-4 border-t border-line bg-background px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] lg:hidden">
+            {isPhotoUploading ? (
+               <p className="mb-2 text-[14px] text-ink-3">
+                  A photo is still going up.
+               </p>
+            ) : null}
+            <div
+               className={cn(
+                  'flex items-center gap-4',
+                  isEdit ? 'justify-end' : 'justify-between'
+               )}
+            >
+               {!isEdit ? (
+                  <button
+                     type="button"
+                     onClick={saveAsDraft}
+                     className="g-tracked inline-flex min-h-11 items-center text-[15px] whitespace-nowrap hover:text-teal-text"
+                  >
+                     Save draft
+                  </button>
+               ) : null}
+               <Button type="submit" size="lg" disabled={isBusy}>
+                  {isEdit ? 'Save changes' : 'Save catch'}
+               </Button>
+            </div>
          </div>
       </form>
    );
@@ -2024,6 +1885,7 @@ export function CatchForm({
 
 export function LogCatchPage() {
    useDocumentTitle('Log a catch');
+   const navigate = useNavigate();
    const [params] = useSearchParams();
    const draftId = params.get('draft');
    const draft = draftId ? readDraft(draftId) : null;
@@ -2042,7 +1904,23 @@ export function LogCatchPage() {
    return (
       <RequireSignIn what="your log">
          <section className="mx-auto w-[min(1400px,100%-32px)] py-8 md:py-12">
-            <h1 className="g text-[44px] md:text-[56px]">Log a catch</h1>
+            {/*
+             * On a phone the navigation stands down for this form and the
+             * save bar carries only Save draft and Save catch, so the way
+             * out lives up here, the way it does on the fast log. On a
+             * desktop the rail's Cancel does the same job.
+             */}
+            <div className="flex items-start justify-between gap-4">
+               <h1 className="g text-[44px] md:text-[56px]">Log a catch</h1>
+               <button
+                  type="button"
+                  onClick={() => navigate('/catches/me')}
+                  aria-label="Close without saving"
+                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-line text-ink hover:border-ink lg:hidden"
+               >
+                  <XMarkIcon className="size-5" aria-hidden="true" />
+               </button>
+            </div>
             <p className="mt-3 max-w-[52ch] text-ink-2">
                Everything here is optional except the fish and the time.
             </p>
