@@ -11,7 +11,13 @@ import path from 'node:path';
  *   - the favicons: the black square kept, at 64 and 180.
  *   node logo.mjs <in.svg> <client/public dir>
  */
-const [, , input, publicDir] = process.argv;
+/*
+ * `invert` as a third argument is for artwork drawn in black on white (the
+ * line-art bass): it is flipped to paper lines on black first, and from there
+ * the recipe is the same, because the header it sits on is always black.
+ */
+const [, , input, publicDir, mode] = process.argv;
+const invert = mode === 'invert';
 const svg = fs.readFileSync(input, 'utf8');
 const data = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 
@@ -19,7 +25,7 @@ const b = await chromium.launch();
 const render = async (size) => {
    const p = await b.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
    await p.setContent(
-      `<html><body style="margin:0;background:transparent"><img src="${data}" style="width:${size}px;height:${size}px;display:block"></body></html>`
+      `<html><body style="margin:0;background:${invert ? '#000' : 'transparent'}"><img src="${data}" style="width:${size}px;height:${size}px;display:block;${invert ? 'filter:invert(1)' : ''}"></body></html>`
    );
    await p.waitForTimeout(600);
    const buf = await p.screenshot({ omitBackground: true });
@@ -64,7 +70,7 @@ const out = path.join(publicDir, 'brand', 'fishtagram-mark.png');
  * 320 wide, which keeps the file small and the fin crisp at 2x.
  */
 const trimmed = `data:image/png;base64,${PNG.sync.write(cut).toString('base64')}`;
-const targetW = 320;
+const targetW = Number(process.argv[5] || 320);
 const targetH = Math.round((h / w) * targetW);
 const p = await b.newPage({ viewport: { width: targetW, height: targetH }, deviceScaleFactor: 1 });
 await p.setContent(

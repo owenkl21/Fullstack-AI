@@ -105,38 +105,56 @@ export function BootGate({ children }: { children: ReactNode }) {
 
 /*
  * Owen's bass leaving the water: a short monochrome clip on a white ground,
- * scrubbed and shrunk by audit/logo.mjs's sibling, loader.mjs. Multiplied
- * onto the page by day the white disappears into the paper; at night the
- * clip is inverted and screened, so its black disappears into the dark and
- * the fish is drawn in paper. Anyone who asked for stillness gets the first
- * frame.
+ * with the watermark scrubbed, the ground pushed to pure white and the frame
+ * shrunk to 640 by ffmpeg.
+ *
+ * Three things keep it from reading as a square dropped on the page. The
+ * clip's water runs to its own edges, so the frame is feathered on all four
+ * sides and the ripples die away instead of being cut. The drawing is inked
+ * in the accent rather than black: the frame is a teal ground the clip is
+ * screened over, so white stays paper and every grey becomes a teal. And the
+ * whole thing is multiplied onto the page, so its white is the page's white.
+ * At night the clip is inverted and multiplied over the same teal, then
+ * screened onto the dark, which draws the fish in light teal on the page's
+ * own black. Anyone who asked for stillness gets the first frame.
  */
 function LeapingFish() {
    const still = prefersReducedMotion();
-   const box =
-      'block size-[220px] md:size-[300px] mix-blend-multiply dark:invert dark:mix-blend-screen';
-   if (still) {
-      return (
-         <img
-            src="/brand/loader.jpg"
-            alt=""
-            width={480}
-            height={480}
-            className={box}
-         />
-      );
-   }
+   const clip =
+      'block size-full mix-blend-screen dark:invert dark:mix-blend-multiply';
    return (
-      <video
-         className={box}
-         autoPlay
-         muted
-         playsInline
-         loop
-         poster="/brand/loader.jpg"
-         aria-hidden="true"
+      <div
+         className="size-[300px] bg-teal-text mix-blend-multiply md:size-[440px] dark:mix-blend-screen"
+         style={{
+            maskImage:
+               'linear-gradient(to right, transparent, #000 14%, #000 86%, transparent), linear-gradient(to bottom, transparent, #000 10%, #000 84%, transparent)',
+            maskComposite: 'intersect',
+            WebkitMaskImage:
+               'linear-gradient(to right, transparent, #000 14%, #000 86%, transparent), linear-gradient(to bottom, transparent, #000 10%, #000 84%, transparent)',
+            WebkitMaskComposite: 'source-in',
+         }}
       >
-         <source src="/brand/loader.mp4" type="video/mp4" />
-      </video>
+         {still ? (
+            <img
+               src="/brand/loader.jpg"
+               alt=""
+               width={640}
+               height={640}
+               className={clip}
+            />
+         ) : (
+            <video
+               className={clip}
+               autoPlay
+               muted
+               playsInline
+               loop
+               poster="/brand/loader.jpg"
+               aria-hidden="true"
+            >
+               <source src="/brand/loader.mp4" type="video/mp4" />
+            </video>
+         )}
+      </div>
    );
 }

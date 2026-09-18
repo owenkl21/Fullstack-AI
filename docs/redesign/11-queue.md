@@ -342,6 +342,13 @@ band, tides and the sun and moon; then the name and the mark arrived.
       the paper by day and inverted and screened onto the dark at night.
       `BootGate` holds the first paint for at least 1.6 s so the leap is seen,
       never more than 2.5 s; reduced motion gets the first frame.
+- [x] **The right mark, and a loader with no edges** (later the same day).
+      The header mark is the line-art bass (`1.svg`), flipped to paper lines
+      for the black header by `audit/logo.mjs ... invert`, and bigger: 44px on
+      a phone, 50px on a desktop. The loader clip is 640px now and shown at
+      300/440px; its frame is feathered on all four sides so the water dies
+      away instead of being cut, and it is inked in the accent (screened over
+      a teal ground by day, inverted and multiplied over it at night).
 
 ## Next, in order
 
