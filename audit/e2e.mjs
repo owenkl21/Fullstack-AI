@@ -64,10 +64,27 @@ async function inspect(p, where) {
          if (at.querySelector?.('a[href], button')) return true;
          return getComputedStyle(at).position === 'absolute';
       };
-      /* The real target is the row, not the word inside it. */
-      const rowHeight = (el) => {
-         const card = el.closest('article, li, tr, .blk, [class*="card"]');
-         return card ? card.getBoundingClientRect().height : 0;
+      /*
+       * The real target is the row, not the word inside it.
+       *
+       * A list row makes its title the link and stretches it over the whole
+       * row with an `::after` pinned to the row's edges, so the anchor measures
+       * 21 pixels and the thing a thumb lands on is 77. Ask the pseudo element
+       * whether it does that, and if it does, measure the row.
+       */
+      const tapHeight = (el) => {
+         const own = el.getBoundingClientRect().height;
+         const after = getComputedStyle(el, '::after');
+         if (after.position === 'absolute' && after.content !== 'none') {
+            for (let node = el.parentElement; node; node = node.parentElement) {
+               const cs = getComputedStyle(node);
+               if (cs.position !== 'static') {
+                  return Math.max(own, node.getBoundingClientRect().height);
+               }
+            }
+         }
+         const card = el.closest('article, li, tr, .blk');
+         return Math.max(own, card ? card.getBoundingClientRect().height : 0);
       };
 
       /* Text clipped by a box that cannot scroll. */
@@ -108,8 +125,11 @@ async function inspect(p, where) {
       for (const el of document.querySelectorAll('main button, main a[href]')) {
          if (!ours(el)) continue;
          const r = el.getBoundingClientRect();
-         if (r.height > 0 && r.height < 40 && (el.textContent ?? '').trim() && !el.closest('p, li') && rowHeight(el) < 44) {
-            small.push(`${(el.textContent ?? '').trim().slice(0, 18)} ${Math.round(r.height)}px`);
+         if (r.height > 0 && r.height < 40 && (el.textContent ?? '').trim() && !el.closest('p, li')) {
+            const tap = tapHeight(el);
+            if (tap < 40) {
+               small.push(`${(el.textContent ?? '').trim().slice(0, 18)} ${Math.round(tap)}px`);
+            }
          }
       }
 

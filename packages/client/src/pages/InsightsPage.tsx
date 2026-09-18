@@ -742,11 +742,21 @@ function Table({
                         className="fact border-b border-line"
                         style={{ '--i': i } as React.CSSProperties}
                      >
-                        <td className="max-w-0 truncate py-2 pr-2">
+                        {/* The name is a link, so the cell gives it the whole
+                            row's height to be hit in rather than the nineteen
+                            pixels the word itself occupies. The padding moves
+                            off the cell and onto the link for the same reason;
+                            a row without a link keeps it. */}
+                        <td
+                           className={cn(
+                              'max-w-0 truncate pr-2',
+                              href && row.id ? 'py-0' : 'py-2'
+                           )}
+                        >
                            {href && row.id ? (
                               <Link
                                  to={href(row.id)}
-                                 className="g-tracked text-[16px] underline-offset-4 hover:underline"
+                                 className="g-tracked flex min-h-11 items-center truncate text-[16px] underline-offset-4 hover:underline"
                               >
                                  {row.name}
                               </Link>
