@@ -271,9 +271,23 @@
       width: 100%;
       height: 100%;
       display: block;
-      /* The shadow and the foam are allowed past the box; nothing is filled
-         to its bottom edge, so there is nothing there to clip. */
+      /* The shadow and the foam are allowed past the box, and the ground
+         under a cut edge closes a few pixels past its bottom, where the
+         section's own ground hides the edge. */
       overflow: visible;
+   }
+   /*
+    * How far a cut edge hangs below its plate. One number, because the
+    * plate's art reaches the same depth: the survey lines run down to the
+    * crest rather than stopping at a ruled edge some way above it.
+    */
+   :root {
+      --hang: 118px;
+   }
+   @media (max-width: 640px) {
+      :root {
+         --hang: 78px;
+      }
    }
    /*
     * A cut edge hangs over the top of the section that follows, so the plate
@@ -281,14 +295,22 @@
     * underneath pads its top by the same amount so nothing sits under it.
     */
    .torn-hang {
-      bottom: -118px;
+      bottom: calc(0px - var(--hang));
       /* Above whatever the next section draws in its top padding. */
       z-index: 6;
    }
-   @media (max-width: 640px) {
-      .torn-hang {
-         bottom: -78px;
-      }
+   /*
+    * The plate under a hollow cut edge, and the art on it. It fills the
+    * plate's own box and the water hanging under it, clipped by this box
+    * rather than by the plate; the water paints the ground back over
+    * whatever spills below the crest. The caller gives it the plate colour.
+    */
+   .plate-art {
+      position: absolute;
+      inset: 0;
+      bottom: calc(0px - var(--hang));
+      overflow: hidden;
+      pointer-events: none;
    }
 
    @media (max-width: 640px) {

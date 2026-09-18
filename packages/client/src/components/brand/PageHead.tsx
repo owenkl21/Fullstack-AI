@@ -35,13 +35,12 @@ export function PageHead({
             { '--contour': 'rgba(244, 241, 236, 0.16)' } as React.CSSProperties
          }
       >
-         {/* The survey lines live on the plate, edge to edge, drawn once.
-             Clipped by their own box, never by the header, which has the
-             water hanging under it. */}
-         <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 overflow-hidden"
-         >
+         {/* The plate itself, with the survey lines on it, edge to edge,
+             drawn once. Its box reaches down through the hanging water to
+             the crest, so the plate is one sheet of lines to the waterline;
+             the water (a hollow edge, so it paints no plate of its own)
+             covers what spills below it. Never clipped by the header. */}
+         <div aria-hidden="true" className="plate-art bg-black-block">
             <Contours seed={17} className="inset-0 h-full w-full" />
          </div>
          <div
@@ -68,7 +67,7 @@ export function PageHead({
             </div>
             {children ? <div className="mt-6">{children}</div> : null}
          </div>
-         <TornEdge fill="black" cut />
+         <TornEdge fill="black" cut hollow />
       </header>
    );
 }

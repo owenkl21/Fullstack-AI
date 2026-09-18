@@ -16,9 +16,11 @@ import { cn } from '@/lib/utils';
  * section's colour) draws the region below each line. Cutting the plate
  * (`cut`) draws the plate above its own line and, under it, two translucent
  * wet strips between the plate's line and their own, a soft shadow the plate
- * throws on the water, and a thread of foam along the crest. Nothing in cut
- * mode is filled down to the bottom of the box, which is what used to end in
- * a ruled line across the section below.
+ * throws on the water, and a thread of foam along the crest. Under all of
+ * that, cut mode paints the page ground below the crest, so art on the plate
+ * can run down into the hanging water and end at the waterline rather than
+ * at the plate's own box. The ground closes past the box (see PAST), so its
+ * edge never shows as a ruled line across the section below.
  */
 
 type Fill = 'bg' | 'bg-2' | 'black';
@@ -93,6 +95,7 @@ export function TornEdge({
    flip = false,
    seed = 1,
    cut = false,
+   hollow = false,
    className,
 }: {
    fill?: Fill;
@@ -103,6 +106,15 @@ export function TornEdge({
     * not the ground, and the section under it shows through the troughs.
     */
    cut?: boolean;
+   /*
+    * With `cut`, leave the plate unpainted. The plate above the crest is an
+    * opaque fill, and it covered anything the caller drew down into the hang:
+    * a contour sheet on a page head stopped at a ruled line a hundred pixels
+    * above the water. A hollow edge draws only the water, so the caller's own
+    * ground reaches the crest (it must extend `--hang` below its box; see
+    * `.plate-art`), and what is drawn on it runs to the waterline.
+    */
+   hollow?: boolean;
    className?: string;
 }) {
    const host = useRef<HTMLDivElement>(null);
@@ -116,6 +128,12 @@ export function TornEdge({
       const varName =
          fill === 'black' ? '--black' : fill === 'bg-2' ? '--bg-2' : '--bg';
       const ground = cs.getPropertyValue(varName).trim() || '#ffffff';
+      /*
+       * In cut mode `fill` names the plate, and the water under it is painted
+       * in the page's own ground so that whatever the plate draws down into
+       * the hang (its contour sheet) ends at the crest.
+       */
+      const water = cs.getPropertyValue('--bg').trim() || '#ffffff';
 
       /*
        * Wavelengths deliberately not multiples of each other, so the three
@@ -158,14 +176,21 @@ export function TornEdge({
            `<defs>` +
            `<filter id="${id}-blur" x="-5%" y="-40%" width="110%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>` +
            `<filter id="${id}-soft" x="-5%" y="-40%" width="110%" height="200%"><feGaussianBlur stdDeviation="1.2"/></filter>` +
+           /* the water's own outline, so the shadow lands on the water only
+              and never on what sits on the plate */
+           `<clipPath id="${id}-water"><path data-role="water-clip"/></clipPath>` +
            `</defs>` +
+           /* the water, in the ground of the section below, covering what
+              the plate lets spill under its crest */
+           `<path data-role="water" fill="${water}"/>` +
            /* the shadow the plate throws on the water */
-           `<path data-role="shadow" fill="rgba(0,0,0,0.42)" filter="url(#${id}-blur)"/>` +
-           /* two wet strips, the far one fainter */
-           `<path data-role="strip0" fill="${paper}0.22)"/>` +
-           `<path data-role="strip1" fill="${paper}0.40)"/>` +
-           /* the plate */
-           `<path data-role="plate" fill="${ground}"/>` +
+           `<path data-role="shadow" fill="rgba(0,0,0,0.42)" filter="url(#${id}-blur)" clip-path="url(#${id}-water)"/>` +
+           /* two wet strips, the far one fainter; on the water only, where
+              they always showed, since the plate used to cover the rest */
+           `<path data-role="strip0" fill="${paper}0.22)" clip-path="url(#${id}-water)"/>` +
+           `<path data-role="strip1" fill="${paper}0.40)" clip-path="url(#${id}-water)"/>` +
+           /* the plate, unless the caller's own ground is the plate */
+           (hollow ? '' : `<path data-role="plate" fill="${ground}"/>`) +
            /* foam along the crest */
            `<path data-role="foam" fill="none" stroke="${paper}0.55)" stroke-width="2" stroke-linecap="round" filter="url(#${id}-soft)"/>` +
            `</svg>`
@@ -185,11 +210,14 @@ export function TornEdge({
          const ys = bands.map((band) => trace(band, state.t, state.breath));
          if (cut) {
             const plate = ys[2]!;
+            const water = below(plate);
+            set('water', water);
+            set('water-clip', water);
             /* The shadow sits a little below the plate's own line. */
             set('shadow', above(plate.map((y) => y + 9)));
             set('strip0', between(plate, ys[0]!));
             set('strip1', between(plate, ys[1]!));
-            set('plate', above(plate));
+            if (!hollow) set('plate', above(plate));
             set('foam', lineOf(plate));
          } else {
             set('band0', below(ys[0]!));
@@ -233,7 +261,7 @@ export function TornEdge({
          swell.kill();
          el.innerHTML = '';
       };
-   }, [fill, seed, theme, cut]);
+   }, [fill, seed, theme, cut, hollow]);
 
    return (
       <div
