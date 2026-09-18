@@ -158,11 +158,11 @@ export function Picker({
       <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-2">
          <span className="flex min-w-0 flex-col">
             <span className="lab text-ink-3">{label}</span>
-            {multiple ? (
+            {/* The count only once anything is chosen: the trigger that opened
+                this panel already says when nothing is. */}
+            {multiple && chosen.length > 0 ? (
                <span className="num text-[13px] text-ink-2">
-                  {chosen.length === 0
-                     ? 'None chosen'
-                     : `${chosen.length} chosen`}
+                  {chosen.length} chosen
                </span>
             ) : null}
          </span>
@@ -208,7 +208,7 @@ export function Picker({
       >
          {icon ? <span className="shrink-0 text-ink-2">{icon}</span> : null}
          <span className="flex min-w-0 flex-1 flex-col leading-none">
-            <span className="lab text-[10px] text-ink-3">{label}</span>
+            <span className="lab text-ink-3">{label}</span>
             <span
                className={cn(
                   'g-tracked mt-0.5 truncate',

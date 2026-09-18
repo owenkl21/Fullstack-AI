@@ -66,5 +66,9 @@ export const readPosition = (
    return { lat, lng };
 };
 
-/** Six decimals is about a tenth of a metre, which is as fine as a pin gets. */
-export const formatCoordinate = (value: number) => value.toFixed(6);
+/**
+ * Five decimals is about a metre, which is finer than any fix the phone gives
+ * and as fine as a pin dropped by hand can honestly claim. The sixth decimal
+ * was a tenth of a metre printed against a position good to thirty.
+ */
+export const formatCoordinate = (value: number) => value.toFixed(5);

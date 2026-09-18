@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import { cn } from '@/lib/utils';
 import {
@@ -141,7 +141,7 @@ export function SpeciesCombobox({
                      setOpen(true);
                      requestAnimationFrame(() => input.current?.focus());
                   }}
-                  className="g-tracked text-[15px] text-teal-text hover:opacity-80"
+                  className="g-tracked inline-flex min-h-11 items-center text-[15px] text-teal-text hover:opacity-80"
                >
                   Change
                </button>
@@ -237,11 +237,7 @@ export function SpeciesCombobox({
                                  ) : null}
                               </>
                            ) : row.kind === 'add' ? (
-                              <span className="inline-flex items-center gap-2 text-[15px]">
-                                 <PlusIcon
-                                    aria-hidden="true"
-                                    className="size-4"
-                                 />
+                              <span className="inline-flex items-center text-[15px]">
                                  {adding ? 'Adding' : `Add "${q}"`}
                               </span>
                            ) : (

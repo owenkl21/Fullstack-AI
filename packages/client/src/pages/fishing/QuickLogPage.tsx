@@ -33,25 +33,13 @@ import {
    type Where,
 } from '@/components/fishing/quicklog/Receipt';
 import { MapLocationPicker } from '@/components/fishing/MapLocationPicker';
-import { TextArea } from '@/components/ui/field';
+import { TextArea, TextField } from '@/components/ui/field';
 import { Fold } from '@/components/ui/fold';
 import { usePhone } from '@/lib/media';
+import { formatCoordinate } from '@/lib/maps';
 import { Segment } from '@/components/fishing/quicklog/Segment';
 import { CaughtAt } from '@/components/fishing/quicklog/CaughtAt';
-import {
-   ArchiveBoxIcon,
-   ArrowRightIcon,
-   ArrowUturnLeftIcon,
-   CameraIcon,
-   EyeIcon,
-   EyeSlashIcon,
-   GlobeAltIcon,
-   LockClosedIcon,
-   MapPinIcon,
-   ShieldCheckIcon,
-   SignalIcon,
-   XMarkIcon,
-} from '@heroicons/react/24/outline';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import { readPhotoMeta } from '@/lib/exif';
 import { formatMetres, nearestSpot, type SpotLike } from '@/lib/geo';
 import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
@@ -142,6 +130,12 @@ function QuickLog() {
    const [hideLocation, setHideLocation] = useState(false);
    const [spotName, setSpotName] = useState('');
    const [savingSpot, setSavingSpot] = useState(false);
+   /*
+    * The map is folded away while the position is already known. Asking for
+    * it back opens it in place; Done folds it again. With no position there
+    * is nothing to fold, so it opens itself.
+    */
+   const [pinOpen, setPinOpen] = useState(false);
    /* Which of the three phone screens is up. */
    const [step, setStep] = useState(1);
    const phone = usePhone();
@@ -387,12 +381,6 @@ function QuickLog() {
       }
    };
 
-   const nothingCaught = () => {
-      // TODO(api): appendix E, blank trips are not stored, so nothing is saved here.
-      toast({ title: 'Nothing saved. Blank trips are not kept yet.' });
-      navigate('/');
-   };
-
    const save = async () => {
       const other = typed.trim();
       if (other.length === 1) {
@@ -483,35 +471,31 @@ function QuickLog() {
       }
    };
 
-   const whereLine = where
+   /*
+    * The position as one receipt line: where it came from, how good it is,
+    * and the coordinates it settled on. Without one there is nothing to
+    * receipt, only a sentence saying why.
+    */
+   const whereSource = where
       ? where.source === 'photo'
          ? 'From the photograph'
          : where.source === 'pin'
            ? 'Pinned by you'
            : `Phone fix${where.accuracy ? `, within ${Math.round(where.accuracy)} m` : ''}`
+      : null;
+   const whereLine = where
+      ? `${whereSource} · ${formatCoordinate(where.latitude)}, ${formatCoordinate(where.longitude)}`
       : fixStatus === 'denied'
         ? 'No position. Location is off for this site.'
         : fixStatus === 'unsupported'
           ? 'No position from this browser.'
-          : 'Getting a fix';
-   const WhereMark =
-      where?.source === 'photo'
-         ? CameraIcon
-         : where?.source === 'pin'
-           ? MapPinIcon
-           : SignalIcon;
+          : 'Getting a fix.';
    const privacyLine =
       visibility === 'PRIVATE'
          ? 'Only you see this catch.'
          : hideLocation
            ? 'Your catch is public. Your exact spot stays private.'
            : 'Your catch is public, spot included.';
-   const footerLine =
-      visibility === 'PRIVATE'
-         ? 'Private catch'
-         : hideLocation
-           ? 'Public catch · Exact spot hidden'
-           : 'Public catch · Spot shown';
 
    const heading = (index: string, title: string, note?: string | null) => (
       <div className="mb-5 flex items-center gap-2.5">
@@ -527,10 +511,7 @@ function QuickLog() {
 
    const speciesBlock = (
       <div>
-         <div className="mb-2 flex items-baseline justify-between gap-2">
-            <span className="lab">Species</span>
-            <span className="text-[12px] text-ink-2">Required</span>
-         </div>
+         <span className="lab mb-2 block">Species</span>
          <SpeciesCombobox
             label=""
             value={chosen ?? typed}
@@ -545,20 +526,6 @@ function QuickLog() {
             }}
             onCreated={(made) => setSpecies((list) => [...list, made])}
          />
-         <p className="mt-2 text-[12px] text-ink-2">
-            Not sure?{' '}
-            <button
-               type="button"
-               onClick={() => {
-                  setChosen(NOT_SURE);
-                  setTyped('');
-                  setSpeciesError(null);
-               }}
-               className="text-teal-text underline underline-offset-[3px] hover:text-ink"
-            >
-               Log it as unidentified
-            </button>
-         </p>
          <SpeciesGuess
             imageUrl={photo?.url ?? null}
             current={typed || chosen || ''}
@@ -586,10 +553,6 @@ function QuickLog() {
 
    const measureBlock = (
       <div>
-         <div className="mb-2 flex items-baseline justify-between gap-2">
-            <span className="lab">Measurements</span>
-            <span className="text-[12px] text-ink-2">Optional</span>
-         </div>
          <div className="grid grid-cols-2 gap-3 md:gap-4">
             <MeasureField
                id="length"
@@ -607,7 +570,6 @@ function QuickLog() {
                onSourceChange={(next) =>
                   setLengthSource(next as 'EYE' | 'TAPE')
                }
-               placeholder="0"
             />
             <MeasureField
                id="weight"
@@ -625,7 +587,6 @@ function QuickLog() {
                onSourceChange={(next) =>
                   setWeightSource(next as 'EYE' | 'SCALE')
                }
-               placeholder="0"
             />
          </div>
       </div>
@@ -633,22 +594,15 @@ function QuickLog() {
 
    const fishBlock = (
       <div className="flex flex-wrap items-center justify-between gap-3">
-         <div className="flex items-baseline gap-2">
-            <span className="lab">The fish</span>
-            <span className="text-[12px] text-ink-2">Optional</span>
-         </div>
+         <span className="lab">Kept or released</span>
          <Segment
             label="Kept or released"
             value={released}
             onChange={setReleased}
             className="w-full sm:w-auto sm:min-w-[215px]"
             options={[
-               {
-                  value: 'RELEASED',
-                  label: 'Released',
-                  Icon: ArrowUturnLeftIcon,
-               },
-               { value: 'KEPT', label: 'Kept', Icon: ArchiveBoxIcon },
+               { value: 'RELEASED', label: 'Released' },
+               { value: 'KEPT', label: 'Kept' },
             ]}
          />
       </div>
@@ -705,33 +659,53 @@ function QuickLog() {
             value={notes}
             maxLength={2000}
             rows={3}
-            placeholder="A detail to remember: the bait, the tide, the take."
+            placeholder="Anything you want to remember about it."
             onChange={(event) => setNotes(event.target.value)}
          />
       </div>
    );
 
+   /*
+    * Open from the start on a desktop. This column is the shorter of the two
+    * and the fold was hiding Notes behind a heading that made the page read
+    * as finished.
+    */
    const gearFold = (
-      <div className="border-t border-b border-line">
+      <div className="border-t border-line">
          <Fold
+            open
             title="Gear, bait & notes"
             headingClassName="text-[18px] md:text-[18px]"
-            aside={gearIds.length ? `${gearIds.length} chosen` : 'Optional'}
+            aside={gearIds.length ? `${gearIds.length} chosen` : undefined}
          >
             <div className="pb-5">{gearInner}</div>
          </Fold>
       </div>
    );
 
-   const sessionLink = (
-      <button
-         type="button"
-         onClick={nothingCaught}
-         className="inline-flex min-h-9 items-center text-[12px] underline underline-offset-[3px] hover:text-teal-text"
-      >
-         Nothing caught? Log a session instead
-      </button>
-   );
+   /*
+    * With no position at all there is nothing to fold, so the map is open;
+    * but only once it is known that no fix is coming (refused, unsupported,
+    * or nothing after six seconds), never while the phone is still finding
+    * one. A fix and its status land in one render while `where` follows a
+    * beat later, so excluding "seeking" alone would still mount a map for a
+    * frame on the ordinary happy path.
+    */
+   const noFixComing =
+      fixStatus === 'denied' ||
+      fixStatus === 'unsupported' ||
+      fixStatus === 'waiting';
+   const mapOpen = pinOpen || (!where && noFixComing);
+   /*
+    * Once the map is on screen it stays until the angler says Done. A late
+    * fix arriving while they are moving it must not pull it out from under
+    * their finger; the fix still lands in `where`, and the map follows it.
+    */
+   useEffect(() => {
+      /* A latch, set from a derived value: the one render it costs is the point. */
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (mapOpen) setPinOpen(true);
+   }, [mapOpen]);
 
    const whenWhereBlock = (
       <div className="border-t-2 border-teal bg-bg-2 p-4 md:p-5">
@@ -744,32 +718,50 @@ function QuickLog() {
             }}
          />
 
+         {/*
+          * One line for a position that is already known, and the map only
+          * when it is asked for. The phone usually knows where the fish came
+          * out before the angler has named it, and a map that takes half the
+          * screen to confirm what is already right is a map in the way.
+          */}
          <div className="mt-4">
-            <MapLocationPicker
-               mapClassName="h-[240px] sm:h-[260px]"
-               latitude={where ? String(where.latitude) : ''}
-               longitude={where ? String(where.longitude) : ''}
-               onChange={(latitude, longitude) =>
-                  setWhere({ latitude, longitude, source: 'pin' })
-               }
-            />
-         </div>
+            {where ? (
+               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <span className="num text-[14px] text-ink">{whereLine}</span>
+                  <button
+                     type="button"
+                     aria-expanded={pinOpen}
+                     aria-controls="quicklog-pin"
+                     onClick={() => setPinOpen((open) => !open)}
+                     className="g-tracked inline-flex min-h-11 items-center text-[15px] text-teal-text hover:opacity-80"
+                  >
+                     {pinOpen ? 'Done' : 'Move the pin'}
+                  </button>
+               </div>
+            ) : (
+               <p className="text-[14px] text-ink-3">{whereLine}</p>
+            )}
 
-         <div className="mt-3 flex items-center gap-2 text-[13px]">
-            <WhereMark
-               aria-hidden="true"
-               className={cn(
-                  'size-4 shrink-0',
-                  where ? 'text-teal-text' : 'text-ink-3'
-               )}
-            />
-            <span className={where ? 'text-ink' : 'text-ink-3'}>
-               {whereLine}
-            </span>
+            {mapOpen ? (
+               <div id="quicklog-pin" className="mt-3">
+                  <MapLocationPicker
+                     mapClassName="h-[240px] sm:h-[260px]"
+                     readout={false}
+                     latitude={where ? String(where.latitude) : ''}
+                     longitude={where ? String(where.longitude) : ''}
+                     onChange={(latitude, longitude) => {
+                        setWhere({ latitude, longitude, source: 'pin' });
+                        /* Moving the map is using it; it stays open until
+                           the angler says it can go. */
+                        setPinOpen(true);
+                     }}
+                  />
+               </div>
+            ) : null}
          </div>
 
          {near ? (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border border-line bg-background px-3 py-2 text-[13px]">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[14px]">
                <span>
                   {filedUnder ? (
                      <>
@@ -791,7 +783,7 @@ function QuickLog() {
                   onClick={() =>
                      setNotThatSpot(filedUnder ? near.spot.id : null)
                   }
-                  className="g-tracked text-[15px] text-teal-text hover:opacity-80"
+                  className="g-tracked inline-flex min-h-11 items-center text-[15px] text-teal-text hover:opacity-80"
                >
                   {filedUnder ? 'Not this spot' : 'File it there'}
                </button>
@@ -800,42 +792,31 @@ function QuickLog() {
 
          {where && !filedUnder ? (
             <div className="mt-3">
-               <label className="flex min-h-9 cursor-pointer items-center gap-2 text-[13px]">
+               <label className="flex min-h-11 cursor-pointer items-center gap-2 text-[15px]">
                   <input
                      type="checkbox"
                      className="size-4 accent-ink"
                      checked={savingSpot}
                      onChange={(event) => setSavingSpot(event.target.checked)}
                   />
-                  Save to my fishing spots
+                  Add this as a spot
                </label>
                {savingSpot ? (
-                  <div className="mt-2 flex flex-col gap-2">
-                     <input
-                        type="text"
+                  <div className="mt-2 flex flex-col gap-3">
+                     <TextField
+                        label="Spot name"
                         value={spotName}
                         maxLength={120}
                         autoComplete="off"
-                        placeholder="Give this spot a name"
-                        aria-label="Fishing spot name"
                         onChange={(event) => setSpotName(event.target.value)}
-                        className="h-11 w-full border border-line-2 bg-background px-3 text-[15px] text-ink outline-none focus:border-ink"
                      />
                      <Segment
                         label="The spot is"
                         value={spotPublic ? 'PUBLIC' : 'PRIVATE'}
                         onChange={(next) => setSpotPublic(next === 'PUBLIC')}
                         options={[
-                           {
-                              value: 'PRIVATE',
-                              label: 'Private spot',
-                              Icon: LockClosedIcon,
-                           },
-                           {
-                              value: 'PUBLIC',
-                              label: 'Public spot',
-                              Icon: GlobeAltIcon,
-                           },
+                           { value: 'PRIVATE', label: 'Private spot' },
+                           { value: 'PUBLIC', label: 'Public spot' },
                         ]}
                      />
                   </div>
@@ -856,39 +837,34 @@ function QuickLog() {
    const sharingBlock = (
       <div className="flex flex-col gap-4">
          <div>
-            <span className="lab mb-2 block">Who can see this catch?</span>
+            <span className="lab mb-2 block">Seen by</span>
             <Segment
-               label="Who can see this catch"
+               label="Seen by"
                value={visibility}
                onChange={setVisibility}
                options={[
-                  { value: 'PUBLIC', label: 'Everyone', Icon: GlobeAltIcon },
-                  { value: 'PRIVATE', label: 'Only me', Icon: LockClosedIcon },
+                  { value: 'PUBLIC', label: 'Everyone' },
+                  { value: 'PRIVATE', label: 'Only me' },
                ]}
             />
          </div>
          {visibility === 'PUBLIC' && where ? (
             <div>
-               <span className="lab mb-2 block">Exact location</span>
+               <span className="lab mb-2 block">Exact spot</span>
                <Segment
-                  label="Exact location"
+                  label="Exact spot"
                   value={hideLocation ? 'HIDDEN' : 'SHOWN'}
                   onChange={(next) => setHideLocation(next === 'HIDDEN')}
                   options={[
-                     { value: 'HIDDEN', label: 'Hidden', Icon: EyeSlashIcon },
-                     { value: 'SHOWN', label: 'Shown', Icon: EyeIcon },
+                     { value: 'HIDDEN', label: 'Hidden' },
+                     { value: 'SHOWN', label: 'Shown' },
                   ]}
                />
             </div>
          ) : null}
-         <p
-            aria-live="polite"
-            className="flex items-start gap-2 bg-teal/10 p-2.5 text-[12px] text-teal-text"
-         >
-            <ShieldCheckIcon
-               aria-hidden="true"
-               className="mt-px size-4 shrink-0"
-            />
+         {/* The one statement of what will be published, so the footer does
+             not say it again in another wording. */}
+         <p aria-live="polite" className="text-[14px] text-ink-2">
             {privacyLine}
          </p>
       </div>
@@ -899,10 +875,9 @@ function QuickLog() {
          type="button"
          onClick={() => void save()}
          disabled={photoBusy || isSaving}
-         className="g-tracked flex min-h-[52px] w-full items-center justify-center gap-5 bg-teal px-7 text-[22px] text-teal-ink transition-[filter] duration-150 hover:brightness-95 disabled:opacity-60 md:w-auto md:min-w-[222px]"
+         className="g-tracked flex min-h-[52px] w-full items-center justify-center bg-teal px-7 text-[22px] text-teal-ink transition-[filter] duration-150 hover:brightness-95 disabled:opacity-60 md:w-auto md:min-w-[222px]"
       >
          {isSaving ? 'Saving' : photoBusy ? 'Sending the photo' : 'Save catch'}
-         <ArrowRightIcon aria-hidden="true" className="size-5" />
       </button>
    );
 
@@ -912,9 +887,9 @@ function QuickLog() {
     * then who sees it. On a desktop everything is on the one card.
     */
    const STEPS = [
-      { title: 'The catch', hint: 'Photo, species, when and where' },
-      { title: 'Size and gear', hint: 'Measurements, kept or released, gear' },
-      { title: 'Sharing', hint: 'Who sees it, then save' },
+      { title: 'The catch', hint: 'The fish, and where it came out' },
+      { title: 'Size and gear', hint: 'How big, and on what' },
+      { title: 'Sharing', hint: 'Who sees it' },
    ] as const;
    const current = STEPS[step - 1] ?? STEPS[0];
    const nextStep = () => {
@@ -938,7 +913,7 @@ function QuickLog() {
                <h1 className="g text-[30px] leading-none md:text-[34px]">
                   Log a catch
                </h1>
-               <p className="mt-1.5 max-w-[36ch] text-[13px] text-ink-2">
+               <p className="mt-1.5 max-w-[36ch] text-[14px] text-ink-2">
                   {phone
                      ? `Step ${step} of 3. ${current.hint}.`
                      : 'Start with the species. Everything else is optional.'}
@@ -973,7 +948,7 @@ function QuickLog() {
                   type="button"
                   onClick={close}
                   aria-label="Close the catch form"
-                  className="grid size-11 place-items-center border border-line hover:bg-bg-2"
+                  className="grid size-11 place-items-center rounded-full border border-line hover:bg-bg-2"
                >
                   <XMarkIcon aria-hidden="true" className="size-5" />
                </button>
@@ -1005,7 +980,6 @@ function QuickLog() {
                   <div className="flex flex-col gap-6">
                      {heading('03', current.title)}
                      {sharingBlock}
-                     {sessionLink}
                   </div>
                )}
             </div>
@@ -1018,7 +992,6 @@ function QuickLog() {
                   <div className="mt-6">{measureBlock}</div>
                   <div className="mt-5">{fishBlock}</div>
                   <div className="mt-6">{gearFold}</div>
-                  <div className="mt-3">{sessionLink}</div>
                </div>
                <aside
                   className="min-w-0"
@@ -1034,7 +1007,7 @@ function QuickLog() {
             </div>
          )}
 
-         <footer className="sticky bottom-0 z-10 border-t border-line bg-background px-4 py-3 md:px-7 md:py-4">
+         <footer className="sticky bottom-0 z-10 border-t border-line bg-background px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] md:px-7 md:py-4">
             {phone ? (
                <div className="flex items-center gap-3">
                   {step > 1 ? (
@@ -1050,30 +1023,19 @@ function QuickLog() {
                      <button
                         type="button"
                         onClick={nextStep}
-                        className="g-tracked flex min-h-[52px] flex-1 items-center justify-center gap-4 bg-ink px-6 text-[20px] text-background"
+                        className="g-tracked flex min-h-[52px] flex-1 items-center justify-center bg-ink px-6 text-[20px] text-background"
                      >
                         Next
-                        <ArrowRightIcon aria-hidden="true" className="size-5" />
                      </button>
                   ) : (
                      <div className="flex-1">{saveButton}</div>
                   )}
                </div>
             ) : (
-               <div className="flex items-center justify-between gap-5">
-                  <p className="flex items-center gap-1.5 text-[12px] text-ink-2">
-                     <ShieldCheckIcon aria-hidden="true" className="size-4" />
-                     {footerLine}
-                  </p>
+               <div className="flex items-center justify-end gap-5">
                   {saveButton}
                </div>
             )}
-            {phone && step === 3 ? (
-               <p className="mt-2 flex items-center justify-center gap-1.5 text-[12px] text-ink-2">
-                  <ShieldCheckIcon aria-hidden="true" className="size-4" />
-                  {footerLine}
-               </p>
-            ) : null}
          </footer>
       </section>
    );

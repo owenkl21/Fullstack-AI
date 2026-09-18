@@ -28,6 +28,12 @@ type MapLocationPickerProps = {
    className?: string;
    /* The map box alone, for a parent that wants it to bleed to its edges. */
    mapClassName?: string;
+   /*
+    * The coordinate readout under the map. A parent that prints the position
+    * itself, as the fast log's receipt line does, turns it off rather than
+    * showing the same pair twice.
+    */
+   readout?: boolean;
 };
 
 /* The country the first anglers fish, rather than a continent they do not. */
@@ -98,6 +104,7 @@ export function MapLocationPicker({
    onChange,
    className,
    mapClassName,
+   readout: showReadout = true,
 }: MapLocationPickerProps) {
    const fieldId = useId();
    const phone = usePhone();
@@ -170,9 +177,22 @@ export function MapLocationPicker({
          const map = createMap(node, {
             centre: start ?? DEFAULT_CENTER,
             zoom: start ? FOCUSED_ZOOM : DEFAULT_ZOOM,
-            wheelZoom: true,
+            /*
+             * The wheel belongs to the page. A map sitting inside a form is
+             * not the page, so scrolling past it should move the form rather
+             * than zoom the imagery; the plus and minus and a pinch still
+             * zoom. This is lib/leaflet's own default, stated here because
+             * this picker used to override it.
+             */
+            wheelZoom: false,
          });
          mapRef.current = map;
+         /*
+          * The first view is this code's move too. Leaflet settles it with a
+          * moveend, and reporting that as a dropped pin put the country's
+          * centre on the fast log before the phone's fix had arrived.
+          */
+         hush();
 
          map.on('movestart', () => setMoving(true));
          map.on('moveend', () => {
@@ -335,7 +355,49 @@ export function MapLocationPicker({
    const baseLabel =
       BASE_LAYERS.find((b) => b.value === base)?.label ?? 'Satellite';
    const control =
-      'grid h-11 place-items-center border border-line bg-background text-ink shadow-[0_1px_0_var(--line)] transition-[transform,background-color] duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2 active:scale-[0.96] disabled:opacity-50';
+      'grid h-11 place-items-center border border-line bg-background text-ink transition-[transform,background-color] duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2 active:scale-[0.96] disabled:opacity-50';
+
+   /*
+    * Locate and the base map. On a phone they sit in flow under the map; on a
+    * desktop they are laid over its bottom left corner, which only works from
+    * inside the `map-surface` box, since that is the nearest positioned
+    * ancestor. Rendered as a sibling of the box they measured themselves
+    * against whatever had a transform higher up the page, which on the catch
+    * form is the card itself, and landed on its footer.
+    */
+   const controls = (
+      <div
+         className={cn(
+            'z-[400] flex gap-2',
+            phone ? 'mt-2' : 'absolute bottom-3 left-3'
+         )}
+      >
+         <button
+            type="button"
+            onClick={useMyPosition}
+            disabled={isLocating}
+            aria-label={
+               isLocating ? 'Finding your position' : 'Use my position'
+            }
+            title="Use my position"
+            className={cn(control, 'w-11')}
+         >
+            <ViewfinderCircleIcon
+               className="size-6"
+               strokeWidth={1.5}
+               aria-hidden="true"
+            />
+         </button>
+         <button
+            type="button"
+            onClick={cycleBase}
+            aria-label={`Base map: ${baseLabel}. Change`}
+            className={cn(control, 'g-tracked px-3 text-[15px]')}
+         >
+            {baseLabel}
+         </button>
+      </div>
+   );
 
    /* The search. Enter asks; a link or a typed pair goes straight there. */
    const form = (
@@ -350,7 +412,7 @@ export function MapLocationPicker({
             void runSearch(query);
          }}
       >
-         <div className="flex h-11 items-center border border-line bg-background shadow-[0_1px_0_var(--line)] focus-within:border-ink">
+         <div className="flex h-11 items-center border border-line border-b-line-2 bg-background focus-within:border-ink">
             <MagnifyingGlassIcon
                aria-hidden="true"
                className="ml-3 size-5 shrink-0 text-ink-3"
@@ -375,7 +437,7 @@ export function MapLocationPicker({
                }}
                autoComplete="off"
                aria-label="Search a place, or paste a link from Maps"
-               placeholder="Search a place, or paste a Maps link"
+               placeholder="Search, or paste a Maps link"
                className="h-full min-w-0 flex-1 bg-transparent px-3 text-[16px] text-ink outline-none placeholder:text-ink-3"
             />
             <button
@@ -390,7 +452,7 @@ export function MapLocationPicker({
             <ul
                role="listbox"
                aria-label="Places found"
-               className="thread-scroll absolute right-0 left-0 z-[401] mt-1 max-h-[220px] overflow-auto border border-line bg-background shadow-[0_8px_24px_rgba(11,9,9,0.18)]"
+               className="thread-scroll absolute right-0 left-0 z-[401] mt-1 max-h-[220px] overflow-auto border border-line bg-background"
             >
                {found.map((place) => (
                   <li key={`${place.lat},${place.lng}`}>
@@ -464,38 +526,9 @@ export function MapLocationPicker({
                      <span className="absolute top-0 left-0 block h-px w-10 -translate-x-1/2 bg-white/70 mix-blend-difference" />
                      <span className="absolute top-0 left-0 block h-10 w-px -translate-y-1/2 bg-white/70 mix-blend-difference" />
                   </div>
+                  {!phone ? controls : null}
                </div>
-               <div
-                  className={cn(
-                     'z-[400] flex gap-2',
-                     phone ? 'mt-2' : 'absolute bottom-3 left-3'
-                  )}
-               >
-                  <button
-                     type="button"
-                     onClick={useMyPosition}
-                     disabled={isLocating}
-                     aria-label={
-                        isLocating ? 'Finding your position' : 'Use my position'
-                     }
-                     title="Use my position"
-                     className={cn(control, 'w-11')}
-                  >
-                     <ViewfinderCircleIcon
-                        className="size-6"
-                        strokeWidth={1.5}
-                        aria-hidden="true"
-                     />
-                  </button>
-                  <button
-                     type="button"
-                     onClick={cycleBase}
-                     aria-label={`Base map: ${baseLabel}. Change`}
-                     className={cn(control, 'g-tracked px-3 text-[15px]')}
-                  >
-                     {baseLabel}
-                  </button>
-               </div>
+               {phone ? controls : null}
             </div>
          )}
 
@@ -541,21 +574,22 @@ export function MapLocationPicker({
          ) : null}
 
          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <p className="flex flex-wrap items-baseline gap-x-3">
-               <span className="lab">Pin</span>
-               <span
-                  className={cn(
-                     'num text-[15px]',
-                     position ? 'text-ink' : 'text-ink-3'
-                  )}
-               >
-                  {readout}
-               </span>
-            </p>
+            {showReadout ? (
+               <p className="flex flex-wrap items-baseline gap-x-3">
+                  <span className="lab">Pin</span>
+                  <span
+                     className={cn(
+                        'num text-[15px]',
+                        position ? 'text-ink' : 'text-ink-3'
+                     )}
+                  >
+                     {readout}
+                  </span>
+               </p>
+            ) : null}
             {!mapFailed ? (
                <p className="text-[14px] text-ink-3">
-                  Move the map until the pin sits on the water. Scroll or pinch
-                  to zoom.
+                  Move the map until the pin sits on the water.
                </p>
             ) : null}
          </div>

@@ -1,4 +1,3 @@
-import { PlusIcon } from '@heroicons/react/24/outline';
 import axios from 'axios';
 import { useState } from 'react';
 import type { GearOption } from '@/pages/fishing/LogCatchPage';
@@ -89,9 +88,8 @@ export function AddGearInline({
          <button
             type="button"
             onClick={() => setOpen(true)}
-            className="g-tracked inline-flex min-h-11 items-center gap-2 self-start border border-line px-4 text-[15px] transition-colors duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2"
+            className="g-tracked inline-flex min-h-11 items-center self-start border border-line px-4 text-[15px] transition-colors duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2"
          >
-            <PlusIcon aria-hidden="true" className="size-[18px]" />
             Add a piece of gear
          </button>
       );

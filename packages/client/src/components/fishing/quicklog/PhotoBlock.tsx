@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { cn } from '@/lib/utils';
-import { CameraIcon, PhotoIcon } from '@heroicons/react/24/outline';
+import { usePhone } from '@/lib/media';
 
 /*
  * The photo, taken and sent while the rest of the catch is being filled in. It uses
@@ -33,6 +33,7 @@ export function PhotoBlock({
    /* A photo already sent up, when a draft is reopened. */
    initial?: UploadedPhoto | null;
 }) {
+   const phone = usePhone();
    const inputRef = useRef<HTMLInputElement>(null);
    const pickRef = useRef<HTMLInputElement>(null);
    const previewRef = useRef<string | null>(null);
@@ -289,46 +290,49 @@ export function PhotoBlock({
                onChange={(event) => onSelect(event.target.files?.[0])}
             />
             {!preview ? (
-               <>
-                  <span
-                     aria-hidden="true"
-                     className="hidden size-[52px] shrink-0 place-items-center border border-paper/30 text-teal sm:grid"
-                  >
-                     <CameraIcon className="size-6" strokeWidth={1.6} />
-                  </span>
-                  <div className="relative z-[1] min-w-0">
-                     <h3 className="g text-[22px] leading-none">
-                        Add a catch photo
-                     </h3>
-                     <p className="mt-1 text-[12px] text-paper-2">
-                        Optional. You can add one later.
-                     </p>
-                     <div className="mt-3 flex flex-wrap items-center gap-3">
+               <div className="relative z-[1] min-w-0">
+                  <h3 className="g text-[22px] leading-none">
+                     Add a catch photo
+                  </h3>
+                  <p className="mt-1 text-[14px] text-paper-2">
+                     Optional. You can add one later.
+                  </p>
+                  {/*
+                   * The camera first on a phone, because the camera is why the
+                   * phone is out. On a desktop there is no camera to open, so
+                   * both buttons would put up the same file dialog and only
+                   * one of them is offered.
+                   */}
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                     {phone ? (
                         <button
                            type="button"
-                           className="g-tracked inline-flex min-h-10 items-center gap-2 border border-paper bg-paper px-3 text-[15px] text-ink transition-[filter] duration-150 hover:brightness-95"
-                           onClick={() => pickRef.current?.click()}
-                        >
-                           <PhotoIcon aria-hidden="true" className="size-4" />
-                           Choose photo
-                        </button>
-                        <button
-                           type="button"
-                           className="g-tracked inline-flex min-h-10 items-center gap-2 border border-paper/50 px-3 text-[15px] text-paper transition-colors duration-150 hover:border-teal"
+                           className="g-tracked inline-flex min-h-11 items-center border border-paper bg-paper px-4 text-[15px] text-ink transition-[filter] duration-150 hover:brightness-95"
                            onClick={() => inputRef.current?.click()}
                         >
-                           <CameraIcon aria-hidden="true" className="size-4" />
                            Take photo
                         </button>
-                     </div>
+                     ) : null}
+                     <button
+                        type="button"
+                        className={cn(
+                           'g-tracked inline-flex min-h-11 items-center px-4 text-[15px] transition-colors duration-150',
+                           phone
+                              ? 'border border-paper/50 text-paper hover:border-teal'
+                              : 'border border-paper bg-paper text-ink hover:brightness-95'
+                        )}
+                        onClick={() => pickRef.current?.click()}
+                     >
+                        Choose photo
+                     </button>
                   </div>
-               </>
+               </div>
             ) : (
                <>
-                  <span className="pointer-events-none absolute top-2.5 left-2.5 z-[1] bg-ink/80 px-2 py-1 text-[11px] tracking-[0.12em] text-paper uppercase">
+                  <span className="pointer-events-none absolute top-2.5 left-2.5 z-[1] bg-ink/80 px-2 py-1 text-[14px] text-paper">
                      {ratio !== null && Math.abs(ratio - FRAME) > 0.02
                         ? 'As the feed shows it. Drag to place.'
-                        : 'As the feed shows it'}
+                        : 'As the feed shows it.'}
                   </span>
                   <div
                      className="absolute right-2.5 bottom-2.5 z-[1] flex items-center gap-3 bg-ink px-2.5"
@@ -336,14 +340,14 @@ export function PhotoBlock({
                   >
                      <button
                         type="button"
-                        className="g-tracked inline-flex h-10 items-center text-[15px] text-paper hover:text-teal"
+                        className="g-tracked inline-flex h-11 items-center text-[15px] text-paper hover:text-teal"
                         onClick={() => pickRef.current?.click()}
                      >
                         Change
                      </button>
                      <button
                         type="button"
-                        className="g-tracked inline-flex h-10 items-center text-[15px] text-paper hover:text-teal"
+                        className="g-tracked inline-flex h-11 items-center text-[15px] text-paper hover:text-teal"
                         onClick={clear}
                      >
                         Remove
@@ -360,7 +364,7 @@ export function PhotoBlock({
             ) : null}
          </div>
          {isUploading ? (
-            <p className="text-[12px] text-ink-3" aria-live="polite">
+            <p className="text-[14px] text-ink-3" aria-live="polite">
                Sending the photo, {progress}%.
             </p>
          ) : null}

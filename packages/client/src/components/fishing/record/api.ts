@@ -347,9 +347,26 @@ export function toReadouts(snapshot: WeatherSnapshot | null) {
    };
 }
 
+/*
+ * Whole kilometres an hour. The forecast hands back a tenth the anemometer
+ * never measured, and `SE 35.5 km/h, gusting 69.1` reads as a precision the
+ * reading does not have.
+ */
+const wholeWindSpeed = (
+   value: number | null | undefined,
+   unit: string | null | undefined
+) => {
+   const metric = toMetricWindSpeed(value, unit);
+   if (!metric) {
+      return null;
+   }
+   const figure = Number.parseFloat(metric);
+   return Number.isFinite(figure) ? String(Math.round(figure)) : null;
+};
+
 /** `SW 24 km/h, gusting 38` */
 export function describeWind(snapshot: WeatherSnapshot | null) {
-   const speed = toMetricWindSpeed(
+   const speed = wholeWindSpeed(
       snapshot?.wind?.speed?.value,
       snapshot?.wind?.speed?.unit
    );
@@ -357,12 +374,12 @@ export function describeWind(snapshot: WeatherSnapshot | null) {
       return null;
    }
    const cardinal = formatCardinal(snapshot?.wind?.direction?.cardinal);
-   const gust = toMetricWindSpeed(
+   const gust = wholeWindSpeed(
       snapshot?.wind?.gust?.value,
       snapshot?.wind?.gust?.unit
    );
-   const head = cardinal ? `${cardinal} ${speed}` : speed;
-   return gust ? `${head}, gusting ${gust.replace(' km/h', '')}` : head;
+   const head = cardinal ? `${cardinal} ${speed} km/h` : `${speed} km/h`;
+   return gust ? `${head}, gusting ${gust}` : head;
 }
 
 /** `1013 hPa` */
