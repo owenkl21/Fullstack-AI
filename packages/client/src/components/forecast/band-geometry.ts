@@ -129,8 +129,51 @@ export function quarterPath(
    return `M ${round(fromX)} ${round(fromY)} A ${round(rx)} ${round(ry)} 0 0 1 ${round(toX)} ${round(toY)}`;
 }
 
-/* Keep a label off the edges of the band; the mark it names stays put. */
-export const labelLeft = (x: number) => {
+/* A position in the band as a percentage of it, and never outside it. */
+export const bandPercent = (x: number) => {
    const percent = (x / BAND_W) * 100;
-   return Math.min(93, Math.max(7, percent));
+   return Math.min(100, Math.max(0, percent));
 };
+
+/*
+ * Where a label sits against the mark it names.
+ *
+ * It used to sit centred on the mark and clamped seven per cent in from the
+ * band's edges, and it lost its left half twice over. Once to the band's own
+ * box, because seven per cent of a band is narrower than half of "Moonset
+ * 01:15", which is why the desktop printed NSET 01:15. And again to the rail:
+ * the hours scroll sideways inside a box with the row names stuck over its
+ * left edge, so a label centred on a mark that has just come past the rail is
+ * half under it, which is why the phone printed 2:18 for a low at 12:18 and
+ * N 12:41 for high noon.
+ *
+ * So a label is never centred. It opens to the right of its mark through the
+ * first half of the day and closes to the left of it through the second,
+ * which is always the side with room in the band and always the side the
+ * reader is scrolling towards. A mark you can see brings its whole name with
+ * it, at any scroll position and any width, and none of this has to know how
+ * long the string is: the shift is the label's own width.
+ */
+export const labelAt = (x: number) => {
+   const percent = bandPercent(x);
+   const closing = percent > 55;
+   return {
+      left: `${round(percent)}%`,
+      transform: closing ? 'translateX(calc(-100% - 4px))' : 'translateX(4px)',
+   };
+};
+
+/*
+ * Where the hour the reader is standing in falls, as a share of the band.
+ *
+ * A cell row can mark now by colouring the cell. A band is one drawing across
+ * every column and has no cells to colour, so it takes the same band as a
+ * stripe laid over it at the same x, and the two line up because both are
+ * measured off the column count rather than off pixels.
+ */
+export type NowMark = { index: number; count: number };
+
+export const nowStripe = (now: NowMark) => ({
+   left: `${(now.index / now.count) * 100}%`,
+   width: `${(1 / now.count) * 100}%`,
+});

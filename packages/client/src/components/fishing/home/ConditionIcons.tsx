@@ -177,6 +177,48 @@ export function MoonPhaseIcon({
    );
 }
 
+/**
+ * The tide, as the shape it makes: water rising to a high and falling away
+ * again over a mean line. Heroicons has no tide, and the rail in the hour grid
+ * has forty four pixels to name a row with, so the row's own drawing shrunk to
+ * an icon is the honest mark for it.
+ */
+export function TideIcon({ className, ...rest }: IconProps) {
+   return (
+      <svg
+         viewBox="0 0 24 24"
+         className={cn('size-5', className)}
+         {...stroke}
+         {...rest}
+      >
+         <path d="M2 16c3.2 0 3.6-8 7-8s3.8 8 7 8 3.4-4 3.4-4" />
+         <path d="M2 19.5h20" strokeDasharray="3 2.5" />
+      </svg>
+   );
+}
+
+/**
+ * UV: the sun's rays arriving at something they burn. The plain sun already
+ * means a clear sky in this vocabulary, so the row that says how hard the
+ * light is has to be a different mark or the rail says "sun" twice.
+ */
+export function UvIcon({ className, ...rest }: IconProps) {
+   return (
+      <svg
+         viewBox="0 0 24 24"
+         className={cn('size-5', className)}
+         {...stroke}
+         {...rest}
+      >
+         <path d="M8 4.5a4.5 4.5 0 0 1 8 0" />
+         <path d="M12 2v-.5M5.6 5 4.8 4.2M18.4 5l.8-.8" />
+         <path d="M7 9.5 5 13M12 9.5V13M17 9.5 19 13" />
+         <path d="M3 17h18" />
+         <path d="M3 20.5h18" />
+      </svg>
+   );
+}
+
 /** A cloud letting go, for the chance of rain. The plain drop means humidity. */
 export function CloudRainIcon({ className, ...rest }: IconProps) {
    return (

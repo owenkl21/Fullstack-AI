@@ -97,9 +97,17 @@ export function PlaceSearch({
 
    const listId = `${id}-list`;
 
+   /*
+    * The field and the locate control share one row on a phone. Two rows for
+    * two controls is forty four pixels of a screen that has a week of weather
+    * to fit in, so the control loses its words and keeps its mark: a square
+    * the size of a thumb, named for anyone listening. On a desk it is the
+    * worded button it has always been, and there the word stands alone,
+    * because a mark beside a label is two names for one thing.
+    */
    return (
-      <div className={cn('flex flex-wrap items-start gap-3', className)}>
-         <div ref={box} className="relative w-full max-w-[420px] min-w-[240px]">
+      <div className={cn('flex items-start gap-2', className)}>
+         <div ref={box} className="relative min-w-0 flex-1 md:max-w-[420px]">
             <label htmlFor={id} className="sr-only">
                Search for a place
             </label>
@@ -198,16 +206,26 @@ export function PlaceSearch({
          </div>
 
          {showMine ? (
-            <Button
-               type="button"
-               variant="outline"
-               onClick={onUseMine}
-               disabled={locating}
-               className="h-11"
-            >
-               <MapPinIcon aria-hidden="true" />
-               {locating ? 'Finding you' : 'Where I am'}
-            </Button>
+            <>
+               <button
+                  type="button"
+                  onClick={onUseMine}
+                  disabled={locating}
+                  aria-label={locating ? 'Finding you' : 'Where I am'}
+                  className="flex size-11 shrink-0 items-center justify-center border border-line-2 text-ink transition-colors duration-150 [transition-timing-function:var(--ease)] hover:border-ink disabled:opacity-60 md:hidden"
+               >
+                  <MapPinIcon aria-hidden="true" className="size-5" />
+               </button>
+               <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onUseMine}
+                  disabled={locating}
+                  className="hidden h-11 md:inline-flex"
+               >
+                  {locating ? 'Finding you' : 'Where I am'}
+               </Button>
+            </>
          ) : null}
       </div>
    );

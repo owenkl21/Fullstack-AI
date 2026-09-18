@@ -10,10 +10,24 @@ import { skyTone, windBar } from './tones';
 /*
  * Seven days in a row, one chosen.
  *
- * Each cell says the little a day can be summed up in: the sky, the high and
- * the low, and the moon, because the moon is what a shore angler looks at
- * first when picking a day. Tabs rather than buttons: choosing one changes the
- * grid under it and nothing else.
+ * Each tab says the little a day can be summed up in: the sky, the wind as a
+ * bar, and the high and the low. Sixty four pixels wide on a phone, so five
+ * and a half stand in the screen and the sixth showing its edge is the only
+ * invitation the strip needs to be dragged.
+ *
+ * The moon leaves the tab on a phone. It is what a shore angler looks at
+ * first, so it does not leave the page: it moves down into the day's facts,
+ * where its rise and set can be printed beside it instead of a percentage
+ * standing on its own. On a desk there is room for both.
+ *
+ * On a desk it was a hundred and sixty pixels of mostly empty tab for six
+ * short things, which is a week of the year given the room of a hero. The
+ * room is used rather than added to now: the same six readings, the moon
+ * sitting on the line with the high and the low rather than under it, and
+ * the gaps closed to what separates a reading from the next one.
+ *
+ * Tabs rather than buttons: choosing one changes the instrument under it and
+ * nothing else.
  */
 const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -39,9 +53,9 @@ export function DayStrip({
    /*
     * The bar under each day is as long as that day's wind against the
     * hardest wind of the week, so the strip is read the way the hour rows
-    * are: a shape first, and the figures after it.
+    * are: a shape first, and the figures after it. The same floor as the
+    * instrument, so a calm week reads calm.
     */
-   /* The same floor as the hour rows, so a calm week reads calm. */
    const weekMax = Math.max(50, ...days.map((d) => d.windMaxKph ?? 0));
 
    return (
@@ -60,7 +74,7 @@ export function DayStrip({
              * colour, which on the chosen day would vanish into the ink the
              * tab is filled with. There it is drawn in the page ground.
              */
-            const quiet = (day.windMaxKph ?? 0) < 15;
+            const quiet = (day.windMaxKph ?? 0) < 12;
             const barFill =
                on && quiet ? 'bg-background/70' : windBar(day.windMaxKph);
             return (
@@ -74,7 +88,7 @@ export function DayStrip({
                   tabIndex={on ? 0 : -1}
                   onClick={() => onSelect(day.date)}
                   className={cn(
-                     'flex min-w-[96px] flex-1 snap-start flex-col items-center gap-1.5 border border-line px-2 py-3 transition-colors duration-150 [transition-timing-function:var(--ease)] not-first:-ml-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal',
+                     'flex min-w-16 flex-1 snap-start flex-col items-center gap-1 border border-line px-1.5 py-2 transition-colors duration-150 [transition-timing-function:var(--ease)] not-first:-ml-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal md:min-w-[96px] md:px-2',
                      on
                         ? 'relative z-10 border-ink bg-ink text-background'
                         : 'text-ink hover:border-ink'
@@ -121,21 +135,27 @@ export function DayStrip({
                         }}
                      />
                   </span>
-                  <span className="num text-[14px]">
-                     {hi === null || lo === null ? '' : `${hi}° / ${lo}°`}
-                  </span>
-                  <span
-                     className={cn(
-                        'flex items-center gap-1 text-[12px]',
-                        on ? 'text-background/80' : 'text-ink-3'
-                     )}
-                     title={day.moon.name}
-                  >
-                     <MoonPhaseIcon
-                        fraction={day.moon.fraction}
-                        className="size-3.5"
-                     />
-                     {Math.round(day.moon.illumination * 100)}%
+                  {/* The high, the low and the moon on one line from md. The
+                      moon was a line of its own carrying four characters,
+                      which cost the tab twenty six pixels to say what fits
+                      beside the temperatures. */}
+                  <span className="flex items-center gap-2">
+                     <span className="num text-[14px] leading-tight">
+                        {hi === null || lo === null ? '' : `${hi}° / ${lo}°`}
+                     </span>
+                     <span
+                        className={cn(
+                           'hidden items-center gap-1 text-[14px] leading-tight md:flex',
+                           on ? 'text-background/80' : 'text-ink-3'
+                        )}
+                        title={day.moon.name}
+                     >
+                        <MoonPhaseIcon
+                           fraction={day.moon.fraction}
+                           className="size-3.5"
+                        />
+                        {Math.round(day.moon.illumination * 100)}%
+                     </span>
                   </span>
                </button>
             );

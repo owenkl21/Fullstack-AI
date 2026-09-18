@@ -2,14 +2,6 @@ import { PageHead } from '@/components/brand/PageHead';
 import axios from 'axios';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-   CloudRainIcon,
-   DaylightIcon,
-   MoonPhaseIcon,
-   SunIconFor,
-   WindArrowIcon,
-   WindIcon,
-} from '@/components/fishing/home/ConditionIcons';
 import { DayStrip } from '@/components/forecast/DayStrip';
 import { HourGrid } from '@/components/forecast/HourGrid';
 import { PlaceSearch } from '@/components/forecast/PlaceSearch';
@@ -202,20 +194,18 @@ export function ForecastPage() {
                   : 'Pick a place')
             }
          />
-         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
-            <PlaceSearch
-               onPick={pick}
-               onUseMine={useMine}
-               locating={positionState === 'asking'}
-               near={
-                  target ??
-                  (fix
-                     ? { latitude: fix.latitude, longitude: fix.longitude }
-                     : HOME_WATERS)
-               }
-               className="w-full"
-            />
-         </div>
+         <PlaceSearch
+            onPick={pick}
+            onUseMine={useMine}
+            locating={positionState === 'asking'}
+            near={
+               target ??
+               (fix
+                  ? { latitude: fix.latitude, longitude: fix.longitude }
+                  : HOME_WATERS)
+            }
+            className="w-full"
+         />
 
          {status === 'idle' ? (
             <p className="mt-8 max-w-[52ch] text-[17px] text-ink-2">
@@ -242,11 +232,11 @@ export function ForecastPage() {
          ) : (
             <>
                {now ? (
-                  <div className="mt-8">
+                  <div className="mt-5">
                      <NowFacts snapshot={now} system={system} />
                   </div>
                ) : null}
-               <div className="mt-8">
+               <div className="mt-5">
                   <DayStrip
                      days={forecast.days}
                      selected={day.date}
@@ -256,15 +246,19 @@ export function ForecastPage() {
                   />
                </div>
 
+               {/* Closer on a desk than on a phone. The strip, its caption and
+                   the instrument are one thing being read top to bottom, and
+                   the target is all of it under the day strip in a single
+                   nine hundred pixel screen. */}
                <div
                   id="forecast-day"
                   role="tabpanel"
                   aria-labelledby={`day-${day.date}`}
-                  className="mt-8"
+                  className="mt-5 md:mt-3"
                >
                   <DayFacts key={day.date} day={day} system={system} />
 
-                  <div className="mt-8">
+                  <div className="mt-5 md:mt-4">
                      <HourGrid
                         key={day.date}
                         hours={dayHours}
@@ -276,7 +270,7 @@ export function ForecastPage() {
                   </div>
                </div>
 
-               <p className="mt-6 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[14px] text-ink-3">
+               <p className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[14px] text-ink-3">
                   <span>
                      Read {formatClock(forecast.issuedAt)}
                      {forecast.timezone
@@ -290,7 +284,7 @@ export function ForecastPage() {
                   <button
                      type="button"
                      onClick={() => setAttempt((n) => n + 1)}
-                     className="g-tracked text-[16px] text-ink underline-offset-4 hover:underline"
+                     className="g-tracked -my-3 inline-flex min-h-11 items-center text-[16px] text-ink underline-offset-4 hover:underline"
                   >
                      Read again
                   </button>
@@ -302,8 +296,22 @@ export function ForecastPage() {
 }
 
 /*
- * What the day can be summed up in, above the hours: when there is light, what
- * the moon is doing, the strongest wind and where from, the rain, the sun.
+ * What the day can be summed up in, above the hours.
+ *
+ * Four facts, never five. The tab above already says the sky, the high and
+ * the low, so printing "Clear, 19 high 13 low" under it is the same day said
+ * twice. What is left is the four things the tab cannot hold: the light, the
+ * moon with its times, the hardest wind, and whether it rains.
+ *
+ * Two columns on a phone, where a label over its sentence is the only way four
+ * facts fit. On a desk it was four columns of the same shape and it cost a
+ * whole band of height to carry about ninety characters, so from md it is one
+ * line under the day strip instead: the label inline in front of what it
+ * names, the four running across, wrapping if a moon has a lot to say. It
+ * reads as the caption to the strip above it, which is what it is.
+ *
+ * No mark beside any of them: an icon next to a word it duplicates is the
+ * oldest tell there is.
  */
 function DayFacts({
    day,
@@ -316,20 +324,12 @@ function DayFacts({
       stamped ? stamped.slice(11, 16) : null;
    const windMax = speedIn(day.windMaxKph, system);
    const gustMax = speedIn(day.windGustMaxKph, system);
-   const hi = tempIn(day.temperatureMaxC, system);
-   const lo = tempIn(day.temperatureMinC, system);
 
-   const facts: {
-      key: string;
-      icon: React.ReactNode;
-      label: string;
-      value: string;
-   }[] = [];
+   const facts: { key: string; label: string; value: string }[] = [];
 
    if (clock(day.sunrise) && clock(day.sunset)) {
       facts.push({
          key: 'light',
-         icon: <DaylightIcon aria-hidden="true" />,
          label: 'Light',
          value: `${clock(day.sunrise)} to ${clock(day.sunset)}`,
       });
@@ -349,7 +349,6 @@ function DayFacts({
 
    facts.push({
       key: 'moon',
-      icon: <MoonPhaseIcon fraction={day.moon.fraction} className="size-5" />,
       label: 'Moon',
       value:
          `${day.moon.name}, ${Math.round(day.moon.illumination * 100)}% lit` +
@@ -360,12 +359,6 @@ function DayFacts({
    if (windMax !== null) {
       facts.push({
          key: 'wind',
-         icon:
-            day.windDirectionDominant === null ? (
-               <WindIcon aria-hidden="true" />
-            ) : (
-               <WindArrowIcon degrees={day.windDirectionDominant} />
-            ),
          label: 'Wind',
          value: `Up to ${windMax} ${unitOf('speed', system)}${
             gustMax !== null ? `, gusting ${gustMax}` : ''
@@ -376,7 +369,6 @@ function DayFacts({
    if (day.precipitationProbabilityMax !== null) {
       facts.push({
          key: 'rain',
-         icon: <CloudRainIcon aria-hidden="true" />,
          label: 'Rain',
          value:
             day.precipitationProbabilityMax === 0
@@ -389,28 +381,18 @@ function DayFacts({
       });
    }
 
-   if (hi !== null && lo !== null) {
-      facts.push({
-         key: 'air',
-         icon: <SunIconFor text={day.conditionText} />,
-         label: day.conditionText ?? 'Air',
-         value: `${hi}° high, ${lo}° low`,
-      });
-   }
-
    return (
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
+      <dl className="grid grid-cols-2 gap-x-5 gap-y-3 md:flex md:flex-wrap md:items-baseline md:gap-x-7 md:gap-y-1">
          {facts.map((fact, index) => (
             <div
                key={fact.key}
-               className="fact flex items-start gap-2.5"
+               className="fact min-w-0 md:flex md:items-baseline md:gap-2"
                style={{ '--i': index } as CSSProperties}
             >
-               <span className="mt-[2px] shrink-0 text-ink-3">{fact.icon}</span>
-               <span className="min-w-0">
-                  <dt className="lab text-ink-3">{fact.label}</dt>
-                  <dd className="mt-0.5 text-[15px] text-ink">{fact.value}</dd>
-               </span>
+               <dt className="lab text-ink-3">{fact.label}</dt>
+               <dd className="text-[14px] leading-tight text-ink">
+                  {fact.value}
+               </dd>
             </div>
          ))}
       </dl>
@@ -419,39 +401,41 @@ function DayFacts({
 
 function ForecastSkeleton() {
    return (
-      <div role="status" aria-label="Reading the forecast" className="mt-8">
-         <div className="flex gap-px">
+      <div role="status" aria-label="Reading the forecast" className="mt-5">
+         <div className="-mx-4 flex gap-px px-4 md:mx-0 md:px-0">
             {[0, 1, 2, 3, 4, 5, 6].map((i) => (
                <span
                   key={i}
-                  className="shimmer h-[132px] min-w-[96px] flex-1 bg-bg-2"
+                  className="shimmer h-[118px] min-w-16 flex-1 bg-bg-2 md:h-[119px] md:min-w-[96px]"
                />
             ))}
          </div>
-         <div className="mt-8 grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5">
-            {[0, 1, 2, 3, 4].map((i) => (
-               <span key={i} className="shimmer h-10 bg-bg-2" />
+         <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-3 md:mt-3 md:flex md:gap-x-7">
+            {[0, 1, 2, 3].map((i) => (
+               <span key={i} className="shimmer h-9 bg-bg-2 md:h-5 md:flex-1" />
             ))}
          </div>
-         {/* The rows at the heights they land at: two arcs, the figures, the
-             wind bars and the tide curve, so nothing shifts under the reader. */}
-         <div className="mt-8 flex flex-col gap-px">
-            {[88, 88, 40, 40, 112, 44, 112, 40].map((height, i) => (
-               <span
-                  key={i}
-                  className="shimmer w-full bg-bg-2"
-                  style={{ height }}
-               />
-            ))}
-         </div>
+         {/* The instrument at the height it lands at, so nothing shifts under
+             the reader: the hours head, the wind bars, the tide, sky and air,
+             the two arcs, rain, swell and the control under them. The desk
+             figure is the ten rows at their md heights plus the head and the
+             hairlines between them, which is what the row table adds up to. */}
+         <div className="shimmer -mx-4 mt-5 h-[550px] bg-bg-2 md:mx-0 md:mt-4 md:h-[647px]" />
       </div>
    );
 }
 
 /*
- * Right now at the place: the figures an angler checks before leaving the
- * car, in one ruled row. Water and swell only where the sea is near enough
- * to have been read.
+ * Right now at the place, in one line.
+ *
+ * This used to print twelve figures, and the instrument below it prints nine
+ * of the same ones against the hour they belong to, with the current hour
+ * banded in teal. Saying the sky, the air, the wind, the pressure, the swell
+ * and the sea twice on one screen is how a page gets to two thousand pixels.
+ *
+ * What is left is the four readings the hours do not carry: what the air feels
+ * like on skin, how wet it is, how much cloud, and how far you can see. Those
+ * are a reading of the moment and no forecast row holds them.
  */
 function NowFacts({
    snapshot,
@@ -464,37 +448,11 @@ function NowFacts({
       typeof c === 'number'
          ? `${Math.round(tempIn(c, system) ?? c)}${unitOf('temp', system)}`
          : null;
-   const w = (kph: number | null | undefined) =>
-      typeof kph === 'number'
-         ? `${Math.round(speedIn(kph, system) ?? kph)} ${unitOf('speed', system)}`
-         : null;
    const facts: { key: string; label: string; value: string | null }[] = [
-      {
-         key: 'sky',
-         label: 'Sky',
-         value: snapshot.weatherCondition?.description?.text ?? null,
-      },
-      { key: 'air', label: 'Air', value: t(snapshot.temperature?.degrees) },
       {
          key: 'feels',
          label: 'Feels like',
          value: t(snapshot.feelsLike?.degrees),
-      },
-      {
-         key: 'wind',
-         label: 'Wind',
-         value:
-            snapshot.wind?.speed?.value != null
-               ? `${snapshot.wind.direction?.cardinal ?? ''} ${w(snapshot.wind.speed.value)}${snapshot.wind.gust?.value != null ? `, gusting ${w(snapshot.wind.gust.value)}` : ''}`.trim()
-               : null,
-      },
-      {
-         key: 'pressure',
-         label: 'Pressure',
-         value:
-            snapshot.airPressure?.meanSeaLevelMillibars != null
-               ? `${Math.round(snapshot.airPressure.meanSeaLevelMillibars)} hPa`
-               : null,
       },
       {
          key: 'humidity',
@@ -513,14 +471,6 @@ function NowFacts({
                : null,
       },
       {
-         key: 'uv',
-         label: 'UV',
-         value:
-            snapshot.uvIndex != null
-               ? String(Math.round(snapshot.uvIndex))
-               : null,
-      },
-      {
          key: 'visibility',
          label: 'Visibility',
          value:
@@ -528,49 +478,30 @@ function NowFacts({
                ? `${Math.round(snapshot.visibilityM / 1000)} km`
                : null,
       },
-      {
-         key: 'water',
-         label: 'Water',
-         value: t(snapshot.sea?.surfaceTemperatureC),
-      },
-      {
-         key: 'swell',
-         label: 'Swell',
-         value:
-            snapshot.sea?.swellHeightM != null
-               ? `${snapshot.sea.swellHeightM.toFixed(1)} m${snapshot.sea.swellPeriodS != null ? ` at ${Math.round(snapshot.sea.swellPeriodS)} s` : ''}`
-               : null,
-      },
-      {
-         key: 'sea',
-         label: 'Sea',
-         value:
-            snapshot.sea?.waveHeightM != null
-               ? `${snapshot.sea.waveHeightM.toFixed(1)} m`
-               : null,
-      },
    ];
    const shown = facts.filter((f) => f.value);
    if (shown.length === 0) return null;
    return (
-      <section aria-label="Right now" className="border-t-2 border-ink pt-4">
+      <section aria-label="Right now" className="border-t border-line pt-3">
          <div className="flex items-baseline justify-between gap-4">
-            <h2 className="g text-[26px]">Right now</h2>
-            <span className="lab text-ink-3">
+            <h2 className="lab text-teal-text">Right now</h2>
+            <p className="lab text-ink-3">
                {snapshot.observedAt
                   ? `Read ${formatClock(snapshot.observedAt)}`
                   : 'The reading of the moment'}
-            </span>
+            </p>
          </div>
-         <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-6">
+         <dl className="mt-1.5 grid grid-cols-4 gap-x-4">
             {shown.map((fact, index) => (
                <div
                   key={fact.key}
                   className="fact min-w-0"
                   style={{ '--i': index } as CSSProperties}
                >
-                  <dt className="lab text-ink-3">{fact.label}</dt>
-                  <dd className="mt-0.5 text-[17px] text-ink">{fact.value}</dd>
+                  <dt className="lab truncate text-ink-3">{fact.label}</dt>
+                  <dd className="num text-[14px] leading-tight text-ink">
+                     {fact.value}
+                  </dd>
                </div>
             ))}
          </dl>

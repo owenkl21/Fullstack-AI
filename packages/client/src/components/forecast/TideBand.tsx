@@ -2,12 +2,15 @@ import type { CSSProperties } from 'react';
 import type { ForecastHour } from './forecast-api';
 import {
    BAND_W,
+   bandPercent,
    clockOfMinutes,
    columnX,
-   labelLeft,
+   labelAt,
    smoothPath,
    turningPoints,
+   type NowMark,
 } from './band-geometry';
+import { NowStripe } from './NowStripe';
 
 /*
  * The tide, as a shape and not a table.
@@ -19,17 +22,27 @@ import {
  * kilometre grid, and the printed tables are against chart datum, so a figure
  * here would argue with the table in the tackle box and lose. So no heights
  * are printed, anywhere: the curve says when, and the tables say how much.
+ *
+ * Drawn rather than plotted. Two pixels of stroke, the water under it a teal
+ * wash, the turns small paper squares, and each turn's time sitting on a patch
+ * of the block's own colour so the dashed mean line never strikes through it.
  */
 
-const H = 96;
-const TOP = 20;
-const BOT = 62;
+const H = 84;
+const TOP = 18;
+const BOT = 56;
 
 const waterFill: CSSProperties = {
-   fill: 'color-mix(in srgb, var(--teal) 18%, transparent)',
+   fill: 'color-mix(in srgb, var(--teal) 20%, transparent)',
 };
 
-export function TideBand({ hours }: { hours: ForecastHour[] }) {
+export function TideBand({
+   hours,
+   now,
+}: {
+   hours: ForecastHour[];
+   now: NowMark | null;
+}) {
    const samples = hours.flatMap((hour, index) => {
       const level = hour.seaLevelM ?? null;
       return level === null ? [] : [{ index, level }];
@@ -99,7 +112,13 @@ export function TideBand({ hours }: { hours: ForecastHour[] }) {
            '.';
 
    return (
-      <div role="img" aria-label={sentence} className="relative h-24 w-full">
+      <div
+         role="img"
+         aria-label={sentence}
+         className="relative w-full"
+         style={{ height: H }}
+      >
+         <NowStripe now={now} />
          <svg
             aria-hidden="true"
             viewBox={`0 0 ${BAND_W} ${H}`}
@@ -120,33 +139,37 @@ export function TideBand({ hours }: { hours: ForecastHour[] }) {
                d={curve}
                pathLength={1}
                fill="none"
-               strokeWidth="1.5"
+               strokeWidth="2"
                className="draw-on stroke-ink"
             />
          </svg>
          {turns.map((turn) => (
             <span key={`${turn.kind}-${turn.clock}`} aria-hidden="true">
                <span
-                  className="absolute size-1.5 -translate-x-1/2 -translate-y-1/2 bg-ink"
+                  className="absolute size-1.5 -translate-x-1/2 -translate-y-1/2 bg-paper"
                   style={{ left: `${(turn.x / BAND_W) * 100}%`, top: turn.y }}
                />
                <span
-                  className="lab num absolute -translate-x-1/2 bg-background px-1 whitespace-nowrap text-ink"
+                  className="lab num fc-ground absolute px-1 whitespace-nowrap text-ink"
                   style={{
-                     left: `${labelLeft(turn.x)}%`,
-                     top: turn.kind === 'high' ? turn.y + 6 : turn.y - 22,
+                     ...labelAt(turn.x),
+                     top: turn.kind === 'high' ? turn.y + 5 : turn.y - 20,
                   }}
                >
                   {turn.kind === 'high' ? 'High' : 'Low'} {turn.clock}
                </span>
             </span>
          ))}
+         {/* The run words name a stretch rather than a point, so these stay
+             centred in their stretch: a word pushed to one end of an ebb
+             would be read as the moment the ebb starts. A stretch is three
+             hours at least, which is wider than the word. */}
          {runs.map((run) => (
             <span
                key={`${run.word}-${Math.round(run.x)}`}
                aria-hidden="true"
                className="lab absolute bottom-0 -translate-x-1/2 whitespace-nowrap text-ink-2"
-               style={{ left: `${labelLeft(run.x)}%` }}
+               style={{ left: `${bandPercent(run.x)}%` }}
             >
                {run.word}
             </span>

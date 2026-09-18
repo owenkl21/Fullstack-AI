@@ -52,6 +52,7 @@
    --color-warning-foreground: var(--warning-foreground);
    --color-cold: var(--cold);
    --color-warm: var(--warm);
+   --color-green: var(--green);
    --color-hot: var(--hot);
    --color-wind-2: var(--wind-2);
    --color-wind-3: var(--wind-3);
@@ -88,10 +89,16 @@
 
    /*
     * The signal colours: the only hues beside the accent, and they are only
-    * ever a reading. Cold, warm and hot carry temperature; wind bands two and
-    * three carry strong and blown-out wind, because band one is teal and a
+    * ever a reading. Cold, warm and hot carry temperature; green, wind two and
+    * wind three carry the wind as it builds, because band one is teal and a
     * light wind is a plain ink figure; rain, UV and storm carry their own
     * readings, and sun is a clear sky.
+    *
+    * Green exists for the wind ramp. Teal straight to an amber walked through
+    * the low-chroma middle of oklab and landed the speeds an angler actually
+    * reads, thirty to forty, in a grey olive. A green anchor holds the run out
+    * to the saturated side, so the bars go teal, green, yellow-green, yellow,
+    * orange, red, and each step is a colour rather than a shade of dishwater.
     *
     * Most of them appear as a color-mix tint over whichever ground the theme
     * is using, so one value reads in day and night alike and ink on the tint
@@ -101,8 +108,11 @@
     */
    --cold: #1f6fb2;
    --warm: #c97b1c;
+   --green: #37a353;
    --hot: #c0392b;
-   --wind-2: #c97b1c;
+   /* An orange, not a second amber: it has to be a step away from --sun or
+      the hard half of the wind ramp is one flat colour. */
+   --wind-2: #e0761c;
    --wind-3: #c0392b;
    --rain: #1f6fb2;
    --uv-1: #d99a1a;
@@ -155,7 +165,8 @@
     */
    --cold: #2f86cf;
    --warm: #d9902c;
-   --wind-2: #d9902c;
+   --green: #4dbc6a;
+   --wind-2: #f08a2b;
    --wind-3: #e3574a;
    --uv-1: #e0a72c;
    --uv-2: #ef8c33;
@@ -334,10 +345,17 @@
     */
    :root {
       --hang: 118px;
+      /*
+       * How far under the hang a plate's own box runs. The waterline swings
+       * below the water's box in a deep trough, and a plate that stopped at
+       * the box cut every such trough flat. The water paints over the rest.
+       */
+      --trough: 44px;
    }
    @media (max-width: 640px) {
       :root {
          --hang: 78px;
+         --trough: 30px;
       }
    }
    /*
@@ -359,7 +377,7 @@
    .plate-art {
       position: absolute;
       inset: 0;
-      bottom: calc(0px - var(--hang));
+      bottom: calc(0px - var(--hang) - var(--trough));
       overflow: hidden;
       pointer-events: none;
    }
@@ -753,6 +771,34 @@
 }
 
 /*
+ * A feed card is never cut.
+ *
+ * The card's lower half carried a fixed height with the overflow hidden, so
+ * that stacked cards would line up. They were never in a row to line up with:
+ * the feed is one column at every width. What the height did instead was
+ * measure the card by the shortest caption and then clip whatever ran past it,
+ * and the first thing past it is the footer, so a card with three lines of
+ * writing ended with the like and comment line sliced through the middle.
+ *
+ * The rule is: the photograph is the only part of a card that may be told what
+ * height to be. Words and controls take the room they need. This selector is
+ * the feed post specifically, which is the one article that names its own
+ * heading, so the landing page's record card and the skeleton are untouched.
+ *
+ * It sits outside the layers on purpose: the height it undoes is a utility,
+ * and layered CSS cannot reach a utility.
+ */
+article.blk[aria-labelledby] > div:last-of-type {
+   block-size: auto;
+   overflow: visible;
+}
+
+/* And the footer gets its own room rather than being pushed against the fold. */
+article.blk[aria-labelledby] > div:last-of-type > .rule-dashed {
+   padding-block-start: 0.875rem;
+}
+
+/*
  * Map. Raster tiles are pictures on someone else's server, so the basemap
  * cannot take the tokens the way the rest of the product does. Night is a
  * filter over the tile pane only, never over the whole map, so markers,
@@ -885,12 +931,51 @@
 }
 
 /*
- * The zoom control sits top-left by default, which is where .blk's corner tab
- * would be if a map ever lands inside one. Keep it clear of that corner.
+ * The corners a control may stand in.
+ *
+ * The zoom used to sit top left, which is the corner the map toolbar reads
+ * from, so on a desktop the plus and minus were underneath Satellite and Fish.
+ * It moves to the top right, which leaves the toolbar its corner and keeps the
+ * zoom as far from the foot of a phone screen as a map control can be. The top
+ * left inset stays because .blk's teal corner tab would land there if a map
+ * ever sits inside a black block.
  */
-.map-surface .leaflet-top.leaflet-left {
+.map-surface .leaflet-top.leaflet-left,
+.map-surface .leaflet-top.leaflet-right {
    top: 0.75rem;
+}
+.map-surface .leaflet-top.leaflet-left {
    left: 0.75rem;
+}
+.map-surface .leaflet-top.leaflet-right {
+   right: 0.75rem;
+}
+
+/*
+ * The pin being dropped, while it is being named.
+ *
+ * It stands above every other mark, so the one pin the angler is holding is
+ * never lost among the spots and slipways under it. The !important is not
+ * decoration: Leaflet writes a z-index into the marker's style attribute from
+ * its latitude, and there is no other way to outrank that.
+ *
+ * It lands rather than appearing, which is the one motion on this gesture.
+ */
+.map-pin-drop {
+   z-index: 650 !important;
+}
+.map-pin-drop .map-pin-svg {
+   animation: pin-land 320ms var(--ease) 1;
+}
+@keyframes pin-land {
+   from {
+      transform: translateY(-14px);
+      opacity: 0;
+   }
+   to {
+      transform: translateY(0);
+      opacity: 1;
+   }
 }
 .map-pin-icon {
    display: block;
@@ -989,50 +1074,36 @@
    }
 }
 
-/* ---- Forecast tones -------------------------------------------------------- */
+/* ---- The forecast instrument ----------------------------------------------- */
 /*
- * Tints sit behind the theme's own ink, so they read in day and night. The
- * loud bands are solid with their own paper text, in both themes. Every hue
- * here is a signal token, so a bar, a tint and a curve all pull from the same
- * palette and a reader learns the colours once.
+ * The hours are drawn inside an always-black block, which is this product's
+ * word for the things that matter. That decides the colour rules here.
+ *
+ * Every tint in the instrument is a continuous mix of a signal token over the
+ * block's own ground, computed per hour in `forecast/tones.ts` rather than
+ * banded into classes: air moves a degree an hour and a stepped tint jumps
+ * between two cells a body could not tell apart. The classes left here are the
+ * two grounds no utility can name, because inside `.blk` the ink and surface
+ * tokens are already remapped.
  */
-.tone {
-   border-radius: 0;
+/*
+ * The block's OWN colour, for anything that has to sit on it and hide what
+ * runs underneath: the sticky rail the hours slide behind, and a label on a
+ * dashed rule. It asks for --bg, which is var(--black) by day and #161414 at
+ * night, where --background stays black and would show as a dark hole against
+ * a lifted night block.
+ */
+.fc-ground {
+   background: var(--bg);
 }
-.tone-rain-1 {
-   background: color-mix(in srgb, var(--rain) 14%, transparent);
-}
-.tone-rain-2 {
-   background: color-mix(in srgb, var(--rain) 32%, transparent);
-}
-.tone-rain-3 {
-   background: var(--rain);
-   color: var(--paper);
-}
-.tone-rain-3 * {
-   color: var(--paper);
-}
-.tone-water-cold {
-   background: color-mix(in srgb, var(--cold) 16%, transparent);
-}
-.tone-water-warm {
-   background: color-mix(in srgb, var(--warm) 18%, transparent);
-}
-.tone-sky-clear {
-   background: color-mix(in srgb, var(--sun) 12%, transparent);
-}
-.tone-sky-grey {
-   background: color-mix(in srgb, var(--ink) 8%, transparent);
-}
-.tone-sky-rain {
-   background: color-mix(in srgb, var(--rain) 22%, transparent);
-}
-.tone-sky-storm {
-   background: var(--storm);
-   color: var(--paper);
-}
-.tone-sky-storm * {
-   color: var(--paper);
+/*
+ * The hour the reader is standing in, carried down every row as one band
+ * rather than a highlight per cell, so the eye drops straight through wind,
+ * tide and sky to the same minute. Translucent, so the tint and the bar in
+ * that hour still say what they were saying.
+ */
+.fc-now {
+   background: color-mix(in srgb, var(--teal) 14%, transparent);
 }
 
 /* ---- Bars and curves in the hour grid -------------------------------------- */
