@@ -7,7 +7,6 @@ import {
    LifebuoyIcon,
    TruckIcon,
 } from '@heroicons/react/24/outline';
-import { FishMark } from '@/components/brand/FishMark';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster';
@@ -160,9 +159,10 @@ const glyphMarkup = (
       })
    );
 
-const GLYPH_ICON: Record<PinKind, ComponentType<SVGProps<SVGSVGElement>>> = {
-   spot: FishMark,
-   other: FishMark,
+const GLYPH_ICON: Record<
+   Exclude<PinKind, 'spot' | 'other'>,
+   ComponentType<SVGProps<SVGSVGElement>>
+> = {
    waypoint: FlagIcon,
    ramp: ArrowDownRightIcon,
    marina: LifebuoyIcon,
@@ -171,11 +171,59 @@ const GLYPH_ICON: Record<PinKind, ComponentType<SVGProps<SVGSVGElement>>> = {
 };
 
 /*
+ * The mark a spot wears: the product's own logo, not a drawing of it.
+ *
+ * It is Owen's artwork, the same file the header carries, and it arrives as a
+ * raster with the drawing in its alpha. A pin head is teal or near black by
+ * turns, so the mark cannot be painted in its own colours: the filter floods
+ * the head's ink and keeps it only where the artwork has alpha, which is the
+ * drawing itself in whatever colour the pin needs.
+ *
+ * The filter is named after the colour it floods rather than being made
+ * unique per pin. Leaflet writes every icon into the document as its own
+ * markup, so ids repeat; naming them by ink means the copies that collide are
+ * identical, and two pins of different kinds never share one.
+ */
+const MARK_URL = '/brand/fishtagram-mark.png';
+
+const fishMarkup = (ink: string, size: number, x: number, y: number) => {
+   const id = `mark-${ink.replace(/[^a-z0-9]/gi, '')}`;
+   return (
+      `<svg x="${x}" y="${y}" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">` +
+      `<defs><filter id="${id}" x="0" y="0" width="100%" height="100%">` +
+      `<feFlood flood-color="${ink}" result="ink"/>` +
+      `<feComposite in="ink" in2="SourceGraphic" operator="in"/>` +
+      `</filter></defs>` +
+      `<image href="${MARK_URL}" x="0" y="0" width="24" height="24" preserveAspectRatio="xMidYMid meet" filter="url(#${id})"/>` +
+      `</svg>`
+   );
+};
+
+/* The mark a kind carries: the house fish for a spot, a Heroicon for a place. */
+const markMarkup = (
+   kind: PinKind,
+   ink: string,
+   size: number,
+   x: number,
+   y: number,
+   strokeWidth: number
+) =>
+   kind === 'spot' || kind === 'other'
+      ? fishMarkup(ink, size, x, y)
+      : glyphMarkup(GLYPH_ICON[kind], ink, size, x, y, strokeWidth);
+
+/*
  * The body colour of each kind. Saturated or dark, always inside a paper
  * stroke, because the base is a photograph and can be any colour underneath.
+ *
+ * `mark` is the mark's own colour, which is not always the ink. The mark is
+ * the product's logo, a drawing of fine lines, and on a teal head those lines
+ * read in paper and close into a blot in the dark ink the count needs. So the
+ * count keeps the ink it needs to be legible and the drawing gets the colour
+ * it needs to be seen.
  */
-const BODY: Record<PinKind, { fill: string; ink: string }> = {
-   spot: { fill: 'var(--teal)', ink: '#06232a' },
+const BODY: Record<PinKind, { fill: string; ink: string; mark?: string }> = {
+   spot: { fill: 'var(--teal)', ink: '#06232a', mark: '#f4f1ec' },
    other: { fill: '#14110f', ink: '#f4f1ec' },
    waypoint: { fill: '#f4f1ec', ink: '#0b0909' },
    ramp: { fill: '#1f6fb2', ink: '#f4f1ec' },
@@ -211,7 +259,12 @@ const SHADOW =
  * yours teal, theirs near black, a private mark paper, the places in their
  * own colours. The shape is the same for all so the map reads as one map.
  */
-export const kindPin = (kind: PinKind, count?: number | null): L.DivIcon => {
+export const kindPin = (
+   kind: PinKind,
+   count?: number | null,
+   /* An extra class for a pin with a job, such as the one you can drag. */
+   extra?: string
+): L.DivIcon => {
    const n = typeof count === 'number' && count > 0 ? count : null;
    const body = BODY[kind];
    const small = kind === 'waypoint';
@@ -219,23 +272,31 @@ export const kindPin = (kind: PinKind, count?: number | null): L.DivIcon => {
    const h = small ? 36 : 46;
    const cx = small ? 14 : 18;
    const cy = small ? 14 : 18;
-   const glyphSize = small ? 14 : 18;
+   /*
+    * The logo is a drawing rather than a glyph, so it needs more of the head
+    * than a Heroicon does: at eighteen pixels its lines run together, at
+    * twenty four it is a bass leaving the water.
+    */
+   const isMark = kind === 'spot' || kind === 'other';
+   const glyphSize = small ? 14 : isMark ? 24 : 18;
+   const markInk = body.mark ?? body.ink;
 
    /*
-    * A spot with fish on it shows the fish and the number, side by side in
-    * the head: the mark says what the count is of, the count says how much.
-    * Past two digits the number takes the whole head on its own.
+    * One thing in the head, never two.
+    *
+    * The mark and the number were set side by side, each shrunk to make room
+    * for the other, and a sixteen pixel head is not big enough to hold a
+    * drawing and a figure without both of them losing. A spot that has fish on
+    * it shows the count, because that is the thing that differs from the spot
+    * next to it; a spot with none shows the mark, because then the only
+    * question is what kind of thing this is.
     */
    const label = n ? (n > 99 ? '99+' : String(n)) : '';
-   const wide = n !== null && (n > 99 || n >= 10);
    const face = n
-      ? wide
-         ? `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-family="var(--font-display), 'League Gothic', sans-serif" font-size="${n > 99 ? 12 : 15}" letter-spacing="0.02em" fill="${body.ink}">${label}</text>`
-         : glyphMarkup(GLYPH_ICON[kind], body.ink, 12, cx - 12, cy - 6, 2.4) +
-           `<text x="${cx + 1}" y="${cy}" text-anchor="start" dominant-baseline="central" font-family="var(--font-display), 'League Gothic', sans-serif" font-size="16" letter-spacing="0.02em" fill="${body.ink}">${label}</text>`
-      : glyphMarkup(
-           GLYPH_ICON[kind],
-           body.ink,
+      ? `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-family="var(--font-display), 'League Gothic', sans-serif" font-size="${n > 99 ? 15 : 20}" letter-spacing="0.02em" fill="${body.ink}">${label}</text>`
+      : markMarkup(
+           kind,
+           markInk,
            glyphSize,
            cx - glyphSize / 2,
            cy - glyphSize / 2,
@@ -251,12 +312,36 @@ export const kindPin = (kind: PinKind, count?: number | null): L.DivIcon => {
 
    return L.divIcon({
       html,
-      className: `map-pin map-pin-kind map-pin-${kind}`,
+      className: `map-pin map-pin-kind map-pin-${kind}${extra ? ` ${extra}` : ''}`,
       iconSize: [w, h],
       /* The tip, not the middle, sits on the coordinate. */
       iconAnchor: [w / 2, h - 1],
       popupAnchor: [0, -(h - 6)],
    });
+};
+
+/**
+ * The pin a person puts where the fish came out.
+ *
+ * Deliberately the same teardrop a saved spot wears, because the pin you drag
+ * on the form is the pin you will find on the map afterwards; a picker with a
+ * shape of its own would teach the map's vocabulary twice. Only the class
+ * differs, so a test can take hold of it.
+ */
+export const DROP_PIN_CLASS = 'map-pin-drop';
+
+export const dropPin = (): L.DivIcon => {
+   const icon = kindPin('spot', null, DROP_PIN_CLASS);
+   /*
+    * The same drawing in a wider box. A pin is 36 across, and 36 is a small
+    * thing to find with a thumb on a moving boat; a control here is 44. The
+    * extra eight are transparent and split either side, so the tip still
+    * stands on the coordinate.
+    */
+   icon.options.html = `<span style="display:flex;justify-content:center;width:44px">${String(icon.options.html)}</span>`;
+   icon.options.iconSize = [44, 46];
+   icon.options.iconAnchor = [22, 45];
+   return icon;
 };
 
 export type CreateMapOptions = {

@@ -3,11 +3,13 @@ import {
    MagnifyingGlassIcon,
    ViewfinderCircleIcon,
 } from '@heroicons/react/24/outline';
-import type { Map as LeafletMap } from 'leaflet';
+import type { Map as LeafletMap, Marker as LeafletMarker } from 'leaflet';
 import { Button } from '@/components/ui/button';
 import {
    BASE_LAYERS,
+   L,
    createMap,
+   dropPin,
    refreshSize,
    setBaseLayer,
    type BaseLayer,
@@ -19,7 +21,6 @@ import {
    type MapPosition,
 } from '@/lib/maps';
 import { cn } from '@/lib/utils';
-import { usePhone } from '@/lib/media';
 
 type MapLocationPickerProps = {
    latitude: string;
@@ -34,6 +35,12 @@ type MapLocationPickerProps = {
     * showing the same pair twice.
     */
    readout?: boolean;
+   /*
+    * Where the position came from, in the words the record uses: `From the
+    * photograph`, `Phone fix`. Printed before the coordinates so the readout
+    * is the one place that says what this pin is standing on.
+    */
+   source?: string | null;
 };
 
 /* The country the first anglers fish, rather than a continent they do not. */
@@ -42,6 +49,12 @@ const DEFAULT_ZOOM = 5;
 const FOCUSED_ZOOM = 15;
 /* About a tenth of a metre: closer than this is the same pin. */
 const SAME_POSITION = 0.000001;
+/* One arrow key press. Short enough to sit the pin on a gully mouth. */
+const NUDGE_METRES = 10;
+const METRES_PER_DEGREE = 111320;
+
+const PIN_LABEL =
+   'The pin. Drag it, or move it ten metres a press with the arrow keys.';
 
 type Found = { label: string; lat: number; lng: number };
 
@@ -89,14 +102,32 @@ const readPair = (text: string): MapPosition | null => {
    return m ? readPosition(m[1] ?? '', m[2] ?? '') : null;
 };
 
+const samePlace = (a: MapPosition | null, b: MapPosition) =>
+   Boolean(
+      a &&
+      Math.abs(a.lat - b.lat) < SAME_POSITION &&
+      Math.abs(a.lng - b.lng) < SAME_POSITION
+   );
+
+const reduceMotion = () =>
+   typeof window !== 'undefined' &&
+   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 /**
- * The pin is fixed and the map moves under it.
+ * A pin you can take hold of.
  *
- * Dropping a pin by tapping a small map on a phone is a game of skill, and
- * dragging one with a mouse is fiddly. Moving the map until the crosshair
- * sits on the water is neither: pan, pinch, scroll, and the position is
- * wherever the map came to rest. Search, a pasted Maps link, a typed pair
- * or your own position all just move the map.
+ * It used to be a crosshair painted over the middle of the map, with the map
+ * sliding underneath it. That reads as a target rather than a pin: there is
+ * nothing to grab, dragging moves the world instead of the mark, and a
+ * position arriving from a photograph moved nothing anyone could see. Now the
+ * pin is a real marker, the same teardrop a saved spot wears, and there are
+ * three ways to put it somewhere: drag it, tap the map, or name the place in
+ * the search. Dragging the map pans the map and leaves the pin where it was.
+ *
+ * Only the reader's own moves are reported. A drag end and a tap are the
+ * whole of that; everything this code does to the marker itself is silent, so
+ * the form's own updates can never come back as a dropped pin and outrank the
+ * photograph that caused them. The first view is not a move either.
  */
 export function MapLocationPicker({
    latitude,
@@ -105,30 +136,22 @@ export function MapLocationPicker({
    className,
    mapClassName,
    readout: showReadout = true,
+   source = null,
 }: MapLocationPickerProps) {
    const fieldId = useId();
-   const phone = usePhone();
    const mapContainerRef = useRef<HTMLDivElement | null>(null);
    const mapRef = useRef<LeafletMap | null>(null);
-   const lastSentRef = useRef<MapPosition | null>(null);
-   /*
-    * Moves made by this code (following the form, Leaflet's own resize
-    * nudge) are not the reader's. A short silent window after each one
-    * keeps the resulting moveend from being reported as a dropped pin,
-    * which would then outrank a photograph's own position.
-    */
-   const silentUntil = useRef(0);
-   const hush = () => {
-      silentUntil.current = Date.now() + 500;
-   };
+   const markerRef = useRef<LeafletMarker | null>(null);
    const onChangeRef = useRef(onChange);
    const startRef = useRef<MapPosition | null>(
       readPosition(latitude, longitude)
    );
+   /* The last position this picker put on the form, or took from it. */
+   const lastSentRef = useRef<MapPosition | null>(startRef.current);
    const searchRequest = useRef<AbortController | null>(null);
 
    const [mapFailed, setMapFailed] = useState(false);
-   const [moving, setMoving] = useState(false);
+   const [hasPin, setHasPin] = useState(Boolean(startRef.current));
    const [base, setBase] = useState<BaseLayer>('satellite');
    const [isLocating, setIsLocating] = useState(false);
    const [note, setNote] = useState<string | null>(null);
@@ -147,24 +170,108 @@ export function MapLocationPicker({
 
    const position = readPosition(latitude, longitude);
 
-   const send = useCallback((next: MapPosition) => {
+   /* The one way out to the form. Nothing else calls onChange. */
+   const report = useCallback((next: MapPosition) => {
       lastSentRef.current = next;
       onChangeRef.current(next.lat, next.lng);
    }, []);
 
-   /* Fly the map so its centre is the position; moveend then sends it. */
-   const goTo = useCallback((next: MapPosition, zoomIn = true) => {
+   /*
+    * Arrow keys on the focused pin. A marker is reachable by tab, and Leaflet
+    * would otherwise pan the map under it, which moves everything except the
+    * thing the keys are pointed at. Ten metres a press, ten times that with
+    * shift, and the map only follows when the pin would leave the view.
+    */
+   const onPinKey = useCallback(
+      (event: KeyboardEvent) => {
+         const marker = markerRef.current;
+         if (!marker) return;
+         const steps: Record<string, [number, number]> = {
+            ArrowUp: [0, 1],
+            ArrowDown: [0, -1],
+            ArrowLeft: [-1, 0],
+            ArrowRight: [1, 0],
+         };
+         const step = steps[event.key];
+         if (!step) return;
+         event.preventDefault();
+         event.stopPropagation();
+         const at = marker.getLatLng();
+         const metres = event.shiftKey ? NUDGE_METRES * 10 : NUDGE_METRES;
+         const shrink = Math.max(Math.cos((at.lat * Math.PI) / 180), 0.05);
+         const next: MapPosition = {
+            lat: at.lat + (step[1] * metres) / METRES_PER_DEGREE,
+            lng: at.lng + (step[0] * metres) / (METRES_PER_DEGREE * shrink),
+         };
+         marker.setLatLng([next.lat, next.lng]);
+         mapRef.current?.panInside([next.lat, next.lng], {
+            padding: [48, 48],
+         });
+         report(next);
+      },
+      [report]
+   );
+
+   /* The pin, put down or moved. Silent: the callers say what to report. */
+   const placePin = useCallback(
+      (at: MapPosition) => {
+         const map = mapRef.current;
+         if (!map) return;
+         const standing = markerRef.current;
+         if (standing) {
+            standing.setLatLng([at.lat, at.lng]);
+            return;
+         }
+         const marker = L.marker([at.lat, at.lng], {
+            icon: dropPin(),
+            draggable: true,
+            /* Reachable by tab, which is what makes the arrow keys possible. */
+            keyboard: true,
+            /* Dragged to the edge, the map comes along rather than stopping. */
+            autoPan: true,
+            autoPanPadding: [36, 36],
+            riseOnHover: true,
+            title: PIN_LABEL,
+         }).addTo(map);
+         marker.on('dragend', () => {
+            const at2 = marker.getLatLng();
+            report({ lat: at2.lat, lng: at2.lng });
+         });
+         markerRef.current = marker;
+         const el = marker.getElement();
+         if (el) {
+            el.setAttribute('role', 'button');
+            el.setAttribute('aria-label', PIN_LABEL);
+            el.addEventListener('keydown', onPinKey);
+         }
+         setHasPin(true);
+      },
+      [onPinKey, report]
+   );
+
+   /* Bring a position into view. Never reports: moving the map is not a move. */
+   const flyTo = useCallback((next: MapPosition, zoomIn = true) => {
       const map = mapRef.current;
-      if (!map) {
-         lastSentRef.current = next;
-         onChangeRef.current(next.lat, next.lng);
-         return;
-      }
+      if (!map) return;
       const zoom = zoomIn
          ? Math.max(map.getZoom(), FOCUSED_ZOOM)
          : map.getZoom();
-      map.setView([next.lat, next.lng], zoom, { animate: true });
+      if (reduceMotion()) {
+         map.setView([next.lat, next.lng], zoom, { animate: false });
+         return;
+      }
+      map.flyTo([next.lat, next.lng], zoom, { duration: 0.9 });
    }, []);
+
+   /* A position the reader chose: pin, view and form, in that order. */
+   const put = useCallback(
+      (next: MapPosition, zoomIn = true) => {
+         placePin(next);
+         flyTo(next, zoomIn);
+         report(next);
+      },
+      [flyTo, placePin, report]
+   );
 
    useEffect(() => {
       const node = mapContainerRef.current;
@@ -187,33 +294,16 @@ export function MapLocationPicker({
             wheelZoom: false,
          });
          mapRef.current = map;
-         /*
-          * The first view is this code's move too. Leaflet settles it with a
-          * moveend, and reporting that as a dropped pin put the country's
-          * centre on the fast log before the phone's fix had arrived.
-          */
-         hush();
+         if (start) placePin(start);
 
-         map.on('movestart', () => setMoving(true));
-         map.on('moveend', () => {
-            setMoving(false);
-            if (Date.now() < silentUntil.current) return;
-            const c = map.getCenter();
-            const next = { lat: c.lat, lng: c.lng };
-            const last = lastSentRef.current;
-            if (
-               last &&
-               Math.abs(last.lat - next.lat) < SAME_POSITION &&
-               Math.abs(last.lng - next.lng) < SAME_POSITION
-            )
-               return;
-            send(next);
+         /* Tapping the map is the other way to put the pin somewhere. */
+         map.on('click', (event) => {
+            const { lat, lng } = event.latlng;
+            placePin({ lat, lng });
+            report({ lat, lng });
          });
 
-         observer = new ResizeObserver(() => {
-            hush();
-            refreshSize(map);
-         });
+         observer = new ResizeObserver(() => refreshSize(map));
          observer.observe(node);
       } catch (error) {
          console.error(error);
@@ -222,31 +312,32 @@ export function MapLocationPicker({
 
       return () => {
          observer?.disconnect();
+         markerRef.current = null;
          mapRef.current?.remove();
          mapRef.current = null;
       };
-   }, [send]);
+   }, [placePin, report]);
 
-   /* The map follows the form, but not the move it just reported itself. */
+   /*
+    * The map follows the form. A phone fix or a photograph's own position
+    * arrives this way, and the pin has to be seen to land on it, so the map
+    * flies rather than jumping. The move it just reported itself is skipped,
+    * or the pin would chase its own tail.
+    */
    useEffect(() => {
       if (mapFailed) return;
       const next = readPosition(latitude, longitude);
-      if (!next) return;
-      const last = lastSentRef.current;
-      if (
-         last &&
-         Math.abs(last.lat - next.lat) < SAME_POSITION &&
-         Math.abs(last.lng - next.lng) < SAME_POSITION
-      )
+      if (!next) {
+         markerRef.current?.remove();
+         markerRef.current = null;
+         setHasPin(false);
          return;
+      }
+      if (samePlace(lastSentRef.current, next)) return;
       lastSentRef.current = next;
-      hush();
-      mapRef.current?.setView(
-         [next.lat, next.lng],
-         Math.max(mapRef.current.getZoom(), FOCUSED_ZOOM),
-         { animate: false }
-      );
-   }, [latitude, longitude, mapFailed]);
+      placePin(next);
+      flyTo(next);
+   }, [latitude, longitude, mapFailed, flyTo, placePin]);
 
    const useMyPosition = () => {
       if (!navigator.geolocation) {
@@ -257,14 +348,14 @@ export function MapLocationPicker({
       setProblem(null);
       navigator.geolocation.getCurrentPosition(
          ({ coords }) => {
-            goTo({ lat: coords.latitude, lng: coords.longitude });
+            put({ lat: coords.latitude, lng: coords.longitude });
             setIsLocating(false);
-            setNote('Centred on your position.');
+            setNote('The pin is on your position.');
          },
          () => {
             setIsLocating(false);
             setProblem(
-               'Could not get your position. Allow location in your browser, or move the map yourself.'
+               'Could not get your position. Allow location in your browser, or tap the map yourself.'
             );
          },
          { enableHighAccuracy: true, timeout: 10000 }
@@ -280,14 +371,14 @@ export function MapLocationPicker({
 
       const link = parseGoogleMapsCoordinates(q);
       if (link) {
-         goTo({ lat: link.parsedLatitude, lng: link.parsedLongitude });
-         setNote('Position taken from the link.');
+         put({ lat: link.parsedLatitude, lng: link.parsedLongitude });
+         setNote('The pin is on the position from the link.');
          setQuery('');
          return;
       }
       const pair = readPair(q);
       if (pair) {
-         goTo(pair);
+         put(pair);
          setQuery('');
          return;
       }
@@ -307,7 +398,7 @@ export function MapLocationPicker({
          if (places.length === 0) {
             setProblem('Nothing found by that name. Try the nearest town.');
          } else if (places.length === 1 && places[0]) {
-            goTo(places[0]);
+            put(places[0]);
             setQuery('');
          } else {
             setFound(places);
@@ -315,7 +406,7 @@ export function MapLocationPicker({
       } catch (error) {
          if (!controller.signal.aborted) {
             console.error(error);
-            setProblem('The search did not answer. Move the map by hand.');
+            setProblem('The search did not answer. Tap the map instead.');
          }
       } finally {
          if (!controller.signal.aborted) setSearching(false);
@@ -345,74 +436,42 @@ export function MapLocationPicker({
          return;
       }
       setProblem(null);
-      send(next);
+      put(next);
    };
 
    const typed = draft ?? { lat: latitude, lng: longitude };
-   const readout = position
+   const pair = position
       ? `${formatCoordinate(position.lat)}, ${formatCoordinate(position.lng)}`
-      : 'Move the map to set it';
+      : 'No pin yet';
    const baseLabel =
       BASE_LAYERS.find((b) => b.value === base)?.label ?? 'Satellite';
+   /*
+    * Square and 44px, the same control as Leaflet's own plus and minus sitting
+    * in the corner of the map above them. A round button here would be the one
+    * circle on a page of squares.
+    */
    const control =
       'grid h-11 place-items-center border border-line bg-background text-ink transition-[transform,background-color] duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2 active:scale-[0.96] disabled:opacity-50';
 
-   /*
-    * Locate and the base map. On a phone they sit in flow under the map; on a
-    * desktop they are laid over its bottom left corner, which only works from
-    * inside the `map-surface` box, since that is the nearest positioned
-    * ancestor. Rendered as a sibling of the box they measured themselves
-    * against whatever had a transform higher up the page, which on the catch
-    * form is the card itself, and landed on its footer.
-    */
-   const controls = (
-      <div
-         className={cn(
-            'z-[400] flex gap-2',
-            phone ? 'mt-2' : 'absolute bottom-3 left-3'
-         )}
-      >
-         <button
-            type="button"
-            onClick={useMyPosition}
-            disabled={isLocating}
-            aria-label={
-               isLocating ? 'Finding your position' : 'Use my position'
-            }
-            title="Use my position"
-            className={cn(control, 'w-11')}
-         >
-            <ViewfinderCircleIcon
-               className="size-6"
-               strokeWidth={1.5}
-               aria-hidden="true"
-            />
-         </button>
-         <button
-            type="button"
-            onClick={cycleBase}
-            aria-label={`Base map: ${baseLabel}. Change`}
-            className={cn(control, 'g-tracked px-3 text-[15px]')}
-         >
-            {baseLabel}
-         </button>
-      </div>
-   );
+   const hint = hasPin
+      ? 'Drag the pin, or tap the map, to move it.'
+      : 'Tap the map to drop the pin.';
 
-   /* The search. Enter asks; a link or a typed pair goes straight there. */
+   /*
+    * The search sits on top of the map and shares its edge, so the two read as
+    * one instrument rather than a field that happens to be near a picture.
+    * Enter asks; a link or a typed pair goes straight there.
+    */
    const form = (
       <form
          role="search"
-         className={cn(
-            'z-[400]',
-            phone ? 'relative mb-2' : 'absolute top-3 right-3 left-3'
-         )}
+         className="relative z-[400]"
          onSubmit={(event) => {
             event.preventDefault();
             void runSearch(query);
          }}
       >
-         <div className="flex h-11 items-center border border-line border-b-line-2 bg-background focus-within:border-ink">
+         <div className="flex h-11 items-center border border-line bg-background focus-within:border-ink">
             <MagnifyingGlassIcon
                aria-hidden="true"
                className="ml-3 size-5 shrink-0 text-ink-3"
@@ -461,7 +520,7 @@ export function MapLocationPicker({
                         role="option"
                         aria-selected={false}
                         onClick={() => {
-                           goTo(place);
+                           put(place);
                            setFound(null);
                            setQuery('');
                         }}
@@ -476,6 +535,36 @@ export function MapLocationPicker({
       </form>
    );
 
+   /* Under the map, in flow: where I am, and which map to draw. */
+   const controls = (
+      <div className="mt-2 flex gap-2">
+         <button
+            type="button"
+            onClick={useMyPosition}
+            disabled={isLocating}
+            aria-label={
+               isLocating ? 'Finding your position' : 'Put the pin where I am'
+            }
+            title="Put the pin where I am"
+            className={cn(control, 'w-11')}
+         >
+            <ViewfinderCircleIcon
+               className="size-6"
+               strokeWidth={1.5}
+               aria-hidden="true"
+            />
+         </button>
+         <button
+            type="button"
+            onClick={cycleBase}
+            aria-label={`Base map: ${baseLabel}. Change`}
+            className={cn(control, 'g-tracked px-3 text-[15px]')}
+         >
+            {baseLabel}
+         </button>
+      </div>
+   );
+
    return (
       <div className={cn('grid gap-3', className)}>
          {mapFailed ? (
@@ -483,52 +572,20 @@ export function MapLocationPicker({
                The map cannot be drawn here. Type the position or use your own.
             </p>
          ) : (
-            <div className={cn(phone && 'flex flex-col')}>
-               {phone ? form : null}
+            <div className="flex flex-col">
+               {form}
                <div
+                  /* The base is on the element so the night rule can leave a
+                     photograph alone and only invert the drawn maps. */
+                  data-base={base}
                   className={cn(
-                     'map-surface relative h-[340px] overflow-hidden border border-line sm:h-[440px]',
+                     'map-surface relative h-[280px] overflow-hidden border border-line border-t-0 md:h-[320px]',
                      mapClassName
                   )}
                >
                   <div ref={mapContainerRef} className="absolute inset-0" />
-                  {!phone ? form : null}
-
-                  {/* The pin. Fixed at the centre; the map moves under it. */}
-                  <div
-                     aria-hidden="true"
-                     className="pointer-events-none absolute top-1/2 left-1/2 z-[400]"
-                  >
-                     <span
-                        className={cn(
-                           'absolute top-0 left-0 block size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/45 blur-[1.5px] transition-transform duration-200 [transition-timing-function:var(--ease)]',
-                           moving ? 'scale-[1.6]' : 'scale-100'
-                        )}
-                     />
-                     <svg
-                        width="36"
-                        height="46"
-                        viewBox="0 0 36 46"
-                        className={cn(
-                           'absolute top-0 left-0 -translate-x-1/2 -translate-y-full transition-transform duration-200 [transition-timing-function:var(--ease)] drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]',
-                           moving && '-translate-y-[calc(100%+10px)]'
-                        )}
-                     >
-                        <path
-                           d="M18 45C18 45 3.5 28.6 3.5 18a14.5 14.5 0 1 1 29 0C32.5 28.6 18 45 18 45Z"
-                           fill="var(--teal)"
-                           stroke="#f4f1ec"
-                           strokeWidth="2.5"
-                           strokeLinejoin="round"
-                        />
-                        <circle cx="18" cy="18" r="4" fill="#06232a" />
-                     </svg>
-                     <span className="absolute top-0 left-0 block h-px w-10 -translate-x-1/2 bg-white/70 mix-blend-difference" />
-                     <span className="absolute top-0 left-0 block h-10 w-px -translate-y-1/2 bg-white/70 mix-blend-difference" />
-                  </div>
-                  {!phone ? controls : null}
                </div>
-               {phone ? controls : null}
+               {controls}
             </div>
          )}
 
@@ -575,7 +632,10 @@ export function MapLocationPicker({
 
          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             {showReadout ? (
-               <p className="flex flex-wrap items-baseline gap-x-3">
+               <p
+                  aria-live="polite"
+                  className="flex flex-wrap items-baseline gap-x-3"
+               >
                   <span className="lab">Pin</span>
                   <span
                      className={cn(
@@ -583,14 +643,12 @@ export function MapLocationPicker({
                         position ? 'text-ink' : 'text-ink-3'
                      )}
                   >
-                     {readout}
+                     {position && source ? `${source} · ${pair}` : pair}
                   </span>
                </p>
             ) : null}
             {!mapFailed ? (
-               <p className="text-[14px] text-ink-3">
-                  Move the map until the pin sits on the water.
-               </p>
+               <p className="text-[14px] text-ink-3">{hint}</p>
             ) : null}
          </div>
          <p aria-live="polite" className="text-[15px] text-ink-2 empty:hidden">

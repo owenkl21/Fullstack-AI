@@ -73,6 +73,19 @@ const PAST = 6;
 const below = (ys: number[]) =>
    `${lineOf(ys)} L${WIDTH} ${HEIGHT + PAST} L0 ${HEIGHT + PAST} Z`;
 
+/*
+ * The water under a cut plate, closed well below the box. The plate's line
+ * swings about 35 units under the box in a deep trough, and a hollow edge's
+ * plate is the caller's own box, which has to reach below the deepest trough
+ * or the trough is cut flat with a ruler: a straight line across the water
+ * where the wave should be. So that box runs `--trough` past the hang, and
+ * the water is painted this far down to cover all of it. 56 units is 56px on
+ * a desktop and 37px on a phone, inside the margin a page head leaves.
+ */
+const DEEP = 56;
+const under = (ys: number[]) =>
+   `${lineOf(ys)} L${WIDTH} ${HEIGHT + DEEP} L0 ${HEIGHT + DEEP} Z`;
+
 /* Closed above the box: the plate being cut. */
 const above = (ys: number[]) =>
    `${lineOf(ys)} L${WIDTH} ${-PAST} L0 ${-PAST} Z`;
@@ -210,7 +223,7 @@ export function TornEdge({
          const ys = bands.map((band) => trace(band, state.t, state.breath));
          if (cut) {
             const plate = ys[2]!;
-            const water = below(plate);
+            const water = under(plate);
             set('water', water);
             set('water-clip', water);
             /* The shadow sits a little below the plate's own line. */

@@ -22,7 +22,7 @@ import {
    type Species,
 } from '@/components/fishing/quicklog/species';
 import { AddGearInline } from '@/components/fishing/AddGearInline';
-import { readTakenAt } from '@/lib/exif';
+import { readPhotoMeta } from '@/lib/exif';
 import { formatMetres, nearestSpot } from '@/lib/geo';
 import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
 import { SpeciesCombobox } from '@/components/fishing/SpeciesCombobox';
@@ -271,6 +271,14 @@ export function CatchForm({
    const [spotMode, setSpotMode] = useState<SpotMode>(
       initial?.siteId ? 'saved' : startsWithPin ? 'new' : 'here'
    );
+   /*
+    * Whether the angler has answered the where question themselves, by
+    * picking a saved spot or putting a pin down. A photograph's own position
+    * fills a blank; it never overrules an answer.
+    */
+   const spotChosen = useRef(Boolean(initial?.siteId) || startsWithPin);
+   /* Named under the map, the way the record names every other source. */
+   const [positionFromPhoto, setPositionFromPhoto] = useState(false);
    const [savedSiteId, setSavedSiteId] = useState(initial?.siteId ?? '');
    const [siteSearch, setSiteSearch] = useState('');
    const [newSpotName, setNewSpotName] = useState('');
@@ -330,17 +338,39 @@ export function CatchForm({
       return to.getTime() - from.getTime() > 60_000 ? { from, to } : null;
    }, [photoTimes]);
    const onPhotoFiles = (files: File[]) => {
-      void Promise.all(files.map((file) => readTakenAt(file))).then((found) => {
-         const times = found.filter((t): t is Date => t !== null);
-         if (!times.length) return;
-         setPhotoTimes((was) => [...was, ...times]);
-         if (!caughtAtEdited.current) {
-            const earliest = [...times, ...photoTimes].sort(
-               (a, b) => a.getTime() - b.getTime()
-            )[0]!;
-            setCaughtAt(toLocalInputValue(earliest));
+      void Promise.all(files.map((file) => readPhotoMeta(file))).then(
+         (found) => {
+            const times = found
+               .map((meta) => meta.takenAt)
+               .filter((t): t is Date => t !== null);
+            if (times.length) {
+               setPhotoTimes((was) => [...was, ...times]);
+               if (!caughtAtEdited.current) {
+                  const earliest = [...times, ...photoTimes].sort(
+                     (a, b) => a.getTime() - b.getTime()
+                  )[0]!;
+                  setCaughtAt(toLocalInputValue(earliest));
+               }
+            }
+
+            /*
+             * And where it was taken. The camera wrote the position beside the
+             * time and this form read past it, so a picture that knew the
+             * gully it came out of still left the map empty. It fills a blank
+             * only: a saved spot or a pin the angler put down themselves is
+             * their answer to the question and stands.
+             */
+            const placed = found.find(
+               (meta) => meta.latitude !== null && meta.longitude !== null
+            );
+            if (!placed || spotChosen.current) return;
+            setSpotMode('new');
+            setNewLatitude(placed.latitude!.toFixed(6));
+            setNewLongitude(placed.longitude!.toFixed(6));
+            setPositionFromPhoto(true);
+            setErrors((current) => ({ ...current, spot: undefined }));
          }
-      });
+      );
    };
 
    const [snapshot, setSnapshot] = useState<WeatherSnapshot | null>(
@@ -485,6 +515,7 @@ export function CatchForm({
    }, []);
 
    const chooseSpotMode = (next: SpotMode) => {
+      spotChosen.current = true;
       setSpotMode(next);
       setErrors((current) => ({ ...current, spot: undefined }));
       // The position is only ever asked for when this is the choice made.
@@ -493,8 +524,12 @@ export function CatchForm({
       }
    };
 
+   /* The picker only calls this for a drag, a tap, a search or Locate, so it
+    * is always the angler's own hand on the pin. */
    const setNewCoordinates = useCallback(
       (latitude: number, longitude: number) => {
+         spotChosen.current = true;
+         setPositionFromPhoto(false);
          setNewLatitude(latitude.toFixed(6));
          setNewLongitude(longitude.toFixed(6));
          setErrors((current) => ({ ...current, spot: undefined }));
@@ -1322,9 +1357,10 @@ export function CatchForm({
                         <MapLocationPicker
                            latitude={String(herePosition.latitude)}
                            longitude={String(herePosition.longitude)}
-                           onChange={(latitude, longitude) =>
-                              setHerePosition({ latitude, longitude })
-                           }
+                           onChange={(latitude, longitude) => {
+                              spotChosen.current = true;
+                              setHerePosition({ latitude, longitude });
+                           }}
                         />
                      ) : null}
                      {hereState === 'refused' ? (
@@ -1488,6 +1524,9 @@ export function CatchForm({
                         <MapLocationPicker
                            latitude={newLatitude}
                            longitude={newLongitude}
+                           source={
+                              positionFromPhoto ? 'From the photograph' : null
+                           }
                            onChange={setNewCoordinates}
                         />
                         <FieldError id="spot-error" message={errors.spot} />

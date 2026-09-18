@@ -142,6 +142,14 @@ function QuickLog() {
    const [notes, setNotes] = useState('');
    const [spotPublic, setSpotPublic] = useState(false);
 
+   /*
+    * A photograph that arrived with its time but no position. Worth saying
+    * once, because the angler added the picture expecting the pin to move and
+    * nothing did: the picture came without one, and both phone pickers are
+    * where that usually happens.
+    */
+   const [photoWithoutPosition, setPhotoWithoutPosition] = useState(false);
+
    const onPhotoFile = (file: File) => {
       void readPhotoMeta(file).then((meta) => {
          if (meta.takenAt && timeSource !== 'typed') {
@@ -156,6 +164,15 @@ function QuickLog() {
                longitude: meta.longitude,
                source: 'photo',
             });
+            setPhotoWithoutPosition(false);
+            /*
+             * And the map opens with it. A position that lands while the map
+             * is folded away is a line of numbers changing on its own, which
+             * is why this read as broken: nothing was seen to move.
+             */
+            setPinOpen(true);
+         } else if (meta.takenAt) {
+            setPhotoWithoutPosition(true);
          }
       });
    };
@@ -742,18 +759,25 @@ function QuickLog() {
                <p className="text-[14px] text-ink-3">{whereLine}</p>
             )}
 
+            {photoWithoutPosition ? (
+               <p className="mt-2 text-[14px] text-ink-3">
+                  This photograph carries no position. Phones often strip it
+                  when a photo is picked from the gallery or shared.
+               </p>
+            ) : null}
+
             {mapOpen ? (
                <div id="quicklog-pin" className="mt-3">
                   <MapLocationPicker
-                     mapClassName="h-[240px] sm:h-[260px]"
                      readout={false}
                      latitude={where ? String(where.latitude) : ''}
                      longitude={where ? String(where.longitude) : ''}
                      onChange={(latitude, longitude) => {
                         setWhere({ latitude, longitude, source: 'pin' });
-                        /* Moving the map is using it; it stays open until
-                           the angler says it can go. */
+                        /* Moving the pin is using the map; it stays open
+                           until the angler says it can go. */
                         setPinOpen(true);
+                        setPhotoWithoutPosition(false);
                      }}
                   />
                </div>

@@ -5,6 +5,7 @@ import { CameraIcon } from '@heroicons/react/24/outline';
 import { Banner } from '@/components/profile/Banner';
 import { FollowCounts } from '@/components/profile/FollowCounts';
 import { FishMark } from '@/components/brand/FishMark';
+import { Img } from '@/components/Img';
 import { useRevealIn } from '@/components/brand/Reveal';
 import type { ConnectionsKind } from '@/components/profile/ConnectionsDialog';
 import {
@@ -43,17 +44,19 @@ export function ProfileView({
    return (
       <div ref={root}>
          <header className="rv">
-            <Banner url={profile.bannerUrl} />
+            <Banner url={profile.bannerUrl} cardUrl={profile.bannerCardUrl} />
             {/* The photograph sits over the banner's bottom edge, which is
                 what makes the two read as one picture of a person. */}
             <div className="relative z-10 -mt-8 flex items-end gap-4">
                {profile.avatarUrl ? (
-                  <img
+                  <Img
                      src={profile.avatarUrl}
+                     thumbSrc={profile.avatarThumbUrl}
                      alt=""
-                     width={80}
-                     height={80}
-                     className="relative z-10 size-20 shrink-0 rounded-full object-cover ring-4 ring-background"
+                     priority
+                     ratio="1 / 1"
+                     sizes="80px"
+                     className="relative z-10 size-20 shrink-0 rounded-full ring-4 ring-background"
                   />
                ) : (
                   <span
@@ -128,8 +131,16 @@ export function ProfileView({
             className="rv mt-10 border-t border-line pt-2"
             style={{ '--i': 2 } as CSSProperties}
          >
+            {/*
+             * Open, when there are photographs to see. A shelf of an angler's
+             * own pictures is the reason to open a profile at all, and it was
+             * folded away behind a heading, which reads as a profile that has
+             * none. Empty, it stays shut: a closed heading is a tidier way to
+             * say "nothing here yet" than four dashed frames.
+             */}
             <Fold
                title="Photographs"
+               open={profile.galleryImages.length > 0}
                aside={
                   profile.galleryImages.length > 0
                      ? plural(profile.galleryImages.length, 'photo')
@@ -185,11 +196,17 @@ export function ProfileView({
                               }
                               className="group block aspect-square w-full overflow-hidden bg-bg-2"
                            >
-                              <img
+                              <Img
                                  src={entry.url}
+                                 cardSrc={entry.cardUrl}
+                                 thumbSrc={entry.thumbUrl}
                                  alt={entry.sourceTitle}
-                                 loading="lazy"
-                                 className="size-full object-cover transition-transform duration-[600ms] [transition-timing-function:var(--ease)] group-hover:scale-[1.04]"
+                                 ratio="1 / 1"
+                                 /* Two up on a phone, three on a tablet, four
+                                    on the widest column the page draws. */
+                                 sizes="(min-width: 1280px) 400px, (min-width: 640px) 33vw, 50vw"
+                                 className="size-full"
+                                 imgClassName="transition-transform duration-[600ms] [transition-timing-function:var(--ease)] group-hover:scale-[1.04]"
                               />
                            </Link>
                         </li>
