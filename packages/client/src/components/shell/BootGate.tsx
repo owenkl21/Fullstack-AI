@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { FishMark } from '@/components/brand/FishMark';
+import { prefersReducedMotion } from '@/components/fishing/record/motion';
 
 /*
  * Holds the first paint until the page is actually ready to be looked at.
@@ -10,24 +10,29 @@ import { FishMark } from '@/components/brand/FishMark';
  * deliberate; arriving in pieces reads as broken.
  *
  * It waits for the fonts and the largest image, with a ceiling so a slow or
- * failed asset can never hold the page hostage.
+ * failed asset can never hold the page hostage, and a floor so the fish that
+ * fills the wait is seen leaving the water rather than flashing past.
  */
 
 const CEILING_MS = 2500;
+const FLOOR_MS = 1600;
 
 export function BootGate({ children }: { children: ReactNode }) {
    const [ready, setReady] = useState(false);
 
    useEffect(() => {
+      const startedAt = Date.now();
       let done = false;
+      let release: number | null = null;
 
       const finish = () => {
          if (done) {
             return;
          }
-
          done = true;
-         setReady(true);
+         /* Whatever finished the wait, the fish gets its moment first. */
+         const owed = Math.max(0, FLOOR_MS - (Date.now() - startedAt));
+         release = window.setTimeout(() => setReady(true), owed);
       };
 
       /* Never wait longer than this, whatever is still outstanding. */
@@ -62,6 +67,7 @@ export function BootGate({ children }: { children: ReactNode }) {
 
       return () => {
          window.clearTimeout(ceiling);
+         if (release !== null) window.clearTimeout(release);
          done = true;
       };
    }, []);
@@ -87,18 +93,50 @@ export function BootGate({ children }: { children: ReactNode }) {
          {ready ? null : (
             <div
                role="status"
-               aria-label="Loading"
+               aria-label="Loading Fishtagram"
                className="fixed inset-0 z-[9999] grid place-items-center bg-background"
             >
-               {/*
-                * The mark rather than a spinner, because the house rule is no
-                * spinners, and because the first thing you should see is whose
-                * app this is. The word is not set here either, for the same
-                * reason it is not set in the header.
-                */}
-               <FishMark className="h-[34px] w-[54px] text-ink-3" />
+               <LeapingFish />
             </div>
          )}
       </>
+   );
+}
+
+/*
+ * Owen's bass leaving the water: a short monochrome clip on a white ground,
+ * scrubbed and shrunk by audit/logo.mjs's sibling, loader.mjs. Multiplied
+ * onto the page by day the white disappears into the paper; at night the
+ * clip is inverted and screened, so its black disappears into the dark and
+ * the fish is drawn in paper. Anyone who asked for stillness gets the first
+ * frame.
+ */
+function LeapingFish() {
+   const still = prefersReducedMotion();
+   const box =
+      'block size-[220px] md:size-[300px] mix-blend-multiply dark:invert dark:mix-blend-screen';
+   if (still) {
+      return (
+         <img
+            src="/brand/loader.jpg"
+            alt=""
+            width={480}
+            height={480}
+            className={box}
+         />
+      );
+   }
+   return (
+      <video
+         className={box}
+         autoPlay
+         muted
+         playsInline
+         loop
+         poster="/brand/loader.jpg"
+         aria-hidden="true"
+      >
+         <source src="/brand/loader.mp4" type="video/mp4" />
+      </video>
    );
 }
