@@ -966,7 +966,7 @@ export function SpotsMap({
             showPois && zoomLevel > 0 && zoomLevel < POI_MIN_ZOOM && !mark ? (
                /* Above the bar and above the attribution line, which is the
                   one thing on this screen that may not be covered. */
-               <p className="absolute inset-x-2 bottom-[92px] z-[550] border border-line bg-background/95 px-3 py-1.5 text-center text-[14px] text-ink-2">
+               <p className="absolute inset-x-2 bottom-[116px] z-[550] border border-line bg-background/95 px-3 py-1.5 text-center text-[14px] text-ink-2">
                   Zoom in for slipways and tackle shops.
                </p>
             ) : null

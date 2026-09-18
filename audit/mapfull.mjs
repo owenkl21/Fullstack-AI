@@ -36,9 +36,16 @@ const box = await p.evaluate(() => {
       const el = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
       return el ? `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 30)}` : null;
    };
+   /* Nothing the app floats on the map may sit on Leaflet's attribution: it
+    * is there by licence, and a strip of ours across it is not a small thing. */
+   const hint = [...document.querySelectorAll('main p')].find((p) => /zoom in for/i.test(p.textContent ?? ''));
+   const overlaps = (a, c) => Boolean(a && c && a.bottom > c.top && a.top < c.bottom);
+
    return {
       map: at(r),
       share: r ? Math.round((r.height / innerHeight) * 100) : 0,
+      hint: at(hint?.getBoundingClientRect()),
+      hintOverAttribution: overlaps(hint?.getBoundingClientRect(), attrib),
       search: at(search),
       searchPainted: painted(search),
       bar: at(bar),
