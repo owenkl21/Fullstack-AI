@@ -166,9 +166,21 @@ export function ForecastPage() {
       });
    };
 
+   /* Inland the marine model says nothing, so the tide row and its
+      provenance both stay away. */
+   const hasTide = useMemo(
+      () => (forecast?.hours ?? []).some((h) => (h.seaLevelM ?? null) !== null),
+      [forecast]
+   );
+
    const nowLocal = forecast ? localHourNow(forecast.utcOffsetSeconds) : null;
    const today = nowLocal ? nowLocal.slice(0, 10) : '';
    const day = forecast?.days.find((d) => d.date === selected) ?? null;
+   /* The day after, because a moon that rises today sets tomorrow morning. */
+   const dayAt = day
+      ? (forecast?.days.findIndex((d) => d.date === day.date) ?? -1)
+      : -1;
+   const nextDay = dayAt < 0 ? null : (forecast?.days[dayAt + 1] ?? null);
    const dayHours = useMemo(
       () =>
          forecast && selected
@@ -209,7 +221,8 @@ export function ForecastPage() {
             <p className="mt-8 max-w-[52ch] text-[17px] text-ink-2">
                Search for a beach, a town or a headland, or use where you are.
                Seven days, hour by hour: wind and gusts with their direction,
-               rain, pressure, swell, water temperature, the sun and the moon.
+               rain, pressure, swell, water temperature, the tide, the sun and
+               the moon.
             </p>
          ) : status === 'error' ? (
             <div className="mt-8 flex flex-col items-start gap-4">
@@ -255,6 +268,8 @@ export function ForecastPage() {
                      <HourGrid
                         key={day.date}
                         hours={dayHours}
+                        day={day}
+                        next={nextDay}
                         nowLocal={day.date === today ? nowLocal : null}
                         system={system}
                      />
@@ -268,6 +283,9 @@ export function ForecastPage() {
                         ? `, hours in ${forecast.timezone.replace('_', ' ')}`
                         : ''}
                      . Weather data by Open-Meteo.com.
+                     {hasTide
+                        ? ' Sea level modelled on an 8 km grid, not a tide table.'
+                        : ''}
                   </span>
                   <button
                      type="button"
@@ -317,13 +335,26 @@ function DayFacts({
       });
    }
 
+   /*
+    * When it is up is as much of the moon as a night session needs, in clock
+    * order: a set before the rise is last night's moon going down.
+    */
+   const moonTimes = [
+      day.moonrise ? { at: clock(day.moonrise), word: 'up' } : null,
+      day.moonset ? { at: clock(day.moonset), word: 'down' } : null,
+   ]
+      .filter((t): t is { at: string; word: string } => t !== null)
+      .sort((a, b) => a.at.localeCompare(b.at))
+      .map((t) => `${t.word} ${t.at}`);
+
    facts.push({
       key: 'moon',
       icon: <MoonPhaseIcon fraction={day.moon.fraction} className="size-5" />,
       label: 'Moon',
-      value: `${day.moon.name}, ${Math.round(day.moon.illumination * 100)}% lit${
-         day.moon.spring ? '. Spring tide' : ''
-      }`,
+      value:
+         `${day.moon.name}, ${Math.round(day.moon.illumination * 100)}% lit` +
+         (moonTimes.length > 0 ? `, ${moonTimes.join(', ')}` : '') +
+         (day.moon.spring ? '. Spring tide' : ''),
    });
 
    if (windMax !== null) {
@@ -402,9 +433,15 @@ function ForecastSkeleton() {
                <span key={i} className="shimmer h-10 bg-bg-2" />
             ))}
          </div>
+         {/* The rows at the heights they land at: two arcs, the figures, the
+             wind bars and the tide curve, so nothing shifts under the reader. */}
          <div className="mt-8 flex flex-col gap-px">
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-               <span key={i} className="shimmer h-10 w-full bg-bg-2" />
+            {[88, 88, 40, 40, 112, 44, 112, 40].map((height, i) => (
+               <span
+                  key={i}
+                  className="shimmer w-full bg-bg-2"
+                  style={{ height }}
+               />
             ))}
          </div>
       </div>

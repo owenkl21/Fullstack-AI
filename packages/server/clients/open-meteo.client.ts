@@ -595,6 +595,14 @@ export type ForecastHour = {
    swellHeightM: number | null;
    swellPeriodS: number | null;
    swellDirectionDegrees: number | null;
+   /*
+    * How high the water stands this hour, in metres against mean sea level.
+    * It is the shape of the tide, not a tide table: the model runs on an 8 km
+    * grid and is referenced to mean sea level rather than chart datum, so the
+    * rise and fall are right and the figures would argue with the printed
+    * tables. Null inland, where the marine model has nothing.
+    */
+   seaLevelM: number | null;
 };
 
 export type ForecastDay = {
@@ -602,6 +610,14 @@ export type ForecastDay = {
    date: string;
    sunrise: string | null;
    sunset: string | null;
+   /*
+    * When the moon comes up and goes down, on the place's own clock. A moonset
+    * can fall earlier in the day than the moonrise, because the moon that sets
+    * at 01:15 rose the evening before, and about once a lunation a date has no
+    * rise or no set at all, which is null rather than a guess.
+    */
+   moonrise: string | null;
+   moonset: string | null;
    conditionText: string | null;
    weatherCode: number | null;
    temperatureMaxC: number | null;
@@ -655,6 +671,8 @@ const FORECAST_DAILY = [
    'wind_gusts_10m_max',
    'wind_direction_10m_dominant',
    'uv_index_max',
+   'moonrise',
+   'moonset',
 ].join(',');
 
 const FORECAST_MARINE = [
@@ -665,6 +683,7 @@ const FORECAST_MARINE = [
    'swell_wave_height',
    'swell_wave_period',
    'swell_wave_direction',
+   'sea_level_height_msl',
 ].join(',');
 
 type Block = Record<string, unknown>;
@@ -774,6 +793,7 @@ export async function getForecast(
                swellHeightM: at(sea, 'swell_wave_height', j),
                swellPeriodS: at(sea, 'swell_wave_period', j),
                swellDirectionDegrees: at(sea, 'swell_wave_direction', j),
+               seaLevelM: at(sea, 'sea_level_height_msl', j),
             },
          ];
       }
@@ -791,6 +811,8 @@ export async function getForecast(
                date,
                sunrise: stamp(column(daily, 'sunrise')[i]),
                sunset: stamp(column(daily, 'sunset')[i]),
+               moonrise: stamp(column(daily, 'moonrise')[i]),
+               moonset: stamp(column(daily, 'moonset')[i]),
                conditionText:
                   code === null ? null : (WEATHER_CODES[code] ?? null),
                weatherCode: code,

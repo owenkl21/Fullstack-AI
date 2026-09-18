@@ -5,7 +5,7 @@ import {
 import { tempIn, type UnitSystem } from '@/lib/units';
 import { cn } from '@/lib/utils';
 import type { ForecastDay } from './forecast-api';
-import { skyTone, windTone } from './tones';
+import { skyTone, windBar } from './tones';
 
 /*
  * Seven days in a row, one chosen.
@@ -16,10 +16,6 @@ import { skyTone, windTone } from './tones';
  * grid under it and nothing else.
  */
 const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-/* The wind band under each day, in the same four colours as the grid. */
-const windBand = (kph: number | null) =>
-   windTone(kph).replace('text-', 'bg-') || 'bg-line';
 
 const dayLabel = (date: string, today: string) => {
    if (date === today) return 'Today';
@@ -40,6 +36,14 @@ export function DayStrip({
    system: UnitSystem;
    onSelect: (date: string) => void;
 }) {
+   /*
+    * The bar under each day is as long as that day's wind against the
+    * hardest wind of the week, so the strip is read the way the hour rows
+    * are: a shape first, and the figures after it.
+    */
+   /* The same floor as the hour rows, so a calm week reads calm. */
+   const weekMax = Math.max(50, ...days.map((d) => d.windMaxKph ?? 0));
+
    return (
       <div
          role="tablist"
@@ -51,6 +55,14 @@ export function DayStrip({
             const Sky = skyIcon(day.conditionText);
             const hi = tempIn(day.temperatureMaxC, system);
             const lo = tempIn(day.temperatureMinC, system);
+            /*
+             * A light wind has no colour of its own, so its bar is the rule
+             * colour, which on the chosen day would vanish into the ink the
+             * tab is filled with. There it is drawn in the page ground.
+             */
+            const quiet = (day.windMaxKph ?? 0) < 15;
+            const barFill =
+               on && quiet ? 'bg-background/70' : windBar(day.windMaxKph);
             return (
                <button
                   key={day.date}
@@ -89,15 +101,26 @@ export function DayStrip({
                   <span
                      aria-hidden="true"
                      className={cn(
-                        'h-1 w-8',
-                        on ? 'bg-background/40' : windBand(day.windMaxKph)
+                        'flex h-1 w-8',
+                        on ? 'bg-background/25' : 'bg-line'
                      )}
                      title={
                         day.windMaxKph === null
                            ? undefined
                            : `Wind up to ${Math.round(day.windMaxKph)} km/h`
                      }
-                  />
+                  >
+                     <span
+                        className={cn('block h-1', barFill)}
+                        style={{
+                           width: `${
+                              day.windMaxKph === null
+                                 ? 0
+                                 : Math.max(4, (day.windMaxKph / weekMax) * 100)
+                           }%`,
+                        }}
+                     />
+                  </span>
                   <span className="num text-[14px]">
                      {hi === null || lo === null ? '' : `${hi}° / ${lo}°`}
                   </span>

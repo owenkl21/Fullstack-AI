@@ -318,6 +318,8 @@ const FORECAST_DAILY = [
    'wind_gusts_10m_max',
    'wind_direction_10m_dominant',
    'uv_index_max',
+   'moonrise',
+   'moonset',
 ].join(',');
 
 const FORECAST_MARINE = [
@@ -328,6 +330,7 @@ const FORECAST_MARINE = [
    'swell_wave_height',
    'swell_wave_period',
    'swell_wave_direction',
+   'sea_level_height_msl',
 ].join(',');
 
 const offsetSuffix = (seconds: number) => {
@@ -415,6 +418,7 @@ export async function readForecast(
                swellHeightM: at(sea, 'swell_wave_height', j),
                swellPeriodS: at(sea, 'swell_wave_period', j),
                swellDirectionDegrees: at(sea, 'swell_wave_direction', j),
+               seaLevelM: at(sea, 'sea_level_height_msl', j),
             },
          ];
       }
@@ -432,6 +436,8 @@ export async function readForecast(
                date,
                sunrise: stamp(column(daily, 'sunrise')[i]),
                sunset: stamp(column(daily, 'sunset')[i]),
+               moonrise: stamp(column(daily, 'moonrise')[i]),
+               moonset: stamp(column(daily, 'moonset')[i]),
                conditionText:
                   code === null ? null : (WEATHER_CODES[code] ?? null),
                weatherCode: code,

@@ -12,14 +12,21 @@ import {
    type UnitSystem,
 } from '@/lib/units';
 import { cn } from '@/lib/utils';
-import { thunderRisk, type ForecastHour } from './forecast-api';
+import {
+   thunderRisk,
+   type ForecastDay,
+   type ForecastHour,
+} from './forecast-api';
+import { MoonBand, SunBand } from './SkyArcs';
+import { TideBand } from './TideBand';
 import {
    rainCell,
    skyCell,
    skyTone,
-   uvCell,
+   tempTint,
+   uvTint,
    waterCell,
-   windCell,
+   windBar,
    windTone,
 } from './tones';
 
@@ -32,31 +39,79 @@ import {
  * in it rather than a row of blanks.
  *
  * The wind cell is an arrow first and a number second. Anyone who fishes reads
- * a row of arrows in a glance, and a row of "SSW" takes a sentence each.
+ * a row of arrows in a glance, and a row of "SSW" takes a sentence each. Under
+ * the arrow the hour's wind stands as a bar, so the row is read as a shape
+ * before a single figure is read: where the day builds, where it drops.
+ *
+ * Some readings are not figures at all. The tide, the sun and the moon are
+ * curves, and a curve cannot be cut into twenty four cells: those rows are one
+ * cell spanning the width, drawn against the same columns, so they scroll with
+ * the hours on a phone and stay lined up with them on a desk.
  */
 type Row = {
    key: string;
    label: string;
    unit?: string;
-   cell: (hour: ForecastHour) => ReactNode;
    has: (hour: ForecastHour) => boolean;
+   /* A reading per hour, in its own column. */
+   cell?: (hour: ForecastHour) => ReactNode;
+   /* Or one drawing across the whole day, for a reading that is a shape. */
+   band?: (hours: ForecastHour[]) => ReactNode;
    /* The tint behind the cell, where the figure has a band. */
    tone?: (hour: ForecastHour) => string;
+   /* Or a tint mixed for this hour's own reading, where the bands are steps. */
+   style?: (hour: ForecastHour) => CSSProperties | undefined;
 };
 
 const num = (n: number | null) => (n === null ? '' : String(n));
 
 export function HourGrid({
    hours,
+   day,
+   next,
    nowLocal,
    system,
 }: {
    hours: ForecastHour[];
+   /* The day these hours belong to, for the readings that are per day. */
+   day: ForecastDay;
+   /* The one after it, because a moon that rises today sets tomorrow. */
+   next: ForecastDay | null;
    /* The place's current hour, in the same form as an hour's `local`. */
    nowLocal: string | null;
    system: UnitSystem;
 }) {
+   /*
+    * The bars stand against a shore angler's scale: 50 km/h fills the track,
+    * which is the wind that ends a session, and a day that blows harder than
+    * that stretches the scale rather than clipping. A fixed floor means a
+    * calm day reads as calm instead of being blown up to fill the row, and
+    * the same bar means the same wind on Tuesday and on Friday.
+    */
+   const windScale = Math.max(50, ...hours.map((h) => h.windSpeedKph ?? 0));
+
+   const windSentence = (h: ForecastHour) => {
+      const speed = speedIn(h.windSpeedKph, system);
+      if (speed === null) return 'Wind not forecast for this hour';
+      const gust = speedIn(h.windGustKph, system);
+      const from = h.windDirectionCardinal ? `${h.windDirectionCardinal} ` : '';
+      const gusting = gust === null ? '' : `, gusting ${gust}`;
+      return `${from}${speed} ${unitOf('speed', system)}${gusting}`;
+   };
+
    const all: Row[] = [
+      {
+         key: 'sun',
+         label: 'Sun',
+         has: () => day.sunrise !== null && day.sunset !== null,
+         band: () => <SunBand day={day} />,
+      },
+      {
+         key: 'moon',
+         label: 'Moon',
+         has: () => day.moonrise !== null || day.moonset !== null,
+         band: () => <MoonBand day={day} next={next} />,
+      },
       {
          key: 'sky',
          tone: (h) => skyCell(h.conditionText),
@@ -77,46 +132,57 @@ export function HourGrid({
          key: 'air',
          label: 'Air',
          unit: unitOf('temp', system),
+         style: (h) => tempTint(h.temperatureC),
          has: (h) => h.temperatureC !== null,
          cell: (h) => num(tempIn(h.temperatureC, system)),
       },
       {
          key: 'wind',
-         tone: (h) => windCell(h.windSpeedKph),
          label: 'Wind',
          unit: unitOf('speed', system),
          has: (h) => h.windSpeedKph !== null,
-         cell: (h) => (
-            <span
-               className={cn(
-                  'flex flex-col items-center gap-0.5',
-                  windTone(h.windSpeedKph)
-               )}
-            >
-               {h.windDirectionDegrees === null ? null : (
-                  <WindArrowIcon
-                     degrees={h.windDirectionDegrees}
-                     className="size-[18px]"
-                     aria-label={h.windDirectionCardinal ?? undefined}
-                  />
-               )}
-               <span className="font-medium">
-                  {num(speedIn(h.windSpeedKph, system))}
+         cell: (h) => {
+            const speed = speedIn(h.windSpeedKph, system);
+            const gust = speedIn(h.windGustKph, system);
+            const tall =
+               h.windSpeedKph === null
+                  ? 0
+                  : Math.min(100, (h.windSpeedKph / windScale) * 100);
+            return (
+               <span
+                  role="img"
+                  aria-label={windSentence(h)}
+                  className={cn(
+                     'flex flex-col items-center gap-1',
+                     windTone(h.windSpeedKph)
+                  )}
+               >
+                  <span className="flex h-[18px] items-center">
+                     {h.windDirectionDegrees === null ? null : (
+                        <WindArrowIcon
+                           degrees={h.windDirectionDegrees}
+                           className="size-[18px]"
+                        />
+                     )}
+                  </span>
+                  <span className="flex h-12 w-5 items-end">
+                     <span
+                        className={cn(
+                           'bar-grow block w-full',
+                           windBar(h.windSpeedKph)
+                        )}
+                        style={{ height: `${Math.max(4, tall)}%` }}
+                     />
+                  </span>
+                  <span className="font-medium">{num(speed)}</span>
+                  {/* The gust is the figure that ends a session: a reading,
+                      at the table's own size, not a small. */}
+                  {gust === null ? null : (
+                     <span className="text-ink-2">{gust}</span>
+                  )}
                </span>
-            </span>
-         ),
-      },
-      {
-         key: 'gust',
-         tone: (h) => windCell(h.windGustKph),
-         label: 'Gust',
-         unit: unitOf('speed', system),
-         has: (h) => h.windGustKph !== null,
-         cell: (h) => (
-            <span className={windTone(h.windGustKph)}>
-               {num(speedIn(h.windGustKph, system))}
-            </span>
-         ),
+            );
+         },
       },
       {
          key: 'rain',
@@ -191,6 +257,14 @@ export function HourGrid({
          cell: (h) => num(heightIn(h.waveHeightM, system)),
       },
       {
+         key: 'tide',
+         label: 'Tide',
+         /* Four samples make a curve; fewer would be a labelled empty row. */
+         has: () =>
+            hours.filter((h) => (h.seaLevelM ?? null) !== null).length >= 4,
+         band: (dayHours) => <TideBand hours={dayHours} />,
+      },
+      {
          key: 'water',
          tone: (h) => waterCell(h.seaSurfaceTemperatureC),
          label: 'Water',
@@ -200,8 +274,8 @@ export function HourGrid({
       },
       {
          key: 'uv',
-         tone: (h) => uvCell(h.uvIndex),
          label: 'UV',
+         style: (h) => uvTint(h.uvIndex),
          has: (h) => h.uvIndex !== null && h.uvIndex > 0,
          cell: (h) =>
             h.uvIndex === null || h.uvIndex <= 0
@@ -257,20 +331,36 @@ export function HourGrid({
                            </span>
                         ) : null}
                      </th>
-                     {hours.map((h, column) => (
-                        <td
-                           key={`${h.local}-${row.key}`}
-                           style={{ '--i': column } as CSSProperties}
-                           className={cn(
-                              'fact num px-1 py-2.5 text-center align-middle',
-                              h.local === nowLocal && 'bg-bg-2',
-                              h.isDaytime === false && 'text-ink-2',
-                              row.tone?.(h)
-                           )}
-                        >
-                           {row.cell(h)}
+                     {row.band ? (
+                        <td colSpan={hours.length} className="fact px-0 py-2">
+                           {row.band(hours)}
                         </td>
-                     ))}
+                     ) : (
+                        hours.map((h, column) => (
+                           <td
+                              key={`${h.local}-${row.key}`}
+                              style={
+                                 {
+                                    '--i': column,
+                                    /* The now column's stripe outranks a
+                                       tint; an inline background would
+                                       beat the class. */
+                                    ...(h.local === nowLocal
+                                       ? undefined
+                                       : row.style?.(h)),
+                                 } as CSSProperties
+                              }
+                              className={cn(
+                                 'fact num px-1 py-2.5 text-center align-middle',
+                                 h.local === nowLocal && 'bg-bg-2',
+                                 h.isDaytime === false && 'text-ink-2',
+                                 row.tone?.(h)
+                              )}
+                           >
+                              {row.cell?.(h)}
+                           </td>
+                        ))
+                     )}
                   </tr>
                ))}
             </tbody>

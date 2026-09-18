@@ -35,6 +35,15 @@ export type ForecastHour = {
    swellHeightM: number | null;
    swellPeriodS: number | null;
    swellDirectionDegrees: number | null;
+   /*
+    * How high the water stands this hour, in metres against mean sea level.
+    * The shape of the tide rather than a tide table: the model runs on an 8 km
+    * grid against mean sea level, not chart datum, so the rise and fall are
+    * right and the figures would argue with the printed tables. Null inland,
+    * and undefined for the few minutes a cached answer of the older shape is
+    * still being served, which is why every reader takes it with `?? null`.
+    */
+   seaLevelM: number | null;
 };
 
 export type MoonPhase = {
@@ -48,6 +57,14 @@ export type ForecastDay = {
    date: string;
    sunrise: string | null;
    sunset: string | null;
+   /*
+    * When the moon comes up and goes down, on the place's own clock. A moonset
+    * can fall earlier in the day than the moonrise, because the moon that sets
+    * at 01:15 rose the evening before, and about once a lunation a date has no
+    * rise or no set at all.
+    */
+   moonrise: string | null;
+   moonset: string | null;
    conditionText: string | null;
    weatherCode: number | null;
    temperatureMaxC: number | null;

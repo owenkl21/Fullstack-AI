@@ -50,6 +50,17 @@
    --color-success: var(--success);
    --color-warning: var(--warning);
    --color-warning-foreground: var(--warning-foreground);
+   --color-cold: var(--cold);
+   --color-warm: var(--warm);
+   --color-hot: var(--hot);
+   --color-wind-2: var(--wind-2);
+   --color-wind-3: var(--wind-3);
+   --color-rain: var(--rain);
+   --color-uv-1: var(--uv-1);
+   --color-uv-2: var(--uv-2);
+   --color-storm: var(--storm);
+   --color-storm-text: var(--storm-text);
+   --color-sun: var(--sun);
 }
 
 /* ---------- Day ---------- */
@@ -74,6 +85,32 @@
    --warning: #34adbd;
    --warning-foreground: #062a2f;
    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+   /*
+    * The signal colours: the only hues beside the accent, and they are only
+    * ever a reading. Cold, warm and hot carry temperature; wind bands two and
+    * three carry strong and blown-out wind, because band one is teal and a
+    * light wind is a plain ink figure; rain, UV and storm carry their own
+    * readings, and sun is a clear sky.
+    *
+    * Most of them appear as a color-mix tint over whichever ground the theme
+    * is using, so one value reads in day and night alike and ink on the tint
+    * keeps its contrast. Night lifts only the five that are never a solid
+    * band: the loud three stay this deep because a band of them is filled
+    * solid and carries paper text, which only holds at this depth.
+    */
+   --cold: #1f6fb2;
+   --warm: #c97b1c;
+   --hot: #c0392b;
+   --wind-2: #c97b1c;
+   --wind-3: #c0392b;
+   --rain: #1f6fb2;
+   --uv-1: #d99a1a;
+   --uv-2: #e67e22;
+   --storm: #8e44ad;
+   /* Storm as text on the page ground; the solid band keeps --storm. */
+   --storm-text: #8e44ad;
+   --sun: #d99a1a;
 
    --background: var(--bg);
    --foreground: var(--ink);
@@ -110,6 +147,20 @@
    --success: #6fc79a;
    --destructive: #f0716a;
    --popover: #151212;
+
+   /*
+    * A tint, a bar or a figure in these sits on near-black, so they come up.
+    * The solid loud band is drawn in --hot, which never moves, so lifting the
+    * wind red here is free: it only ever paints a bar or a figure.
+    */
+   --cold: #2f86cf;
+   --warm: #d9902c;
+   --wind-2: #d9902c;
+   --wind-3: #e3574a;
+   --uv-1: #e0a72c;
+   --uv-2: #ef8c33;
+   --sun: #e0a72c;
+   --storm-text: #b07cc9;
    color-scheme: dark;
 }
 
@@ -941,68 +992,87 @@
 /* ---- Forecast tones -------------------------------------------------------- */
 /*
  * Tints sit behind the theme's own ink, so they read in day and night. The
- * loud bands are solid with their own paper text, in both themes.
+ * loud bands are solid with their own paper text, in both themes. Every hue
+ * here is a signal token, so a bar, a tint and a curve all pull from the same
+ * palette and a reader learns the colours once.
  */
 .tone {
    border-radius: 0;
 }
-.tone-wind-1 {
-   background: color-mix(in srgb, var(--teal) 18%, transparent);
-}
-.tone-wind-2 {
-   background: color-mix(in srgb, #c97b1c 32%, transparent);
-}
-.tone-wind-3 {
-   background: #c0392b;
-   color: #f4f1ec;
-}
-.tone-wind-3 * {
-   color: #f4f1ec;
-}
 .tone-rain-1 {
-   background: color-mix(in srgb, #1f6fb2 14%, transparent);
+   background: color-mix(in srgb, var(--rain) 14%, transparent);
 }
 .tone-rain-2 {
-   background: color-mix(in srgb, #1f6fb2 32%, transparent);
+   background: color-mix(in srgb, var(--rain) 32%, transparent);
 }
 .tone-rain-3 {
-   background: #1f6fb2;
-   color: #f4f1ec;
+   background: var(--rain);
+   color: var(--paper);
 }
 .tone-rain-3 * {
-   color: #f4f1ec;
-}
-.tone-uv-1 {
-   background: color-mix(in srgb, #d99a1a 20%, transparent);
-}
-.tone-uv-2 {
-   background: color-mix(in srgb, #e67e22 38%, transparent);
-}
-.tone-uv-3 {
-   background: #c0392b;
-   color: #f4f1ec;
+   color: var(--paper);
 }
 .tone-water-cold {
-   background: color-mix(in srgb, #1f6fb2 16%, transparent);
+   background: color-mix(in srgb, var(--cold) 16%, transparent);
 }
 .tone-water-warm {
-   background: color-mix(in srgb, #c97b1c 18%, transparent);
+   background: color-mix(in srgb, var(--warm) 18%, transparent);
 }
 .tone-sky-clear {
-   background: color-mix(in srgb, #d99a1a 12%, transparent);
+   background: color-mix(in srgb, var(--sun) 12%, transparent);
 }
 .tone-sky-grey {
    background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 .tone-sky-rain {
-   background: color-mix(in srgb, #1f6fb2 22%, transparent);
+   background: color-mix(in srgb, var(--rain) 22%, transparent);
 }
 .tone-sky-storm {
-   background: #8e44ad;
-   color: #f4f1ec;
+   background: var(--storm);
+   color: var(--paper);
 }
 .tone-sky-storm * {
-   color: #f4f1ec;
+   color: var(--paper);
+}
+
+/* ---- Bars and curves in the hour grid -------------------------------------- */
+/*
+ * A wind bar grows from its foot, in step with the cell it stands in, so the
+ * row fills from the left like the figures under it. The curves and arcs draw
+ * themselves along their own length: the path carries pathLength="1", so one
+ * unit of dash is the whole line whatever its shape.
+ */
+.bar-grow {
+   transform-origin: bottom;
+   animation: bar-grow 380ms var(--ease) both;
+   animation-delay: calc(var(--i, 0) * 18ms);
+}
+@keyframes bar-grow {
+   from {
+      transform: scaleY(0);
+   }
+   to {
+      transform: scaleY(1);
+   }
+}
+.draw-on {
+   stroke-dasharray: 1;
+   stroke-dashoffset: 1;
+   animation: draw-on 900ms var(--ease) forwards;
+}
+@keyframes draw-on {
+   to {
+      stroke-dashoffset: 0;
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .bar-grow {
+      animation: none;
+   }
+   .draw-on {
+      animation: none;
+      stroke-dashoffset: 0;
+   }
 }
 
 /* ---- A shimmer for anything still loading ---------------------------------- */
