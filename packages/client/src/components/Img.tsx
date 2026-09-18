@@ -21,8 +21,8 @@ import { FishMark } from '@/components/brand/FishMark';
 /* The widths the three variants really are, so the browser's density
  * arithmetic is arithmetic and not a guess. lib/images.ts makes the first two;
  * the third is whatever the camera wrote, and 2400 is a deliberate floor. */
-const THUMB_W = 160;
-const CARD_W = 900;
+const THUMB_W = 256;
+const CARD_W = 1200;
 const FULL_W = 2400;
 
 export type ImgProps = {
@@ -148,7 +148,15 @@ export function Img({
       <div
          className={cn(
             'overflow-hidden bg-bg-2',
-            fill ? 'absolute inset-0 size-full' : 'relative',
+            /*
+             * A ratio needs a width to work from. Without one the box takes
+             * its height from the column it sits in and derives the width
+             * from the ratio, which on the feed made a 4:3 photograph 660
+             * pixels wide inside a 358 pixel card: blown up, overflowing and
+             * soft. A caller that sets its own size still wins, because its
+             * classes come after these.
+             */
+            fill ? 'absolute inset-0 size-full' : 'relative w-full',
             className
          )}
          style={boxStyle}

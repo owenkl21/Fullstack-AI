@@ -10,8 +10,8 @@
  * packages/server/services/uploads.service.ts:
  *
  *   <key>            the original
- *   <key>.card.jpg   900px on the long edge
- *   <key>.thumb.jpg  160px on the long edge
+ *   <key>.card.jpg   1200px wide
+ *   <key>.thumb.jpg  256px wide
  *
  * Safe to run again: a key that already has both copies is counted and
  * skipped, so a run that was interrupted picks up where it stopped. Nothing is
@@ -42,8 +42,8 @@ const ENV_FILE = resolve(HERE, '../packages/server/.env');
 /* The same two sizes and qualities the browser uses, so a photograph looks the
  * same whether it went up today or was backfilled. See client/src/lib/images.ts. */
 const VARIANTS = [
-   { suffix: '.card.jpg', longEdge: 900, quality: 78 },
-   { suffix: '.thumb.jpg', longEdge: 160, quality: 72 },
+   { suffix: '.card.jpg', width: 1200, quality: 80 },
+   { suffix: '.thumb.jpg', width: 256, quality: 74 },
 ];
 
 const IMAGE_KEY = /\.(jpe?g|png|webp)$/i;
@@ -163,10 +163,18 @@ async function main() {
       .filter((key) => IMAGE_KEY.test(key))
       .sort();
 
+   /*
+    * --force remakes what is already there. The sizes these are cut to are a
+    * judgement that can change, and it changed once already: a copy made to an
+    * older rule is not missing, it is wrong, and only this tells the two apart.
+    */
+   const force = process.argv.includes('--force');
    const work = originals
       .map((key) => ({
          key,
-         missing: VARIANTS.filter((v) => !keys.has(`${key}${v.suffix}`)),
+         missing: force
+            ? VARIANTS
+            : VARIANTS.filter((v) => !keys.has(`${key}${v.suffix}`)),
       }))
       .filter((entry) => entry.missing.length > 0);
 
@@ -211,7 +219,7 @@ async function main() {
                /* The camera's orientation tag, applied and then dropped, so a
                 * fish held up sideways comes out the right way up. */
                .rotate()
-               .resize(variant.longEdge, variant.longEdge, {
+               .resize(variant.width, null, {
                   fit: 'inside',
                   withoutEnlargement: true,
                })

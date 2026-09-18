@@ -35,12 +35,23 @@ export type VariantName = 'card' | 'thumb';
  * Which is the whole of the fix: a feed of twenty five cards was pulling 28 MB
  * and is now pulling a few hundred kilobytes of it.
  */
+/*
+ * Sized by WIDTH, not by the long edge, because width is the only thing a
+ * srcset entry can promise. A portrait photograph capped at 900 on its long
+ * edge is about 500 wide; declaring it as `900w` told the browser it had
+ * something it did not, so it picked that copy for a box far wider and drew
+ * it soft. The number here is the number the ladder quotes.
+ *
+ * 1200 is the card because a phone at three times density asks for about
+ * 1170 across a full-width photograph, and 256 is the thumb because a 52px
+ * row photograph at that density asks for 156.
+ */
 export const VARIANT_SPEC: Record<
    VariantName,
-   { longEdge: number; quality: number }
+   { maxWidth: number; quality: number }
 > = {
-   card: { longEdge: 900, quality: 0.78 },
-   thumb: { longEdge: 160, quality: 0.72 },
+   card: { maxWidth: 1200, quality: 0.8 },
+   thumb: { maxWidth: 256, quality: 0.74 },
 };
 
 export type ResizedVariant = {
@@ -102,15 +113,12 @@ async function decode(file: File): Promise<Decoded> {
 
 function drawn(
    decoded: Decoded,
-   longEdge: number,
+   maxWidth: number,
    quality: number
 ): Promise<{ blob: Blob; width: number; height: number }> {
    /* Never upscale. A photograph smaller than the target is already the
     * variant, and blowing it up would cost bytes to lose sharpness. */
-   const scale = Math.min(
-      1,
-      longEdge / Math.max(decoded.width, decoded.height)
-   );
+   const scale = Math.min(1, maxWidth / decoded.width);
    const width = Math.max(1, Math.round(decoded.width * scale));
    const height = Math.max(1, Math.round(decoded.height * scale));
 
@@ -158,7 +166,7 @@ export async function makeImageVariants(file: File): Promise<ResizedVariant[]> {
          const spec = VARIANT_SPEC[variant];
          const { blob, width, height } = await drawn(
             decoded,
-            spec.longEdge,
+            spec.maxWidth,
             spec.quality
          );
          out.push({ variant, blob, width, height });

@@ -140,8 +140,15 @@ export function FeedPostBlock({
           * card really measures at each width, so the scrollbar stays honest
           * and the page does not jump as cards come back into view. `auto`
           * means the browser keeps the real height once it has seen it.
+          *
+          * Height only. The shorthand takes one length for BOTH axes, so
+          * `contain-intrinsic-size: auto 660px` told the browser every card
+          * it had not drawn yet was also 660 pixels WIDE, and on a 390 pixel
+          * phone the photograph came out at 660 across: overflowing, zoomed
+          * in and soft. The width of a card is not a guess to be made, it is
+          * the column it sits in.
           */
-         className="blk flex h-full flex-col [content-visibility:auto] [contain-intrinsic-size:auto_660px] md:[contain-intrinsic-size:auto_1100px]"
+         className="blk flex h-full flex-col [content-visibility:auto] [contain-intrinsic-height:auto_660px] md:[contain-intrinsic-height:auto_1100px]"
          aria-labelledby={`post-${post.id}`}
       >
          <header className="flex items-center gap-3 px-4 pt-5 pr-12 pb-4">
