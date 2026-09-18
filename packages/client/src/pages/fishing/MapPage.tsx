@@ -7,6 +7,7 @@ import {
    type SpotPin,
 } from '@/components/map/SpotsMap';
 import { PlaceSearch } from '@/components/forecast/PlaceSearch';
+import { usePhone } from '@/lib/media';
 import { usePosition } from '@/lib/position';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { useDocumentTitle } from '@/lib/title';
@@ -45,6 +46,7 @@ function MapScreen() {
    const [mine, setMine] = useState<SpotPin[]>([]);
    const [focus, setFocus] = useState<MapFocus | null>(null);
    const { ask, state: positionState } = usePosition({ auto: false });
+   const phone = usePhone();
 
    useEffect(() => {
       const controller = new AbortController();
@@ -73,6 +75,56 @@ function MapScreen() {
 
       return () => controller.abort();
    }, []);
+
+   const goTo = (latitude: number, longitude: number, zoom: number) =>
+      setFocus({ latitude, longitude, zoom, key: Date.now() });
+
+   const useMyPosition = () => {
+      void ask().then((fix) => {
+         if (fix) goTo(fix.latitude, fix.longitude, 13);
+      });
+   };
+
+   /*
+    * On a phone the map is the screen.
+    *
+    * It used to be a 284 pixel window on the water under a heading, a
+    * paragraph and a search field, which is a picture of a map: too small to
+    * see where the next headland is, so too small to decide anything with.
+    * Here it runs from under the header to the top of the navigation bar, the
+    * search floats on its top edge and the controls on its bottom one, and the
+    * whole screen is the thing you came to look at.
+    */
+   if (phone) {
+      return (
+         <section className="relative h-[calc(100dvh-60px-64px-env(safe-area-inset-bottom))] w-full overflow-hidden">
+            {/* The page still names itself, for a screen reader and for the
+                focus that moves here on every navigation. The map is the
+                heading a sighted reader gets. */}
+            <h1 className="sr-only">Map</h1>
+
+            <SpotsMap
+               full
+               spots={mine}
+               wheelZoom
+               focus={focus}
+               onOpen={(id) => navigate(`/sites/${id}`)}
+            />
+
+            <div className="absolute inset-x-0 top-0 z-[600] p-3">
+               <PlaceSearch
+                  className="w-full"
+                  /* The bar at the foot of the map already carries Locate,
+                     and one screen does not need two of it. */
+                  showMine={false}
+                  locating={positionState === 'asking'}
+                  onPick={(place) => goTo(place.latitude, place.longitude, 12)}
+                  onUseMine={useMyPosition}
+               />
+            </div>
+         </section>
+      );
+   }
 
    return (
       /*

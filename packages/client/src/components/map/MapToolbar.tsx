@@ -42,6 +42,7 @@ export function MapToolbar({
    onLocate,
    locating = false,
    placement = 'overlay',
+   className,
 }: {
    base: BaseLayer;
    onBase: (next: BaseLayer) => void;
@@ -66,6 +67,8 @@ export function MapToolbar({
     * foot of the screen would cut it in half.
     */
    placement?: 'overlay' | 'bar';
+   /** Where the bar is put, for the page that floats it on the map itself. */
+   className?: string;
 }) {
    const [layersOpen, setLayersOpen] = useState(false);
    const shown = Object.values(layers).filter(Boolean).length;
@@ -83,7 +86,8 @@ export function MapToolbar({
          className={cn(
             bar
                ? 'grid grid-cols-5 gap-px border border-line bg-line'
-               : 'absolute top-3 left-3 z-[500] flex flex-wrap items-start gap-2 pr-16'
+               : 'absolute top-3 left-3 z-[500] flex flex-wrap items-start gap-2 pr-16',
+            className
          )}
       >
          {phone ? (

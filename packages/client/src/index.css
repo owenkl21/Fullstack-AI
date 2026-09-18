@@ -952,6 +952,20 @@ article.blk[aria-labelledby] > div:last-of-type > .rule-dashed {
 }
 
 /*
+ * The map that is the whole screen.
+ *
+ * The search floats on its top edge and the row of controls on its bottom one,
+ * so Leaflet's own corners step inside both rather than sitting underneath
+ * them: the zoom clears the search field, and the attribution clears the bar.
+ */
+.map-surface[data-full] .leaflet-top {
+   top: 4.25rem;
+}
+.map-surface[data-full] .leaflet-bottom {
+   bottom: 3.25rem;
+}
+
+/*
  * The pin being dropped, while it is being named.
  *
  * It stands above every other mark, so the one pin the angler is holding is

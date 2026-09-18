@@ -101,6 +101,7 @@ export function SpotsMap({
    wheelZoom = false,
    focus = null,
    fill = false,
+   full = false,
 }: {
    spots: SpotPin[];
    onOpen: (id: string) => void;
@@ -116,6 +117,16 @@ export function SpotsMap({
     * in the middle of My spots still asks for its own height.
     */
    fill?: boolean;
+   /**
+    * The map is the screen.
+    *
+    * On a phone a map inside a column, under a heading and a search and above
+    * a row of controls, is a third of a screen of water: you cannot see where
+    * the next point is, so you cannot decide anything, which is the only
+    * reason to open a map. Here the water runs corner to corner and every
+    * control floats on it.
+    */
+   full?: boolean;
 }) {
    const holder = useRef<HTMLDivElement | null>(null);
    const map = useRef<LeafletMap | null>(null);
@@ -696,10 +707,18 @@ export function SpotsMap({
        * The naming panel covers the foot of the map, so the pin is lifted into
        * the clear part above it. Without this a mark dropped low on the screen
        * is named blind, which is the whole complaint.
+       *
+       * The panel's own height is measured rather than assumed. It was a flat
+       * 280 pixels, and on a full screen phone map the panel is nearer five
+       * hundred, so the pin was lifted into the part of the map the panel had
+       * just covered and the angler named a mark they could not see. The ref
+       * is already attached by the time an effect runs, so this is the real
+       * number; the old guess stands in only if the panel has not painted yet.
        */
+      const cover = panel.current?.getBoundingClientRect().height || 280;
       created.panInside([at.lat, at.lng], {
          paddingTopLeft: [40, 40],
-         paddingBottomRight: [40, 280],
+         paddingBottomRight: [40, Math.round(cover) + 24],
       });
 
       /*
@@ -742,17 +761,20 @@ export function SpotsMap({
    return (
       <div
          className={
-            fill
-               ? /*
-                  * flex-1, not h-full. The page gives this column a
-                  * min-height rather than a height, and a percentage height
-                  * against an ancestor that has no definite height of its own
-                  * resolves to nothing: the map came out zero pixels tall and
-                  * the page rendered a heading over blank paper. Growing into
-                  * the room the flex column has left asks no such question.
-                  */
-                 'flex min-h-0 flex-1 flex-col gap-3'
-               : 'flex flex-col gap-3'
+            full
+               ? /* The screen itself. Nothing is stacked, everything floats. */
+                 'relative size-full'
+               : fill
+                 ? /*
+                    * flex-1, not h-full. The page gives this column a
+                    * min-height rather than a height, and a percentage height
+                    * against an ancestor that has no definite height of its own
+                    * resolves to nothing: the map came out zero pixels tall and
+                    * the page rendered a heading over blank paper. Growing into
+                    * the room the flex column has left asks no such question.
+                    */
+                   'flex min-h-0 flex-1 flex-col gap-3'
+                 : 'flex flex-col gap-3'
          }
       >
          {/*
@@ -760,25 +782,38 @@ export function SpotsMap({
           * picture of a map rather than a map: you could not pan without losing
           * your place. It takes real height now and the controls sit under it.
           */}
-         <div className={fill ? 'relative min-h-0 flex-1' : 'relative'}>
+         <div
+            className={
+               full
+                  ? 'absolute inset-0'
+                  : fill
+                    ? 'relative min-h-0 flex-1'
+                    : 'relative'
+            }
+         >
             <div
                ref={holder}
                /* The base is on the element so the night rule can leave a
                   photograph alone and only invert the drawn maps. */
                data-base={base}
+               /* Told it is the screen, so the stylesheet can move Leaflet's
+                  own corners clear of the search and the bar that float on it. */
+               data-full={full ? 'true' : undefined}
                className={
-                  'map-surface border border-line ' +
-                  (fill
-                     ? /*
-                        * Pinned to its box rather than asked for all of its
-                        * height. The box is a flex item, and a percentage
-                        * height against a parent whose own height comes from
-                        * flex resolves to nothing in the pass that lays this
-                        * out: the map came back two pixels tall, which is its
-                        * own border and no map at all.
-                        */
-                       'absolute inset-0'
-                     : 'h-[62vh] min-h-[380px] w-full')
+                  'map-surface ' +
+                  (full
+                     ? 'absolute inset-0'
+                     : fill
+                       ? /*
+                          * Pinned to its box rather than asked for all of its
+                          * height. The box is a flex item, and a percentage
+                          * height against a parent whose own height comes from
+                          * flex resolves to nothing in the pass that lays this
+                          * out: the map came back two pixels tall, which is
+                          * its own border and no map at all.
+                          */
+                         'absolute inset-0 border border-line'
+                       : 'h-[62vh] min-h-[380px] w-full border border-line')
                }
             />
 
@@ -858,7 +893,7 @@ export function SpotsMap({
             {mark ? (
                <div
                   ref={panel}
-                  className="thread-scroll absolute inset-x-0 bottom-0 z-[600] max-h-[78%] scroll-mb-[calc(64px+env(safe-area-inset-bottom))] overflow-y-auto border-t border-line bg-background md:scroll-mb-0"
+                  className="thread-scroll absolute inset-x-0 bottom-0 z-[700] max-h-[78%] scroll-mb-[calc(64px+env(safe-area-inset-bottom))] overflow-y-auto border-t border-line bg-background md:scroll-mb-0"
                >
                   <NewWaypoint
                      at={mark}
@@ -870,8 +905,17 @@ export function SpotsMap({
          </div>
 
          {phone ? (
+            /*
+             * On a full screen map the bar floats on the water at the foot of
+             * it rather than sitting under it. It is opaque, it is the height
+             * of a thumb, and it stands on the map's own bottom edge, which on
+             * this page is the line above the navigation bar.
+             */
             <MapToolbar
                placement="bar"
+               className={
+                  full ? 'absolute inset-x-0 bottom-0 z-[600] border-x-0' : ''
+               }
                base={base}
                onBase={(next) => {
                   setBase(next);
@@ -912,13 +956,29 @@ export function SpotsMap({
             />
          ) : null}
 
-         <p className="text-[14px] text-ink-3">
-            {showPois && zoomLevel > 0 && zoomLevel < POI_MIN_ZOOM
-               ? 'Zoom in for slipways and tackle shops.'
-               : ''}{' '}
-            Press and hold the map, or use the mark control, to drop a private
-            mark. Drag the pin to put it exactly where you mean.
-         </p>
+         {full ? (
+            /*
+             * The one sentence worth the water it covers: that there are
+             * slipways and shops down there and the map is too far out to
+             * fetch them. The gesture for dropping a mark is on the bar as a
+             * control, so it does not need saying here as well.
+             */
+            showPois && zoomLevel > 0 && zoomLevel < POI_MIN_ZOOM && !mark ? (
+               /* Above the bar and above the attribution line, which is the
+                  one thing on this screen that may not be covered. */
+               <p className="absolute inset-x-0 bottom-[70px] z-[550] bg-background/92 px-3 py-1.5 text-center text-[14px] text-ink-2">
+                  Zoom in for slipways and tackle shops.
+               </p>
+            ) : null
+         ) : (
+            <p className="text-[14px] text-ink-3">
+               {showPois && zoomLevel > 0 && zoomLevel < POI_MIN_ZOOM
+                  ? 'Zoom in for slipways and tackle shops.'
+                  : ''}{' '}
+               Press and hold the map, or use the mark control, to drop a
+               private mark. Drag the pin to put it exactly where you mean.
+            </p>
+         )}
       </div>
    );
 }
