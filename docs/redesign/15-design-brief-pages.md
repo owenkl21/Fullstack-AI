@@ -7,7 +7,7 @@ decided, the pages are not.
 
 ---
 
-You are reworking pages of **Fishtagram**, a fishing log for South African
+You are reworking pages of **Fisherfeed**, a fishing log for South African
 rock, surf and dam anglers, used on a phone on the water and on a desktop at
 home. An angler taps Log, and the app stamps the minute, the position and the
 conditions before the sheet has finished opening. Around that sit a feed, spots

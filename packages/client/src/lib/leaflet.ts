@@ -210,7 +210,7 @@ const GLYPH_ICON: Record<
  * markup, so ids repeat; naming them by ink means the copies that collide are
  * identical, and two pins of different kinds never share one.
  */
-const MARK_URL = '/brand/fishtagram-mark.png';
+const MARK_URL = '/brand/fisherfeed-mark.png';
 
 const fishMarkup = (ink: string, size: number, x: number, y: number) => {
    const id = `mark-${ink.replace(/[^a-z0-9]/gi, '')}`;

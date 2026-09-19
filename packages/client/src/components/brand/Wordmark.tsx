@@ -20,21 +20,21 @@ export function Wordmark({
    return (
       <Link
          to={to}
-         aria-label="Fishtagram, home"
+         aria-label="Fisherfeed, home"
          className={cn(
             'g-tracked inline-flex min-h-11 items-center gap-2 text-[24px] text-paper md:gap-2.5 md:text-[28px]',
             className
          )}
       >
          <img
-            src="/brand/fishtagram-mark.png"
+            src="/brand/fisherfeed-mark.png"
             alt=""
             width={192}
             height={190}
             decoding="async"
             className="h-[44px] w-auto md:h-[50px]"
          />
-         <span>Fishtagram</span>
+         <span>Fisherfeed</span>
       </Link>
    );
 }

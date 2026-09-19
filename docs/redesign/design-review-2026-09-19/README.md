@@ -1,7 +1,7 @@
 # Design review and simplification, 19 September 2026
 
 Owen's Claude Design export, kept whole so the frames can be opened later.
-Open `Fishtagram Rework.dc.html` for the overview, then the three canvases.
+Open `Fisherfeed Rework.dc.html` for the overview, then the three canvases.
 `frames/` holds every frame on its own: `<id>.html` is the exact spec (inline
 styles), `<id>.png` its render, `<id>.note.txt` its annotation.
 

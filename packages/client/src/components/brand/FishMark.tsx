@@ -11,8 +11,8 @@ import { cn } from '@/lib/utils';
  * would only be right on one of them.
  */
 const MASK: CSSProperties = {
-   maskImage: 'url(/brand/fishtagram-mark.png)',
-   WebkitMaskImage: 'url(/brand/fishtagram-mark.png)',
+   maskImage: 'url(/brand/fisherfeed-mark.png)',
+   WebkitMaskImage: 'url(/brand/fisherfeed-mark.png)',
    maskRepeat: 'no-repeat',
    WebkitMaskRepeat: 'no-repeat',
    maskPosition: 'center',

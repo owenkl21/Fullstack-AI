@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 /* The product's name, settled on 18 September 2026. One string, used everywhere. */
-const BRAND = 'Fishtagram';
+const BRAND = 'Fisherfeed';
 
 /** Sets the tab title from the record on screen. Pass nothing for the brand alone. */
 export function useDocumentTitle(title?: string) {

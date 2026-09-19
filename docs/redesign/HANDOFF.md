@@ -228,7 +228,7 @@ The entry chunk was 661.14 kB raw and 197.80 kB gzipped before the split, so fir
 3. A **CORS policy on the R2 bucket**, now that photos upload straight to R2 rather than through the API. Without it every upload fails with an opaque browser error and nothing reaches the server logs. The policy is in [09-deploy.md](09-deploy.md) section 4.5.
 4. A **verified sending domain in Resend**, before email verification and password reset can work.
 5. ~~A Stadia Maps account~~. No longer needed. The maps went in on keyless OpenStreetMap tiles with a CSS filter for night, so there is no account, no key and no registered domain anywhere in the map path.
-6. ~~A **product name**~~. Settled 18 September 2026: **Fishtagram**. The wordmark (`brand/Wordmark.tsx`) shows Owen's mark from `public/brand/fishtagram-mark.png` beside the name, the favicons are `public/favicon.png` and `apple-touch-icon.png` (rendered from his Canva export by `audit/logo.mjs`), and `lib/title.ts` carries the name for every tab title.
+6. ~~A **product name**~~. Settled 18 September 2026: **Fisherfeed**. The wordmark (`brand/Wordmark.tsx`) shows Owen's mark from `public/brand/fisherfeed-mark.png` beside the name, the favicons are `public/favicon.png` and `apple-touch-icon.png` (rendered from his Canva export by `audit/logo.mjs`), and `lib/title.ts` carries the name for every tab title.
 
 ---
 

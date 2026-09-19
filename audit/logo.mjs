@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /*
- * The Fishtagram mark from the Canva export (a 1500 x 1500 SVG wrapping three
+ * The Fisherfeed mark from the Canva export (a 1500 x 1500 SVG wrapping three
  * raster layers on a black square). Renders it flat, then:
  *   - the header mark: black made transparent, trimmed to the fish, so it sits
  *     on the always-black header whatever exact black the export used;
@@ -62,7 +62,7 @@ const w = maxX - minX + 1, h = maxY - minY + 1;
 const cut = new PNG({ width: w, height: h });
 PNG.bitblt(big, cut, minX, minY, w, h, 0, 0);
 fs.mkdirSync(path.join(publicDir, 'brand'), { recursive: true });
-const out = path.join(publicDir, 'brand', 'fishtagram-mark.png');
+const out = path.join(publicDir, 'brand', 'fisherfeed-mark.png');
 
 /*
  * The header shows the mark about 32px tall, so a 1024-wide cut is eight

@@ -93,7 +93,7 @@ export function BootGate({ children }: { children: ReactNode }) {
          {ready ? null : (
             <div
                role="status"
-               aria-label="Loading Fishtagram"
+               aria-label="Loading Fisherfeed"
                className="fixed inset-0 z-[9999] grid place-items-center bg-background"
             >
                <LeapingFish />

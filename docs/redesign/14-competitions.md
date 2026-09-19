@@ -1,7 +1,7 @@
 # Competitions: the flow, with verification (19 September 2026)
 
 Owen brought a prototype of the competition flow he wants
-(fishtagram-competitions.brandondarker.chatgpt.site, a single page whose other
+(fisherfeed-competitions.brandondarker.chatgpt.site, a single page whose other
 screens live in its bundle). This document is that flow rebuilt in this
 product's own language and look, with the AI verification the prototype left
 out ("AI verification is not active in this prototype") worked in. The eight

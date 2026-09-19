@@ -9,7 +9,7 @@ for (const [tag, vp] of [['phone', PHONE], ['desk', DESK]]) {
    const info = await page.evaluate(() => {
       const out = [];
       for (const i of document.querySelectorAll('img')) {
-         if (!/r2\.cloudflarestorage|fishtagram-mark/.test(i.currentSrc)) continue;
+         if (!/r2\.cloudflarestorage|fisherfeed-mark/.test(i.currentSrc)) continue;
          const r = i.getBoundingClientRect();
          const cs = getComputedStyle(i);
          const chain = [];

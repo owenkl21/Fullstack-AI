@@ -334,7 +334,7 @@ band, tides and the sun and moon; then the name and the mark arrived.
       sunset, moonrise and moonset over a dashed horizon. Signal colours are
       tokens with night values; no hex left in `tones.ts`. The browser
       fallback mirrors every new field.
-- [x] **Fishtagram.** The name and Owen's mark (`public/brand`,
+- [x] **Fisherfeed.** The name and Owen's mark (`public/brand`,
       `brand/Wordmark.tsx`, the favicons, `lib/title.ts`).
 - [x] **The loader is the fish leaving the water.** Owen's clip, scrubbed of
       its watermark and shrunk to a 270 KB muted mp4 (`public/brand/loader.*`,

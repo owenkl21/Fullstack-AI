@@ -8,7 +8,7 @@ for (const [name, vp] of [['desk', DESK], ['phone', PHONE]]) {
    const p = await ctx.newPage();
    await open(p, '/', 2500);
    const m = await p.evaluate(() => {
-      const img = document.querySelector('header img[src*="fishtagram"]');
+      const img = document.querySelector('header img[src*="fisherfeed"]');
       const r = img?.getBoundingClientRect();
       return { title: document.title, mark: r ? { w: Math.round(r.width), h: Math.round(r.height) } : null, icon: document.querySelector('link[rel="icon"]')?.getAttribute('href') };
    });
