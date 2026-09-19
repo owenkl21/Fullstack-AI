@@ -555,6 +555,7 @@ function QuickLog() {
                setChosen(null);
                setSpeciesError(null);
             }}
+            onCreated={(made) => setSpecies((list) => [...list, made])}
          />
       </div>
    );

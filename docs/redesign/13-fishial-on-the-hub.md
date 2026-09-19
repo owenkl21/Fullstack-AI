@@ -13,41 +13,53 @@ contract the server speaks to it.
 { "image": "<base64 of the photo>", "mediaType": "image/jpeg" }
 ```
 
-and an optional `Authorization: Bearer {FISHIAL_TOKEN}` header. It answers:
+and an `Authorization: Bearer {FISHIAL_TOKEN}` header. It answers:
 
 ```json
-{ "candidates": [ { "name": "Galjoen", "confidence": 0.91 },
-                  { "name": "Blacktail", "confidence": 0.07 } ] }
+{ "candidates": [ { "name": "Lithognathus lithognathus", "commonName": "White steenbras", "confidence": 0.75 },
+                  { "name": "Rhabdosargus holubi", "commonName": "Cape stumpnose", "confidence": 0.44 } ],
+  "fishFound": true, "fishCount": 1 }
 ```
 
-Names may be common or scientific; the server matches them to the species
-table either way and hands the app the best two. Anything it cannot match is
-shown to the angler as what the namer said, so they can pick or type.
+`name` is the classifier's scientific name; `commonName` is the English
+Wikipedia title for that species where there is one, else null. The server
+matches each guess to the species table by common or scientific name and
+offers the best two. A guess the table does not have is offered anyway, by
+its common name, and becomes a species if the angler takes it, so the catch
+can still be scored. `GET /health` answers with the same header.
 
-## On the hub
+## On the hub (done 19 September 2026)
 
-1. Fishial's model and code: https://github.com/fishial/fish-identification
-   (the "Fish Detector" and "Fish Classifier" weights are on the releases page).
-   Put it under `C:\hub\fishial\` on the box; WSL2 with ROCm is already set
-   up for WhisperX, and the same environment runs this.
-2. Wrap it in a small FastAPI app that exposes `/identify` as above. Decode
-   the base64, run the detector, crop to the best box, run the classifier,
-   return the top five labels with their softmax scores. Keep the model
-   loaded between requests. Bind to `127.0.0.1:8765`.
-3. Expose it to Railway. The hub is on the tailnet and Railway is not, so
-   use a Tailscale Funnel on the hub: `tailscale funnel 8765` gives a public
-   `https://<box>.<tailnet>.ts.net` address. Put a bearer token in front of
-   it in the FastAPI app and set the same value as `FISHIAL_TOKEN`.
-4. On Railway, set `FISHIAL_URL=https://<box>.<tailnet>.ts.net` and
-   `FISHIAL_TOKEN=<the token>` on the `server` service. Until they are set the
-   app simply does not offer a name, and nothing else changes.
+1. Fishial's code now lives at github.com/Wye-Foundation/Fishial-Fish-Identification
+   (MIT). The weights are zips on `storage.googleapis.com/fishial-ml-resources`:
+   `detector_v26_n3.zip` (YOLO26 nano, an Ultralytics `.pt`) and
+   `classification_model_v0.10.2.zip` (DinoV2, 866 species, a TorchScript
+   bundle with the vendor's own `inference.py` beside it). Both unpacked under
+   `D:\hub\fishial\weights`.
+2. The service is `/home/owen/fishial/server.py` (FastAPI, one photo through
+   the GPU at a time, models kept loaded, warmed on start), in its own venv on
+   the same ROCm torch wheels WhisperX uses. It runs as the user systemd unit
+   `fishial` on port 8765 and takes about 0.6 s a photo with 700 MiB of VRAM,
+   so it sits beside the chat model. CPU was tried and is 5 s a stage.
+   `~/fishial/README.md` on the hub has the commands.
+3. Reaching it from Railway: not Tailscale (Owen's call). A Cloudflare quick
+   tunnel runs as the user unit `cloudflared` beside it. Its address is a
+   random `*.trycloudflare.com` name that changes whenever cloudflared
+   restarts; when that happens `FISHIAL_URL` on Railway has to be set again
+   and the server redeployed (setting a variable does not redeploy on its
+   own). The permanent fix is a domain in Owen's Cloudflare account and a
+   named tunnel; the account had none on 19 September.
+4. On Railway, `FISHIAL_URL` and `FISHIAL_TOKEN` are set on the `server`
+   service. Until they are set the app simply does not offer a name.
 
 ## What the app does with it
 
 After a photo goes up on either log form, the app asks for the top two names
-and offers them as "Is this a Galjoen, or a Blacktail?" with "Neither". The
-angler's answer is what is saved; a guess is never written to a catch on its
-own. With several photos, only the first is asked about.
+and offers them as "Is this a Galjoen, or a Blacktail?" with "Neither, I will
+type it". The angler's answer is what is saved; a guess is never written to a
+catch on its own. A name the table does not have yet (the classifier knows
+866 species, the table started with 24) is offered all the same and is added
+as a species when taken. With several photos, only the first is asked about.
 
 ## The competition reader is different
 

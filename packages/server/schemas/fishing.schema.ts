@@ -187,4 +187,6 @@ export const speciesSearchSchema = z.object({
 
 export const createSpeciesSchema = z.object({
    name: z.string().trim().min(2).max(80),
+   /* From the fish namer, which speaks in scientific names. */
+   scientificName: z.string().trim().min(3).max(120).nullish(),
 });

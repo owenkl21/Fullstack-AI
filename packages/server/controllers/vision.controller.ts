@@ -67,13 +67,22 @@ export const visionController = {
          const species = await prisma.species.findMany({
             select: { id: true, commonName: true, scientificName: true },
          });
-         const matches: {
-            id: string;
+         /*
+          * The best two, in the namer's order. A fish the table already has
+          * comes back as that row. One it does not is offered all the same,
+          * by its common name where the namer knows one, with no id: the
+          * form adds it as a species if the angler takes it, so the catch
+          * can still be scored.
+          */
+         const candidates: {
+            id: string | null;
             commonName: string;
+            scientificName: string | null;
             confidence: number;
             guess: string;
          }[] = [];
          for (const guess of guesses) {
+            if (candidates.length === 2) break;
             const g = norm(guess.name);
             const hit = species.find((s) => {
                const c = norm(s.commonName);
@@ -86,18 +95,29 @@ export const visionController = {
                   (sci && (g.includes(sci) || sci.includes(g)))
                );
             });
-            if (hit && !matches.some((m) => m.id === hit.id)) {
-               matches.push({
+            if (hit) {
+               if (candidates.some((m) => m.id === hit.id)) continue;
+               candidates.push({
                   id: hit.id,
                   commonName: hit.commonName,
+                  scientificName: hit.scientificName,
+                  confidence: guess.confidence,
+                  guess: guess.name,
+               });
+            } else {
+               if (candidates.some((m) => norm(m.guess) === g)) continue;
+               candidates.push({
+                  id: null,
+                  commonName: guess.commonName ?? guess.name,
+                  scientificName: guess.name,
                   confidence: guess.confidence,
                   guess: guess.name,
                });
             }
          }
          return res.json({
-            candidates: matches.slice(0, 2),
-            /* What the namer said, for the angler to read when nothing matched. */
+            candidates,
+            /* What the namer said, in its own words. */
             raw: guesses.slice(0, 3),
          });
       } catch (error) {

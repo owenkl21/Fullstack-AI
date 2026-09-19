@@ -246,7 +246,10 @@ export const fishingController = {
          return res.status(400).json(parsed.error.format());
       }
       try {
-         const result = await fishingService.createSpecies(parsed.data.name);
+         const result = await fishingService.createSpecies(
+            parsed.data.name,
+            parsed.data.scientificName ?? null
+         );
          return res.status(result.created ? 201 : 200).json(result);
       } catch (error) {
          console.error('[species:create] failed', error);

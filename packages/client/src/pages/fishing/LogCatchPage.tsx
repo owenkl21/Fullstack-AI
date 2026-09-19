@@ -1121,6 +1121,9 @@ export function CatchForm({
                         }));
                      }
                   }}
+                  onCreated={(made) =>
+                     setSpeciesList((list) => [...list, made])
+                  }
                />
 
                <div data-field="species">

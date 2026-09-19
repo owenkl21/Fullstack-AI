@@ -679,10 +679,11 @@ export const fishingService = {
     * and the match ignores case, spaces and punctuation and forgives a letter
     * or two, so "Dusky Kob", "duskykob" and "dusky cob" are one fish.
     */
-   async createSpecies(name: string) {
+   async createSpecies(name: string, scientificName: string | null = null) {
       const norm = (value: string) =>
          value.toLowerCase().replace(/[^a-z0-9]/g, '');
       const wanted = norm(name);
+      const wantedSci = scientificName ? norm(scientificName) : '';
       const all = await prisma.species.findMany({
          select: {
             id: true,
@@ -711,7 +712,10 @@ export const fishingService = {
          ...(Array.isArray(row.aliases) ? (row.aliases as string[]) : []),
       ];
       const exact = all.find((row) =>
-         namesOf(row).some((n) => n && norm(n) === wanted)
+         namesOf(row).some(
+            (n) =>
+               n && (norm(n) === wanted || (wantedSci && norm(n) === wantedSci))
+         )
       );
       if (exact) return { species: exact, created: false };
       const allowance = wanted.length > 6 ? 2 : wanted.length > 3 ? 1 : 0;
@@ -724,7 +728,10 @@ export const fishingService = {
          .replace(/\s+/g, ' ')
          .replace(/^./, (c) => c.toUpperCase());
       const made = await prisma.species.create({
-         data: { commonName },
+         data: {
+            commonName,
+            scientificName: scientificName?.trim().replace(/\s+/g, ' ') || null,
+         },
          select: {
             id: true,
             commonName: true,

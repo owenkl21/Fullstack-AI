@@ -175,12 +175,18 @@ export const visionService = {
     */
    async identify(
       imageUrl: string
-   ): Promise<{ name: string; confidence: number }[] | null> {
+   ): Promise<
+      { name: string; commonName: string | null; confidence: number }[] | null
+   > {
       const base = process.env.FISHIAL_URL;
       if (!base) return null;
       const image = await fetchImage(imageUrl);
       const response = await axios.post<{
-         candidates?: { name: string; confidence: number }[];
+         candidates?: {
+            name: string;
+            commonName?: string | null;
+            confidence: number;
+         }[];
       }>(
          `${base.replace(/\/$/, '')}/identify`,
          { image: image.data, mediaType: image.mediaType },
@@ -195,6 +201,10 @@ export const visionService = {
          .filter((c) => c && typeof c.name === 'string')
          .map((c) => ({
             name: c.name,
+            commonName:
+               typeof c.commonName === 'string' && c.commonName.trim()
+                  ? c.commonName.trim()
+                  : null,
             confidence: typeof c.confidence === 'number' ? c.confidence : 0,
          }))
          .sort((a, b) => b.confidence - a.confidence)
