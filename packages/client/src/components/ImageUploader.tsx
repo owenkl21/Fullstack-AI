@@ -114,7 +114,6 @@ export function ImageUploader({
    const [localRejected, setLocalRejected] = useState<RejectedFile[]>([]);
 
    const maxMb = Math.round(maxSize / MB);
-   const helper = `JPG, PNG or WebP, up to ${maxMb} MB each.`;
 
    const report = useCallback(
       (rejected: RejectedFile[]) => {
@@ -312,7 +311,6 @@ export function ImageUploader({
                   </span>
                ) : null}
             </div>
-            <p className="mt-2 text-[14px] text-paper-2">{helper}</p>
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
                <button
