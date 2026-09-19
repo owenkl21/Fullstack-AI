@@ -25,7 +25,7 @@ const pass = (n, ok, note = '') =>
 const seen = await page.evaluate(() => {
    const t = document.body.innerText;
    return {
-      read: (t.match(/Read \d{2}:\d{2}/) || [null])[0],
+      read: (t.match(/Read \d{2}:\d{2}/i) || [null])[0],
       checked: (t.match(/Checked[^\n]*/) || [null])[0],
       nowHeading: (t.match(/Right now[^\n]*/) || [null])[0],
    };
