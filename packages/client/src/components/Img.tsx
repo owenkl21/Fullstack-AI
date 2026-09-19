@@ -129,7 +129,15 @@ export function Img({
            : 'failed'
         : 'loading';
 
-   /* Idempotent for the same reason the ref above is: it is reached from it. */
+   /*
+    * Idempotent for the same reason the ref above is: it is reached from it.
+    *
+    * The browser picks its own rung off the ladder, so the URL that failed is
+    * read off the element, not assumed. On the record, where the original is
+    * the largest rung, assuming it was the original that failed blamed a
+    * missing card copy on the photograph itself and the record showed the
+    * house fish over a picture that would have loaded fine on its own.
+    */
    const onFailed = (url: string) => {
       if (src && url !== src && degradedFor !== src) {
          setDegradedFor(src);
@@ -187,7 +195,7 @@ export function Img({
                      );
                      return;
                   }
-                  onFailed(chosen);
+                  onFailed(node.currentSrc || chosen);
                }}
                src={chosen}
                srcSet={srcSet}
@@ -203,7 +211,9 @@ export function Img({
                         : { url: chosen, ok: true }
                   )
                }
-               onError={() => onFailed(chosen)}
+               onError={(event) =>
+                  onFailed(event.currentTarget.currentSrc || chosen)
+               }
                style={objectPosition ? { objectPosition } : undefined}
                className={cn(
                   ratio || fill

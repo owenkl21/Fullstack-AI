@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { makeImageVariants, type VariantName } from '@/lib/images';
 import type { UploadedPhoto } from './PhotoBlock';
 
 /*
@@ -23,24 +24,73 @@ export function photoProblem(file: File) {
    return null;
 }
 
+type SignedVariant = {
+   variant: VariantName;
+   contentType: string;
+   uploadUrl: string;
+};
+
+/**
+ * Sign, put the original, then put the two smaller copies beside it.
+ *
+ * The copies are what the feed, the rows and the record's ladder ask for
+ * first. Without them the server still signs their URLs, the bucket answers
+ * 404, and every phone-logged catch was drawn from its original or not at
+ * all. Same convention as the long form's picker: the copies are not fatal,
+ * the original is the upload.
+ */
 export async function uploadPhoto(file: File): Promise<UploadedPhoto> {
+   let variants: Awaited<ReturnType<typeof makeImageVariants>> = [];
+   try {
+      variants = await makeImageVariants(file);
+   } catch (error) {
+      console.warn('Could not make smaller copies of this photo', error);
+   }
+
    const { data: signed } = await axios.post<{
       storageKey: string;
       uploadUrl: string;
       readUrl: string;
+      cardReadUrl?: string | null;
+      thumbReadUrl?: string | null;
+      variants?: SignedVariant[];
    }>('/api/uploads/sign', {
       scope: 'catch',
       fileName: file.name,
       contentType: file.type,
       sizeBytes: file.size,
+      variants: variants.map((entry) => entry.variant),
    });
    await axios.put(signed.uploadUrl, file, {
       headers: { 'Content-Type': file.type },
    });
+   await putVariants(variants, signed.variants ?? []);
    return {
       storageKey: signed.storageKey,
       url: signed.readUrl,
+      cardUrl: signed.cardReadUrl ?? null,
+      thumbUrl: signed.thumbReadUrl ?? null,
       focusX: 0.5,
       focusY: 0.5,
    };
+}
+
+/** The small copies go up after the original, in parallel, and a miss is a warning. */
+export async function putVariants(
+   made: Awaited<ReturnType<typeof makeImageVariants>>,
+   signed: SignedVariant[]
+) {
+   await Promise.all(
+      made.map(async (entry) => {
+         const target = signed.find((item) => item.variant === entry.variant);
+         if (!target) return;
+         try {
+            await axios.put(target.uploadUrl, entry.blob, {
+               headers: { 'Content-Type': target.contentType },
+            });
+         } catch (error) {
+            console.warn(`The ${entry.variant} copy did not go up`, error);
+         }
+      })
+   );
 }

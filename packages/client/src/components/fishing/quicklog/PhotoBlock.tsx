@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import axios from 'axios';
+import { makeImageVariants } from '@/lib/images';
+import { putVariants } from './upload';
 import { CameraIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 import { usePhone } from '@/lib/media';
@@ -21,6 +23,10 @@ import { usePhone } from '@/lib/media';
 export type UploadedPhoto = {
    storageKey: string;
    url: string;
+   /* The two smaller copies made in the browser at upload time; null when
+      the browser could not make them. */
+   cardUrl?: string | null;
+   thumbUrl?: string | null;
    /* Where the eye lands when the feed crops it to its frame: fractions
       across and down. */
    focusX?: number | null;
@@ -181,15 +187,28 @@ export function PhotoBlock({
       setIsUploading(true);
       onBusyChange(true);
       try {
+         /* The two smaller copies first, so a photograph the browser cannot
+            decode fails before anything is signed. Not fatal: the original
+            is the upload, the copies are what the feed and the rows ask for. */
+         let variants: Awaited<ReturnType<typeof makeImageVariants>> = [];
+         try {
+            variants = await makeImageVariants(file);
+         } catch (error) {
+            console.warn('Could not make smaller copies of this photo', error);
+         }
          const { data: signed } = await axios.post<{
             storageKey: string;
             uploadUrl: string;
             readUrl: string;
+            cardReadUrl?: string | null;
+            thumbReadUrl?: string | null;
+            variants?: Parameters<typeof putVariants>[1];
          }>('/api/uploads/sign', {
             scope: 'catch',
             fileName: file.name,
             contentType: file.type,
             sizeBytes: file.size,
+            variants: variants.map((entry) => entry.variant),
          });
          // Straight to R2 on the presigned URL. The bytes never pass through
          // the API, so the size cap is ours rather than a host's. Needs the
@@ -202,9 +221,12 @@ export function PhotoBlock({
                }
             },
          });
+         await putVariants(variants, signed.variants ?? []);
          const uploaded = {
             storageKey: signed.storageKey,
             url: signed.readUrl,
+            cardUrl: signed.cardReadUrl ?? null,
+            thumbUrl: signed.thumbReadUrl ?? null,
             focusX: focus.x,
             focusY: focus.y,
          };
