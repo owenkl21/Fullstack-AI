@@ -395,6 +395,15 @@ band, tides and the sun and moon; then the name and the mark arrived.
       hints are shorter. Critiqued through frontend-design and the installed
       taste and redesign skills (Owen rejected ui-ux-pro as slop). Baseline and
       after shots: `audit/logshots.mjs` (TAG=before|after|after2).
+- [x] **The site through the taste audit** (`/taste-skill`, redesign-preserve
+      mode). Clean already: no em dashes in copy, eyebrows within count, tokens
+      off-black and one teal. Fixed: metadata strips chaining three or four
+      facts with middle dots (feed, saved posts, recent rows, place search,
+      conditions, competition cards) now carry at most one; section numbers
+      dropped where sections are not steps (the full form, the desktop quick
+      log). Kept on purpose: the tracked caps labels, the single dot as a
+      separator, the landing Thread rail. Frames in `audit/site-viewport.mjs`
+      and `audit/taste-shots.mjs`.
 
 ## Next, in order
 
