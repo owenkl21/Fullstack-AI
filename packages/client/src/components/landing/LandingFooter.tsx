@@ -10,6 +10,7 @@ const columns = [
    ],
    [
       { href: '#record', label: 'The record' },
+      { href: '#questions', label: 'Questions' },
       { href: '#join', label: 'Join' },
    ],
 ];
@@ -35,8 +36,8 @@ export function LandingFooter() {
             <div>
                <FishMark className="h-[30px] w-[46px] text-paper" />
                <p className="mt-3 max-w-[36ch] text-[14px]">
-                  A fishing log for the South African coast and its dams. Sample
-                  data and Unsplash photographs on this page.
+                  A fishing log for the South African coast and its dams. The
+                  log shown on this page is sample data.
                </p>
             </div>
 

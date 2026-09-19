@@ -2,14 +2,21 @@ import { useEffect, useRef, useState } from 'react';
 import { TornEdge } from '@/components/brand/TornEdge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ANCHOR } from './layout';
+import { ANCHOR, WRAP } from './layout';
 import { photos } from './photos';
 import { useParallaxFallback } from './useParallaxFallback';
 import { Link } from 'react-router-dom';
 
 /*
- * One photograph edge to edge, the promise over it, and the single teal action. The
- * three lines arrive 120ms apart once the page has painted.
+ * One photograph edge to edge, the promise over it, and the single teal action.
+ *
+ * The words sit at the bottom left rather than dead centre. Centred type over a
+ * photograph is the safe arrangement and it fought the picture: the headline
+ * landed on the horizon and the rock on the right had nothing to do. Anchored
+ * low and left, the type sits on the dark water where it is legible without a
+ * heavy scrim, and the coast keeps the top of the frame.
+ *
+ * The three lines arrive 120ms apart once the page has painted.
  */
 export function LandingHero() {
    const band = useRef<HTMLDivElement>(null);
@@ -55,42 +62,46 @@ export function LandingHero() {
                src={photos.heroSpot}
                alt="An angler casting from the rocks at sunset"
                fetchPriority="high"
-               className="h-full w-full object-cover object-[50%_45%]"
+               className="h-full w-full object-cover object-[62%_45%]"
             />
          </div>
          <div className="scrim-hero absolute inset-0" aria-hidden="true" />
 
-         <div className="absolute inset-x-0 top-0 bottom-[84px] z-[2] flex flex-col items-center justify-center gap-3.5 px-6 text-center md:bottom-[90px] md:gap-[18px]">
-            <h1
-               className={cn(
-                  headline.className,
-                  'g max-w-[30ch] text-[clamp(52px,17vw,72px)] text-balance [text-shadow:0_2px_24px_rgba(0,0,0,0.35)] md:text-[clamp(48px,6.6vw,96px)]'
-               )}
-               style={headline.style}
+         <div className="absolute inset-x-0 top-0 bottom-[92px] z-[2] flex items-end md:bottom-[104px]">
+            <div
+               className={cn(WRAP, 'flex flex-col items-start gap-4 md:gap-5')}
             >
-               Every fish. Every condition. The whole season.
-            </h1>
-            <p
-               className={cn(
-                  line.className,
-                  'max-w-[52ch] text-[16px] text-paper text-pretty [text-shadow:0_1px_14px_rgba(0,0,0,0.55)] md:text-[18px]'
-               )}
-               style={line.style}
-            >
-               One tap stamps the place, the minute and the weather. The record
-               builds itself before the fish goes back.
-            </p>
-            <Button
-               size="lg"
-               className={cn(
-                  action.className,
-                  'md:h-[52px] md:px-7 md:text-[26px]'
-               )}
-               style={action.style}
-               asChild
-            >
-               <Link to="/sign-up">Start your log</Link>
-            </Button>
+               <h1
+                  className={cn(
+                     headline.className,
+                     'g max-w-[19ch] text-[clamp(42px,12.2vw,60px)] text-balance [text-shadow:0_2px_24px_rgba(0,0,0,0.45)] md:max-w-[18ch] md:text-[clamp(56px,7.4vw,104px)]'
+                  )}
+                  style={headline.style}
+               >
+                  Log the fish before it goes back
+               </h1>
+               <p
+                  className={cn(
+                     line.className,
+                     'max-w-[46ch] text-[16px] text-paper text-pretty [text-shadow:0_1px_14px_rgba(0,0,0,0.6)] md:text-[19px]'
+                  )}
+                  style={line.style}
+               >
+                  One tap stamps where you are, the minute and the weather. The
+                  photograph names the fish.
+               </p>
+               <Button
+                  size="lg"
+                  className={cn(
+                     action.className,
+                     'md:h-[52px] md:px-7 md:text-[26px]'
+                  )}
+                  style={action.style}
+                  asChild
+               >
+                  <Link to="/sign-up">Start your log</Link>
+               </Button>
+            </div>
          </div>
 
          <TornEdge fill="bg" seed={5} />

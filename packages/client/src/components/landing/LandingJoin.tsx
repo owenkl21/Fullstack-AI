@@ -22,7 +22,7 @@ export function LandingJoin() {
                      src={photos.dawnBoats}
                      alt="Anglers in a boat at dusk"
                      loading="lazy"
-                     className="h-full min-h-[200px] w-full object-cover md:min-h-[280px]"
+                     className="hidden h-full w-full object-cover md:block md:min-h-[280px]"
                   />
                   <form
                      onSubmit={(event) => event.preventDefault()}
@@ -32,8 +32,8 @@ export function LandingJoin() {
                         Stay on the water
                      </h2>
                      <p className="text-paper-2">
-                        The first record you log is the whole tour. There is no
-                        onboarding, only your fish.
+                        No setup and no tour. Log one fish and you have seen the
+                        whole of it.
                      </p>
                      <div className="flex flex-col gap-1.5">
                         <label htmlFor={emailId} className="lab text-paper-2">

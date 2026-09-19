@@ -5,7 +5,6 @@ import { DeviceDemo } from './demo/DeviceDemo';
 import { steps } from './demo/data';
 import { useDemo } from './demo/useDemo';
 import { ANCHOR, WRAP, stagger } from './layout';
-import { LandingMedia } from './LandingMedia';
 
 /*
  * The dashed line draws down the margin while the four steps light up beside the
@@ -16,12 +15,12 @@ export function LandingHowItLogs() {
    const { demo, phoneRef, stripRef } = useDemo();
 
    return (
-      <section id="how" className={cn('relative py-14 md:py-[88px]', ANCHOR)}>
+      <section id="how" className={cn('relative py-10 md:py-[88px]', ANCHOR)}>
          <Thread className="left-[2px] w-[28px] lg:left-[max(12px,calc((100%-1200px)/2-56px))] lg:w-[60px]" />
 
          <div className={WRAP}>
             <div className="grid items-start gap-9 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-16">
-               <div className="flex flex-col gap-[26px] pl-5 md:pl-6 lg:sticky lg:top-[84px] lg:pt-4 lg:pl-0">
+               <div className="flex flex-col gap-[22px] pl-5 md:gap-[26px] md:pl-6 lg:sticky lg:top-[84px] lg:pt-4 lg:pl-0">
                   <span className="lab lab-rule rv text-ink-2">
                      How it logs
                   </span>
@@ -124,11 +123,8 @@ export function LandingHowItLogs() {
             </div>
 
             <p className="rv mt-2.5 text-center text-[13px] text-ink-3">
-               Sample data. Unsplash photographs stand in for the angler&apos;s
-               own.
+               A sample log. Your own photographs take these places.
             </p>
-
-            <LandingMedia />
          </div>
       </section>
    );

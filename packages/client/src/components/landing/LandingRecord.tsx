@@ -45,9 +45,10 @@ export function LandingRecord() {
                   className="rv max-w-[46ch] text-[17px] text-ink-2 text-pretty"
                   style={stagger(2)}
                >
-                  Nothing is a badge or a colour code. A number says where it
-                  came from in words, so a stranger reading a shared link needs
-                  no legend, and you can compare a season against itself.
+                  Every number says where it came from, in words. By eye, on a
+                  tape, off a live fix. Share the link and a stranger reads it
+                  the way you do, with nothing to decode and nothing to take on
+                  trust.
                </p>
             </div>
 
