@@ -22,6 +22,8 @@ export type SpeciesCandidate = {
    confidence: number;
    /* The namer's own words, a scientific name. */
    guess: string;
+   /* True when the name was learned from anglers' confirmed catches. */
+   learned?: boolean;
 };
 
 async function guessSpecies(
@@ -173,6 +175,9 @@ function Guess({
                   <span className="num text-[13px] opacity-60">
                      {Math.round(c.confidence * 100)}%
                   </span>
+                  {c.learned ? (
+                     <span className="text-[12px] text-teal-text">learned</span>
+                  ) : null}
                </button>
             ))}
             <button

@@ -11,6 +11,7 @@ import {
    weatherLookupSchema,
 } from '../schemas/fishing.schema';
 import { fishingService } from '../services/fishing.service';
+import { visionService } from '../services/vision.service';
 
 const unauthorizedResponse = {
    code: 'unauthorized',
@@ -99,6 +100,8 @@ export const fishingController = {
             auth.userId,
             parseResult.data
          );
+         /* The namer learns from what this fish turned out to be. */
+         void visionService.teachFromCatch(created.id);
          return res.status(201).json({ catch: created });
       } catch (error) {
          console.error('Failed to create catch', {
@@ -156,6 +159,7 @@ export const fishingController = {
          });
       }
 
+      void visionService.teachFromCatch(catchId);
       return res.json({ catch: updated });
    },
 

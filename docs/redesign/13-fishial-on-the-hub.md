@@ -61,6 +61,40 @@ catch on its own. A name the table does not have yet (the classifier knows
 866 species, the table started with 24) is offered all the same and is added
 as a species when taken. With several photos, only the first is asked about.
 
+## It learns from what the angler settles on (19 September 2026)
+
+The classifier is an embedding model: it turns the fish crop into a 768-float
+vector and scores species by cosine similarity to a centroid per species.
+That makes learning cheap, with no retraining:
+
+- **Every saved catch teaches the hub.** After a catch is created or edited
+  the server posts its first photograph and its species to `POST /learn`
+  (`{ image, mediaType, catchId, userId, species: { id, commonName,
+  scientificName } }`), never awaited by the request. The hub finds the fish,
+  embeds the crop and keeps the vector in `D:\hub\fishial\gallery\gallery.jsonl`
+  under the species the angler chose, with the crop beside it as a jpeg for a
+  real retraining one day. It also notes what `/identify` had guessed for that
+  photograph, so the gallery doubles as a record of the namer's misses. A
+  catch with no species, or a photo with no fish in it, teaches nothing. An
+  edit that changes the species replaces the earlier lesson (keyed by catch).
+- **Every question consults the gallery.** `/identify` scores the new photo
+  against the confirmed examples as well as the model's centroids and merges
+  the two. A learned species is offered once it has `FISHIAL_LEARN_MIN`
+  confirmed examples (2) and the new photo is at least `FISHIAL_LEARN_SIM`
+  (0.5 cosine) like one of them. It comes back with the app's own `speciesId`,
+  `learned: true` and the example count, and the form marks it "learned".
+- **So a fish the model has never heard of** (bigmouth yellowfish, say, which
+  is not among the 866) starts being offered after two confirmed catches of it.
+- **Guarding against bad labels.** Two examples before a name is offered, a
+  similarity floor, and the gallery keeps who taught what, so a wrong lesson
+  can be found and removed by catch id. Sibling species that look alike on a
+  phone photo (smallmouth and bigmouth yellowfish) may still be confused; the
+  gallery gives the right name a chance it otherwise never has.
+
+Also fixed the same day: the classifier expects RGB and had been fed
+OpenCV's BGR, so every colour was swapped. Scores on the test photos went up
+with the fix (the kob photo is now Argyrosomus japonicus on top).
+
 ## The competition reader is different
 
 Reading a length or a weight off a photograph of the fish on a tape or a

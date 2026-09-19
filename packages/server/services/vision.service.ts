@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import axios from 'axios';
+import { prisma } from '../lib/prisma';
+import { uploadsService } from './uploads.service';
 
 /*
  * Two eyes on a photograph.
@@ -13,6 +15,12 @@ import axios from 'axios';
  * The species namer: Fishial's open model, running on Owen's own machine,
  * reached through a URL the server is told about. It names the fish; the
  * angler confirms. Nothing here is stored except what the angler accepts.
+ *
+ * And it learns from that. Every catch saved with a photograph and a species
+ * is sent back to the hub as a confirmed example, labelled with the species
+ * the angler settled on. The hub keeps the fish's embedding in a gallery and
+ * consults it beside the model, so a fish the model has never heard of
+ * starts being offered once a few anglers have confirmed it.
  */
 
 const MODEL = 'claude-haiku-4-5';
@@ -173,11 +181,7 @@ export const visionService = {
     * with names and confidences; matching them to our species table is the
     * caller's job, because only the caller knows the table.
     */
-   async identify(
-      imageUrl: string
-   ): Promise<
-      { name: string; commonName: string | null; confidence: number }[] | null
-   > {
+   async identify(imageUrl: string): Promise<NamerGuess[] | null> {
       const base = process.env.FISHIAL_URL;
       if (!base) return null;
       const image = await fetchImage(imageUrl);
@@ -186,6 +190,10 @@ export const visionService = {
             name: string;
             commonName?: string | null;
             confidence: number;
+            /* Set when the hub learned this fish from confirmed catches. */
+            speciesId?: string | null;
+            learned?: boolean;
+            examples?: number | null;
          }[];
       }>(
          `${base.replace(/\/$/, '')}/identify`,
@@ -206,8 +214,82 @@ export const visionService = {
                   ? c.commonName.trim()
                   : null,
             confidence: typeof c.confidence === 'number' ? c.confidence : 0,
+            speciesId: typeof c.speciesId === 'string' ? c.speciesId : null,
+            learned: c.learned === true,
+            examples: typeof c.examples === 'number' ? c.examples : null,
          }))
          .sort((a, b) => b.confidence - a.confidence)
          .slice(0, 5);
    },
+
+   /**
+    * Tell the hub what the fish in a saved catch turned out to be. Called
+    * after a catch is created or edited; never awaited by the request, never
+    * allowed to throw. The hub keys examples by catch id, so an edit that
+    * changes the species replaces the earlier lesson.
+    */
+   async teachFromCatch(catchId: string): Promise<void> {
+      const base = process.env.FISHIAL_URL;
+      if (!base) return;
+      try {
+         const record = await prisma.catch.findUnique({
+            where: { id: catchId },
+            select: {
+               id: true,
+               createdById: true,
+               species: {
+                  select: { id: true, commonName: true, scientificName: true },
+               },
+               images: {
+                  orderBy: { position: 'asc' },
+                  take: 1,
+                  select: { image: { select: { storageKey: true } } },
+               },
+            },
+         });
+         const storageKey = record?.images[0]?.image.storageKey;
+         if (!record?.species || !storageKey) return;
+         /* A seeded photograph served from public/ is not a real catch. */
+         if (storageKey.startsWith('/')) return;
+         const { readUrl } = await uploadsService.getReadUrl(storageKey);
+         const image = await fetchImage(readUrl);
+         const { data } = await axios.post<{
+            learned: boolean;
+            examples?: number;
+            reason?: string;
+         }>(
+            `${base.replace(/\/$/, '')}/learn`,
+            {
+               image: image.data,
+               mediaType: image.mediaType,
+               catchId: record.id,
+               userId: record.createdById,
+               species: record.species,
+            },
+            {
+               timeout: 25000,
+               headers: process.env.FISHIAL_TOKEN
+                  ? { Authorization: `Bearer ${process.env.FISHIAL_TOKEN}` }
+                  : {},
+            }
+         );
+         console.info(
+            '[vision:learn]',
+            catchId,
+            record.species.commonName,
+            data.learned ? `now ${data.examples} example(s)` : data.reason
+         );
+      } catch (error) {
+         console.warn('[vision:learn] failed', catchId, String(error));
+      }
+   },
+};
+
+export type NamerGuess = {
+   name: string;
+   commonName: string | null;
+   confidence: number;
+   speciesId: string | null;
+   learned: boolean;
+   examples: number | null;
 };

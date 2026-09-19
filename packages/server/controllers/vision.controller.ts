@@ -80,10 +80,28 @@ export const visionController = {
             scientificName: string | null;
             confidence: number;
             guess: string;
+            /* True when the name comes from anglers' confirmed catches. */
+            learned?: boolean;
          }[] = [];
          for (const guess of guesses) {
             if (candidates.length === 2) break;
             const g = norm(guess.name);
+            /* The hub learned this one from confirmed catches: it knows the row. */
+            const learnt = guess.speciesId
+               ? species.find((s) => s.id === guess.speciesId)
+               : undefined;
+            if (learnt) {
+               if (candidates.some((m) => m.id === learnt.id)) continue;
+               candidates.push({
+                  id: learnt.id,
+                  commonName: learnt.commonName,
+                  scientificName: learnt.scientificName,
+                  confidence: guess.confidence,
+                  guess: guess.name,
+                  learned: true,
+               });
+               continue;
+            }
             const hit = species.find((s) => {
                const c = norm(s.commonName);
                const sci = norm(s.scientificName ?? '');

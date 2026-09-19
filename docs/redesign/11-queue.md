@@ -360,6 +360,11 @@ band, tides and the sun and moon; then the name and the mark arrived.
       and becomes a species when taken, so the catch still scores. The tunnel
       address changes when cloudflared restarts; the permanent fix is a domain
       on Owen's Cloudflare account. Details in [13-fishial-on-the-hub.md](13-fishial-on-the-hub.md).
+- [x] **The namer learns.** Every saved catch with a photo and a species is
+      sent back to the hub, which keeps the fish's embedding under that species
+      and consults the gallery on every question. A fish the model does not
+      know is offered after two confirmed catches. Also fixed: the classifier
+      had been fed BGR instead of RGB.
 
 ## Next, in order
 
