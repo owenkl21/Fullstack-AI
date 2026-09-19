@@ -202,6 +202,8 @@ model User {
   competitionInvitesReceived CompetitionInvite[]  @relation("CompetitionInvitesReceived")
   competitionInvitesSent     CompetitionInvite[]  @relation("CompetitionInvitesSent")
 
+  competitionCatchEntries CompetitionEntry[] @relation("CompetitionEntriesByUser")
+
   @@map("users")
 }
 
@@ -291,6 +293,7 @@ model Catch {
   // Appendix E gap B5. Until this existed the seed had to put "Released." in
   // the notes text, which no query can read.
   /**
+   * /**
    * /* The last fish of a log that carries several, read from the photographs
    * where they carry a time. Null when there was one fish or one photo.
    */
@@ -390,6 +393,8 @@ model Catch {
   updatedAt                      DateTime     @updatedAt
   deletedAt                      DateTime?
 
+  competitionEntries CompetitionEntry[]
+
   @@index([createdById, caughtAt(sort: Desc)])
   @@index([siteId, caughtAt(sort: Desc)])
 }
@@ -463,8 +468,10 @@ model Image {
   id           String       @id @default(cuid())
   url          String       @db.VarChar(512)
   storageKey   String       @unique @db.VarChar(512)
-  /* Where the eye should land when the picture is cropped to a frame, as
-     fractions across and down. Null means the middle. */
+  /**
+   * Where the eye should land when the picture is cropped to a frame, as
+   * fractions across and down. Null means the middle.
+   */
   focusX       Float?
   focusY       Float?
   uploadedById String
@@ -675,9 +682,25 @@ model Competition {
   timeZoneId          String               @default("Africa/Johannesburg")
   state               CompetitionState     @default(DRAFT)
   maxPerSpeciesPerDay Int                  @default(3)
+  /**
+   * Where a catch has to come from. Anywhere; a waterbody (a place with a
+   * radius around it); or a province. The exact spot is never shown.
+   */
+  areaType            CompetitionArea      @default(ANYWHERE)
+  areaName            String?              @db.VarChar(120)
+  areaLatitude        Float?
+  areaLongitude       Float?
+  areaRadiusKm        Float?
+  /**
+   * Casual: an entry counts as soon as its checks pass. Review: every entry
+   * waits for the organiser.
+   */
+  checks              CompetitionChecks    @default(CASUAL)
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   deletedAt           DateTime?
+
+  entries CompetitionEntry[]
 
   @@index([groupId, startsAt(sort: Desc)])
   @@index([scope, startsAt(sort: Desc)])
@@ -718,7 +741,9 @@ model SavedSpot {
   @@map("saved_spots")
 }
 
-/* A post kept from the feed. A reference: the post's own visibility still rules. */
+/**
+ * A post kept from the feed. A reference: the post's own visibility still rules.
+ */
 model SavedPost {
   id        String   @id @default(cuid())
   userId    String
@@ -732,7 +757,7 @@ model SavedPost {
   @@map("saved_posts")
 }
 
-/*
+/**
  * Something that happened to you: a follow, a reply, a like, an invitation.
  * Read by polling; nothing here is pushed. The actor is optional so a
  * notification survives the actor's account going.
@@ -818,4 +843,102 @@ model CompetitionInvite {
   @@unique([competitionId, userId])
   @@index([userId, state])
   @@map("competition_invites")
+}
+
+enum CompetitionArea {
+  ANYWHERE
+  WATERBODY
+  REGION
+}
+
+enum CompetitionChecks {
+  CASUAL
+  REVIEW
+}
+
+enum EntryState {
+  /**
+   * Submitted, checks still running.
+   */
+  PENDING
+  /**
+   * On the board.
+   */
+  COUNTED
+  /**
+   * Something did not add up, or the competition reviews everything: waiting for the organiser.
+   */
+  HELD
+  /**
+   * Excluded by the organiser, or withdrawn.
+   */
+  EXCLUDED
+}
+
+/**
+ * A catch entered in a competition, frozen as it was when it was entered.
+ * Editing the catch later does not move a result; deleting it excludes the
+ * entry. The position is kept for the area check and never sent to a client.
+ */
+model CompetitionEntry {
+  id              String             @id @default(cuid())
+  competitionId   String
+  competition     Competition        @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  catchId         String
+  catch           Catch              @relation(fields: [catchId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User               @relation("CompetitionEntriesByUser", fields: [userId], references: [id])
+  state           EntryState         @default(PENDING)
+  measure         CompetitionMeasure
+  speciesId       String?
+  speciesName     String?            @db.VarChar(120)
+  /**
+   * What the angler typed, metric.
+   */
+  declaredValue   Float?
+  /**
+   * What the reader saw on the tape or scale, metric, and how sure it was.
+   */
+  readValue       Float?
+  readConfidence  Float?
+  readNote        String?            @db.VarChar(280)
+  /**
+   * What the board uses: the reading when there is one, else the typed figure.
+   */
+  value           Float?
+  caughtAt        DateTime
+  latitude        Float?
+  longitude       Float?
+  areaConfirmed   Boolean            @default(false)
+  photoTakenAt    DateTime?
+  heroImageKey    String?            @db.VarChar(512)
+  heroImageUrl    String?            @db.VarChar(512)
+  measureImageKey String?            @db.VarChar(512)
+  measureImageUrl String?            @db.VarChar(512)
+  note            String?            @db.VarChar(280)
+  /**
+   * The fish's embedding from the namer, for the duplicate check.
+   */
+  fingerprint     Json?
+  /**
+   * The six checks, one line each.
+   */
+  report          Json?
+  /**
+   * The codes of the checks that flagged.
+   */
+  flags           Json?
+  flaggedById     String?
+  flagReason      String?            @db.VarChar(280)
+  flaggedAt       DateTime?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  reviewNote      String?            @db.VarChar(280)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([competitionId, catchId])
+  @@index([competitionId, state])
+  @@index([userId])
+  @@map("competition_entries")
 }

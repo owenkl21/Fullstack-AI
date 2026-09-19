@@ -1,6 +1,11 @@
 import { prisma } from '../lib/prisma';
+import type { Prisma } from '@prisma/client';
+import {
+   ENTRY_SELECT,
+   entriesService,
+   type EntryRow,
+} from './competition-entries.service';
 import { notificationsService } from './notifications.service';
-import { massKgFor, type ScoringSpecies } from './scoring';
 
 /*
  * Competitions anglers run themselves.
@@ -39,6 +44,12 @@ export type CreateCompetitionInput = {
    endsAt: Date;
    maxPerSpeciesPerDay?: number;
    inviteeIds?: string[];
+   areaType?: 'ANYWHERE' | 'WATERBODY' | 'REGION';
+   areaName?: string | null;
+   areaLatitude?: number | null;
+   areaLongitude?: number | null;
+   areaRadiusKm?: number | null;
+   checks?: 'CASUAL' | 'REVIEW';
 };
 
 /* A week to answer an invitation. */
@@ -61,86 +72,30 @@ const COMPETITION_SELECT = {
    speciesId: true,
    species: { select: { id: true, commonName: true } },
    createdBy: { select: { id: true, displayName: true, username: true } },
-   _count: { select: { entrants: true } },
+   areaType: true,
+   areaName: true,
+   areaLatitude: true,
+   areaLongitude: true,
+   areaRadiusKm: true,
+   checks: true,
+   _count: { select: { entrants: { where: { leftAt: null } } } },
 } as const;
 
-type CatchRow = {
-   id: string;
-   createdById: string;
-   speciesId: string | null;
-   length: number | null;
-   weight: number | null;
-   weightSource: 'LENGTH' | 'SCALE';
-   caughtAt: Date;
-   title: string;
-   species: {
-      commonName: string;
-      lwA: number | null;
-      lwB: number | null;
+type CompetitionRow = Prisma.CompetitionGetPayload<{
+   select: typeof COMPETITION_SELECT;
+}>;
+export type DecoratedCompetition = Omit<CompetitionRow, '_count'> & {
+   entrantCount: number;
+   entryCount: number;
+   youEntered: boolean;
+   youOrganise: boolean;
+   leading: {
+      displayName: string;
+      value: number;
+      speciesName: string | null;
    } | null;
-};
-
-export type CompetitionStanding = {
-   anglerId: string;
-   displayName: string;
-   username: string | null;
-   /* Metric always: centimetres, and kilograms. */
-   total: number;
-   best: number;
-   entries: number;
-   distinctSpecies: number;
-};
-
-/**
- * What one fish is worth in this competition.
- *
- * Null means it cannot be counted, and the reason matters: a competition judged
- * on weight cannot score a fish with no length and no scale reading, and one
- * judged on length cannot score a fish nobody measured. Those catches are left
- * out rather than counted as nought.
- */
-const valueOf = (row: CatchRow, measure: CompetitionMeasure): number | null => {
-   if (measure === 'LENGTH') {
-      return row.length ?? null;
-   }
-
-   if (row.weight !== null) {
-      return row.weight;
-   }
-
-   /*
-    * No scale reading, so fall back to the published length-weight figures,
-    * the same conversion the species boards use. A species without published
-    * figures cannot be converted, and that fish stays out of the standings
-    * rather than being guessed at.
-    */
-   if (!row.species) {
-      return null;
-   }
-
-   const species: ScoringSpecies = {
-      commonName: row.species.commonName,
-      lwA: row.species.lwA,
-      lwB: row.species.lwB,
-      /* Neither matters here: this competition is not scoring by size class. */
-      sizeClass: 'EDIBLE',
-      minLegalCm: null,
-      closedFrom: null,
-      closedTo: null,
-   };
-
-   const mass = massKgFor(
-      {
-         lengthCm: row.length,
-         weightKg: row.weight,
-         weightSource: row.weightSource,
-         released: true,
-         caughtAt: row.caughtAt,
-      },
-      species
-   );
-
-   return mass?.massKg ?? null;
+   invite: { id: string; expiresAt: Date } | null;
+   status: 'upcoming' | 'running' | 'finished';
 };
 
 export const competitionsService = {
@@ -164,6 +119,22 @@ export const competitionsService = {
             /* Started by a person rather than drafted by the system. */
             state: 'OPEN',
             maxPerSpeciesPerDay: input.maxPerSpeciesPerDay ?? 3,
+            areaType: input.areaType ?? 'ANYWHERE',
+            areaName:
+               input.areaType === 'ANYWHERE' ? null : (input.areaName ?? null),
+            areaLatitude:
+               input.areaType === 'WATERBODY'
+                  ? (input.areaLatitude ?? null)
+                  : null,
+            areaLongitude:
+               input.areaType === 'WATERBODY'
+                  ? (input.areaLongitude ?? null)
+                  : null,
+            areaRadiusKm:
+               input.areaType === 'WATERBODY'
+                  ? (input.areaRadiusKm ?? 25)
+                  : null,
+            checks: input.checks ?? 'CASUAL',
             /* Whoever starts it is in it. */
             entrants: { create: { userId } },
          },
@@ -316,21 +287,114 @@ export const competitionsService = {
     * The list an angler can act on: everything public, plus anything they have
     * already entered. A group competition they are not in is somebody else's.
     */
-   async list(userId: string, page = 1, size = 20) {
+   /**
+    * A competition as the client sees it: the row, plus what it means to
+    * this angler and the catch to beat. Shared by list, create and detail so
+    * every payload is the same shape.
+    */
+   async decorate(
+      userId: string,
+      rows: CompetitionRow[]
+   ): Promise<DecoratedCompetition[]> {
+      if (!rows.length) return [];
+      const ids = rows.map((r) => r.id);
+      const now = new Date();
+      const [mine, invites, entries] = await Promise.all([
+         prisma.competitionEntrant.findMany({
+            where: { userId, leftAt: null, competitionId: { in: ids } },
+            select: { competitionId: true },
+         }),
+         prisma.competitionInvite.findMany({
+            where: {
+               userId,
+               state: 'PENDING',
+               expiresAt: { gt: now },
+               competitionId: { in: ids },
+            },
+            select: { id: true, competitionId: true, expiresAt: true },
+         }),
+         prisma.competitionEntry.findMany({
+            where: { competitionId: { in: ids }, state: { not: 'EXCLUDED' } },
+            select: ENTRY_SELECT,
+         }),
+      ]);
+      const entered = new Set(mine.map((m) => m.competitionId));
+      const invited = new Map(invites.map((i) => [i.competitionId, i]));
+      const byCompetition = new Map<string, EntryRow[]>();
+      for (const e of entries) {
+         const list = byCompetition.get(e.competitionId) ?? [];
+         list.push(e);
+         byCompetition.set(e.competitionId, list);
+      }
+      return rows.map((row) => {
+         const { _count, ...rest } = row;
+         const own = byCompetition.get(row.id) ?? [];
+         const invite = invited.get(row.id);
+         return {
+            ...rest,
+            entrantCount: _count.entrants,
+            entryCount: own.filter((e) => e.state === 'COUNTED').length,
+            youEntered: entered.has(row.id),
+            youOrganise: row.createdById === userId,
+            leading: entriesService.leading(row, own),
+            invite: invite
+               ? { id: invite.id, expiresAt: invite.expiresAt }
+               : null,
+            /* Worked out rather than stored, so it is never stale. */
+            status:
+               now < row.startsAt
+                  ? ('upcoming' as const)
+                  : now > row.endsAt
+                    ? ('finished' as const)
+                    : ('running' as const),
+         };
+      });
+   },
+
+   async list(
+      userId: string,
+      page = 1,
+      size = 20,
+      tab: 'all' | 'mine' | 'invites' = 'all'
+   ) {
       /*
        * Everything public, plus anything this angler is in or has been
        * invited to. A private competition is invisible to everyone else,
        * which is the whole point of it being private. Running ones first,
        * then upcoming, then finished, newest at the top within each.
        */
+      const now = new Date();
       const where = {
          deletedAt: null as null,
          state: { not: 'DRAFT' as const },
-         OR: [
-            { scope: 'PUBLIC' as const },
-            { entrants: { some: { userId, leftAt: null } } },
-            { invites: { some: { userId, state: 'PENDING' as const } } },
-         ],
+         ...(tab === 'mine'
+            ? {
+                 OR: [
+                    { createdById: userId },
+                    { entrants: { some: { userId, leftAt: null } } },
+                 ],
+              }
+            : tab === 'invites'
+              ? {
+                   invites: {
+                      some: {
+                         userId,
+                         state: 'PENDING' as const,
+                         expiresAt: { gt: now },
+                      },
+                   },
+                }
+              : {
+                   OR: [
+                      { scope: 'PUBLIC' as const },
+                      { entrants: { some: { userId, leftAt: null } } },
+                      {
+                         invites: {
+                            some: { userId, state: 'PENDING' as const },
+                         },
+                      },
+                   ],
+                }),
       };
       const total = await prisma.competition.count({ where });
       const rows = await prisma.competition.findMany({
@@ -340,30 +404,53 @@ export const competitionsService = {
          take: size,
          select: COMPETITION_SELECT,
       });
-
-      const mine = await prisma.competitionEntrant.findMany({
-         where: { userId, leftAt: null },
-         select: { competitionId: true },
-      });
-      const entered = new Set(mine.map((m) => m.competitionId));
-
-      const now = new Date();
-      const items = rows.map((row) => ({
-         ...row,
-         entrantCount: row._count.entrants,
-         youEntered: entered.has(row.id),
-         youOrganise: row.createdById === userId,
-         /* Worked out rather than stored, so it is never stale. */
-         status:
-            now < row.startsAt
-               ? ('upcoming' as const)
-               : now > row.endsAt
-                 ? ('finished' as const)
-                 : ('running' as const),
-      }));
+      const items = await this.decorate(userId, rows);
       const order = { running: 0, upcoming: 1, finished: 2 };
       items.sort((a, b) => order[a.status] - order[b.status]);
       return { items, total, page, size };
+   },
+
+   /** One competition with its board and its entries, as this angler may see it. */
+   async detail(competitionId: string, viewerId: string) {
+      const row = await prisma.competition.findFirst({
+         where: { id: competitionId, deletedAt: null },
+         select: COMPETITION_SELECT,
+      });
+      if (!row) return null;
+      const [competition] = await this.decorate(viewerId, [row]);
+      if (!competition) return null;
+      const organise = row.createdById === viewerId;
+      const entrant = competition.youEntered || organise;
+      if (row.scope === 'PRIVATE' && !entrant && !competition.invite)
+         return null;
+      if (row.scope === 'GROUP' && row.groupId && !entrant) {
+         const member = await prisma.groupMember.findFirst({
+            where: { groupId: row.groupId, userId: viewerId, leftAt: null },
+            select: { id: true },
+         });
+         if (!member) return null;
+      }
+      const entries = await entriesService.listFor(competitionId);
+      const standings = entriesService.standings(row, entries);
+      const shaped = await Promise.all(
+         entries.map((e) =>
+            entriesService.shape(e, {
+               id: viewerId,
+               organiser: organise,
+               entrant,
+            })
+         )
+      );
+      return {
+         competition,
+         standings,
+         entries: shaped,
+         you: {
+            entered: competition.youEntered,
+            organise,
+            invite: competition.invite,
+         },
+      };
    },
 
    async join(userId: string, competitionId: string) {
@@ -429,136 +516,21 @@ export const competitionsService = {
     * board they did not ask to be on.
     */
    async standings(competitionId: string, viewerId: string | null = null) {
-      const competition = await prisma.competition.findFirst({
-         where: { id: competitionId, deletedAt: null },
-         select: COMPETITION_SELECT,
-      });
-
-      if (!competition) {
-         return null;
-      }
-
-      /* Private: the standings are for the people in it. */
-      if (competition.scope === 'PRIVATE') {
-         const inIt =
-            viewerId !== null &&
-            (competition.createdById === viewerId ||
-               (await prisma.competitionEntrant.findFirst({
-                  where: { competitionId, userId: viewerId, leftAt: null },
-                  select: { id: true },
-               })) !== null);
-         if (!inIt) return null;
-      }
-
-      const entrants = await prisma.competitionEntrant.findMany({
-         where: { competitionId, leftAt: null },
-         select: {
-            userId: true,
-            user: { select: { displayName: true, username: true } },
-         },
-      });
-
-      if (!entrants.length) {
-         return { competition, standings: [] as CompetitionStanding[] };
-      }
-
-      const rows = (await prisma.catch.findMany({
-         where: {
-            deletedAt: null,
-            createdById: { in: entrants.map((e) => e.userId) },
-            caughtAt: { gte: competition.startsAt, lte: competition.endsAt },
-            ...(competition.speciesId
-               ? { speciesId: competition.speciesId }
-               : {}),
-         },
-         select: {
-            id: true,
-            createdById: true,
-            speciesId: true,
-            length: true,
-            weight: true,
-            weightSource: true,
-            caughtAt: true,
-            title: true,
-            species: { select: { commonName: true, lwA: true, lwB: true } },
-         },
-      })) as CatchRow[];
-
-      const measure = competition.measure as CompetitionMeasure;
-
-      /*
-       * The daily cap, applied per angler per species per day, which is what
-       * stops a competition being won by whoever had the most time rather than
-       * the best fish. The largest of the day's fish are the ones kept.
-       */
-      const perDay = new Map<string, { value: number; row: CatchRow }[]>();
-      for (const row of rows) {
-         const value = valueOf(row, measure);
-         if (value === null || value <= 0) {
-            continue;
-         }
-         const day = row.caughtAt.toISOString().slice(0, 10);
-         const key = `${row.createdById}|${row.speciesId ?? 'none'}|${day}`;
-         const list = perDay.get(key) ?? [];
-         list.push({ value, row });
-         perDay.set(key, list);
-      }
-
-      const counted: { anglerId: string; value: number; speciesId: string }[] =
-         [];
-      for (const list of perDay.values()) {
-         list.sort((a, b) => b.value - a.value);
-         for (const entry of list.slice(0, competition.maxPerSpeciesPerDay)) {
-            counted.push({
-               anglerId: entry.row.createdById,
-               value: entry.value,
-               speciesId: entry.row.speciesId ?? 'none',
-            });
-         }
-      }
-
-      const byAngler = new Map<string, CompetitionStanding>();
-      for (const entrant of entrants) {
-         byAngler.set(entrant.userId, {
-            anglerId: entrant.userId,
-            displayName: entrant.user.displayName,
-            username: entrant.user.username,
-            total: 0,
-            best: 0,
-            entries: 0,
-            distinctSpecies: 0,
-         });
-      }
-
-      const speciesSeen = new Map<string, Set<string>>();
-      for (const entry of counted) {
-         const standing = byAngler.get(entry.anglerId);
-         if (!standing) continue;
-         standing.total += entry.value;
-         standing.best = Math.max(standing.best, entry.value);
-         standing.entries += 1;
-         const seen = speciesSeen.get(entry.anglerId) ?? new Set<string>();
-         seen.add(entry.speciesId);
-         speciesSeen.set(entry.anglerId, seen);
-      }
-
-      for (const [anglerId, seen] of speciesSeen) {
-         const standing = byAngler.get(anglerId);
-         if (standing) standing.distinctSpecies = seen.size;
-      }
-
-      /* The rule decides what "ahead" means. */
-      const rank = (s: CompetitionStanding) =>
-         competition.rule === 'BIGGEST_FISH'
-            ? s.best
-            : competition.rule === 'SPECIES_VARIETY'
-              ? s.distinctSpecies
-              : s.total;
-
-      const standings = [...byAngler.values()].sort(
-         (a, b) => rank(b) - rank(a) || b.best - a.best
-      );
-
-      return { competition, standings };
+      /* Kept for the old route; the board is the detail's board now. */
+      if (!viewerId) return null;
+      const detail = await this.detail(competitionId, viewerId);
+      if (!detail) return null;
+      return {
+         competition: detail.competition,
+         standings: detail.standings.map((s) => ({
+            anglerId: s.anglerId,
+            displayName: s.displayName,
+            username: s.username,
+            total: s.score,
+            best: s.bestValue ?? 0,
+            entries: s.entries,
+            distinctSpecies: s.distinctSpecies,
+         })),
+      };
    },
 };

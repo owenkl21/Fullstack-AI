@@ -223,6 +223,67 @@ export const visionService = {
    },
 
    /**
+    * Look at a photograph for a competition entry: is there a fish, which
+    * fish, and the fish's embedding so the same fish entered twice can be
+    * spotted. Null when the namer is not connected.
+    */
+   async inspect(imageUrl: string): Promise<{
+      candidates: NamerGuess[];
+      fishFound: boolean;
+      fishCount: number;
+      embedding: number[] | null;
+   } | null> {
+      const base = process.env.FISHIAL_URL;
+      if (!base) return null;
+      const image = await fetchImage(imageUrl);
+      const { data } = await axios.post<{
+         candidates?: {
+            name: string;
+            commonName?: string | null;
+            confidence: number;
+            speciesId?: string | null;
+            learned?: boolean;
+            examples?: number | null;
+         }[];
+         fishFound?: boolean;
+         fishCount?: number;
+         embedding?: number[] | null;
+      }>(
+         `${base.replace(/\/$/, '')}/identify`,
+         {
+            image: image.data,
+            mediaType: image.mediaType,
+            returnEmbedding: true,
+         },
+         {
+            timeout: 20000,
+            headers: process.env.FISHIAL_TOKEN
+               ? { Authorization: `Bearer ${process.env.FISHIAL_TOKEN}` }
+               : {},
+         }
+      );
+      return {
+         candidates: (data.candidates ?? [])
+            .filter((c) => c && typeof c.name === 'string')
+            .map((c) => ({
+               name: c.name,
+               commonName:
+                  typeof c.commonName === 'string' && c.commonName.trim()
+                     ? c.commonName.trim()
+                     : null,
+               confidence: typeof c.confidence === 'number' ? c.confidence : 0,
+               speciesId: typeof c.speciesId === 'string' ? c.speciesId : null,
+               learned: c.learned === true,
+               examples: typeof c.examples === 'number' ? c.examples : null,
+            }))
+            .sort((a, b) => b.confidence - a.confidence),
+         fishFound: data.fishFound === true,
+         fishCount: typeof data.fishCount === 'number' ? data.fishCount : 0,
+         embedding: Array.isArray(data.embedding) ? data.embedding : null,
+      };
+   },
+
+   /**
     * Tell the hub what the fish in a saved catch turned out to be. Called
     * after a catch is created or edited; never awaited by the request, never
     * allowed to throw. The hub keys examples by catch id, so an edit that

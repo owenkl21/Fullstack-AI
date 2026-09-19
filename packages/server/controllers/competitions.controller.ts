@@ -2,10 +2,14 @@ import type { Request, Response } from 'express';
 import { getAuth } from '../lib/auth-context';
 import {
    createCompetitionSchema,
+   flagEntrySchema,
    inviteSchema,
    listCompetitionsSchema,
+   reviewEntrySchema,
+   submitEntrySchema,
 } from '../schemas/competition.schema';
 import { competitionsService } from '../services/competitions.service';
+import { entriesService } from '../services/competition-entries.service';
 
 /* Express can hand back a repeated route value as an array. */
 const asSingleParam = (value: string | string[] | undefined) =>
@@ -74,8 +78,15 @@ export const competitionsController = {
       }
 
       const query = listCompetitionsSchema.safeParse(req.query);
-      const { page, size } = query.success ? query.data : { page: 1, size: 20 };
-      const result = await competitionsService.list(auth.userId, page, size);
+      const { page, size, tab } = query.success
+         ? query.data
+         : { page: 1, size: 20, tab: 'all' as const };
+      const result = await competitionsService.list(
+         auth.userId,
+         page,
+         size,
+         tab
+      );
       return res.json({
          competitions: result.items,
          total: result.total,
@@ -92,14 +103,23 @@ export const competitionsController = {
 
       const parsed = createCompetitionSchema.safeParse(req.body);
       if (!parsed.success) {
-         return res.status(400).json(parsed.error.format());
+         const issue = parsed.error.issues[0];
+         return res.status(400).json({
+            code: 'bad_competition',
+            message: issue?.message ?? 'Check the form.',
+            field: issue?.path.join('.') ?? null,
+         });
       }
 
       try {
-         const competition = await competitionsService.create(
+         const created = await competitionsService.create(
             auth.userId,
             parsed.data
          );
+         /* The same shape as the list, so the client can show it at once. */
+         const [competition] = await competitionsService.decorate(auth.userId, [
+            created,
+         ]);
          return res.status(201).json({ competition });
       } catch (error) {
          console.error('[competitions:create] failed', error);
@@ -133,6 +153,180 @@ export const competitionsController = {
       }
 
       return res.json(result);
+   },
+
+   async detail(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const id = asSingleParam(req.params.competitionId);
+      if (!id) {
+         return res.status(400).json({ code: 'competition_id_required' });
+      }
+      const result = await competitionsService.detail(id, auth.userId);
+      if (!result) {
+         return res.status(404).json({
+            code: 'competition_not_found',
+            message: 'That competition could not be found.',
+         });
+      }
+      return res.json(result);
+   },
+
+   /* Entering a catch, and what becomes of the entry. */
+
+   async submitEntry(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const id = asSingleParam(req.params.competitionId);
+      const parsed = submitEntrySchema.safeParse(req.body);
+      if (!id || !parsed.success) {
+         return res.status(400).json({
+            code: 'bad_entry',
+            message: parsed.success
+               ? 'A competition id is required.'
+               : (parsed.error.issues[0]?.message ?? 'Check the entry.'),
+         });
+      }
+      try {
+         const result = await entriesService.submit(auth.userId, id, {
+            catchId: parsed.data.catchId,
+            measureImage: parsed.data.measureImage ?? null,
+            declaredValue: parsed.data.declaredValue ?? null,
+            areaConfirmed: parsed.data.areaConfirmed,
+            photoTakenAt: parsed.data.photoTakenAt ?? null,
+            note: parsed.data.note ?? null,
+         });
+         if ('error' in result) {
+            const messages: Record<typeof result.error, [number, string]> = {
+               not_found: [404, 'That competition could not be found.'],
+               not_entered: [403, 'Enter the competition first.'],
+               not_open: [409, 'The competition has not started yet.'],
+               closed: [409, 'The competition has closed.'],
+               catch_not_found: [404, 'That catch could not be found.'],
+               already_entered: [409, 'That catch is already entered.'],
+               measure_photo_required: [
+                  400,
+                  'A photograph of the fish on the tape or scale is needed.',
+               ],
+            };
+            const [status, message] = messages[result.error];
+            return res.status(status).json({ code: result.error, message });
+         }
+         const entry = await entriesService.shape(result.entry, {
+            id: auth.userId,
+            organiser: false,
+            entrant: true,
+         });
+         return res.status(201).json({ entry });
+      } catch (error) {
+         console.error('[entries:submit] failed', error);
+         return res.status(500).json({
+            code: 'failed_to_enter',
+            message: 'Could not enter that catch right now.',
+         });
+      }
+   },
+
+   async getEntry(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const id = asSingleParam(req.params.competitionId);
+      const entryId = asSingleParam(req.params.entryId);
+      if (!id || !entryId) return res.status(400).json({ code: 'bad_entry' });
+      const competition = await entriesService.competitionFor(id);
+      const entry = await entriesService.get(entryId);
+      if (!competition || !entry || entry.competitionId !== id) {
+         return res.status(404).json({ code: 'entry_not_found' });
+      }
+      const organiser = competition.createdById === auth.userId;
+      const entrant = organiser || (await entriesService.isIn(id, auth.userId));
+      return res.json({
+         entry: await entriesService.shape(entry, {
+            id: auth.userId,
+            organiser,
+            entrant,
+         }),
+      });
+   },
+
+   async withdrawEntry(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const id = asSingleParam(req.params.competitionId);
+      const entryId = asSingleParam(req.params.entryId);
+      if (!id || !entryId) return res.status(400).json({ code: 'bad_entry' });
+      const entry = await entriesService.withdraw(auth.userId, id, entryId);
+      if (!entry) return res.status(404).json({ code: 'entry_not_found' });
+      return res.status(204).send();
+   },
+
+   async reviewEntry(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const id = asSingleParam(req.params.competitionId);
+      const entryId = asSingleParam(req.params.entryId);
+      const parsed = reviewEntrySchema.safeParse(req.body);
+      if (!id || !entryId || !parsed.success) {
+         return res.status(400).json({ code: 'bad_review' });
+      }
+      const result = await entriesService.review(
+         auth.userId,
+         id,
+         entryId,
+         parsed.data.action,
+         parsed.data.note ?? null
+      );
+      if ('error' in result) {
+         const status =
+            result.error === 'not_found'
+               ? 404
+               : result.error === 'not_organiser'
+                 ? 403
+                 : 409;
+         return res.status(status).json({ code: result.error });
+      }
+      return res.json({
+         entry: await entriesService.shape(result.entry, {
+            id: auth.userId,
+            organiser: true,
+            entrant: true,
+         }),
+      });
+   },
+
+   async flagEntry(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const id = asSingleParam(req.params.competitionId);
+      const entryId = asSingleParam(req.params.entryId);
+      const parsed = flagEntrySchema.safeParse(req.body);
+      if (!id || !entryId || !parsed.success) {
+         return res
+            .status(400)
+            .json({ code: 'bad_flag', message: 'Say what is not right.' });
+      }
+      const result = await entriesService.flag(
+         auth.userId,
+         id,
+         entryId,
+         parsed.data.reason
+      );
+      if ('error' in result) {
+         const status =
+            result.error === 'not_found'
+               ? 404
+               : result.error === 'not_entered'
+                 ? 403
+                 : 409;
+         return res.status(status).json({ code: result.error });
+      }
+      return res.json({
+         entry: await entriesService.shape(result.entry, {
+            id: auth.userId,
+            organiser: false,
+            entrant: true,
+         }),
+      });
    },
 
    async join(req: Request, res: Response) {

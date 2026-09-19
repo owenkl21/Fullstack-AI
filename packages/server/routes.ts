@@ -243,6 +243,37 @@ router.get(
    requireApiAuth,
    competitionsController.standings
 );
+router.get(
+   '/api/competitions/:competitionId',
+   requireApiAuth,
+   competitionsController.detail
+);
+/* A catch entered, checked, and what the organiser and the others make of it. */
+router.post(
+   '/api/competitions/:competitionId/entries',
+   requireApiAuth,
+   competitionsController.submitEntry
+);
+router.get(
+   '/api/competitions/:competitionId/entries/:entryId',
+   requireApiAuth,
+   competitionsController.getEntry
+);
+router.delete(
+   '/api/competitions/:competitionId/entries/:entryId',
+   requireApiAuth,
+   competitionsController.withdrawEntry
+);
+router.post(
+   '/api/competitions/:competitionId/entries/:entryId/review',
+   requireApiAuth,
+   competitionsController.reviewEntry
+);
+router.post(
+   '/api/competitions/:competitionId/entries/:entryId/flag',
+   requireApiAuth,
+   competitionsController.flagEntry
+);
 router.post(
    '/api/competitions/:competitionId/join',
    requireApiAuth,

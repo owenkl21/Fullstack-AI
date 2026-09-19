@@ -3,6 +3,7 @@ import {
    weatherKitAvailable,
 } from '../clients/weatherkit.client';
 import { prisma } from '../lib/prisma';
+import { entriesService } from './competition-entries.service';
 import { getCoordinates } from '../clients/geocoding.client';
 import {
    getConditionsAt,
@@ -1202,6 +1203,9 @@ export const fishingService = {
             where: { catchId, deletedAt: null },
             data: { deletedAt },
          });
+
+         /* A deleted catch leaves every board it was on. */
+         await entriesService.excludeForCatch(tx, catchId);
 
          if (existing.siteId) {
             await tx.fishingSite.update({
