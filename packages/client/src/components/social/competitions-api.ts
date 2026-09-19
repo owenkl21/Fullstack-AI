@@ -1,5 +1,10 @@
 import axios from 'axios';
-import { formatDayMonth } from '@/components/fishing/record/format';
+import {
+   formatClock,
+   formatDay,
+   formatDayMonth,
+   toDate,
+} from '@/components/fishing/record/format';
 import { formatMeasure, type UnitSystem } from '@/lib/units';
 
 /*
@@ -31,6 +36,10 @@ export type Competition = {
    checks: CompetitionChecks;
    areaType: CompetitionArea;
    areaName: string | null;
+   /* Where the waterbody is and how far from it still counts. */
+   areaLatitude?: number | null;
+   areaLongitude?: number | null;
+   areaRadiusKm?: number | null;
    startsAt: string;
    endsAt: string;
    timeZoneId?: string;
@@ -259,6 +268,118 @@ export function dateRange(startsAt: string, endsAt: string) {
    if (!from || !to) return '';
    return from === to ? from : `${from} to ${to}`;
 }
+
+/**
+ * The same range, shortened where the month repeats: "18 to 21 Sep" rather
+ * than "18 Sep to 21 Sep". The card has one line for where and when, so the
+ * month is written once when once is enough.
+ */
+export function dateSpan(startsAt: string, endsAt: string) {
+   const from = toDate(startsAt);
+   const to = toDate(endsAt);
+   if (!from || !to) return '';
+   const long = dateRange(startsAt, endsAt);
+   if (
+      from.getFullYear() === to.getFullYear() &&
+      from.getMonth() === to.getMonth()
+   ) {
+      return from.getDate() === to.getDate()
+         ? (formatDayMonth(from) ?? '')
+         : `${from.getDate()} to ${formatDayMonth(to)}`;
+   }
+   return long;
+}
+
+/** "Fri 18 Sep, 06:00 to Mon 21 Sep, 18:00", the whole window in full. */
+export function whenSentence(startsAt: string, endsAt: string) {
+   const from = toDate(startsAt);
+   const to = toDate(endsAt);
+   if (!from || !to) return '';
+   return `${formatDay(from)}, ${formatClock(from)} to ${formatDay(to)}, ${formatClock(to)}`;
+}
+
+/*
+ * The clock on a card: what a wall clock would say about this competition
+ * whatever state it is in. Running counts down, an upcoming one says when it
+ * opens, a finished one says when it closed.
+ */
+export function clockWords(
+   c: Pick<Competition, 'status' | 'startsAt' | 'endsAt'>,
+   now = Date.now()
+) {
+   if (c.status === 'upcoming') return `Starts ${formatDayMonth(c.startsAt)}`;
+   if (c.status === 'finished') return `Ended ${formatDayMonth(c.endsAt)}`;
+   const ms = new Date(c.endsAt).getTime() - now;
+   if (ms <= 0) return 'Closed';
+   const minutes = Math.floor(ms / 60000);
+   const hours = Math.floor(minutes / 60);
+   const days = Math.floor(hours / 24);
+   if (days >= 2) return `${days} days left`;
+   if (hours >= 1) return `${hours} h left`;
+   return `${minutes} min left`;
+}
+
+/*
+ * The big clock on a competition's plate, split so the figure can be League
+ * Gothic and the word beside it a tracked label: ["45 h 37 min", "left"].
+ * Null once there is nothing left to count.
+ */
+export function clockParts(
+   c: Pick<Competition, 'status' | 'startsAt' | 'endsAt'>,
+   now = Date.now()
+): [string, string] | null {
+   if (c.status === 'finished') return null;
+   const at = c.status === 'upcoming' ? c.startsAt : c.endsAt;
+   const word = c.status === 'upcoming' ? 'until it opens' : 'left';
+   const ms = new Date(at).getTime() - now;
+   if (ms <= 0) return null;
+   const minutes = Math.floor(ms / 60000);
+   const hours = Math.floor(minutes / 60);
+   const days = Math.floor(hours / 24);
+   if (days >= 2) return [`${days} days ${hours % 24} h`, word];
+   if (hours >= 1) return [`${hours} h ${minutes % 60} min`, word];
+   return [`${minutes} min`, word];
+}
+
+/**
+ * Where it counts, on a card: the water and how far from it, no preposition.
+ * "Vaal Dam, 25 km".
+ */
+export const whereWords = (
+   c: Pick<Competition, 'areaType' | 'areaName' | 'areaRadiusKm'>
+) => {
+   if (c.areaType === 'ANYWHERE' || !c.areaName)
+      return 'Anywhere in South Africa';
+   if (c.areaType === 'WATERBODY' && c.areaRadiusKm)
+      return `${c.areaName}, ${c.areaRadiusKm} km`;
+   return c.areaName;
+};
+
+/**
+ * The same thing written out for the rules table, where there is room for
+ * the whole sentence: "Vaal Dam, within 25 km of Oranjeville".
+ */
+export const whereSentence = (
+   c: Pick<Competition, 'areaType' | 'areaName' | 'areaRadiusKm'>
+) => {
+   if (c.areaType === 'ANYWHERE' || !c.areaName)
+      return 'Anywhere in South Africa';
+   if (c.areaType === 'WATERBODY' && c.areaRadiusKm)
+      return `Within ${c.areaRadiusKm} km of ${c.areaName}`;
+   return c.areaName;
+};
+
+/** The rule with its species folded in, the way a card prints it. */
+export const ruleWords = (
+   c: Pick<Competition, 'rule' | 'measure' | 'species'>
+) =>
+   c.species
+      ? `${ruleSentence(c.rule, c.measure)}, ${c.species.commonName.toLowerCase()} only`
+      : ruleSentence(c.rule, c.measure);
+
+/** "6 anglers", "1 angler". */
+export const anglerWords = (count: number) =>
+   count === 1 ? '1 angler' : `${count} anglers`;
 
 /** The figure a competition is led by, in the reader's units. */
 export function leadingFigure(

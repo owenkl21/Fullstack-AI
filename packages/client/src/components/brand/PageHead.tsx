@@ -11,14 +11,28 @@ import { cn } from '@/lib/utils';
  * with its contour lines, starts under the wave rather than through it.
  */
 export function PageHead({
+   back,
    kicker,
+   kickerTone = 'teal',
    title,
    aside,
    lede,
    column = 'w-[min(1680px,100%-32px)]',
    children,
 }: {
-   kicker?: string;
+   /*
+    * A way back out, above everything else on the plate: an arrow and one
+    * word. The slot carries the type (League Gothic 15px, tracked, paper-2),
+    * so a page passes a bare link and gets the same back link every other
+    * page has.
+    */
+   back?: ReactNode;
+   kicker?: ReactNode;
+   /*
+    * The status line. Teal while something is live; quiet once it has
+    * finished and the line is only a record of what it was.
+    */
+   kickerTone?: 'teal' | 'quiet';
    title: ReactNode;
    /* Something on the right: a count, a button, a line of figures. */
    aside?: ReactNode;
@@ -49,9 +63,28 @@ export function PageHead({
                column
             )}
          >
-            <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+            {back ? (
+               <div className="g-tracked text-[15px] leading-none text-paper-2">
+                  {back}
+               </div>
+            ) : null}
+            <div
+               className={cn(
+                  'flex flex-wrap items-end justify-between gap-x-8 gap-y-4',
+                  back && 'mt-3.5 md:mt-[18px]'
+               )}
+            >
                <div className="min-w-0">
-                  {kicker ? <p className="lab text-teal">{kicker}</p> : null}
+                  {kicker ? (
+                     <p
+                        className={cn(
+                           'lab',
+                           kickerTone === 'quiet' ? 'text-paper-2' : 'text-teal'
+                        )}
+                     >
+                        {kicker}
+                     </p>
+                  ) : null}
                   <h1 className="g mt-1 text-[44px] leading-none text-paper md:text-[64px]">
                      {title}
                   </h1>

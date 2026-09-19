@@ -234,14 +234,31 @@ function CarouselNext({ className, ...props }: React.ComponentProps<'button'>) {
    );
 }
 
-/** `2 of 5`, sitting under the photograph rather than on it. */
-function CarouselCounter({ className, ...props }: React.ComponentProps<'p'>) {
+/**
+ * Where you are in the set. `2 of 5` by default, sitting under the
+ * photograph; pass `separator="/"` for the `2 / 5` the feed card wears as a
+ * badge on the picture itself, with the badge's own look coming from
+ * `className`. Whatever the separator, it is spoken as "Photo 2 of 5", so a
+ * slash is never read out as one.
+ */
+function CarouselCounter({
+   className,
+   separator = 'of',
+   ...props
+}: React.ComponentProps<'p'> & { separator?: React.ReactNode }) {
    const { index, itemCount } = useCarousel();
    if (itemCount < 2) return null;
 
    return (
-      <p className={cn('lab num', className)} aria-live="polite" {...props}>
-         {index + 1} of {itemCount}
+      <p
+         className={cn('lab num', className)}
+         aria-live="polite"
+         aria-label={`Photo ${index + 1} of ${itemCount}`}
+         {...props}
+      >
+         <span aria-hidden="true">
+            {index + 1} {separator} {itemCount}
+         </span>
       </p>
    );
 }

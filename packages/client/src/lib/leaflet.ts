@@ -434,7 +434,17 @@ export const setBaseLayer = (map: L.Map, base: BaseLayer) => {
 
 /** Leaflet measures its container once; anything that resizes it must say so. */
 export const refreshSize = (map: L.Map) => {
-   window.requestAnimationFrame(() => map.invalidateSize());
+   window.requestAnimationFrame(() => {
+      /*
+       * A frame is long enough for the map to have gone. Leaving the log, or
+       * any route change that unmounts a map, calls `map.remove()`, which
+       * drops the panes; the frame queued a moment earlier then arrives at a
+       * map with nothing to measure and Leaflet throws on the missing pane.
+       * Asking for the pane is the cheapest way to hear that it is over.
+       */
+      if (!map.getPane('mapPane')) return;
+      map.invalidateSize();
+   });
 };
 
 export { L };

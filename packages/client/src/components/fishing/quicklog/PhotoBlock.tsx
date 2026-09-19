@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import axios from 'axios';
+import { CameraIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 import { usePhone } from '@/lib/media';
 
@@ -7,6 +8,15 @@ import { usePhone } from '@/lib/media';
  * The photo, taken and sent while the rest of the catch is being filled in. It uses
  * the same upload the other forms use; the shutter flashes, the picture fades in and
  * settles, and a photo still going up is the one thing that holds the save.
+ *
+ * Two shapes. `hero` is the catch's own photograph: a four by three frame in
+ * black with the teal corner tab, the camera glyph, a teal block to take one
+ * and a quiet line to choose one instead. `cell` is the competition's tape or
+ * scale picture: a shorter block with a single outlined button, because it is
+ * a second ask under a first one and must not shout as loud.
+ *
+ * Whatever sits directly under the frame (the namer's band) is butted against
+ * the picture with no gap, so the two read as one object.
  */
 export type UploadedPhoto = {
    storageKey: string;
@@ -24,25 +34,38 @@ export function PhotoBlock({
    onChange,
    onBusyChange,
    onFile,
+   onPreviewUrl,
    initial = null,
-   title = 'Add a catch photo',
-   hint = '',
-   frameNote = '',
+   title = 'Take a photo',
+   second = 'Choose one instead',
+   variant = 'hero',
    idPrefix = 'quicklog-photo',
+   children,
+   className,
 }: {
    onChange: (photo: UploadedPhoto | null) => void;
    onBusyChange: (busy: boolean) => void;
    /* The file as picked, before the upload, for what the camera wrote in it. */
    onFile?: (file: File) => void;
+   /*
+    * The picture as the browser already has it, for anything else on the page
+    * that wants to show it. The address the upload gives back points at a
+    * derivative the bucket makes in its own time, so a preview drawn from it
+    * is a broken picture for the first few seconds.
+    */
+   onPreviewUrl?: (url: string | null) => void;
    /* A photo already sent up, when a draft is reopened. */
    initial?: UploadedPhoto | null;
-   /* The words on the empty block: what photo, and whether it can wait. */
+   /* The words on the block's own button. */
    title?: string;
-   hint?: string;
-   /* The corner note on the picture once it is in. */
-   frameNote?: string;
+   /* The quiet second way in, on the hero frame only. */
+   second?: string;
+   variant?: 'hero' | 'cell';
    /* Two blocks on one page need two sets of ids. */
    idPrefix?: string;
+   /* The namer's band, butted against the bottom of the picture. */
+   children?: ReactNode;
+   className?: string;
 }) {
    const phone = usePhone();
    const inputRef = useRef<HTMLInputElement>(null);
@@ -73,6 +96,7 @@ export function PhotoBlock({
       fy: number;
    } | null>(null);
    const FRAME = 4 / 3;
+   const cell = variant === 'cell';
 
    const commitFocus = (next: { x: number; y: number }) => {
       setFocus(next);
@@ -121,13 +145,19 @@ export function PhotoBlock({
       commitFocus(focus);
    };
 
+   /*
+    * The object URL is let go when this block goes, unless the page took a
+    * copy of it: on a phone this block is unmounted every time the angler
+    * steps forward, and the card on step 3 is drawn from the same picture.
+    */
+   const keepsPreview = Boolean(onPreviewUrl);
    useEffect(() => {
       return () => {
-         if (previewRef.current) {
+         if (previewRef.current && !keepsPreview) {
             URL.revokeObjectURL(previewRef.current);
          }
       };
-   }, []);
+   }, [keepsPreview]);
 
    const showPreview = (file: File) => {
       if (previewRef.current) {
@@ -136,6 +166,7 @@ export function PhotoBlock({
       const url = URL.createObjectURL(file);
       previewRef.current = url;
       setPreview(url);
+      onPreviewUrl?.(url);
       setSettled(false);
       setFlash(true);
       window.setTimeout(() => setFlash(false), 420);
@@ -216,6 +247,7 @@ export function PhotoBlock({
          previewRef.current = null;
       }
       setPreview(null);
+      onPreviewUrl?.(null);
       setProgress(0);
       setError(null);
       setRatio(null);
@@ -227,8 +259,38 @@ export function PhotoBlock({
       }
    };
 
+   /* The camera on a phone; a desktop has none, so both ways in would put up
+      the same file dialog and only one of them is offered. */
+   const openCamera = () =>
+      phone ? inputRef.current?.click() : pickRef.current?.click();
+
+   const inputs = (
+      <>
+         <input
+            ref={inputRef}
+            id={idPrefix}
+            type="file"
+            accept={ACCEPTED.join(',')}
+            capture="environment"
+            className="sr-only"
+            aria-label="Take a photo"
+            onChange={(event) => onSelect(event.target.files?.[0])}
+         />
+         {/* The same picker without `capture`: the camera roll, for a
+             fish photographed before the phone came out of the bag. */}
+         <input
+            ref={pickRef}
+            type="file"
+            accept={ACCEPTED.join(',')}
+            className="sr-only"
+            aria-label="Choose a photo"
+            onChange={(event) => onSelect(event.target.files?.[0])}
+         />
+      </>
+   );
+
    return (
-      <div className="flex flex-col gap-2">
+      <div className={cn('flex flex-col', className)}>
          <div
             id={`${idPrefix}-zone`}
             ref={preview ? frameRef : undefined}
@@ -241,12 +303,22 @@ export function PhotoBlock({
             onPointerUp={preview ? onFramePointerUp : undefined}
             onPointerCancel={preview ? onFramePointerUp : undefined}
             className={cn(
-               'relative flex items-center gap-4 overflow-hidden bg-black-block p-5 text-paper',
+               'relative flex flex-col items-center justify-center overflow-hidden text-paper',
                preview
-                  ? 'aspect-[4/3] cursor-grab touch-none p-0 select-none active:cursor-grabbing'
-                  : 'min-h-[145px]'
+                  ? 'aspect-[4/3] cursor-grab touch-none bg-black-block-2 select-none active:cursor-grabbing'
+                  : cell
+                    ? 'h-[150px] gap-3.5 bg-black-block-2'
+                    : 'aspect-[4/3] gap-4 bg-black-block'
             )}
          >
+            {/* The teal corner tab, 22px, on the hero frame only: the tape
+                cell sits under a card that already carries one. */}
+            {!cell && !preview ? (
+               <span
+                  aria-hidden="true"
+                  className="absolute top-0 right-0 z-[1] size-0 border-t-[22px] border-l-[22px] border-t-teal border-l-transparent"
+               />
+            ) : null}
             {preview ? (
                /*
                 * The feed's own frame, four by three, with the picture inside
@@ -280,113 +352,76 @@ export function PhotoBlock({
                   aria-hidden="true"
                />
             ) : null}
-            <input
-               ref={inputRef}
-               id={idPrefix}
-               type="file"
-               accept={ACCEPTED.join(',')}
-               capture="environment"
-               className="sr-only"
-               aria-label="Take a photo"
-               onChange={(event) => onSelect(event.target.files?.[0])}
-            />
-            {/* The same picker without `capture`: the camera roll, for a
-                fish photographed before the phone came out of the bag. */}
-            <input
-               ref={pickRef}
-               type="file"
-               accept={ACCEPTED.join(',')}
-               className="sr-only"
-               aria-label="Choose a photo"
-               onChange={(event) => onSelect(event.target.files?.[0])}
-            />
+            {inputs}
             {!preview ? (
-               <div className="relative z-[1] min-w-0">
-                  <h3 className="g text-[22px] leading-none">{title}</h3>
-                  {hint ? (
-                     <p className="mt-1 text-[14px] text-paper-2">{hint}</p>
-                  ) : null}
-                  {/*
-                   * The camera first on a phone, because the camera is why the
-                   * phone is out. On a desktop there is no camera to open, so
-                   * both buttons would put up the same file dialog and only
-                   * one of them is offered.
-                   */}
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                     {phone ? (
-                        <button
-                           type="button"
-                           className="g-tracked inline-flex min-h-11 items-center border border-paper bg-paper px-4 text-[15px] text-ink transition-[filter] duration-150 hover:brightness-95"
-                           onClick={() => inputRef.current?.click()}
-                        >
-                           Take photo
-                        </button>
-                     ) : null}
-                     <button
-                        type="button"
-                        className={cn(
-                           'g-tracked inline-flex min-h-11 items-center px-4 text-[15px] transition-colors duration-150',
-                           phone
-                              ? 'border border-paper/50 text-paper hover:border-teal'
-                              : 'border border-paper bg-paper text-ink hover:brightness-95'
-                        )}
-                        onClick={() => pickRef.current?.click()}
-                     >
-                        Choose photo
-                     </button>
-                  </div>
-               </div>
-            ) : (
                <>
-                  {(() => {
-                     /* Only something worth saying: how to place a photo that
-                        does not fit the frame, or a note the parent asked for. */
-                     const text =
-                        ratio !== null && Math.abs(ratio - FRAME) > 0.02
-                           ? 'Drag to place.'
-                           : frameNote;
-                     return text ? (
-                        <span className="pointer-events-none absolute top-2.5 left-2.5 z-[1] bg-ink/80 px-2 py-1 text-[14px] text-paper">
-                           {text}
-                        </span>
-                     ) : null;
-                  })()}
-                  <div
-                     className="absolute right-2.5 bottom-2.5 z-[1] flex items-center gap-3 bg-ink px-2.5"
-                     onPointerDown={(event) => event.stopPropagation()}
+                  <CameraIcon
+                     aria-hidden="true"
+                     strokeWidth={1.5}
+                     className={cn(
+                        'relative z-[1] text-paper-2',
+                        cell ? 'size-[26px]' : 'size-8'
+                     )}
+                  />
+                  <button
+                     type="button"
+                     onClick={openCamera}
+                     className={cn(
+                        'g-tracked relative z-[1] grid place-items-center transition-[filter,border-color] duration-150',
+                        cell
+                           ? 'h-10 border border-paper/40 px-4 text-[15px] text-paper hover:border-teal'
+                           : 'h-12 bg-teal px-6 text-[20px] text-teal-ink hover:brightness-95'
+                     )}
                   >
+                     {title}
+                  </button>
+                  {!cell && second ? (
                      <button
                         type="button"
-                        className="g-tracked inline-flex h-11 items-center text-[15px] text-paper hover:text-teal"
                         onClick={() => pickRef.current?.click()}
+                        className="g-tracked relative z-[1] text-[15px] text-paper-2 hover:text-paper"
                      >
-                        Change
+                        {second}
                      </button>
-                     <button
-                        type="button"
-                        className="g-tracked inline-flex h-11 items-center text-[15px] text-paper hover:text-teal"
-                        onClick={clear}
-                     >
-                        Remove
-                     </button>
-                  </div>
+                  ) : null}
                </>
+            ) : (
+               <div
+                  className="absolute right-0 bottom-0 z-[1] flex bg-black-block text-paper"
+                  onPointerDown={(event) => event.stopPropagation()}
+               >
+                  <button
+                     type="button"
+                     className="g-tracked grid h-10 place-items-center px-3.5 text-[15px] hover:text-teal md:h-11 md:px-4"
+                     onClick={() => pickRef.current?.click()}
+                  >
+                     Change
+                  </button>
+                  <button
+                     type="button"
+                     className="g-tracked grid h-10 place-items-center border-l border-paper/20 px-3.5 text-[15px] hover:text-teal md:h-11 md:px-4"
+                     onClick={clear}
+                  >
+                     Remove
+                  </button>
+               </div>
             )}
             {isUploading ? (
                <span
                   style={{ width: `${progress}%` }}
-                  className="absolute bottom-0 left-0 z-[1] h-[2px] bg-teal transition-[width] duration-150"
+                  className="absolute bottom-0 left-0 z-[2] h-[2px] bg-teal transition-[width] duration-150"
                   aria-hidden="true"
                />
             ) : null}
+            {/* The upload speaks through the bar and through the save button;
+                it does not need a sentence of its own. */}
+            <span className="sr-only" aria-live="polite">
+               {isUploading ? `Sending the photo, ${progress}%.` : ''}
+            </span>
          </div>
-         {isUploading ? (
-            <p className="text-[14px] text-ink-3" aria-live="polite">
-               Sending the photo, {progress}%.
-            </p>
-         ) : null}
+         {children}
          {error ? (
-            <p className="text-[13px] text-destructive" role="alert">
+            <p className="mt-2 text-[13px] text-destructive" role="alert">
                {error}
             </p>
          ) : null}

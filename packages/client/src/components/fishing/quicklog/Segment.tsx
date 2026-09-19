@@ -40,7 +40,7 @@ export function Segment<T extends string>({
                   aria-checked={on}
                   onClick={() => onChange(option.value)}
                   className={cn(
-                     'g-tracked flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 border border-line px-3 text-[15px] whitespace-nowrap transition-colors duration-150 [transition-timing-function:var(--ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal',
+                     'g-tracked flex h-11 min-w-0 flex-1 items-center justify-center gap-1.5 border border-line px-3 text-[16px] whitespace-nowrap transition-colors duration-150 [transition-timing-function:var(--ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal',
                      i > 0 && 'border-l-0',
                      on
                         ? 'border-ink bg-ink text-background'

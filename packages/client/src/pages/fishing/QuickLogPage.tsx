@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import axios from 'axios';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { useDocumentTitle } from '@/lib/title';
 import {
-   describeAir,
-   describePressure,
-   describeWind,
    fetchConditions,
    fetchMyCatches,
+   toKilometresPerHour,
+   toReadouts,
    toSavableSnapshot,
    type WeatherSnapshot,
 } from '@/components/fishing/record/api';
@@ -19,33 +19,39 @@ import {
    lengthMetric,
    weightMetric,
 } from '@/components/fishing/record/format';
+import { formatCardinal } from '@/lib/weather';
 import {
    Conditions,
    type ConditionsPhase,
+   type Readout,
 } from '@/components/fishing/quicklog/Conditions';
 import { MeasureField } from '@/components/fishing/quicklog/MeasureField';
 import {
    PhotoBlock,
    type UploadedPhoto,
 } from '@/components/fishing/quicklog/PhotoBlock';
+import { PhotoStrip } from '@/components/fishing/quicklog/PhotoStrip';
+import { SmallBox } from '@/components/fishing/quicklog/SmallBox';
+import { SpotRow } from '@/components/fishing/quicklog/SpotRow';
+import { GearPicker } from '@/components/fishing/quicklog/GearPicker';
+import { PreviewCard } from '@/components/fishing/quicklog/PreviewCard';
+import { CompetitionRow } from '@/components/fishing/quicklog/CompetitionRow';
 import {
    type TimeSource,
    type Where,
 } from '@/components/fishing/quicklog/Receipt';
 import { MapLocationPicker } from '@/components/fishing/MapLocationPicker';
-import { TextArea, TextField } from '@/components/ui/field';
-import { Fold } from '@/components/ui/fold';
 import { usePhone } from '@/lib/media';
-import { formatCoordinate } from '@/lib/maps';
 import { Segment } from '@/components/fishing/quicklog/Segment';
 import { CaughtAt } from '@/components/fishing/quicklog/CaughtAt';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { dayStamp } from '@/components/fishing/quicklog/stamp';
 import { readPhotoMeta } from '@/lib/exif';
-import { distanceM, formatMetres, nearestSpot, type SpotLike } from '@/lib/geo';
+import { distanceM, nearestSpot, type SpotLike } from '@/lib/geo';
 import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
 import {
    enterCompetition,
    fetchCompetition,
+   needsMeasurePhoto,
    submitEntry,
    type Competition,
 } from '@/components/social/competitions-api';
@@ -55,8 +61,6 @@ import {
 } from '@/components/fishing/CompetitionEntryFields';
 import { entryProblem } from '@/components/fishing/competition-entry';
 import { SpeciesCombobox } from '@/components/fishing/SpeciesCombobox';
-import { Picker } from '@/components/ui/picker';
-import { AddGearInline } from '@/components/fishing/AddGearInline';
 import type { GearOption } from '@/pages/fishing/LogCatchPage';
 import { readDraft, removeDraft, saveDraft } from '@/lib/drafts';
 import {
@@ -72,11 +76,18 @@ import {
    type Species,
 } from '@/components/fishing/quicklog/species';
 import { usePositionFix } from '@/components/fishing/quicklog/useFix';
+import { useSession } from '@/lib/auth-client';
+import { useMyAvatar } from '@/components/profile/avatar-api';
 
 /*
- * The fast path. The clock is stamped on arrival, the fix starts tightening and the
- * conditions land on their own; the angler only names the fish and its size. The
- * only thing that can hold the save is a photo still going up.
+ * The log. There is one.
+ *
+ * The clock is stamped on arrival, the fix starts tightening and the
+ * conditions land on their own; the angler only names the fish and its size.
+ * On a phone it is three steps in the order the fish comes in: the catch,
+ * its size and gear, then who sees it. On a desktop it is one card, the fish
+ * on the left and its context on the right. The only thing that can hold the
+ * save is a photo still going up.
  */
 export function QuickLogPage() {
    useDocumentTitle('Log a catch');
@@ -87,8 +98,24 @@ export function QuickLogPage() {
    );
 }
 
+/* How far apart two places are, in the words the line under the map uses. */
+const away = (metres: number) =>
+   metres < 1000
+      ? `${Math.round(metres / 10) * 10} m`
+      : metres < 10000
+        ? `${(metres / 1000).toFixed(1)} km`
+        : `${Math.round(metres / 1000)} km`;
+
+/* Which way the pressure is going, read off the hour three hours back. */
+const PRESSURE_STEP_HOURS = 3;
+const trendWord = (now: number, before: number) =>
+   now - before > 0.6 ? 'Rising' : before - now > 0.6 ? 'Falling' : 'Steady';
+
 function QuickLog() {
    const navigate = useNavigate();
+   const { data: session } = useSession();
+   /* The session carries a storage key; the profile route signs it. */
+   const avatarUrl = useMyAvatar(Boolean(session?.user));
    const [stampedAt, setStampedAt] = useState(() => new Date());
    const [timeSource, setTimeSource] = useState<TimeSource>('clock');
    const { status: fixStatus, fix } = usePositionFix();
@@ -129,8 +156,23 @@ function QuickLog() {
       whereRef.current = where;
    }, [where]);
    const near = useMemo(() => nearestSpot(spots, where), [spots, where]);
-   const [notThatSpot, setNotThatSpot] = useState<string | null>(null);
-   const filedUnder = near && notThatSpot !== near.spot.id ? near.spot : null;
+   /*
+    * Undefined while nobody has said: the nearest spot stands. A spot or a
+    * null is the angler's own answer and beats whatever is near.
+    */
+   const [spotChoice, setSpotChoice] = useState<SpotLike | null | undefined>(
+      undefined
+   );
+   /* Logging from a spot's own page: the catch is filed there to start. */
+   const siteIdParam = params.get('siteId');
+   const fromSpotPage = siteIdParam
+      ? (spots.find((spot) => spot.id === siteIdParam) ?? null)
+      : null;
+   const filedUnder =
+      spotChoice === undefined
+         ? (fromSpotPage ?? near?.spot ?? null)
+         : spotChoice;
+
    useEffect(() => {
       if (fix && (!where || where.source === 'phone')) {
          setWhere({
@@ -210,6 +252,7 @@ function QuickLog() {
       at: string | null;
    } | null>(null);
    const [conditionsFailed, setConditionsFailed] = useState(false);
+   const [pressureTrend, setPressureTrend] = useState<string | null>(null);
 
    const [options, setOptions] = useState<string[]>([]);
    const [species, setSpecies] = useState<Species[]>([]);
@@ -261,9 +304,22 @@ function QuickLog() {
    const [weight, setWeight] = useState('');
    const [weightUnit, setWeightUnit] = useState<MeasureUnit>('kg');
    const [weightSource, setWeightSource] = useState<'EYE' | 'SCALE'>('EYE');
-   const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
+   /* The photographs, the first of them the cover. */
+   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
+   const photo = photos[0] ?? null;
    const [photoBusy, setPhotoBusy] = useState(false);
+   /* The chosen picture as the browser holds it, so the step 3 card can show
+      it at once rather than waiting on the bucket's own copy. */
+   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+   const [stripBusy, setStripBusy] = useState(false);
    const [released, setReleased] = useState<'KEPT' | 'RELEASED'>('KEPT');
+   /* The long form's three: how many, how deep, how warm the water was. */
+   const [countValue, setCountValue] = useState('1');
+   const [depthValue, setDepthValue] = useState('');
+   const [waterTempValue, setWaterTempValue] = useState('');
+
+   const setCover = (next: UploadedPhoto | null) =>
+      setPhotos((was) => (next ? [next, ...was.slice(1)] : was.slice(1)));
 
    /* Gear and bait, optional like everything. Your own list, split by kind. */
    const [gear, setGear] = useState<GearOption[]>([]);
@@ -280,32 +336,57 @@ function QuickLog() {
    }, []);
    const isBait = (entry: GearOption) =>
       entry.type === 'BAIT' || entry.type === 'LURE';
-   const gearOptions = gear
-      .filter((entry) => !isBait(entry))
-      .map((entry) => ({
-         value: entry.id,
-         label: entry.name,
-         hint: [entry.brand, entry.type.toLowerCase()]
-            .filter(Boolean)
-            .join(' · '),
-      }));
-   const baitOptions = gear.filter(isBait).map((entry) => ({
-      value: entry.id,
-      label: entry.name,
-      hint: [entry.brand, entry.type.toLowerCase()].filter(Boolean).join(' · '),
-   }));
+   const rods = gear.filter((entry) => !isBait(entry));
+   const baits = gear.filter(isBait);
 
    /*
     * A draft reopened. Everything that was typed comes back; the photo too,
-    * since it was sent up when it was chosen.
+    * since it was sent up when it was chosen. Both kinds open here, because
+    * there is one log now and the long form's drafts have nowhere else to go.
     */
    const draftId = params.get('draft');
    useEffect(() => {
       if (!draftId) return;
       const draft = readDraft(draftId);
-      if (!draft || draft.kind !== 'quick') return;
+      if (!draft) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const d = draft.state as Record<string, any>;
+      if (draft.kind === 'full') {
+         if (typeof d.title === 'string' && d.title) setChosen(d.title);
+         if (typeof d.notes === 'string') setNotes(d.notes ?? '');
+         if (typeof d.caughtAt === 'string' && d.caughtAt) {
+            const when = new Date(d.caughtAt);
+            if (!Number.isNaN(when.getTime())) {
+               setStampedAt(when);
+               setTimeSource('typed');
+            }
+         }
+         if (
+            typeof d.latitude === 'number' &&
+            typeof d.longitude === 'number'
+         ) {
+            setWhere({
+               latitude: d.latitude,
+               longitude: d.longitude,
+               source: 'pin',
+            });
+         }
+         if (typeof d.length === 'number') setLength(String(d.length));
+         if (typeof d.weight === 'number') setWeight(String(d.weight));
+         if (d.count != null) setCountValue(String(d.count));
+         if (d.depth != null) setDepthValue(String(d.depth));
+         if (d.waterTemp != null) setWaterTempValue(String(d.waterTemp));
+         if (d.visibility) setVisibility(d.visibility);
+         if (typeof d.hideLocation === 'boolean')
+            setHideLocation(d.hideLocation);
+         if (Array.isArray(d.gearIds)) setGearIds(d.gearIds);
+         if (Array.isArray(d.images)) setPhotos(d.images as UploadedPhoto[]);
+         if (typeof d.released === 'boolean')
+            setReleased(d.released ? 'RELEASED' : 'KEPT');
+         if (d.lengthSource) setLengthSource(d.lengthSource);
+         if (d.weightSource) setWeightSource(d.weightSource);
+         return;
+      }
       if (d.stampedAt) {
          setStampedAt(new Date(d.stampedAt));
          setTimeSource('typed');
@@ -325,10 +406,15 @@ function QuickLog() {
       if (d.weightSource) setWeightSource(d.weightSource);
       if (d.released) setReleased(d.released);
       if (Array.isArray(d.gearIds)) setGearIds(d.gearIds);
-      if (d.photo) setPhoto(d.photo);
+      if (Array.isArray(d.photos)) setPhotos(d.photos);
+      else if (d.photo) setPhotos([d.photo]);
       if (typeof d.notes === 'string') setNotes(d.notes);
       if (typeof d.savingSpot === 'boolean') setSavingSpot(d.savingSpot);
-   }, [draftId]); // eslint-disable-line react-hooks/exhaustive-deps
+      if (typeof d.countValue === 'string') setCountValue(d.countValue);
+      if (typeof d.depthValue === 'string') setDepthValue(d.depthValue);
+      if (typeof d.waterTempValue === 'string')
+         setWaterTempValue(d.waterTempValue);
+   }, [draftId]);
 
    const saveAsDraft = () => {
       const title = chosen && chosen !== NOT_SURE ? chosen : typed || 'Catch';
@@ -352,9 +438,12 @@ function QuickLog() {
             weightSource,
             released,
             gearIds,
-            photo,
+            photos,
             notes,
             savingSpot,
+            countValue,
+            depthValue,
+            waterTempValue,
          },
          draftId
       );
@@ -399,7 +488,9 @@ function QuickLog() {
    /*
     * The conditions for the place and the hour, read again whenever either
     * moves: a photograph with its own time and place replaces what the phone
-    * guessed in the car park.
+    * guessed in the car park. The hour before is read as well, because a
+    * pressure figure on its own says nothing and which way it is going is
+    * what an angler reads it for.
     */
    const hourKey = `${stampedAt.toISOString().slice(0, 13)}|${where ? `${where.latitude.toFixed(3)},${where.longitude.toFixed(3)}` : ''}`;
    useEffect(() => {
@@ -408,6 +499,7 @@ function QuickLog() {
       const controller = new AbortController();
       conditionsRequest.current = controller;
       setConditionsFailed(false);
+      setPressureTrend(null);
       const load = async () => {
          try {
             const weather = await fetchConditions(
@@ -422,6 +514,21 @@ function QuickLog() {
                return;
             }
             setConditions({ snapshot: weather, at: formatClock(new Date()) });
+            const now = weather.airPressure?.meanSeaLevelMillibars;
+            if (typeof now !== 'number') return;
+            const before = new Date(
+               stampedAt.getTime() - PRESSURE_STEP_HOURS * 3600_000
+            );
+            const earlier = await fetchConditions(
+               where.latitude,
+               where.longitude,
+               controller.signal,
+               before
+            );
+            if (controller.signal.aborted) return;
+            const then = earlier?.airPressure?.meanSeaLevelMillibars;
+            if (typeof then === 'number')
+               setPressureTrend(trendWord(now, then));
          } catch (error) {
             if (!axios.isCancel(error)) setConditionsFailed(true);
          }
@@ -441,18 +548,38 @@ function QuickLog() {
 
    const snapshot = conditions?.snapshot ?? null;
 
-   const lines = useMemo(() => {
-      if (!snapshot) {
-         return [];
-      }
-      return [
-         { key: 'Wind', value: describeWind(snapshot) },
-         { key: 'Pressure', value: describePressure(snapshot) },
-         { key: 'Air', value: describeAir(snapshot) },
-      ].filter((line): line is { key: string; value: string } =>
-         Boolean(line.value)
+   /*
+    * The three readings, as figures rather than sentences: the wind with its
+    * direction and its gusts under it, the pressure with which way it is
+    * going, the air with the sky.
+    */
+   const readouts = useMemo<Readout[]>(() => {
+      const read = toReadouts(snapshot);
+      const cardinal = formatCardinal(snapshot?.wind?.direction?.cardinal);
+      const gust = toKilometresPerHour(
+         snapshot?.wind?.gust?.value,
+         snapshot?.wind?.gust?.unit
       );
-   }, [snapshot]);
+      const gusts = gust === null ? null : Math.round(gust);
+      return [
+         {
+            key: 'wind',
+            value: read.wind.value,
+            unit: 'km/h',
+            note:
+               cardinal && gusts !== null
+                  ? `${cardinal}, gusts ${gusts}`
+                  : (cardinal ?? (gusts !== null ? `Gusts ${gusts}` : null)),
+         },
+         {
+            key: 'pressure',
+            value: read.pressure.value,
+            unit: 'hPa',
+            note: pressureTrend,
+         },
+         { key: 'air', value: read.air.value, unit: '°C', note: read.air.note },
+      ];
+   }, [snapshot, pressureTrend]);
 
    const close = () => {
       if (window.history.length > 1) {
@@ -461,6 +588,14 @@ function QuickLog() {
          navigate('/');
       }
    };
+
+   const declaredValue = !competition
+      ? null
+      : competition.rule === 'SPECIES_VARIETY'
+        ? null
+        : competition.measure === 'LENGTH'
+          ? toMetricValue(length, lengthUnit)
+          : toMetricValue(weight, weightUnit);
 
    const save = async () => {
       const other = typed.trim();
@@ -481,14 +616,6 @@ function QuickLog() {
       const lengthCm = toMetricValue(length, lengthUnit);
       const weightKg = toMetricValue(weight, weightUnit);
 
-      /* What the competition judges, metric, and whether it can be entered. */
-      const declaredValue = !competition
-         ? null
-         : competition.rule === 'SPECIES_VARIETY'
-           ? null
-           : competition.measure === 'LENGTH'
-             ? lengthCm
-             : weightKg;
       if (competition) {
          const problem = entryProblem(
             competition,
@@ -504,7 +631,17 @@ function QuickLog() {
                description: problem,
                variant: 'error',
             });
-            if (phone) setStep(competition.rule === 'SPECIES_VARIETY' ? 3 : 2);
+            /* The three asks sit in three different steps now. */
+            if (phone) {
+               setStep(
+                  !photo || (needsMeasurePhoto(competition) && !measurePhoto)
+                     ? 1
+                     : needsMeasurePhoto(competition) &&
+                         !(declaredValue !== null && declaredValue > 0)
+                       ? 2
+                       : 3
+               );
+            }
             return;
          }
       }
@@ -532,6 +669,10 @@ function QuickLog() {
             siteId = made.site?.id ?? made.id ?? null;
          }
 
+         const countNumber = Number(countValue.trim());
+         const depthNumber = Number(depthValue.trim().replace(',', '.'));
+         const waterNumber = Number(waterTempValue.trim().replace(',', '.'));
+
          const payload = {
             title,
             caughtAt: stampedAt.toISOString(),
@@ -546,6 +687,22 @@ function QuickLog() {
             weatherSnapshot: toSavableSnapshot(snapshot),
             length: lengthCm,
             weight: weightKg,
+            count:
+               countValue.trim() &&
+               Number.isFinite(countNumber) &&
+               countNumber > 0
+                  ? Math.round(countNumber)
+                  : 1,
+            depth:
+               depthValue.trim() && Number.isFinite(depthNumber)
+                  ? depthNumber
+                  : null,
+            /* TODO(api): appendix E item 11. The write path takes waterTemp
+               and stores null for it, so this reading is not kept yet. */
+            waterTemp:
+               waterTempValue.trim() && Number.isFinite(waterNumber)
+                  ? waterNumber
+                  : null,
             /* A competition entry's figure came off the tape or the scale. */
             lengthSource:
                competition?.measure === 'LENGTH' && declaredValue !== null
@@ -555,7 +712,7 @@ function QuickLog() {
                competition?.measure === 'WEIGHT' && declaredValue !== null
                   ? 'SCALE'
                   : weightSource,
-            images: photo ? [photo] : [],
+            images: photos,
             gearIds,
             released: released === 'RELEASED',
          };
@@ -627,9 +784,9 @@ function QuickLog() {
    };
 
    /*
-    * The position as one receipt line: where it came from, how good it is,
-    * and the coordinates it settled on. Without one there is nothing to
-    * receipt, only a sentence saying why.
+    * The position as one line under the map: where it came from and how good
+    * it is. A photograph's place says how far that is from the phone, because
+    * that is the number that tells the angler whether it is the right picture.
     */
    const whereSource = where
       ? where.source === 'photo'
@@ -638,8 +795,12 @@ function QuickLog() {
            ? 'Pinned by you'
            : `Phone fix${where.accuracy ? `, within ${Math.round(where.accuracy)} m` : ''}`
       : null;
+   const fromPhone =
+      where?.source === 'photo' && fix
+         ? `${away(distanceM(where, fix))} from the phone`
+         : null;
    const whereLine = where
-      ? `${whereSource} · ${formatCoordinate(where.latitude)}, ${formatCoordinate(where.longitude)}`
+      ? [whereSource, fromPhone].filter(Boolean).join(' · ')
       : fixStatus === 'denied'
         ? 'No position. Location is off for this site.'
         : fixStatus === 'unsupported'
@@ -652,29 +813,83 @@ function QuickLog() {
            ? 'Your catch is public. Your exact spot stays private.'
            : 'Your catch is public, spot included.';
 
-   /* Numbered on the phone, where the sections are steps taken in order;
-      side by side on a desktop they are just sections. */
-   const heading = (index: string, title: string, note?: string | null) => (
-      <div className="mb-5 flex items-center gap-2.5">
-         {phone ? (
-            <span className="g-tracked text-[19px] text-teal-text">
-               {index}
-            </span>
-         ) : null}
-         <h2 className="g text-[22px] leading-none">{title}</h2>
-         {note ? (
-            <span className="ml-auto text-[12px] text-ink-2">{note}</span>
-         ) : null}
-      </div>
+   /* A section title. No number: the dashes above are the steps. */
+   const heading = (title: string, className?: string) => (
+      <h2 className={cn('g text-[26px] leading-[0.95]', className)}>{title}</h2>
    );
 
    /* ---- The blocks, each drawn once, placed by the screen ---------------- */
 
+   const namerBand = (
+      <SpeciesGuess
+         band
+         columns={!phone}
+         imageUrl={photo?.url ?? null}
+         current={typed || chosen || ''}
+         onPick={(candidate) => {
+            if (!candidate) {
+               speciesInput.current?.focus();
+               return;
+            }
+            setTyped(candidate.commonName);
+            setChosen(null);
+            setSpeciesError(null);
+         }}
+         onCreated={(made) => setSpecies((list) => [...list, made])}
+      />
+   );
+
+   const photoBlock = (
+      <PhotoBlock
+         initial={photo}
+         onChange={setCover}
+         onBusyChange={setPhotoBusy}
+         onFile={onPhotoFile}
+         onPreviewUrl={setPhotoPreview}
+         title={phone ? 'Take a photo' : 'Choose a photo'}
+         second={phone ? 'Choose one instead' : ''}
+      >
+         {namerBand}
+      </PhotoBlock>
+   );
+
+   const tapeBlock =
+      competition && needsMeasurePhoto(competition) ? (
+         <CompetitionEntryFields
+            part="photo"
+            competition={competition}
+            measurePhoto={measurePhoto}
+            onMeasurePhoto={(next) => {
+               setMeasurePhoto(next);
+               setEntryIssue(null);
+            }}
+            onMeasureBusy={setMeasureBusy}
+            areaConfirmed={areaConfirmed}
+            onAreaConfirmed={setAreaConfirmed}
+         />
+      ) : null;
+
+   const areaBlock = competition ? (
+      <CompetitionEntryFields
+         part="area"
+         competition={competition}
+         measurePhoto={measurePhoto}
+         onMeasurePhoto={setMeasurePhoto}
+         onMeasureBusy={setMeasureBusy}
+         areaConfirmed={areaConfirmed}
+         onAreaConfirmed={(next) => {
+            setAreaConfirmed(next);
+            setEntryIssue(null);
+         }}
+         problem={entryIssue}
+      />
+   ) : null;
+
    const speciesBlock = competition?.species ? (
-      <div>
-         <span className="lab mb-2 block">Species</span>
-         <div className="flex items-center justify-between gap-3 border border-ink px-3 py-2">
-            <span className="g-tracked text-[21px]">
+      <div className="flex flex-col gap-2">
+         <span className="lab">Species</span>
+         <div className="flex h-12 items-center justify-between gap-3 border-b border-dashed border-line-2">
+            <span className="g-tracked text-[18px]">
                {competition.species.commonName}
             </span>
             <span className="text-[13px] text-ink-3">
@@ -683,8 +898,12 @@ function QuickLog() {
          </div>
       </div>
    ) : (
-      <div>
-         <span className="lab mb-2 block">Species</span>
+      /*
+       * The shared combobox, standing on a dashed rule like every other
+       * field here rather than in its own filled box.
+       */
+      <div className="species-line flex flex-col gap-2 [&_input]:h-12 [&_input]:border-0 [&_input]:border-b [&_input]:border-dashed [&_input]:border-line-2 [&_input]:bg-transparent [&_input]:py-0 [&_input]:!pr-0 [&_input]:!pl-[30px] [&_svg]:!left-0">
+         <span className="lab">Species</span>
          <SpeciesCombobox
             label=""
             value={chosen ?? typed}
@@ -699,108 +918,152 @@ function QuickLog() {
             }}
             onCreated={(made) => setSpecies((list) => [...list, made])}
          />
-         <SpeciesGuess
-            imageUrl={photo?.url ?? null}
-            current={typed || chosen || ''}
-            onPick={(candidate) => {
-               if (!candidate) {
-                  speciesInput.current?.focus();
-                  return;
-               }
-               setTyped(candidate.commonName);
-               setChosen(null);
-               setSpeciesError(null);
-            }}
-            onCreated={(made) => setSpecies((list) => [...list, made])}
-         />
       </div>
    );
 
-   const competitionBanner = competition ? (
-      <CompetitionBanner competition={competition} />
-   ) : null;
-
-   const competitionBlock = competition ? (
-      <CompetitionEntryFields
-         competition={competition}
-         measurePhoto={measurePhoto}
-         onMeasurePhoto={(next) => {
-            setMeasurePhoto(next);
-            setEntryIssue(null);
+   const caughtAtBlock = (
+      <CaughtAt
+         at={stampedAt}
+         timeSource={timeSource}
+         onTime={(next) => {
+            setStampedAt(next);
+            setTimeSource('typed');
          }}
-         onMeasureBusy={setMeasureBusy}
-         areaConfirmed={areaConfirmed}
-         onAreaConfirmed={(next) => {
-            setAreaConfirmed(next);
-            setEntryIssue(null);
-         }}
-         problem={entryIssue}
       />
-   ) : null;
+   );
 
-   const photoBlock = (
-      <PhotoBlock
-         initial={photo}
-         onChange={setPhoto}
-         onBusyChange={setPhotoBusy}
-         onFile={onPhotoFile}
-         hint={
-            competition
-               ? 'Required for the competition. This is the picture that goes on the board.'
-               : undefined
-         }
+   const mapBlock = (
+      <div className="flex flex-col gap-2">
+         <div id="quicklog-pin">
+            <MapLocationPicker
+               readout={false}
+               compact
+               className="gap-0"
+               /* Nothing floats over this map's top left, so Leaflet's own
+                  zoom goes back to the corner the review draws it in. */
+               mapClassName={cn(
+                  'border-0 [&_.leaflet-control-zoom]:!mt-0 [&_.leaflet-control-zoom]:!ml-0',
+                  phone ? 'h-[200px]' : 'h-[260px] md:h-[260px]'
+               )}
+               latitude={where ? String(where.latitude) : ''}
+               longitude={where ? String(where.longitude) : ''}
+               source={whereSource}
+               onChange={(latitude, longitude) => {
+                  setWhere({ latitude, longitude, source: 'pin' });
+                  setPhotoPlace(null);
+                  setPhotoWithoutPosition(false);
+               }}
+            />
+         </div>
+         <p
+            className="text-[14px] text-ink-3"
+            data-where-source={where?.source ?? ''}
+         >
+            {whereLine}
+         </p>
+         {/*
+          * Two things no frame draws, because no frame shows them: a picture
+          * that came without a position, and a picture whose position arrived
+          * after the angler had already put the pin down.
+          */}
+         {photoWithoutPosition ? (
+            <p className="text-[14px] text-ink-3">
+               This photograph carries no position. Phones often strip it when a
+               photo is picked from the gallery or shared.
+            </p>
+         ) : null}
+         {photoPlace ? (
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[14px]">
+               <span className="text-ink-2">
+                  The photograph was taken{' '}
+                  {where ? away(distanceM(where, photoPlace)) : ''} from your
+                  pin.
+               </span>
+               <button
+                  type="button"
+                  onClick={() => {
+                     setWhere({ ...photoPlace, source: 'photo' });
+                     setPhotoPlace(null);
+                  }}
+                  className="g-tracked text-[15px] text-teal-text hover:opacity-80"
+               >
+                  Use the photograph's place
+               </button>
+            </div>
+         ) : null}
+      </div>
+   );
+
+   const spotBlock = (
+      <SpotRow
+         spot={filedUnder}
+         spots={spots}
+         onFileUnder={(next) => {
+            setSpotChoice(next);
+            if (next) setSavingSpot(false);
+         }}
+         adding={savingSpot}
+         spotName={spotName}
+         onSpotName={setSpotName}
+         spotPublic={spotPublic}
+         onSpotPublic={setSpotPublic}
+         onAdding={setSavingSpot}
+         canAdd={Boolean(where)}
+      />
+   );
+
+   const conditionsBlock = (
+      <Conditions
+         phase={phase}
+         readouts={readouts}
+         takenAt={conditions?.at ?? null}
       />
    );
 
    const measureBlock = (
-      <div>
-         <div className="grid grid-cols-2 gap-3 md:gap-4">
-            <MeasureField
-               id="length"
-               label="Length"
-               units={['cm', 'in']}
-               unit={lengthUnit}
-               value={length}
-               onChange={setLength}
-               onUnitChange={setLengthUnit}
-               sources={[
-                  { value: 'EYE', label: 'By eye' },
-                  { value: 'TAPE', label: 'On a tape' },
-               ]}
-               source={lengthSource}
-               onSourceChange={(next) =>
-                  setLengthSource(next as 'EYE' | 'TAPE')
-               }
-            />
-            <MeasureField
-               id="weight"
-               label="Weight"
-               units={['kg', 'lb']}
-               unit={weightUnit}
-               value={weight}
-               onChange={setWeight}
-               onUnitChange={setWeightUnit}
-               sources={[
-                  { value: 'EYE', label: 'By eye' },
-                  { value: 'SCALE', label: 'On a scale' },
-               ]}
-               source={weightSource}
-               onSourceChange={(next) =>
-                  setWeightSource(next as 'EYE' | 'SCALE')
-               }
-            />
-         </div>
+      <div className="grid grid-cols-2 gap-4 md:gap-6">
+         <MeasureField
+            id="length"
+            label="Length"
+            units={['cm', 'in']}
+            unit={lengthUnit}
+            value={length}
+            onChange={setLength}
+            onUnitChange={setLengthUnit}
+            placeholder="0"
+            sources={[
+               { value: 'EYE', label: 'By eye' },
+               { value: 'TAPE', label: 'On a tape' },
+            ]}
+            source={lengthSource}
+            onSourceChange={(next) => setLengthSource(next as 'EYE' | 'TAPE')}
+         />
+         <MeasureField
+            id="weight"
+            label="Weight"
+            units={['kg', 'lb']}
+            unit={weightUnit}
+            value={weight}
+            onChange={setWeight}
+            onUnitChange={setWeightUnit}
+            placeholder="0.0"
+            sources={[
+               { value: 'EYE', label: 'By eye' },
+               { value: 'SCALE', label: 'On a scale' },
+            ]}
+            source={weightSource}
+            onSourceChange={(next) => setWeightSource(next as 'EYE' | 'SCALE')}
+         />
       </div>
    );
 
-   const fishBlock = (
-      <div className="flex flex-wrap items-center justify-between gap-3">
+   const keptBlock = (
+      <div className="flex flex-col gap-2">
          <span className="lab">Kept or released</span>
          <Segment
             label="Kept or released"
             value={released}
             onChange={setReleased}
-            className="w-full sm:w-auto sm:min-w-[215px]"
             options={[
                { value: 'RELEASED', label: 'Released' },
                { value: 'KEPT', label: 'Kept' },
@@ -809,233 +1072,137 @@ function QuickLog() {
       </div>
    );
 
-   const gearInner = (
-      <div className="flex flex-col gap-4">
-         <div className="grid gap-3 sm:grid-cols-2">
-            <Picker
-               multiple
-               size="sm"
-               label="Gear"
-               allLabel="None chosen"
-               value={gearIds.filter((id) =>
-                  gearOptions.some((o) => o.value === id)
-               )}
-               options={gearOptions}
-               onChange={(next) =>
-                  setGearIds((was) => [
-                     ...was.filter((id) =>
-                        baitOptions.some((o) => o.value === id)
-                     ),
-                     ...(next as string[]),
-                  ])
-               }
-            />
-            <Picker
-               multiple
-               size="sm"
-               label="Bait or lure"
-               allLabel="None chosen"
-               value={gearIds.filter((id) =>
-                  baitOptions.some((o) => o.value === id)
-               )}
-               options={baitOptions}
-               onChange={(next) =>
-                  setGearIds((was) => [
-                     ...was.filter((id) =>
-                        gearOptions.some((o) => o.value === id)
-                     ),
-                     ...(next as string[]),
-                  ])
-               }
-            />
-         </div>
-         <AddGearInline
-            onAdded={(entry) => {
-               setGear((list) => [...list, entry]);
-               setGearIds((was) => [...was, entry.id]);
-            }}
+   const countBlock = (
+      <SmallBox
+         id="count"
+         label="How many"
+         value={countValue}
+         onChange={setCountValue}
+         inputMode="numeric"
+         placeholder="1"
+      />
+   );
+
+   const depthBlock = (
+      <SmallBox
+         id="depth"
+         label="Depth"
+         value={depthValue}
+         onChange={setDepthValue}
+         unit="m"
+         placeholder="0"
+      />
+   );
+
+   const waterBlock = (
+      <SmallBox
+         id="water"
+         label="Water"
+         value={waterTempValue}
+         onChange={setWaterTempValue}
+         unit="°C"
+         placeholder="0"
+      />
+   );
+
+   const gearBlock = (
+      <div className="flex flex-col">
+         <GearPicker
+            label="Gear"
+            gear={rods}
+            value={gearIds.filter((id) => rods.some((o) => o.id === id))}
+            onChange={(next) =>
+               setGearIds((was) => [
+                  ...was.filter((id) => baits.some((o) => o.id === id)),
+                  ...next,
+               ])
+            }
+            onAdded={(entry) => setGear((list) => [...list, entry])}
          />
-         <TextArea
-            label="Notes"
+         <GearPicker
+            label="Bait or lure"
+            gear={baits}
+            value={gearIds.filter((id) => baits.some((o) => o.id === id))}
+            onChange={(next) =>
+               setGearIds((was) => [
+                  ...was.filter((id) => rods.some((o) => o.id === id)),
+                  ...next,
+               ])
+            }
+            onAdded={(entry) => setGear((list) => [...list, entry])}
+         />
+      </div>
+   );
+
+   const notesBlock = (
+      <div className="flex flex-col gap-2">
+         <label className="lab" htmlFor="notes">
+            Notes
+         </label>
+         <textarea
+            id="notes"
             value={notes}
             maxLength={2000}
-            rows={3}
             placeholder="Anything you want to remember about it."
             onChange={(event) => setNotes(event.target.value)}
+            className={cn(
+               'w-full resize-none border border-line bg-bg-2 px-3 py-2.5 text-[15px] leading-[1.5] text-ink outline-none placeholder:text-ink-3 focus:border-ink',
+               phone ? 'h-[88px]' : 'h-24'
+            )}
          />
       </div>
    );
 
-   /*
-    * Open from the start on a desktop. This column is the shorter of the two
-    * and the fold was hiding Notes behind a heading that made the page read
-    * as finished.
-    */
-   const gearFold = (
-      <div className="border-t border-line">
-         <Fold
-            open
-            title="Gear, bait & notes"
-            headingClassName="text-[18px] md:text-[18px]"
-            aside={gearIds.length ? `${gearIds.length} chosen` : undefined}
+   /* The fold on the phone: the three readings the fast log used to drop. */
+   const [moreOpen, setMoreOpen] = useState(() => !phone);
+   const moreFold = (
+      <div
+         className={cn(
+            'fold flex flex-col border-t border-line',
+            moreOpen && 'fold-open'
+         )}
+      >
+         <button
+            type="button"
+            aria-expanded={moreOpen}
+            aria-controls="quicklog-more"
+            onClick={() => setMoreOpen((was) => !was)}
+            className="flex h-[52px] items-center justify-between gap-3"
          >
-            <div className="pb-5">{gearInner}</div>
-         </Fold>
-      </div>
-   );
-
-   /* How far the photograph's place is from the pin, in words. */
-   const photoPlaceAway =
-      photoPlace && where ? formatMetres(distanceM(where, photoPlace)) : null;
-
-   const whenWhereBlock = (
-      <div className="border-t-2 border-teal bg-bg-2 p-4 md:p-5">
-         <CaughtAt
-            at={stampedAt}
-            timeSource={timeSource}
-            onTime={(next) => {
-               setStampedAt(next);
-               setTimeSource('typed');
-            }}
-         />
-
-         {/*
-          * The map is always on screen, small, with the pin on whatever is
-          * known: the phone's fix, the photograph's place, or where the
-          * angler put it. The line above it says which. A position that
-          * changes is seen to move, which is the whole point of a map.
-          */}
-         <div className="mt-4">
-            <p
-               className={cn(
-                  'num text-[14px]',
-                  where ? 'text-ink' : 'text-ink-3'
-               )}
-               data-where-source={where?.source ?? ''}
-            >
-               {whereLine}
-            </p>
-
-            {photoWithoutPosition ? (
-               <p className="mt-2 text-[14px] text-ink-3">
-                  This photograph carries no position. Phones often strip it
-                  when a photo is picked from the gallery or shared.
-               </p>
-            ) : null}
-
-            {photoPlace ? (
-               <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[14px]">
-                  <span className="text-ink-2">
-                     The photograph was taken {photoPlaceAway} from your pin.
-                  </span>
-                  <button
-                     type="button"
-                     onClick={() => {
-                        setWhere({ ...photoPlace, source: 'photo' });
-                        setPhotoPlace(null);
-                     }}
-                     className="g-tracked inline-flex min-h-11 items-center text-[15px] text-teal-text hover:opacity-80"
-                  >
-                     Use the photograph's place
-                  </button>
-               </div>
-            ) : null}
-
-            <div id="quicklog-pin" className="mt-3">
-               <MapLocationPicker
-                  readout={false}
-                  compact
-                  mapClassName="h-[220px] md:h-[260px]"
-                  latitude={where ? String(where.latitude) : ''}
-                  longitude={where ? String(where.longitude) : ''}
-                  source={whereSource}
-                  onChange={(latitude, longitude) => {
-                     setWhere({ latitude, longitude, source: 'pin' });
-                     setPhotoPlace(null);
-                     setPhotoWithoutPosition(false);
-                  }}
-               />
-            </div>
-         </div>
-
-         {near ? (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[14px]">
-               <span>
-                  {filedUnder ? (
-                     <>
-                        <span className="g-tracked text-[17px]">
-                           {near.spot.name}
-                        </span>
-                        <span className="ml-2 text-ink-3">
-                           {formatMetres(near.metres)} away. Filed there.
-                        </span>
-                     </>
-                  ) : (
-                     <span className="text-ink-2">
-                        Not filed under {near.spot.name}.
-                     </span>
+            <span className="g text-[22px] leading-[0.95]">More</span>
+            <span className="flex items-center gap-3">
+               <span className="lab">How many, depth, water</span>
+               <ChevronDownIcon
+                  aria-hidden="true"
+                  strokeWidth={2}
+                  className={cn(
+                     'size-5 text-ink-2 transition-transform duration-300',
+                     moreOpen && 'rotate-180'
                   )}
-               </span>
-               <button
-                  type="button"
-                  onClick={() =>
-                     setNotThatSpot(filedUnder ? near.spot.id : null)
-                  }
-                  className="g-tracked inline-flex min-h-11 items-center text-[15px] text-teal-text hover:opacity-80"
-               >
-                  {filedUnder ? 'Not this spot' : 'File it there'}
-               </button>
+               />
+            </span>
+         </button>
+         <div
+            id="quicklog-more"
+            className="fold-body"
+            aria-hidden={!moreOpen}
+            inert={!moreOpen || undefined}
+         >
+            <div className="fold-inner min-h-0">
+               <div className="grid grid-cols-2 gap-4 pt-1 pb-5">
+                  {countBlock}
+                  {depthBlock}
+                  {waterBlock}
+               </div>
             </div>
-         ) : null}
-
-         {where && !filedUnder ? (
-            <div className="mt-3">
-               <label className="flex min-h-11 cursor-pointer items-center gap-2 text-[15px]">
-                  <input
-                     type="checkbox"
-                     className="size-4 accent-ink"
-                     checked={savingSpot}
-                     onChange={(event) => setSavingSpot(event.target.checked)}
-                  />
-                  Add this as a spot
-               </label>
-               {savingSpot ? (
-                  <div className="mt-2 flex flex-col gap-3">
-                     <TextField
-                        label="Spot name"
-                        value={spotName}
-                        maxLength={120}
-                        autoComplete="off"
-                        onChange={(event) => setSpotName(event.target.value)}
-                     />
-                     <Segment
-                        label="The spot is"
-                        value={spotPublic ? 'PUBLIC' : 'PRIVATE'}
-                        onChange={(next) => setSpotPublic(next === 'PUBLIC')}
-                        options={[
-                           { value: 'PRIVATE', label: 'Private spot' },
-                           { value: 'PUBLIC', label: 'Public spot' },
-                        ]}
-                     />
-                  </div>
-               ) : null}
-            </div>
-         ) : null}
-
-         <div className="mt-4 border-t border-line pt-3">
-            <Conditions
-               phase={phase}
-               lines={lines}
-               takenAt={conditions?.at ?? null}
-            />
          </div>
       </div>
    );
 
    const sharingBlock = (
-      <div className="flex flex-col gap-4">
-         <div>
-            <span className="lab mb-2 block">Seen by</span>
+      <>
+         <div className="flex flex-col gap-2">
+            <span className="lab">Seen by</span>
             <Segment
                label="Seen by"
                value={visibility}
@@ -1046,58 +1213,140 @@ function QuickLog() {
                ]}
             />
          </div>
-         {visibility === 'PUBLIC' && where ? (
-            <div>
-               <span className="lab mb-2 block">Exact spot</span>
-               <Segment
-                  label="Exact spot"
-                  value={hideLocation ? 'HIDDEN' : 'SHOWN'}
-                  onChange={(next) => setHideLocation(next === 'HIDDEN')}
-                  options={[
-                     { value: 'HIDDEN', label: 'Hidden' },
-                     { value: 'SHOWN', label: 'Shown' },
-                  ]}
-               />
-            </div>
-         ) : null}
-         {/* The one statement of what will be published, so the footer does
-             not say it again in another wording. */}
-         <p aria-live="polite" className="text-[14px] text-ink-2">
-            {privacyLine}
-         </p>
+         <div className="flex flex-col gap-2">
+            <span className="lab">Exact spot</span>
+            <Segment
+               label="Exact spot"
+               value={hideLocation ? 'HIDDEN' : 'SHOWN'}
+               onChange={(next) => setHideLocation(next === 'HIDDEN')}
+               options={[
+                  { value: 'SHOWN', label: 'Shown' },
+                  { value: 'HIDDEN', label: 'Hidden' },
+               ]}
+            />
+            <p aria-live="polite" className="mt-1 text-[15px] text-ink-2">
+               {privacyLine}
+            </p>
+         </div>
+      </>
+   );
+
+   /* The card as the feed will publish it, so the two Segments above decide
+      something that can be seen. */
+   const lengthCm = toMetricValue(length, lengthUnit);
+   const weightKg = toMetricValue(weight, weightUnit);
+   const previewCard = (
+      <div className="flex flex-col gap-2">
+         <span className="lab">What will be published</span>
+         <PreviewCard
+            name={session?.user?.name ?? 'You'}
+            handle={session?.user?.username ?? null}
+            avatarUrl={avatarUrl}
+            photoUrl={photoPreview ?? photo?.url ?? null}
+            focusX={photo?.focusX}
+            focusY={photo?.focusY}
+            species={
+               (typed.trim() ||
+                  (chosen && chosen !== NOT_SURE ? chosen : '') ||
+                  UNNAMED_TITLE) as string
+            }
+            size={
+               lengthCm !== null
+                  ? lengthMetric(lengthCm)
+                  : weightKg !== null
+                    ? weightMetric(weightKg)
+                    : null
+            }
+            sizeSource={
+               lengthCm !== null
+                  ? lengthSource === 'TAPE'
+                     ? 'On a tape'
+                     : 'By eye'
+                  : weightKg !== null
+                    ? weightSource === 'SCALE'
+                       ? 'On a scale'
+                       : 'By eye'
+                    : null
+            }
+            caughtLine={`Caught at ${[
+               filedUnder?.name,
+               dayStamp(stampedAt),
+               formatClock(stampedAt),
+            ]
+               .filter(Boolean)
+               .join(', ')}`}
+         />
       </div>
    );
+
+   const competitionRow = (
+      <CompetitionRow
+         competition={competition}
+         onChoose={(next) => {
+            setCompetition(next);
+            setCompetitionEntered(Boolean(next?.youEntered));
+            setEntryIssue(null);
+            if (next?.species) {
+               setChosen(next.species.commonName);
+               setTyped('');
+            }
+         }}
+      />
+   );
+
+   const saveWord = isSaving
+      ? 'Saving'
+      : photoBusy || measureBusy || stripBusy
+        ? 'Sending the photo'
+        : competition
+          ? competition.checks === 'REVIEW'
+             ? 'Submit for review'
+             : 'Submit and update standings'
+          : 'Save catch';
 
    const saveButton = (
       <button
          type="button"
          onClick={() => void save()}
-         disabled={photoBusy || measureBusy || isSaving}
-         className="g-tracked flex min-h-[52px] w-full items-center justify-center bg-teal px-7 text-[22px] text-teal-ink transition-[filter] duration-150 hover:brightness-95 disabled:opacity-60 md:w-auto md:min-w-[222px]"
+         disabled={photoBusy || measureBusy || stripBusy || isSaving}
+         className={cn(
+            'g-tracked flex h-[52px] items-center justify-center bg-teal px-6 text-[22px] text-teal-ink transition-[filter] duration-150 hover:brightness-95 disabled:opacity-60',
+            phone ? 'flex-1' : 'w-[280px]'
+         )}
       >
-         {isSaving
-            ? 'Saving'
-            : photoBusy || measureBusy
-              ? 'Sending the photo'
-              : competition
-                ? competition.checks === 'REVIEW'
-                   ? 'Submit for review'
-                   : 'Submit and update standings'
-                : 'Save catch'}
+         {saveWord}
+      </button>
+   );
+
+   const saveDraftButton = (className?: string) => (
+      <button
+         type="button"
+         onClick={saveAsDraft}
+         className={cn('g-tracked whitespace-nowrap', className)}
+      >
+         Save draft
+      </button>
+   );
+
+   const closeButton = (
+      <button
+         type="button"
+         onClick={close}
+         aria-label="Close the catch form"
+         className={cn(
+            'grid shrink-0 place-items-center rounded-full border border-line hover:bg-bg-2',
+            phone ? 'size-10' : 'size-11'
+         )}
+      >
+         <XMarkIcon aria-hidden="true" className="size-5" />
       </button>
    );
 
    /*
     * On a phone the form is three steps, one screen each, in the order the
-    * fish comes in: the fish and where it came out, then its size and gear,
-    * then who sees it. On a desktop everything is on the one card.
+    * fish comes in. On a desktop everything is on the one card.
     */
-   const STEPS = [
-      { title: 'The catch', hint: 'The fish, and where it came out' },
-      { title: 'Size and gear', hint: 'How big, and on what' },
-      { title: 'Sharing', hint: 'Who sees it' },
-   ] as const;
-   const current = STEPS[step - 1] ?? STEPS[0];
+   const STEPS = ['The catch', 'Size and gear', 'Sharing'] as const;
    const nextStep = () => {
       setStep((n) => Math.min(3, n + 1));
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1107,146 +1356,217 @@ function QuickLog() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
    };
 
-   return (
+   const shell = (children: ReactNode) => (
       <section
          className={cn(
-            'mx-auto w-full max-w-[1160px] border border-line border-t-[3px] border-t-teal bg-background transition-[transform,opacity] duration-[460ms] [transition-timing-function:cubic-bezier(0.2,0,0,1)] md:my-8',
+            'mx-auto w-full max-w-[1160px] bg-background transition-[transform,opacity] duration-[460ms] [transition-timing-function:cubic-bezier(0.2,0,0,1)] md:my-8 md:mb-16 md:border md:border-line',
             entered ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'
          )}
       >
-         <header className="flex items-start justify-between gap-4 border-b border-line px-4 py-5 md:items-center md:px-7">
-            <div className="min-w-0">
-               <h1 className="g text-[30px] leading-none md:text-[34px]">
-                  Log a catch
-               </h1>
+         {children}
+      </section>
+   );
 
-               {phone ? (
-                  <ol
-                     aria-label="Steps"
-                     className="mt-3 flex items-center gap-1.5"
-                  >
-                     {STEPS.map((s, i) => (
-                        <li
-                           key={s.title}
-                           aria-current={i + 1 === step ? 'step' : undefined}
-                           className={cn(
-                              'h-[3px] flex-1 transition-colors duration-200',
-                              i + 1 <= step ? 'bg-teal' : 'bg-line'
-                           )}
-                        />
-                     ))}
-                  </ol>
-               ) : null}
-            </div>
-            <div className="flex shrink-0 items-center gap-3 md:gap-4">
-               <button
-                  type="button"
-                  onClick={saveAsDraft}
-                  className="g-tracked inline-flex min-h-11 items-center text-[15px] whitespace-nowrap hover:text-teal-text md:text-[16px]"
-               >
-                  Save draft
-               </button>
-               <button
-                  type="button"
-                  onClick={close}
-                  aria-label="Close the catch form"
-                  className="grid size-11 place-items-center rounded-full border border-line hover:bg-bg-2"
-               >
-                  <XMarkIcon aria-hidden="true" className="size-5" />
-               </button>
-            </div>
-         </header>
+   if (phone) {
+      return shell(
+         <>
+            <header className="flex flex-col gap-3 border-b border-line px-4 pt-4 pb-3.5">
+               <div className="flex items-center gap-3.5">
+                  <h1 className="g text-[30px] leading-[0.95]">Log a catch</h1>
+                  {saveDraftButton('ml-auto text-[15px] text-ink-2')}
+                  {closeButton}
+               </div>
+               <ol aria-label="Steps" className="flex gap-1.5">
+                  {STEPS.map((title, i) => (
+                     <li
+                        key={title}
+                        aria-current={i + 1 === step ? 'step' : undefined}
+                        className={cn(
+                           'h-[2px] w-10 transition-colors duration-200',
+                           i + 1 === step
+                              ? 'bg-teal'
+                              : i + 1 < step
+                                ? 'bg-ink'
+                                : 'bg-line'
+                        )}
+                     />
+                  ))}
+               </ol>
+            </header>
 
-         {phone ? (
-            <div className="px-4 py-6">
+            <div className="flex flex-col gap-6 px-4 pt-5 pb-6">
                {step === 1 ? (
-                  <div className="flex flex-col gap-6">
-                     {heading('01', current.title)}
-                     {competitionBanner}
+                  <>
+                     {competition ? (
+                        <CompetitionBanner competition={competition} />
+                     ) : null}
+                     {heading('The catch')}
                      {photoBlock}
+                     {tapeBlock}
                      {speciesBlock}
-                     {whenWhereBlock}
-                  </div>
+                     {caughtAtBlock}
+                     {mapBlock}
+                     {spotBlock}
+                     {conditionsBlock}
+                  </>
                ) : step === 2 ? (
-                  <div className="flex flex-col gap-6">
-                     {heading('02', current.title)}
+                  <>
+                     {heading('Size and gear')}
                      {measureBlock}
-                     {competitionBlock}
-                     {fishBlock}
-                     <div>
-                        <span className="lab mb-3 block">
-                           Gear, bait & notes
-                        </span>
-                        {gearInner}
-                     </div>
-                  </div>
+                     {keptBlock}
+                     {gearBlock}
+                     {notesBlock}
+                     {moreFold}
+                  </>
                ) : (
-                  <div className="flex flex-col gap-6">
-                     {heading('03', current.title)}
+                  <>
+                     {heading('Sharing')}
+                     {previewCard}
                      {sharingBlock}
-                  </div>
+                     {areaBlock}
+                     {competitionRow}
+                  </>
                )}
             </div>
-         ) : (
-            <div className="grid gap-7 px-4 py-6 md:grid-cols-[minmax(0,1.62fr)_minmax(0,1fr)] md:gap-9 md:px-7 xl:gap-12 xl:px-9">
-               <div className="min-w-0">
-                  {heading('01', 'The catch')}
-                  {competitionBanner ? (
-                     <div className="mb-5">{competitionBanner}</div>
-                  ) : null}
-                  {speciesBlock}
-                  <div className="mt-5">{photoBlock}</div>
-                  <div className="mt-6">{measureBlock}</div>
-                  {competitionBlock ? (
-                     <div className="mt-6">{competitionBlock}</div>
-                  ) : null}
-                  <div className="mt-5">{fishBlock}</div>
-                  <div className="mt-6">{gearFold}</div>
-               </div>
-               <aside
-                  className="min-w-0"
-                  aria-label="When, where and who sees it"
-               >
-                  {heading('02', 'When & where')}
-                  {whenWhereBlock}
-                  <div className="mt-6">
-                     {heading('03', 'Sharing')}
-                     {sharingBlock}
-                  </div>
-               </aside>
-            </div>
-         )}
 
-         <footer className="sticky bottom-0 z-10 border-t border-line bg-background px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] md:px-7 md:py-4">
-            {phone ? (
-               <div className="flex items-center gap-3">
-                  {step > 1 ? (
-                     <button
-                        type="button"
-                        onClick={prevStep}
-                        className="g-tracked inline-flex min-h-[52px] items-center border border-line px-4 text-[17px]"
-                     >
-                        Back
-                     </button>
-                  ) : null}
-                  {step < 3 ? (
-                     <button
-                        type="button"
-                        onClick={nextStep}
-                        className="g-tracked flex min-h-[52px] flex-1 items-center justify-center bg-ink px-6 text-[20px] text-background"
-                     >
-                        Next
-                     </button>
-                  ) : (
-                     <div className="flex-1">{saveButton}</div>
+            <footer className="sticky bottom-0 z-10 flex gap-2.5 border-t border-line bg-background px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
+               {step > 1 ? (
+                  <button
+                     type="button"
+                     onClick={prevStep}
+                     className="g-tracked grid h-[52px] w-16 place-items-center border border-ink text-[18px]"
+                  >
+                     Back
+                  </button>
+               ) : null}
+               {step < 3 ? (
+                  <button
+                     type="button"
+                     onClick={nextStep}
+                     className="g-tracked flex h-[52px] flex-1 items-center justify-center bg-ink text-[22px] text-background"
+                  >
+                     Next
+                  </button>
+               ) : (
+                  saveButton
+               )}
+            </footer>
+         </>
+      );
+   }
+
+   return shell(
+      <>
+         <header className="flex items-center gap-5 border-b border-line px-8 py-6">
+            <h1 className="g text-[36px] leading-[0.95] whitespace-nowrap">
+               Log a catch
+            </h1>
+            <div className="ml-auto">{closeButton}</div>
+         </header>
+
+         {/* The review draws this at 1440, where the right column is 440 and
+             the gap 56. Below that both give way rather than squeezing the
+             fish into a column too narrow to hold its photograph. */}
+         <div className="grid grid-cols-[minmax(0,1fr)_minmax(320px,380px)] items-stretch gap-8 px-8 pt-8 pb-9 xl:grid-cols-[minmax(0,1fr)_440px] xl:gap-14">
+            <div className="flex min-w-0 flex-col gap-7">
+               {competition ? (
+                  <CompetitionBanner competition={competition} />
+               ) : null}
+               {heading('The catch')}
+               {photoBlock}
+               {photos.length ? (
+                  <PhotoStrip
+                     photos={photos}
+                     onChange={setPhotos}
+                     onBusyChange={setStripBusy}
+                     coverPreview={photoPreview}
+                  />
+               ) : null}
+               {tapeBlock}
+               {speciesBlock}
+               {measureBlock}
+               <div className="grid grid-cols-2 items-end gap-6">
+                  {keptBlock}
+                  {countBlock}
+               </div>
+               <div
+                  className={cn(
+                     'fold flex flex-col gap-5 border-t border-line pt-2',
+                     moreOpen && 'fold-open'
                   )}
+               >
+                  <button
+                     type="button"
+                     aria-expanded={moreOpen}
+                     aria-controls="quicklog-more-desk"
+                     onClick={() => setMoreOpen((was) => !was)}
+                     className="flex h-11 items-center justify-between gap-3"
+                  >
+                     <span className="g text-[22px] leading-[0.95]">More</span>
+                     <ChevronDownIcon
+                        aria-hidden="true"
+                        strokeWidth={2}
+                        className={cn(
+                           'size-5 text-ink-2 transition-transform duration-300',
+                           moreOpen && 'rotate-180'
+                        )}
+                     />
+                  </button>
+                  <div
+                     id="quicklog-more-desk"
+                     className="fold-body"
+                     aria-hidden={!moreOpen}
+                     inert={!moreOpen || undefined}
+                  >
+                     <div className="fold-inner min-h-0">
+                        <div className="grid grid-cols-3 gap-6 pb-1">
+                           {depthBlock}
+                           {waterBlock}
+                           <CompetitionRow
+                              layout="cell"
+                              competition={competition}
+                              onChoose={(next) => {
+                                 setCompetition(next);
+                                 setCompetitionEntered(
+                                    Boolean(next?.youEntered)
+                                 );
+                                 setEntryIssue(null);
+                                 if (next?.species) {
+                                    setChosen(next.species.commonName);
+                                    setTyped('');
+                                 }
+                              }}
+                           />
+                        </div>
+                     </div>
+                  </div>
                </div>
-            ) : (
-               <div className="flex items-center justify-end gap-5">
-                  {saveButton}
-               </div>
+            </div>
+
+            <aside
+               className="flex min-w-0 flex-col gap-6"
+               aria-label="When, where and who sees it"
+            >
+               {heading('When and where')}
+               {caughtAtBlock}
+               {mapBlock}
+               {spotBlock}
+               {conditionsBlock}
+               {heading('Gear and notes', 'mt-3')}
+               {gearBlock}
+               {notesBlock}
+               {heading('Sharing', 'mt-3')}
+               {sharingBlock}
+               {areaBlock}
+            </aside>
+         </div>
+
+         <footer className="sticky bottom-0 z-10 flex items-center gap-4 border-t border-line bg-background px-8 py-4">
+            {saveDraftButton(
+               'ml-auto grid h-[52px] place-items-center border border-ink px-6 text-[18px]'
             )}
+            {saveButton}
          </footer>
-      </section>
+      </>
    );
 }

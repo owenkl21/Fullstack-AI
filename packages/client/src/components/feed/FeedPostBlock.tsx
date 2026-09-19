@@ -1,8 +1,6 @@
 import {
    ChatBubbleOvalLeftIcon,
    HeartIcon,
-   UserMinusIcon,
-   UserPlusIcon,
    BookmarkIcon,
 } from '@heroicons/react/24/outline';
 import {
@@ -23,18 +21,28 @@ import {
 } from '@/components/ui/carousel';
 import { CommentThread } from '@/components/feed/CommentThread';
 import {
-   countSentence,
    formatDistance,
    formatLength,
    formatRelative,
    formatStamp,
    formatWeight,
    joinMeta,
+   sourceWord,
 } from '@/components/feed/format';
 import type { FeedPostInView } from '@/components/feed/types';
 
-const textControl =
-   'g-tracked inline-flex h-12 items-center text-[19px] transition-[color,opacity] duration-150 [transition-timing-function:var(--ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal';
+/*
+ * A word, not a button drawn around a word. Follow, See the catch, Post and
+ * Read the other five are all the same object: League Gothic, tracked, at the
+ * height a thumb needs, and nothing else. The card has one teal corner and one
+ * dashed rule in it, and a row of outlined boxes on top of that made every
+ * card look like a form.
+ */
+const word =
+   'g-tracked inline-flex items-center tracking-[0.07em] transition-[color,opacity] duration-150 [transition-timing-function:var(--ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal';
+
+/** One action in the row: a 44px target holding a 22px icon and its count. */
+const action = `${word} h-11 gap-1.5`;
 
 /** `Caught at Kalk Bay, Tue 15 Sep, 06:42 · 4 h ago`, built from what the post carries. */
 function contextSentence(post: FeedPostInView, showDistance: boolean) {
@@ -60,13 +68,29 @@ function contextSentence(post: FeedPostInView, showDistance: boolean) {
    return joinMeta([stamp ? `Caught on ${stamp}` : 'Caught', since]);
 }
 
+/*
+ * The size, or nothing at all.
+ *
+ * A catch that was never measured has no line here and never had a line saying
+ * so: "Not measured" printed under half the feed, in the same place the figures
+ * go, and said less than the empty space does.
+ */
 function measurementLine(post: FeedPostInView) {
    const length = formatLength(post.catch?.lengthCm);
    const weight = formatWeight(post.catch?.weightKg);
    if (!length && !weight) return null;
 
-   const source = post.catch?.lengthSource ?? post.catch?.weightSource ?? null;
-   return { value: joinMeta([length, weight]), source };
+   /*
+    * A source only describes the fact it was taken for. The API sends no
+    * `lengthSource` at all today, and a length-only catch carries
+    * `weightSource: 'LENGTH'`, which describes a weight that is not on the card:
+    * `sourceWord` gives that one no word, so nothing is claimed about a figure
+    * nobody took.
+    */
+   const source = weight
+      ? (post.catch?.weightSource ?? null)
+      : (post.catch?.lengthSource ?? null);
+   return { value: joinMeta([length, weight]), source: sourceWord(source) };
 }
 
 export function FeedPostBlock({
@@ -108,16 +132,13 @@ export function FeedPostBlock({
    isReadingAllComments: boolean;
    hasReadAllComments: boolean;
 }) {
-   const counts = countSentence(post.likeCount, post.commentCount);
-
    const images = post.catch?.images ?? [];
    /*
     * The fish leads. A card used to be headed by whatever the angler typed
     * as a title, with the species in small type under it, so a row of cards
     * read "Morning session", "Tuesday", "Slangkop" and never said what was
     * caught. The species is the heading; the angler's own title, when it is
-    * more than the species again, sits under the figures as what they called
-    * it.
+    * more than the species again, sits above the notes as what they called it.
     */
    const heading = post.catch?.species?.trim() || post.catch?.title || null;
    const called =
@@ -130,6 +151,15 @@ export function FeedPostBlock({
    const measurement = measurementLine(post);
    const threadId = `comments-${post.id}`;
    const canFollow = isSignedIn && post.authorIsMe !== true;
+
+   /*
+    * The photograph's box, at both shapes the card takes. On a phone it is the
+    * full width of the card at 4:3; at desktop the card turns sideways and this
+    * is the left column, 600 wide and spanning both rows, so the header and the
+    * fish sit beside it rather than under it.
+    */
+   const frame =
+      'relative aspect-[4/3] w-full overflow-hidden bg-black-block-2 lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:min-h-full lg:w-[600px]';
 
    return (
       <article
@@ -148,11 +178,16 @@ export function FeedPostBlock({
           * phone the photograph came out at 660 across: overflowing, zoomed
           * in and soft. The width of a card is not a guess to be made, it is
           * the column it sits in.
+          *
+          * A sideways card is about 470 pixels tall, not 1100, so the desktop
+          * guess is the sideways one from `lg` up and the tall stacked one
+          * only in the band between where the column stops growing and where
+          * the card turns.
           */
-         className="blk flex h-full flex-col [content-visibility:auto] [contain-intrinsic-height:auto_660px] md:[contain-intrinsic-height:auto_1100px]"
+         className="blk blk-flat grid h-full grid-cols-1 [content-visibility:auto] [contain-intrinsic-height:auto_660px] md:[contain-intrinsic-height:auto_1000px] lg:grid-cols-[600px_1fr] lg:grid-rows-[auto_1fr] lg:[contain-intrinsic-height:auto_470px]"
          aria-labelledby={`post-${post.id}`}
       >
-         <header className="flex items-center gap-3 px-4 pt-5 pr-12 pb-4">
+         <header className="flex items-center gap-3 px-4 pt-4 pr-10 pb-3.5 lg:col-start-2 lg:row-start-1 lg:px-6 lg:pr-9 lg:pt-5 lg:pb-0">
             {/*
              * The photograph and the name are one link. Making only the name
              * clickable left a 26px target, which is under the minimum and
@@ -160,7 +195,9 @@ export function FeedPostBlock({
              */}
             <Link
                to={`/anglers/${post.author.id}`}
-               className="group flex min-h-11 min-w-0 items-center gap-3"
+               /* A 44px target inside a 40px row: it overlaps the header's
+                  own padding rather than making the header taller. */
+               className="group -my-0.5 flex min-h-11 min-w-0 items-center gap-3"
             >
                {post.author.avatarUrl ? (
                   /*
@@ -177,18 +214,18 @@ export function FeedPostBlock({
                      alt=""
                      ratio="1 / 1"
                      sizes="40px"
-                     className="size-10 shrink-0 rounded-full bg-black-block-2"
+                     className="size-10 shrink-0 rounded-full bg-paper/30"
                   />
                ) : (
                   <span
                      aria-hidden="true"
-                     className="g flex size-10 shrink-0 items-center justify-center rounded-full bg-black-block-2 text-[20px] text-paper-2"
+                     className="g grid size-10 shrink-0 place-items-center rounded-full bg-paper/30 text-[20px] text-paper"
                   >
                      {post.author.displayName.slice(0, 1)}
                   </span>
                )}
-               <span className="min-w-0">
-                  <span className="line-clamp-2 block leading-tight font-semibold text-paper underline-offset-4 group-hover:underline">
+               <span className="min-w-0 leading-tight">
+                  <span className="line-clamp-2 block text-[16px] font-semibold text-paper underline-offset-4 group-hover:underline">
                      {post.author.displayName}
                   </span>
                   {/*
@@ -203,14 +240,45 @@ export function FeedPostBlock({
                   ) : null}
                </span>
             </Link>
+
+            {/*
+             * Follow sits beside the angler it concerns rather than down in the
+             * row of things you do to the fish. One word, and the word is the
+             * state: teal while you follow, quiet while you do not.
+             */}
+            {canFollow ? (
+               <button
+                  type="button"
+                  aria-pressed={post.authorFollowedByMe === true}
+                  onClick={post.authorFollowedByMe ? onUnfollow : onFollow}
+                  /* Same 44px target, same 40px row: the word keeps the
+                     header the height the avatar sets. */
+                  className={`${word} -my-0.5 ml-auto h-11 shrink-0 text-[15px] ${
+                     post.authorFollowedByMe
+                        ? 'text-teal-text hover:opacity-80'
+                        : 'text-paper-2 hover:text-paper'
+                  }`}
+               >
+                  {post.authorFollowedByMe ? 'Following' : 'Follow'}
+               </button>
+            ) : null}
          </header>
 
          {images.length > 0 ? (
-            <Carousel label={heading ? `Photos of ${heading}` : 'Photos'}>
-               <div className="relative">
-                  <CarouselContent>
+            <div className={frame}>
+               {/* The carousel fills the frame rather than setting it, so the
+                   photograph is the same shape whether the card is stacked or
+                   sideways and whatever the words beside it come to. */}
+               <Carousel
+                  label={heading ? `Photos of ${heading}` : 'Photos'}
+                  className="absolute inset-0 [&>div]:h-full"
+               >
+                  <CarouselContent className="h-full">
                      {images.map((entry, index) => (
-                        <CarouselItem key={entry.image.id}>
+                        <CarouselItem
+                           key={entry.image.id}
+                           className="relative h-full"
+                        >
                            {/*
                             * The window follows the photograph. Catch photos are
                             * mostly held up to the camera and come out portrait,
@@ -227,33 +295,41 @@ export function FeedPostBlock({
                                     ? `${heading}, photo ${index + 1} of ${images.length}`
                                     : `Photo ${index + 1} of ${images.length}`
                               }
-                              ratio="4 / 3"
-                              /* The column is 960px at its widest and the whole
-                                 width of a phone below that. */
-                              sizes="(min-width: 992px) 960px, 100vw"
+                              fill
+                              /* The whole width of a phone, and the card's own
+                                 left column once the card turns sideways. */
+                              sizes="(min-width: 1024px) 600px, 100vw"
                               objectPosition={`${Math.round((entry.image.focusX ?? 0.5) * 100)}% ${Math.round((entry.image.focusY ?? 0.5) * 100)}%`}
-                              className="w-full bg-black-block-2"
                            />
                         </CarouselItem>
                      ))}
                   </CarouselContent>
                   <CarouselPrevious />
                   <CarouselNext />
-               </div>
-               <CarouselCounter className="px-4 pt-3 text-paper-2" />
-            </Carousel>
+                  {/*
+                   * Where you are in the set, on the picture itself. It used to
+                   * be a line of type under the photograph, which spent a whole
+                   * row of the card saying "2 of 5".
+                   */}
+                  <CarouselCounter
+                     separator="/"
+                     className="num absolute top-3 right-3 bg-black-block/72 px-2 py-[5px] text-[12px] leading-none tracking-[0.14em] text-paper"
+                  />
+               </Carousel>
+            </div>
          ) : (
             /*
              * No photograph. A card that simply skips the picture collapses to a
              * headline over a link and reads as though something failed to load,
              * so the space is kept and given the house fish. Most catches are
-             * never photographed, so this is the common card, not the odd one.
+             * never photographed, so this is the common card, not the odd one,
+             * and a column of them keeps its rhythm.
              */
             <div
                aria-hidden="true"
-               className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-black-block-2"
+               className={`${frame} grid place-items-center`}
             >
-               <FishMark className="h-9 w-14 text-paper/20" />
+               <FishMark className="size-[120px] text-paper/22 lg:size-[140px]" />
                <span className="absolute inset-x-0 bottom-0 h-1 bg-teal/70" />
             </div>
          )}
@@ -261,87 +337,106 @@ export function FeedPostBlock({
          {/*
           * No fixed height. It used to hold the body at 292px and clip what
           * did not fit, which cut the like and comment line in half at the
-          * foot of the card. The height was there to line stacked cards up,
-          * and there is nothing to line up with: the feed is one column at
-          * every width. A card is as tall as what is in it.
+          * foot of the card. A card is as tall as what is in it, except
+          * sideways, where the photograph sets the height and the action row
+          * falls to the bottom of the column beside it.
           */}
-         <div className="flex flex-1 flex-col gap-3 px-4 pt-5 pb-6">
-            {heading ? (
-               <h2 id={`post-${post.id}`} className="g text-[30px] text-paper">
-                  {heading}
-               </h2>
-            ) : (
-               <span id={`post-${post.id}`} className="sr-only">
-                  A catch from {post.author.displayName}
-               </span>
-            )}
+         <div className="flex flex-col px-4 py-[18px] lg:col-start-2 lg:row-start-2 lg:px-6 lg:pt-7 lg:pb-5">
+            <div className="flex flex-col gap-2">
+               {heading ? (
+                  <h2
+                     id={`post-${post.id}`}
+                     className="g text-[30px] text-paper lg:text-[36px]"
+                  >
+                     {heading}
+                  </h2>
+               ) : (
+                  <span id={`post-${post.id}`} className="sr-only">
+                     A catch from {post.author.displayName}
+                  </span>
+               )}
 
-            {measurement ? (
-               /* League Gothic for the figures, but not uppercased: `cm` and `lb`
-                  are units and are never shouted. Straight under the species,
-                  because the fish and its size are one fact. */
-               <p className="num -mt-1 font-display text-[26px] tracking-[0.03em] text-paper">
-                  {measurement.value}
-                  {measurement.source ? (
-                     <span className="ml-2 font-sans text-[14px] tracking-normal text-paper-2">
-                        {measurement.source}
+               {measurement ? (
+                  /* League Gothic for the figures, but not uppercased: `cm` and
+                     `kg` are units and are never shouted. Straight under the
+                     species, because the fish and its size are one fact. */
+                  <p className="flex items-baseline gap-2.5 leading-none">
+                     <span className="num font-display text-[26px] leading-none tracking-[0.03em] text-paper lg:text-[28px]">
+                        {measurement.value}
                      </span>
-                  ) : null}
+                     {measurement.source ? (
+                        <span className="text-[14px] text-paper-2">
+                           {measurement.source}
+                        </span>
+                     ) : null}
+                  </p>
+               ) : null}
+
+               {/* Where and when, after what: the meta line reads as a caption
+                   to the fish rather than as a preamble to the photograph. */}
+               <p className="text-[14px] text-paper-2">
+                  {contextSentence(post, showDistance)}
                </p>
-            ) : null}
 
-            {/* Where and when, after what: the meta line reads as a caption
-                to the fish rather than as a preamble to the photograph. */}
-            <p className="text-[14px] text-paper-2">
-               {contextSentence(post, showDistance)}
-            </p>
+               {called ? (
+                  <p className="text-[15px] font-semibold text-paper">
+                     {called}
+                  </p>
+               ) : null}
 
-            {called ? <p className="text-[15px] text-paper">{called}</p> : null}
+               {post.content ? (
+                  <p className="line-clamp-3 text-[15px] leading-relaxed whitespace-pre-line text-paper">
+                     {post.content}
+                  </p>
+               ) : null}
+            </div>
 
-            {post.content ? (
-               <p className="line-clamp-3 text-[15px] leading-relaxed whitespace-pre-line text-paper">
-                  {post.content}
-               </p>
-            ) : null}
-
-            {recordHref ? (
-               /*
-                * The card's primary action, drawn as one. It was a bare teal
-                * link on a row of its own, which spent a whole line on the one
-                * thing the card is for and still looked like body text.
-                */
-               <Link
-                  to={recordHref}
-                  className="g-tracked inline-flex min-h-11 items-center gap-2 self-start border border-paper/30 px-4 text-[15px] text-paper transition-colors duration-150 [transition-timing-function:var(--ease)] hover:border-paper hover:bg-paper/10"
-               >
-                  See the catch
-               </Link>
-            ) : null}
-
-            <div className="rule-dashed mt-auto flex flex-wrap items-center gap-x-6 pt-2">
+            {/*
+             * One row, under one dashed rule, and it is the whole foot of the
+             * card: what you can do to the fish on the left, where the fish
+             * lives on the right. The sentence that used to sit under it
+             * counting the likes said again, in words, what the figures beside
+             * the hearts already say.
+             */}
+            <div className="mt-4 flex items-center gap-[22px] border-t border-dashed border-line-2 pt-3 lg:mt-auto">
                {isSignedIn ? (
                   <button
                      type="button"
                      aria-pressed={post.likedByMe}
                      aria-label={post.likedByMe ? 'Liked' : 'Like'}
                      onClick={onLike}
-                     className={`${textControl} gap-2 ${post.likedByMe ? 'text-teal' : 'text-paper-2 hover:text-paper'}`}
+                     className={`${action} ${post.likedByMe ? 'text-teal-text' : 'text-paper-2 hover:text-paper'}`}
                   >
                      {post.likedByMe ? (
-                        <HeartSolid aria-hidden="true" className="size-5" />
+                        <HeartSolid
+                           aria-hidden="true"
+                           className="size-[22px]"
+                        />
                      ) : (
-                        <HeartIcon aria-hidden="true" className="size-5" />
+                        <HeartIcon
+                           aria-hidden="true"
+                           className="size-[22px]"
+                           strokeWidth={1.5}
+                        />
                      )}
-                     <span className="num">{post.likeCount}</span>
+                     <span className="num text-[19px] tracking-[0.04em]">
+                        {post.likeCount}
+                     </span>
                   </button>
                ) : (
                   <Link
                      to="/sign-in"
                      aria-label="Sign in to like"
-                     aria-pressed={false}
-                     className={`${textControl} gap-2 text-paper-2 hover:text-paper`}
+                     className={`${action} text-paper-2 hover:text-paper`}
                   >
-                     <HeartIcon aria-hidden="true" className="size-5" />
+                     <HeartIcon
+                        aria-hidden="true"
+                        className="size-[22px]"
+                        strokeWidth={1.5}
+                     />
+                     <span className="num text-[19px] tracking-[0.04em]">
+                        {post.likeCount}
+                     </span>
                   </Link>
                )}
 
@@ -352,13 +447,16 @@ export function FeedPostBlock({
                   aria-controls={threadId}
                   aria-label="Comments"
                   onClick={onToggleComments}
-                  className={`${textControl} gap-2 ${commentsOpen ? 'text-teal' : 'text-paper-2 hover:text-paper'}`}
+                  className={`${action} ${commentsOpen ? 'text-teal-text' : 'text-paper-2 hover:text-paper'}`}
                >
                   <ChatBubbleOvalLeftIcon
                      aria-hidden="true"
-                     className="size-5"
+                     className="size-[22px]"
+                     strokeWidth={1.5}
                   />
-                  <span className="num">{post.commentCount}</span>
+                  <span className="num text-[19px] tracking-[0.04em]">
+                     {post.commentCount}
+                  </span>
                </button>
 
                {isSignedIn ? (
@@ -367,39 +465,37 @@ export function FeedPostBlock({
                      aria-pressed={post.savedByMe === true}
                      aria-label={post.savedByMe ? 'Kept' : 'Keep'}
                      onClick={onSave}
-                     className={`${textControl} gap-2 ${post.savedByMe ? 'text-teal' : 'text-paper-2 hover:text-paper'}`}
+                     className={`${action} ${post.savedByMe ? 'text-teal-text' : 'text-paper-2 hover:text-paper'}`}
                   >
                      {post.savedByMe ? (
-                        <BookmarkSolid aria-hidden="true" className="size-5" />
+                        <BookmarkSolid
+                           aria-hidden="true"
+                           className="size-[22px]"
+                        />
                      ) : (
-                        <BookmarkIcon aria-hidden="true" className="size-5" />
+                        <BookmarkIcon
+                           aria-hidden="true"
+                           className="size-[22px]"
+                           strokeWidth={1.5}
+                        />
                      )}
                   </button>
                ) : null}
 
-               {canFollow ? (
-                  <button
-                     type="button"
-                     aria-pressed={post.authorFollowedByMe === true}
-                     onClick={post.authorFollowedByMe ? onUnfollow : onFollow}
-                     className={`${textControl} ml-auto gap-2 ${post.authorFollowedByMe ? 'text-teal' : 'text-paper-2 hover:text-paper'}`}
+               {recordHref ? (
+                  /* The card's one primary action, and the only thing on the
+                     right of the row. */
+                  <Link
+                     to={recordHref}
+                     className={`${word} ml-auto h-11 text-[16px] text-paper hover:opacity-80`}
                   >
-                     {post.authorFollowedByMe ? (
-                        <UserMinusIcon aria-hidden="true" className="size-5" />
-                     ) : (
-                        <UserPlusIcon aria-hidden="true" className="size-5" />
-                     )}
-                     {post.authorFollowedByMe ? 'Following' : 'Follow'}
-                  </button>
+                     See the catch
+                  </Link>
                ) : null}
             </div>
 
-            {counts ? (
-               <p className="num text-[14px] text-paper-2">{counts}</p>
-            ) : null}
-
             {actionError ? (
-               <p className="text-[15px] text-paper">{actionError}</p>
+               <p className="mt-2 text-[14px] text-paper">{actionError}</p>
             ) : null}
 
             {commentsOpen ? (

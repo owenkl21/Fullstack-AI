@@ -1,7 +1,8 @@
 /*
- * Copy helpers for the feed. Dates read `Tue 15 Sep, 06:42`, measurements print
- * both systems with their source word, plurals are real, and a missing value is
- * a sentence somewhere else rather than a dash here.
+ * Copy helpers for the feed. Dates read `Tue 15 Sep, 06:42`, a measurement is
+ * one figure in the system it was taken in, plurals are real, and a value that
+ * was never taken is simply absent: nothing here ever prints a dash or the
+ * words "not measured" in its place.
  */
 
 const STAMP = new Intl.DateTimeFormat('en-GB', {
@@ -73,20 +74,44 @@ function tidy(value: number) {
       : String(Number(value.toFixed(1)));
 }
 
-/** `44 cm (17.3 in)`. Null when the angler did not measure it. */
+/**
+ * `44 cm`. Null when the angler did not measure it.
+ *
+ * One system, not two. The card carries the size as a single League Gothic
+ * line beside the species, and `44 cm (17.3 in) · 1.9 kg (4 lb 3 oz)` wrapped
+ * onto three lines of parentheses on a phone and buried the fish. The record
+ * is where a catch is read closely, and the record still prints both.
+ */
 export function formatLength(cm?: number | null): string | null {
    if (typeof cm !== 'number' || !Number.isFinite(cm) || cm <= 0) return null;
-   return `${tidy(cm)} cm (${(cm / 2.54).toFixed(1)} in)`;
+   return `${tidy(cm)} cm`;
 }
 
-/** `1.9 kg (4 lb 3 oz)`. Pounds and ounces, never decimal pounds. */
+/** `1.9 kg`. Null when it was never weighed. */
 export function formatWeight(kg?: number | null): string | null {
    if (typeof kg !== 'number' || !Number.isFinite(kg) || kg <= 0) return null;
-   const totalOunces = Math.round(kg * 35.27396195);
-   const pounds = Math.floor(totalOunces / 16);
-   const ounces = totalOunces % 16;
-   const imperial = pounds > 0 ? `${pounds} lb ${ounces} oz` : `${ounces} oz`;
-   return `${tidy(kg)} kg (${imperial})`;
+   return `${tidy(kg)} kg`;
+}
+
+/**
+ * How a figure was taken, as the quiet word that sits beside it.
+ *
+ * The API sends the enum the log form wrote, so a card used to read
+ * `43 cm LENGTH`. `LENGTH` is not a way of measuring at all: it is a weight the
+ * server worked out from a length, and it has no word because there is nothing
+ * to tell the reader that the figures do not already say.
+ */
+export function sourceWord(source?: string | null): string | null {
+   switch (source) {
+      case 'EYE':
+         return 'By eye';
+      case 'TAPE':
+         return 'On a tape';
+      case 'SCALE':
+         return 'On a scale';
+      default:
+         return null;
+   }
 }
 
 /** `1 like` / `3 likes`, never `1 likes`. */
@@ -95,21 +120,32 @@ export function plural(count: number, one: string, many: string): string {
 }
 
 /**
- * The counts as one sentence under the controls, or nothing at all.
- *
- * Null when there is neither, because "No likes or comments yet." printed under
- * every card in a fresh feed is twenty five identical sentences saying nothing.
- * An absence does not need announcing.
+ * How old a reply is, in the fewest characters that still say it: `2 h`,
+ * `40 min`, `3 d`. It rides after a name on one line, so it drops the `ago`
+ * the feed's own meta line keeps. Past a week it hands back the stamp, because
+ * `9 d` is a number nobody converts.
  */
-export function countSentence(likes: number, comments: number): string | null {
-   const likeText = likes > 0 ? plural(likes, 'like', 'likes') : null;
-   const commentText =
-      comments > 0 ? plural(comments, 'comment', 'comments') : null;
+export function formatAge(
+   value?: string | null,
+   now: number = Date.now()
+): string | null {
+   const date = toDate(value);
+   if (!date) return null;
 
-   if (likeText && commentText) return `${likeText} and ${commentText}.`;
-   if (likeText) return `${likeText}.`;
-   if (commentText) return `${commentText}.`;
-   return null;
+   const seconds = Math.round((now - date.getTime()) / 1000);
+   if (seconds < 0) return null;
+   if (seconds < 60) return 'now';
+
+   const minutes = Math.floor(seconds / 60);
+   if (minutes < 60) return `${minutes} min`;
+
+   const hours = Math.floor(minutes / 60);
+   if (hours < 24) return `${hours} h`;
+
+   const days = Math.floor(hours / 24);
+   if (days <= 7) return `${days} d`;
+
+   return formatStamp(value);
 }
 
 /** `800 m away` under a kilometre, `12 km away` above it. */

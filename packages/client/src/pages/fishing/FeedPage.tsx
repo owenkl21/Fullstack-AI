@@ -1,14 +1,7 @@
 import { PageHead } from '@/components/brand/PageHead';
 import axios from 'axios';
 import { removePost, savePost } from '@/components/saved/saved-api';
-import {
-   useCallback,
-   useEffect,
-   useMemo,
-   useRef,
-   useState,
-   type CSSProperties,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -23,7 +16,8 @@ import {
 import { toast } from '@/components/ui/use-toast';
 import { useRevealIn } from '@/components/brand/Reveal';
 import {
-   FeedFilters,
+   FeedRadius,
+   FeedScopeSegment,
    MAX_RADIUS_KM,
    MIN_RADIUS_KM,
    type LocationState,
@@ -549,7 +543,7 @@ export function FeedPage() {
                      className={inlineControl}
                      onClick={() => setFilter({ scope: 'everywhere' })}
                   >
-                     Show everywhere
+                     Show global
                   </button>
                </div>
             </div>
@@ -577,28 +571,48 @@ export function FeedPage() {
       >
          <PageHead
             column="w-[min(960px,100%-32px)]"
-            kicker="The catches other anglers logged, newest first"
+            kicker="Newest first"
             title="Feed"
-         />
+         >
+            {/*
+             * The switch rides on the plate, so the black band carries
+             * something and the first card starts sooner. PageHead holds its
+             * children 24px under the title and its column is the positioned
+             * one, so the margin is trimmed to the 18px the phone wants and
+             * dropped entirely once the plate is wide enough to set the switch
+             * beside the title, bottom aligned with it.
+             */}
+            <div className="-mt-1.5 lg:-mt-6">
+               <FeedScopeSegment
+                  scope={scope}
+                  onScopeChange={(next) => setFilter({ scope: next })}
+                  className="lg:absolute lg:right-0 lg:bottom-7"
+               />
+            </div>
+         </PageHead>
 
-         <div className="rv mt-8" style={{ '--i': 1 } as CSSProperties}>
-            <FeedFilters
-               scope={scope}
-               onScopeChange={(next) => setFilter({ scope: next })}
-               radiusKm={radiusKm}
-               onRadiusChange={setRadiusKm}
-               onRadiusCommit={(next) =>
-                  setFilter({ radius: next }, { replace: true })
-               }
-               matchCount={
-                  status === 'ready' && position ? visiblePosts.length : null
-               }
-               locationState={locationState}
-               onRetryLocation={requestPosition}
-            />
-         </div>
+         {/* No reveal on it: it is mounted by the switch above rather than
+             scrolled to, and the reveal pass only ever sees what was on the
+             page when the feed opened. */}
+         {scope === 'near-me' ? (
+            <div className="mb-8">
+               <FeedRadius
+                  radiusKm={radiusKm}
+                  onRadiusChange={setRadiusKm}
+                  onRadiusCommit={(next) =>
+                     setFilter({ radius: next }, { replace: true })
+                  }
+                  matchCount={
+                     status === 'ready' && position ? visiblePosts.length : null
+                  }
+                  locationState={locationState}
+                  onRetryLocation={requestPosition}
+                  onScopeChange={(next) => setFilter({ scope: next })}
+               />
+            </div>
+         ) : null}
 
-         <section aria-label="Posts" className="mt-10 flex flex-col gap-6">
+         <section aria-label="Posts" className="flex flex-col gap-6">
             {status === 'loading' ? (
                <>
                   <FeedSkeleton />
@@ -642,7 +656,7 @@ export function FeedPage() {
                : null}
 
             {status === 'ready' && showList && visiblePosts.length > 0 ? (
-               <div className="grid gap-8">
+               <div className="grid gap-6 lg:gap-8">
                   {visiblePosts.map((post) => (
                      <FeedPostBlock
                         key={post.id}

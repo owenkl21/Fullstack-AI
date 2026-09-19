@@ -296,6 +296,27 @@
       --bg: #161414;
       --bg-2: #201d1d;
    }
+
+   /*
+    * The other way to read the same idea, and the one the review draws: the
+    * card stays black on a black page and takes a paper hairline so it still
+    * has an edge. Nothing is lifted, so the ground inside the card is the true
+    * black pair again and the tab steps out by the width of the border to meet
+    * the corner over it. Opt in with `blk blk-flat`; `.blk` on its own keeps
+    * the lift, so every page that is not being redrawn looks as it did.
+    */
+   :root[data-theme='night'] .blk-flat {
+      background: var(--black);
+      border: 1px solid rgba(244, 241, 236, 0.14);
+      box-shadow: none;
+      --bg: var(--black);
+      --bg-2: var(--black-2);
+   }
+   :root[data-theme='night'] .blk-flat::before {
+      top: -1px;
+      right: -1px;
+   }
+   /* The teal corner tab: 22px on every card in the product. */
    .blk::before {
       content: '';
       position: absolute;
@@ -303,7 +324,7 @@
       top: 0;
       z-index: 1;
       border-style: solid;
-      border-width: 0 36px 36px 0;
+      border-width: 0 22px 22px 0;
       border-color: transparent var(--teal) transparent transparent;
    }
    .blk-plain::before {

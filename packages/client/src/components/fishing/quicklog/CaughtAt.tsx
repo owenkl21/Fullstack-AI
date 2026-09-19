@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { formatClock } from '@/components/fishing/record/format';
 import type { TimeSource } from './Receipt';
+import { dayStamp } from './stamp';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const toLocalInput = (d: Date) =>
    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 /*
- * When the fish came out: the clock large, the date beside it, where the
- * time came from, and an editor behind Edit for the catch logged later.
+ * When the fish came out: the clock large, the date beside it, where the time
+ * came from at the end of the same line, and an editor behind Edit for the
+ * catch logged later.
  */
 export function CaughtAt({
    at,
@@ -30,26 +32,9 @@ export function CaughtAt({
            : 'When you tapped Log';
 
    return (
-      <div>
+      <div className="flex flex-col gap-1.5">
          <div className="flex items-center justify-between gap-2">
             <span className="lab">Caught at</span>
-            <span className="text-[14px] whitespace-nowrap text-ink-2">
-               {note}
-            </span>
-         </div>
-         <div className="mt-2 flex items-center justify-between gap-2">
-            <div className="flex items-baseline gap-2.5">
-               <span className="g num text-[33px] leading-none">
-                  {formatClock(at)}
-               </span>
-               <span className="text-[14px] text-ink-2">
-                  {at.toLocaleDateString(undefined, {
-                     day: 'numeric',
-                     month: 'short',
-                     year: 'numeric',
-                  })}
-               </span>
-            </div>
             <button
                type="button"
                aria-expanded={editing}
@@ -57,13 +42,25 @@ export function CaughtAt({
                   setDraft(toLocalInput(at));
                   setEditing((open) => !open);
                }}
-               className="g-tracked inline-flex min-h-11 items-center text-[15px] text-teal-text hover:opacity-80"
+               className="g-tracked text-[15px] text-teal-text hover:opacity-80"
             >
                {editing ? 'Cancel' : 'Edit'}
             </button>
          </div>
+         <div className="flex items-baseline gap-3">
+            <span className="g num text-[36px] leading-[0.95]">
+               {formatClock(at)}
+            </span>
+            <span className="text-[15px] text-ink-2">{dayStamp(at)}</span>
+            <span
+               data-time-source={timeSource}
+               className="ml-auto text-[14px] whitespace-nowrap text-ink-3"
+            >
+               {note}
+            </span>
+         </div>
          {editing ? (
-            <div className="mt-3 border-t border-line pt-3">
+            <div className="mt-2 border-t border-line pt-3">
                <label className="lab" htmlFor="caught-at">
                   Date and time
                </label>

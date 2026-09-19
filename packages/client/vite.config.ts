@@ -23,6 +23,22 @@ export default defineConfig({
             changeOrigin: true,
             cookieDomainRewrite: '',
             secure: true,
+            /*
+             * A deployed API only trusts the app's own origin, so a request
+             * proxied from localhost arrives wearing it. Dev only: this
+             * block is what lets the audit scripts run against a local
+             * build with live data.
+             */
+            configure: (proxy) => {
+               if (!process.env.VITE_API_TARGET) return;
+               const origin =
+                  process.env.VITE_APP_ORIGIN ||
+                  'https://fishlogger-client.vercel.app';
+               proxy.on('proxyReq', (req) => {
+                  if (req.getHeader('origin')) req.setHeader('origin', origin);
+                  req.setHeader('referer', `${origin}/`);
+               });
+            },
          },
       },
    },

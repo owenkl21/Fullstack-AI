@@ -1,0 +1,1 @@
+2e The feed · desktop 1440 The card turns sideways at desktop: the photograph on the left at 600 wide, the fish and the actions on the right. A 960 column no longer holds a 720px tall photograph; three cards fit a screen instead of one.

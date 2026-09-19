@@ -1,32 +1,26 @@
-import {
-   useId,
-   useRef,
-   useState,
-   type FormEvent,
-   type KeyboardEvent,
-} from 'react';
-import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
-import { ChatBubbleOvalLeftIcon } from '@heroicons/react/24/outline';
+import { useId, useRef, useState, type FormEvent } from 'react';
 
-import { formatStamp, plural } from '@/components/feed/format';
+import { formatAge } from '@/components/feed/format';
 import type { FeedComment } from '@/components/feed/types';
-import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 
 const COMMENT_LIMIT = 1000;
-/* Shown at first, and how many more each Load more brings. */
+/* Shown at first, and how many more each Read the other N brings. */
 const PAGE = 4;
 
 const initialOf = (name: string) => (name.trim()[0] ?? '?').toUpperCase();
 
+const word =
+   'g-tracked inline-flex items-center text-[15px] tracking-[0.07em] transition-[color,opacity] duration-150 [transition-timing-function:var(--ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal';
+
 /*
- * The thread under a post.
+ * The thread, inside the card, under the action row.
  *
- * Four replies show; the list scrolls for the rest on a teal rail, and Load
- * more brings the next four, reading the whole thread from the server the
- * first time it runs out. Each reply is a small card: who, when, what. The
- * composer is a box you can see with a send button that is a button. Enter
- * sends, Shift and Enter takes a new line, and a reply appears the moment
+ * Four replies show and Read the other N brings the next four, reading the
+ * whole thread from the server the first time it runs out. A reply is a name,
+ * how long ago, and what was said: no bubble around it, because the card is
+ * already a surface and a surface on a surface is just a box. The composer is
+ * one line with the word Post at the end of it, and a reply appears the moment
  * it is written rather than after the round trip.
  */
 export function CommentThread({
@@ -57,8 +51,7 @@ export function CommentThread({
    hasReadAll: boolean;
 }) {
    const fieldId = useId();
-   const box = useRef<HTMLTextAreaElement>(null);
-   const list = useRef<HTMLUListElement>(null);
+   const box = useRef<HTMLInputElement>(null);
    const trimmed = draft.trim();
    const remaining = COMMENT_LIMIT - draft.length;
    const canSend = Boolean(trimmed) && !isSubmitting;
@@ -84,18 +77,9 @@ export function CommentThread({
    const total = Math.max(commentCount, comments.length);
    const left = total - shown.length;
 
-   /* A reply just written is at the end; scroll the list to it. */
-   const scrollToEnd = () =>
-      requestAnimationFrame(() => {
-         list.current?.scrollTo({
-            top: list.current.scrollHeight,
-            behavior: 'smooth',
-         });
-      });
-
    /*
-    * Load more asked for a page the client did not have. The whole thread
-    * is read, and once it lands the next page opens: tracked as a wish,
+    * Read the other N asked for a page the client did not have. The whole
+    * thread is read, and once it lands the next page opens: tracked as a wish,
     * settled in the click handler of the button the reader presses.
     */
    const [wanted, setWanted] = useState(false);
@@ -119,53 +103,22 @@ export function CommentThread({
       event.preventDefault();
       if (!canSend) return;
       onSubmit();
-      scrollToEnd();
       box.current?.focus();
-   };
-
-   const onKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key === 'Enter' && !event.shiftKey) {
-         event.preventDefault();
-         if (canSend) {
-            onSubmit();
-            scrollToEnd();
-         }
-      }
-   };
-
-   /* The box grows with the reply, to a point, and shrinks back. */
-   const grow = (node: HTMLTextAreaElement) => {
-      node.style.height = 'auto';
-      node.style.height = `${Math.min(node.scrollHeight, 160)}px`;
    };
 
    return (
       <div
          id={id}
-         className="flex flex-col gap-3 border-t border-paper/15 pt-4"
+         className="mt-2 flex flex-col gap-3.5 border-t border-paper/12 pt-3.5"
       >
          {shown.length > 0 ? (
-            <ul
-               ref={list}
-               onScroll={(event) => {
-                  /* Near the bottom, the next page comes on its own. */
-                  const el = event.currentTarget;
-                  if (
-                     left > 0 &&
-                     !isReadingAll &&
-                     el.scrollTop + el.clientHeight >= el.scrollHeight - 24
-                  ) {
-                     loadMore();
-                  }
-               }}
-               className="thread-scroll flex max-h-[276px] flex-col gap-3 overflow-y-auto pr-2"
-            >
+            <ul className="flex flex-col gap-3.5">
                {shown.map((comment, i) => {
-                  const stamp = formatStamp(comment.createdAt);
+                  const age = formatAge(comment.createdAt);
                   return (
                      <li
                         key={comment.id}
-                        className="comment-in flex gap-3"
+                        className="comment-in flex gap-2.5"
                         style={
                            {
                               '--i': Math.min(i % PAGE, 6),
@@ -174,22 +127,21 @@ export function CommentThread({
                      >
                         <span
                            aria-hidden="true"
-                           className="g grid size-9 shrink-0 place-items-center rounded-full bg-black-block-2 text-[18px] text-paper-2"
+                           className="g grid size-7 shrink-0 place-items-center rounded-full bg-paper/30 text-[14px] text-paper"
                         >
                            {initialOf(comment.user.displayName)}
                         </span>
-                        <div className="min-w-0 flex-1 bg-black-block-2/60 px-3 py-2">
-                           <p className="flex flex-wrap items-baseline gap-x-3">
-                              <span className="g-tracked text-[17px] text-paper">
-                                 {comment.user.displayName}
-                              </span>
-                              {stamp ? (
-                                 <span className="lab text-paper-2">
-                                    {stamp}
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                           <p className="text-[14px] leading-[1.3] font-semibold text-paper">
+                              {comment.user.displayName}
+                              {age ? (
+                                 <span className="font-normal text-paper-2">
+                                    {' '}
+                                    · {age}
                                  </span>
                               ) : null}
                            </p>
-                           <p className="mt-0.5 text-[15px] leading-relaxed break-words whitespace-pre-line text-paper">
+                           <p className="text-[15px] leading-[1.5] break-words whitespace-pre-line text-paper">
                               {comment.body}
                            </p>
                         </div>
@@ -198,102 +150,71 @@ export function CommentThread({
                })}
             </ul>
          ) : (
-            <p className="flex items-center gap-2 text-[15px] text-paper-2">
-               <ChatBubbleOvalLeftIcon
-                  aria-hidden="true"
-                  className="size-5 text-paper-2"
-               />
+            <p className="text-[15px] text-paper-2">
                No comments yet. Be the first.
             </p>
          )}
 
          {left > 0 ? (
-            <div className="flex items-baseline justify-between gap-4">
-               <button
-                  type="button"
-                  onClick={loadMore}
-                  disabled={isReadingAll}
-                  className="g-tracked inline-flex h-10 items-center gap-2 text-[17px] text-teal transition-[opacity] duration-150 [transition-timing-function:var(--ease)] hover:opacity-80 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
-               >
-                  {isReadingAll
-                     ? 'Reading the thread'
-                     : `Load ${Math.min(PAGE, left)} more`}
-               </button>
-               <span className="num text-[13px] text-paper-2">
-                  {shown.length} of {plural(total, 'comment', 'comments')}
-               </span>
-            </div>
+            /* The target is 44px; the line it draws is the 15px the frame
+               holds, so the gaps above and below it stay even. */
+            <button
+               type="button"
+               onClick={loadMore}
+               disabled={isReadingAll}
+               className={`${word} -my-3.5 h-11 self-start text-teal-text hover:opacity-80 disabled:opacity-50`}
+            >
+               {isReadingAll ? 'Reading the thread' : `Read the other ${left}`}
+            </button>
          ) : null}
 
          {isSignedIn ? (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+            <form onSubmit={handleSubmit}>
                <label htmlFor={fieldId} className="sr-only">
                   Add a comment
                </label>
-               <div
-                  className={cn(
-                     'flex items-end gap-2 border bg-black-block-2/40 p-1.5 pl-3 transition-colors duration-150 [transition-timing-function:var(--ease)] focus-within:border-teal',
-                     error ? 'border-destructive' : 'border-paper/25'
-                  )}
-               >
-                  <textarea
+               <div className="flex h-12 items-center gap-3 border-b border-dashed border-paper/35 transition-colors duration-150 [transition-timing-function:var(--ease)] focus-within:border-paper">
+                  <input
                      ref={box}
                      id={fieldId}
-                     rows={1}
+                     type="text"
                      value={draft}
                      maxLength={COMMENT_LIMIT}
                      autoComplete="off"
-                     onChange={(event) => {
-                        onDraftChange(event.target.value);
-                        grow(event.target);
-                     }}
-                     onKeyDown={onKey}
-                     className="max-h-40 min-h-[40px] flex-1 resize-none bg-transparent py-2 text-[16px] leading-6 text-paper outline-none placeholder:text-paper-2"
-                     placeholder="Say something useful"
+                     onChange={(event) => onDraftChange(event.target.value)}
+                     className="min-w-0 flex-1 bg-transparent text-[15px] text-paper outline-none placeholder:text-paper-2"
+                     placeholder="Add a comment"
                      aria-describedby={error ? `${fieldId}-error` : undefined}
                      aria-invalid={error ? true : undefined}
                   />
                   <button
                      type="submit"
                      disabled={!canSend}
-                     aria-label={isSubmitting ? 'Sending' : 'Send'}
-                     className="grid size-10 shrink-0 place-items-center bg-teal text-teal-ink transition-[transform,opacity] duration-150 [transition-timing-function:var(--ease)] hover:brightness-95 active:scale-95 disabled:opacity-35 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+                     className={`${word} h-full shrink-0 text-paper hover:opacity-80 disabled:opacity-40`}
                   >
-                     <PaperAirplaneIcon
-                        aria-hidden="true"
-                        className={cn(
-                           'size-5 translate-x-[1px] -rotate-45',
-                           isSubmitting && 'animate-pulse'
-                        )}
-                     />
+                     {isSubmitting ? 'Sending' : 'Post'}
                   </button>
                </div>
-               <div className="flex items-baseline justify-between gap-3">
-                  {error ? (
-                     <p
-                        id={`${fieldId}-error`}
-                        className="text-[14px] text-paper"
-                     >
-                        {error}
-                     </p>
-                  ) : (
-                     <p className="text-[13px] text-paper-2/80">
-                        Enter sends. Shift and Enter for a new line.
-                     </p>
-                  )}
-                  {remaining <= 100 ? (
-                     <p className="lab num shrink-0 text-paper-2">
-                        {remaining} left
-                     </p>
-                  ) : null}
-               </div>
+               {error ? (
+                  <p
+                     id={`${fieldId}-error`}
+                     className="mt-2 text-[14px] text-paper"
+                  >
+                     {error}
+                  </p>
+               ) : null}
+               {remaining <= 100 ? (
+                  <p className="num mt-2 text-[13px] text-paper-2">
+                     {remaining} left
+                  </p>
+               ) : null}
             </form>
          ) : (
             <p className="flex flex-wrap items-center gap-x-3 text-[15px] text-paper-2">
                Sign in to reply.
                <Link
                   to="/sign-in"
-                  className="g-tracked inline-flex h-10 items-center text-[17px] text-teal transition-[opacity] duration-150 [transition-timing-function:var(--ease)] hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+                  className={`${word} h-11 text-teal-text hover:opacity-80`}
                >
                   Sign in
                </Link>

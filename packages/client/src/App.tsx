@@ -26,11 +26,6 @@ const QuickLogPage = lazyRoute(() =>
       default: m.QuickLogPage,
    }))
 );
-const LogCatchPage = lazyRoute(() =>
-   import('@/pages/fishing/LogCatchPage').then((m) => ({
-      default: m.LogCatchPage,
-   }))
-);
 const MyCatchesPage = lazyRoute(() =>
    import('@/pages/fishing/MyCatchesPage').then((m) => ({
       default: m.MyCatchesPage,
@@ -152,8 +147,14 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
+            {/*
+             * One log. /catches/new was the long form and is now the same
+             * page, so a link from a spot, a draft or an old bookmark lands
+             * on the log the product actually has. LogCatchPage stays for the
+             * edit route, which mounts its CatchForm.
+             */}
             <Route path="/log" element={<QuickLogPage />} />
-            <Route path="/catches/new" element={<LogCatchPage />} />
+            <Route path="/catches/new" element={<QuickLogPage />} />
             <Route path="/catches/me" element={<MyCatchesPage />} />
             <Route path="/catches/:catchId" element={<CatchDetailPage />} />
             <Route path="/catches/:catchId/edit" element={<EditCatchPage />} />

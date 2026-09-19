@@ -40,6 +40,7 @@ export function Picker({
    multiple = false,
    allLabel = 'Any',
    size = 'md',
+   variant = 'box',
    align = 'start',
    className,
    icon,
@@ -53,6 +54,14 @@ export function Picker({
    /* What the button says when a multiple picker has nothing chosen. */
    allLabel?: string;
    size?: 'sm' | 'md';
+   /*
+    * How the trigger is drawn. `box` is the filter button: a bordered box with
+    * the value in League Gothic. `line` is the same control standing in a
+    * form, where the fields around it are lines rather than boxes: a 60px row
+    * on a dashed rule, the label over the value in Jost. The panel and the
+    * sheet are the same either way.
+    */
+   variant?: 'box' | 'line';
    align?: 'start' | 'end';
    className?: string;
    icon?: ReactNode;
@@ -189,6 +198,8 @@ export function Picker({
       </div>
    );
 
+   const line = variant === 'line';
+
    const trigger = (
       <button
          type="button"
@@ -196,13 +207,20 @@ export function Picker({
          aria-expanded={open}
          onClick={phone ? () => setOpen(true) : undefined}
          className={cn(
-            'inline-flex w-full items-center gap-2 border bg-background text-left transition-colors duration-150 [transition-timing-function:var(--ease)] hover:border-ink-3',
-            size === 'sm' ? 'min-h-11 px-3' : 'min-h-12 px-3.5',
-            open
-               ? 'border-ink shadow-[inset_0_-2px_0_var(--teal)]'
-               : chosen.length > 0 && (multiple || chosen[0])
-                 ? 'border-ink'
-                 : 'border-line',
+            'inline-flex w-full items-center gap-2 text-left transition-colors duration-150 [transition-timing-function:var(--ease)]',
+            line
+               ? 'h-[60px] border-b border-dashed bg-transparent'
+               : 'border bg-background hover:border-ink-3',
+            !line && (size === 'sm' ? 'min-h-11 px-3' : 'min-h-12 px-3.5'),
+            line
+               ? open
+                  ? 'border-ink'
+                  : 'border-line-2'
+               : open
+                 ? 'border-ink shadow-[inset_0_-2px_0_var(--teal)]'
+                 : chosen.length > 0 && (multiple || chosen[0])
+                   ? 'border-ink'
+                   : 'border-line',
             className
          )}
       >
@@ -211,15 +229,20 @@ export function Picker({
             <span className="lab text-ink-3">{label}</span>
             <span
                className={cn(
-                  'g-tracked mt-0.5 truncate',
-                  size === 'sm' ? 'text-[15px]' : 'text-[16px]',
+                  'truncate',
+                  line
+                     ? 'mt-[5px] text-[16px] leading-none text-ink'
+                     : 'g-tracked mt-0.5',
+                  !line && (size === 'sm' ? 'text-[15px]' : 'text-[16px]'),
                   multiple && chosen.length === 0 && 'text-ink-2'
                )}
             >
                {summary}
             </span>
          </span>
-         {multiple && chosen.length > 0 ? (
+         {/* The count is a filter-bar affordance: on a form line the value
+             itself already lists what is chosen. */}
+         {multiple && chosen.length > 0 && !line ? (
             <span className="num grid size-6 shrink-0 place-items-center bg-ink text-[12px] text-background">
                {chosen.length}
             </span>
@@ -227,7 +250,8 @@ export function Picker({
          <ChevronDownIcon
             aria-hidden="true"
             className={cn(
-               'size-4 shrink-0 text-ink-3 transition-transform duration-150',
+               'shrink-0 transition-transform duration-150',
+               line ? 'size-[18px] text-ink-2' : 'size-4 text-ink-3',
                open && 'rotate-180 text-ink'
             )}
          />

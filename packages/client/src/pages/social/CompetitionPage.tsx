@@ -1,69 +1,60 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import {
-   CheckIcon,
-   FlagIcon,
-   MinusIcon,
-   UsersIcon,
-} from '@heroicons/react/24/outline';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { PageHead } from '@/components/brand/PageHead';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { InlineError } from '@/components/states/InlineError';
 import { NoData } from '@/components/states/NoData';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { Button } from '@/components/ui/button';
+import { Fold } from '@/components/ui/fold';
 import { Picker } from '@/components/ui/picker';
-import { TextField } from '@/components/ui/field';
+import { Sheet } from '@/components/ui/sheet';
 import { toast } from '@/components/ui/use-toast';
 import {
    answerInvite,
-   areaSentence,
-   checksSentence,
-   dateRange,
+   clockParts,
    enterCompetition,
-   entryStateLabel,
    fetchCompetition,
    fetchMyFollowers,
    flagEntry,
    inviteToCompetition,
-   leadingFigure,
    leaveCompetition,
    reviewEntry,
-   ruleSentence,
-   timeLeft,
+   ruleWords,
+   scopeLabel,
+   statusLabel,
+   whenSentence,
+   whereSentence,
    withdrawEntry,
-   type CheckCode,
-   type Competition,
    type CompetitionDetail,
    type CompetitionEntry,
-   type CompetitionStanding,
    type Follower,
 } from '@/components/social/competitions-api';
-import { ScopeChip, StatusChip } from '@/pages/social/CompetitionsPage';
-import { formatStamp } from '@/components/fishing/record/format';
+import { EntryRow } from '@/components/social/EntryRow';
+import { RulesTable } from '@/components/social/RulesTable';
+import { StandingsRows } from '@/components/social/StandingsRows';
+import { WinnerCard } from '@/components/social/WinnerCard';
+import { formatDayMonth } from '@/components/fishing/record/format';
 import { useDocumentTitle } from '@/lib/title';
-import { formatMeasure, readUnitSystem, type UnitSystem } from '@/lib/units';
-import { cn } from '@/lib/utils';
+import { readUnitSystem, type UnitSystem } from '@/lib/units';
 
 /*
  * One competition: its rules, who is where, and every entry with what was
  * checked about it.
  *
- * The standings are provisional while it runs and settle when it ends. An
- * entry is a catch frozen at the moment it was entered, so the board does
- * not move when a catch is edited later. Each entry shows its checks, one
- * line each, and the organiser accepts or excludes from here.
+ * The plate carries what a competition is and what you can do about it: the
+ * status line, the name, the clock and the two actions. Under the wave the
+ * rules are a table, the standings are rows, and the entries are a list that
+ * opens one at a time. On a desktop the rules and standings stand on the
+ * left with the entries beside them, so an organiser reviews without losing
+ * sight of the board.
+ *
+ * Once it has ended the clock and the actions leave the plate, the winner
+ * takes the one black card and the entries fold away under the standings.
  */
 
-const CHECK_LABELS: Record<CheckCode, string> = {
-   fish: 'Fish in the photo',
-   species: 'Species',
-   figure: 'Figure',
-   window: 'Time',
-   area: 'Area',
-   duplicate: 'Not entered twice',
-};
-
+const COLUMN = 'w-[min(960px,100%-32px)]';
 const POLL_MS = 3000;
 const POLL_FOR_MS = 60000;
 
@@ -85,6 +76,7 @@ function CompetitionScreen() {
    const [attempt, setAttempt] = useState(0);
    const [units] = useState<UnitSystem>(() => readUnitSystem());
    const [busy, setBusy] = useState<string | null>(null);
+   const [inviting, setInviting] = useState(false);
    useDocumentTitle(detail?.competition.name ?? 'Competition');
 
    const load = useCallback(
@@ -151,40 +143,125 @@ function CompetitionScreen() {
 
    const c = detail?.competition ?? null;
    const you = detail?.you ?? null;
+   const finished = c?.status === 'finished';
+   const clock = c && !finished ? clockParts(c, now) : null;
 
-   const timing = !c
-      ? ''
-      : c.status === 'running'
-        ? timeLeft(c.endsAt, now)
-        : c.status === 'upcoming'
-          ? `Starts ${dateRange(c.startsAt, c.startsAt)}`
-          : 'Results';
+   const answer = (accept: boolean) =>
+      void act('invite', async () => {
+         if (!you?.invite) return;
+         await answerInvite(you.invite.id, accept);
+         if (!accept) navigate('/competitions');
+      });
+
+   /*
+    * The plate's two actions. The teal one is the way in: submit a catch
+    * once you are in it, accept an invitation, or enter an open one. The
+    * outlined one beside it is whatever else is yours to do here.
+    */
+   const actions =
+      !c || !you || finished ? null : (
+         <div className="on-black flex gap-2.5">
+            {you.invite ? (
+               <>
+                  <Button
+                     type="button"
+                     className="text-[18px]"
+                     disabled={busy !== null}
+                     onClick={() => answer(true)}
+                  >
+                     Accept invite
+                  </Button>
+                  <Button
+                     type="button"
+                     variant="outline"
+                     className="border-paper/50 px-[18px] text-[18px] text-paper"
+                     disabled={busy !== null}
+                     onClick={() => answer(false)}
+                  >
+                     Decline
+                  </Button>
+               </>
+            ) : you.entered && c.status === 'running' ? (
+               <Button asChild className="text-[18px]">
+                  <Link to={`/log?competition=${c.id}`}>Submit a catch</Link>
+               </Button>
+            ) : !you.entered && c.scope === 'PUBLIC' ? (
+               <Button
+                  type="button"
+                  className="text-[18px]"
+                  disabled={busy !== null}
+                  onClick={() =>
+                     void act('enter', () => enterCompetition(c.id))
+                  }
+               >
+                  Enter
+               </Button>
+            ) : null}
+
+            {you.organise && c.scope === 'PRIVATE' ? (
+               <Button
+                  type="button"
+                  variant="outline"
+                  className="border-paper/50 px-[18px] text-[18px] text-paper"
+                  onClick={() => setInviting(true)}
+               >
+                  Invite
+               </Button>
+            ) : you.entered && !you.organise && !you.invite ? (
+               <Button
+                  type="button"
+                  variant="outline"
+                  className="border-paper/50 px-[18px] text-[18px] text-paper"
+                  disabled={busy !== null}
+                  onClick={() =>
+                     void act('leave', () => leaveCompetition(c.id))
+                  }
+               >
+                  Leave
+               </Button>
+            ) : null}
+         </div>
+      );
 
    return (
-      <section className="relative mx-auto w-[min(1040px,100%-32px)] pb-10 md:pb-14">
+      <section className={`relative mx-auto ${COLUMN} pb-10 md:pb-14`}>
          <PageHead
-            column="w-[min(1040px,100%-32px)]"
+            column={COLUMN}
+            back={
+               <Link
+                  to="/competitions"
+                  className="inline-flex items-center gap-2.5"
+               >
+                  <ArrowLeftIcon
+                     aria-hidden="true"
+                     strokeWidth={1.5}
+                     className="size-[18px]"
+                  />
+                  Competitions
+               </Link>
+            }
             kicker={
                c
-                  ? `${ruleSentence(c.rule, c.measure)} · ${areaSentence(c)}`
-                  : 'Competition'
+                  ? `${statusLabel(c.status)} · ${scopeLabel(c.scope)}${finished ? ` · ${formatDayMonth(c.endsAt)}` : ''}`
+                  : undefined
             }
+            kickerTone={finished ? 'quiet' : 'teal'}
             title={c?.name ?? 'Competition'}
-            lede={
-               c ? (
-                  <span className="flex flex-wrap items-center gap-2">
-                     <StatusChip status={c.status} />
-                     <ScopeChip scope={c.scope} className="text-paper" />
-                     <span className="num">
-                        {dateRange(c.startsAt, c.endsAt)}
-                     </span>
-                  </span>
-               ) : null
-            }
+            lede={c?.blurb ?? undefined}
             aside={
-               c ? (
-                  <span className="g-tracked text-[22px]">{timing}</span>
-               ) : null
+               clock || actions ? (
+                  <div className="mt-4 flex flex-col gap-4 md:mt-0 md:items-end">
+                     {clock ? (
+                        <p className="flex items-baseline gap-2">
+                           <span className="g num text-[40px] leading-[0.95] text-paper md:text-[48px]">
+                              {clock[0]}
+                           </span>
+                           <span className="lab text-paper-2">{clock[1]}</span>
+                        </p>
+                     ) : null}
+                     {actions}
+                  </div>
+               ) : undefined
             }
          />
 
@@ -200,384 +277,139 @@ function CompetitionScreen() {
                   setAttempt((n) => n + 1);
                }}
             />
+         ) : finished ? (
+            <Results detail={detail} units={units} />
          ) : (
-            <>
-               <Rules competition={c} />
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-16">
+               <div className="flex flex-col gap-8 lg:gap-9">
+                  <RulesTable
+                     rows={[
+                        { label: 'Rule', value: ruleWords(c) },
+                        { label: 'Where', value: whereSentence(c) },
+                        {
+                           label: 'When',
+                           value: (
+                              <span className="num">
+                                 {whenSentence(c.startsAt, c.endsAt)}
+                              </span>
+                           ),
+                        },
+                        { label: 'Entry', value: entrySentence(detail) },
+                        {
+                           label: 'Anglers',
+                           value: `${c.entrantCount} entered${you.organise ? ' · you organise' : ''}`,
+                        },
+                     ]}
+                  />
 
-               <Actions
-                  competition={c}
-                  you={you}
-                  busy={busy}
-                  onEnter={() =>
-                     void act('enter', () => enterCompetition(c.id))
-                  }
-                  onLeave={() =>
-                     void act('leave', () => leaveCompetition(c.id))
-                  }
-                  onAnswer={(accept) =>
-                     void act('invite', async () => {
-                        if (!you.invite) return;
-                        await answerInvite(you.invite.id, accept);
-                        if (!accept) navigate('/competitions');
-                     })
-                  }
-               />
+                  <section aria-labelledby="standings-heading">
+                     <h2
+                        id="standings-heading"
+                        className="g text-[26px] lg:text-[28px]"
+                     >
+                        Provisional standings
+                     </h2>
+                     <div className="mt-3">
+                        {detail.standings.length ? (
+                           <StandingsRows
+                              competition={c}
+                              standings={detail.standings}
+                              entries={detail.entries}
+                              units={units}
+                           />
+                        ) : (
+                           <p className="text-[15px] text-ink-2">
+                              No counted entry yet.
+                           </p>
+                        )}
+                     </div>
+                  </section>
 
-               <Standings
-                  competition={c}
-                  standings={detail.standings}
-                  units={units}
-               />
+                  <p className="hidden text-[14px] text-ink-3 lg:block">
+                     Your exact fishing spot is never shown on these boards.
+                  </p>
+               </div>
 
                <Entries
-                  competition={c}
-                  entries={detail.entries}
+                  detail={detail}
                   units={units}
                   busy={busy}
-                  onReview={(entry, action, note) =>
-                     void act(`review:${entry.id}`, () =>
-                        reviewEntry(c.id, entry.id, action, note)
-                     )
-                  }
-                  onFlag={(entry, reason) =>
-                     void act(`flag:${entry.id}`, () =>
-                        flagEntry(c.id, entry.id, reason)
-                     )
-                  }
-                  onWithdraw={(entry) =>
-                     void act(`withdraw:${entry.id}`, () =>
-                        withdrawEntry(c.id, entry.id)
-                     )
-                  }
+                  act={act}
+                  competitionId={c.id}
                />
 
-               <p className="mt-10 text-[14px] text-ink-3">
+               <p className="text-[14px] text-ink-3 lg:hidden">
                   Your exact fishing spot is never shown on these boards.
                </p>
-            </>
-         )}
-      </section>
-   );
-}
-
-function Rules({ competition: c }: { competition: Competition }) {
-   const rows: [string, string][] = [
-      [
-         'Rule',
-         `${ruleSentence(c.rule, c.measure)}${c.species ? `, ${c.species.commonName} only` : ''}`,
-      ],
-      ['Where', areaSentence(c)],
-      ['When', dateRange(c.startsAt, c.endsAt)],
-      ['Entries', checksSentence(c.checks)],
-      ['Organiser', c.createdBy.displayName],
-   ];
-   return (
-      <section aria-labelledby="rules-heading">
-         <h2 id="rules-heading" className="lab">
-            The rules and area
-         </h2>
-         {c.blurb ? (
-            <p className="mt-2 max-w-[60ch] text-[16px]">{c.blurb}</p>
-         ) : null}
-         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-[15px]">
-            {rows.map(([k, v]) => (
-               <div key={k} className="contents">
-                  <dt className="lab pt-0.5 text-ink-3">{k}</dt>
-                  <dd className="min-w-0">{v}</dd>
-               </div>
-            ))}
-         </dl>
-      </section>
-   );
-}
-
-function Actions({
-   competition: c,
-   you,
-   busy,
-   onEnter,
-   onLeave,
-   onAnswer,
-}: {
-   competition: Competition;
-   you: CompetitionDetail['you'];
-   busy: string | null;
-   onEnter: () => void;
-   onLeave: () => void;
-   onAnswer: (accept: boolean) => void;
-}) {
-   const [inviting, setInviting] = useState(false);
-   const [followers, setFollowers] = useState<Follower[] | null>(null);
-   const [picked, setPicked] = useState<string[]>([]);
-   const [sent, setSent] = useState<number | null>(null);
-   useEffect(() => {
-      if (!inviting || followers) return;
-      const controller = new AbortController();
-      fetchMyFollowers(controller.signal)
-         .then(setFollowers)
-         .catch(() => setFollowers([]));
-      return () => controller.abort();
-   }, [inviting, followers]);
-
-   const finished = c.status === 'finished';
-   const running = c.status === 'running';
-
-   return (
-      <section className="mt-8 flex flex-col gap-3">
-         <div className="flex flex-wrap items-center gap-3">
-            {you.invite ? (
-               <>
-                  <Button
-                     type="button"
-                     disabled={busy !== null}
-                     onClick={() => onAnswer(true)}
-                  >
-                     Accept invitation
-                  </Button>
-                  <Button
-                     type="button"
-                     variant="ghost"
-                     disabled={busy !== null}
-                     onClick={() => onAnswer(false)}
-                  >
-                     Decline
-                  </Button>
-               </>
-            ) : null}
-
-            {you.entered && running ? (
-               <Link
-                  to={`/log?competition=${c.id}`}
-                  className="g-tracked inline-flex h-11 items-center bg-teal px-5 text-[19px] text-teal-ink hover:brightness-105"
-               >
-                  Submit a catch
-               </Link>
-            ) : null}
-
-            {!you.entered &&
-            !you.invite &&
-            !finished &&
-            c.scope === 'PUBLIC' ? (
-               <Button type="button" disabled={busy !== null} onClick={onEnter}>
-                  Enter competition
-               </Button>
-            ) : null}
-
-            {!you.entered && !you.invite && c.scope === 'PRIVATE' ? (
-               <span className="text-[14px] text-ink-3">By invitation.</span>
-            ) : null}
-
-            {you.organise && c.scope === 'PRIVATE' && !finished ? (
-               <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setInviting((open) => !open)}
-               >
-                  {inviting ? 'Done inviting' : 'Invite'}
-               </Button>
-            ) : null}
-
-            {you.entered && !you.organise && !finished ? (
-               <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={busy !== null}
-                  onClick={onLeave}
-               >
-                  Leave
-               </Button>
-            ) : null}
-
-            <span className="ml-auto flex items-center gap-1.5 text-[14px] text-ink-3">
-               <UsersIcon aria-hidden="true" className="size-4" />
-               <span className="num">
-                  {c.entrantCount === 1
-                     ? '1 angler'
-                     : `${c.entrantCount} anglers`}
-               </span>
-               {you.organise ? (
-                  <span className="lab text-teal-text">You organise</span>
-               ) : null}
-            </span>
-         </div>
-
-         {inviting ? (
-            <div className="flex flex-wrap items-end gap-3 border-l-[3px] border-teal bg-bg-2 px-4 py-3">
-               <Picker
-                  multiple
-                  label="Followers"
-                  allLabel={
-                     followers === null
-                        ? 'Reading'
-                        : followers.length
-                          ? 'Pick who to invite'
-                          : 'Nobody follows you yet'
-                  }
-                  value={picked}
-                  onChange={(next) => setPicked(next as string[])}
-                  options={(followers ?? []).map((f) => ({
-                     value: f.id,
-                     label: f.displayName,
-                     hint: f.username ? `@${f.username}` : undefined,
-                  }))}
-                  className="min-w-[240px]"
-               />
-               <Button
-                  type="button"
-                  size="sm"
-                  disabled={!picked.length}
-                  onClick={() =>
-                     void inviteToCompetition(c.id, picked).then((r) => {
-                        setSent(r.sent);
-                        setPicked([]);
-                     })
-                  }
-               >
-                  Send
-               </Button>
-               {sent !== null ? (
-                  <span className="text-[14px] text-ink-2">
-                     {sent === 1
-                        ? '1 invitation sent.'
-                        : `${sent} invitations sent.`}
-                  </span>
-               ) : null}
             </div>
+         )}
+
+         {c ? (
+            <InviteSheet
+               open={inviting}
+               onOpenChange={setInviting}
+               competitionId={c.id}
+            />
          ) : null}
       </section>
    );
 }
 
-function Standings({
-   competition: c,
-   standings,
-   units,
-}: {
-   competition: Competition;
-   standings: CompetitionStanding[];
-   units: UnitSystem;
-}) {
-   const finished = c.status === 'finished';
-   const figure = (s: CompetitionStanding) =>
-      leadingFigure(c, s.score, units) ?? 'Nothing yet';
-   const winners = finished
-      ? standings.filter((s) => s.place === 1 && s.score > 0)
-      : [];
-
-   return (
-      <section className="mt-10" aria-labelledby="standings-heading">
-         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h2 id="standings-heading" className="g text-[26px]">
-               {finished ? 'Standings' : 'Provisional standings'}
-            </h2>
-            {!finished ? (
-               <span className="text-[14px] text-ink-3">
-                  Equal scores share a place.
-               </span>
-            ) : null}
-         </div>
-
-         {winners.length ? (
-            <p className="mt-3 border-l-[3px] border-teal bg-bg-2 px-4 py-3 text-[16px]">
-               <span className="lab mr-2 text-ink-3">
-                  {winners.length > 1 ? 'Joint winners' : 'Winner'}
-               </span>
-               <span className="g text-[22px]">
-                  {winners.map((w) => w.displayName).join(' and ')}
-               </span>{' '}
-               <span className="text-ink-2">with {figure(winners[0]!)}.</span>
-            </p>
-         ) : null}
-
-         {standings.length === 0 ? (
-            <p className="mt-3 text-[15px] text-ink-2">
-               {finished
-                  ? 'It closed with no counted entry.'
-                  : 'No counted entry yet.'}
-            </p>
-         ) : (
-            <table className="mt-3 w-full border-collapse text-left">
-               <thead>
-                  <tr className="border-b border-line">
-                     <th className="lab py-2 pr-3 font-normal">#</th>
-                     <th className="lab py-2 pr-3 font-normal">Angler</th>
-                     <th className="lab hidden py-2 pr-3 font-normal sm:table-cell">
-                        Best catch
-                     </th>
-                     <th className="lab py-2 text-right font-normal">
-                        {c.rule === 'SPECIES_VARIETY'
-                           ? 'Species'
-                           : c.measure === 'LENGTH'
-                             ? 'Length'
-                             : 'Weight'}
-                     </th>
-                  </tr>
-               </thead>
-               <tbody>
-                  {standings.map((s) => (
-                     <tr key={s.anglerId} className="border-b border-line/60">
-                        <td className="num py-3 pr-3 text-[15px] text-ink-2">
-                           {s.joint ? `=${s.place}` : s.place}
-                        </td>
-                        <td className="py-3 pr-3 text-[17px]">
-                           <Link
-                              to={`/anglers/${s.anglerId}`}
-                              className="hover:text-teal-text"
-                           >
-                              {s.displayName}
-                           </Link>
-                        </td>
-                        <td className="hidden py-3 pr-3 text-[15px] text-ink-2 sm:table-cell">
-                           {s.bestSpeciesName ?? ''}
-                        </td>
-                        <td className="num py-3 text-right text-[17px]">
-                           {figure(s)}
-                        </td>
-                     </tr>
-                  ))}
-               </tbody>
-            </table>
-         )}
-      </section>
-   );
+/* What happens to an entry here, in the words the rules table prints. */
+function entrySentence(detail: CompetitionDetail) {
+   const c = detail.competition;
+   const photo =
+      c.rule === 'SPECIES_VARIETY'
+         ? 'A photo of the fish.'
+         : c.measure === 'LENGTH'
+           ? 'Photo on the tape.'
+           : 'Photo on the scale.';
+   const after =
+      c.checks === 'REVIEW'
+         ? detail.you.organise
+            ? 'Six checks, then you review.'
+            : 'Six checks, then the organiser reviews.'
+         : 'Six checks, then it counts.';
+   return `${photo} ${after}`;
 }
 
 function Entries({
-   competition: c,
-   entries,
+   detail,
    units,
    busy,
-   onReview,
-   onFlag,
-   onWithdraw,
+   act,
+   competitionId,
 }: {
-   competition: Competition;
-   entries: CompetitionEntry[];
+   detail: CompetitionDetail;
    units: UnitSystem;
    busy: string | null;
-   onReview: (
-      entry: CompetitionEntry,
-      action: 'accept' | 'exclude',
-      note: string
-   ) => void;
-   onFlag: (entry: CompetitionEntry, reason: string) => void;
-   onWithdraw: (entry: CompetitionEntry) => void;
+   act: (key: string, run: () => Promise<unknown>) => Promise<void>;
+   competitionId: string;
 }) {
-   const [open, setOpen] = useState<string | null>(null);
+   const c = detail.competition;
    const sorted = useMemo(
       () =>
-         [...entries].sort(
+         [...detail.entries].sort(
             (a, b) =>
                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
          ),
-      [entries]
+      [detail.entries]
    );
+   const held = sorted.filter((e) => e.state === 'HELD');
+
+   /* The entry waiting on somebody is the one that is open to begin with. */
+   const [open, setOpen] = useState<string | null>(() => held[0]?.id ?? null);
+
+   const count = `${sorted.length}${held.length ? ` · ${held.length} held` : ''}`;
 
    return (
-      <section className="mt-10" aria-labelledby="entries-heading">
-         <h2 id="entries-heading" className="g text-[26px]">
-            Entries
-         </h2>
+      <section aria-labelledby="entries-heading" className="min-w-0">
+         <div className="flex items-baseline justify-between gap-4">
+            <h2 id="entries-heading" className="g text-[26px] lg:text-[28px]">
+               Entries
+            </h2>
+            {sorted.length ? <span className="lab num">{count}</span> : null}
+         </div>
          {sorted.length === 0 ? (
             <div className="mt-3">
                <NoData compact title="No entries yet">
@@ -587,7 +419,7 @@ function Entries({
                </NoData>
             </div>
          ) : (
-            <ul className="mt-3 flex flex-col">
+            <ul className="mt-3 flex flex-col border-t border-line">
                {sorted.map((entry) => (
                   <EntryRow
                      key={entry.id}
@@ -599,9 +431,21 @@ function Entries({
                         setOpen((was) => (was === entry.id ? null : entry.id))
                      }
                      busy={busy}
-                     onReview={onReview}
-                     onFlag={onFlag}
-                     onWithdraw={onWithdraw}
+                     onReview={(e, action, note) =>
+                        void act(`review:${e.id}`, () =>
+                           reviewEntry(competitionId, e.id, action, note)
+                        )
+                     }
+                     onFlag={(e, reason) =>
+                        void act(`flag:${e.id}`, () =>
+                           flagEntry(competitionId, e.id, reason)
+                        )
+                     }
+                     onWithdraw={(e) =>
+                        void act(`withdraw:${e.id}`, () =>
+                           withdrawEntry(competitionId, e.id)
+                        )
+                     }
                   />
                ))}
             </ul>
@@ -610,300 +454,183 @@ function Entries({
    );
 }
 
-function StateChip({ state }: { state: CompetitionEntry['state'] }) {
+/* A finished competition: the winner, the final standings, the entries folded. */
+function Results({
+   detail,
+   units,
+}: {
+   detail: CompetitionDetail;
+   units: UnitSystem;
+}) {
+   const c = detail.competition;
+   const winner =
+      detail.standings.find((s) => s.place === 1 && s.score > 0) ?? null;
+   const notCounted = detail.entries.filter(
+      (e) => e.state === 'EXCLUDED'
+   ).length;
+
    return (
-      <span
-         className={cn(
-            'lab px-2 py-1',
-            state === 'COUNTED'
-               ? 'bg-teal text-teal-ink'
-               : state === 'HELD'
-                 ? 'border border-ink text-ink'
-                 : state === 'EXCLUDED'
-                   ? 'border border-line text-ink-3'
-                   : 'text-ink-3'
-         )}
-      >
-         {entryStateLabel(state)}
-      </span>
+      <div className="flex flex-col gap-8">
+         {winner ? (
+            <WinnerCard
+               competition={c}
+               winner={winner}
+               entries={detail.entries}
+               units={units}
+            />
+         ) : null}
+
+         <section aria-labelledby="final-heading">
+            <h2 id="final-heading" className="g text-[26px] lg:text-[28px]">
+               Final standings
+            </h2>
+            <div className="mt-3">
+               {detail.standings.length ? (
+                  <StandingsRows
+                     competition={c}
+                     standings={detail.standings}
+                     entries={detail.entries}
+                     units={units}
+                     final
+                  />
+               ) : (
+                  <p className="text-[15px] text-ink-2">
+                     It closed with no counted entry.
+                  </p>
+               )}
+            </div>
+         </section>
+
+         <div className="border-y border-line">
+            <Fold
+               title="Entries"
+               className="[&>button]:min-h-[52px]"
+               headingClassName="g text-[22px] md:text-[22px]"
+               aside={
+                  detail.entries.length
+                     ? `${detail.entries.length}${notCounted ? ` · ${notCounted} not counted` : ''}`
+                     : undefined
+               }
+            >
+               <ul className="flex flex-col border-t border-line pb-2">
+                  {detail.entries.map((entry) => (
+                     <ClosedEntry key={entry.id} entry={entry} />
+                  ))}
+               </ul>
+            </Fold>
+         </div>
+
+         <p className="text-[14px] text-ink-3">
+            Your exact fishing spot is never shown on these boards.
+         </p>
+      </div>
    );
 }
 
-function EntryRow({
-   competition: c,
-   entry,
-   units,
-   open,
-   onToggle,
-   busy,
-   onReview,
-   onFlag,
-   onWithdraw,
-}: {
-   competition: Competition;
-   entry: CompetitionEntry;
-   units: UnitSystem;
-   open: boolean;
-   onToggle: () => void;
-   busy: string | null;
-   onReview: (
-      entry: CompetitionEntry,
-      action: 'accept' | 'exclude',
-      note: string
-   ) => void;
-   onFlag: (entry: CompetitionEntry, reason: string) => void;
-   onWithdraw: (entry: CompetitionEntry) => void;
-}) {
-   const [note, setNote] = useState('');
-   const [flagging, setFlagging] = useState(false);
-   const [reason, setReason] = useState('');
-   const working = busy !== null && busy.endsWith(entry.id);
+/* Inside the fold on a finished competition there is nothing left to do
+   about an entry, so the row does not open. */
+function ClosedEntry({ entry }: { entry: CompetitionEntry }) {
+   return (
+      <li className="flex items-center gap-3 border-b border-line py-3.5 last:border-b-0">
+         <span className="size-14 shrink-0 bg-black-block">
+            {entry.heroUrl ? (
+               <img
+                  src={entry.heroUrl}
+                  alt=""
+                  className="size-14 object-cover"
+               />
+            ) : null}
+         </span>
+         <span className="flex min-w-0 flex-1 flex-col leading-[1.3]">
+            <span className="truncate text-[15px] font-semibold">
+               {entry.displayName}
+            </span>
+            <span className="truncate text-[14px] text-ink-2">
+               {entry.speciesName ?? 'Species not given'}
+            </span>
+         </span>
+         <span
+            className={`lab shrink-0 text-right ${entry.state === 'COUNTED' ? 'text-ink' : 'text-ink-3'}`}
+         >
+            {entry.state === 'COUNTED' ? 'Counted' : 'Not counted'}
+         </span>
+      </li>
+   );
+}
 
-   const figure =
-      c.rule === 'SPECIES_VARIETY'
-         ? null
-         : formatMeasure(entry.value, c.measure, units);
-   const typed =
-      entry.readValue !== null &&
-      entry.declaredValue !== null &&
-      Math.abs(entry.readValue - entry.declaredValue) > 0.001
-         ? formatMeasure(entry.declaredValue, c.measure, units)
-         : null;
+/*
+ * Inviting, in a sheet.
+ *
+ * The plate gives Invite one outlined button, so the follower list it used
+ * to open inline now rises over the page and closes again.
+ */
+function InviteSheet({
+   open,
+   onOpenChange,
+   competitionId,
+}: {
+   open: boolean;
+   onOpenChange: (open: boolean) => void;
+   competitionId: string;
+}) {
+   const [followers, setFollowers] = useState<Follower[] | null>(null);
+   const [picked, setPicked] = useState<string[]>([]);
+   const [sent, setSent] = useState<number | null>(null);
+
+   useEffect(() => {
+      if (!open || followers) return;
+      const controller = new AbortController();
+      fetchMyFollowers(controller.signal)
+         .then(setFollowers)
+         .catch(() => setFollowers([]));
+      return () => controller.abort();
+   }, [open, followers]);
 
    return (
-      <li className="border-t border-line last:border-b">
-         <div className="flex gap-4 py-4">
-            <button
-               type="button"
-               onClick={onToggle}
-               aria-expanded={open}
-               className="w-24 shrink-0 bg-black-block md:w-32"
-               aria-label={open ? 'Close the entry' : 'Open the entry'}
-            >
-               {entry.heroUrl ? (
-                  <img
-                     src={entry.heroUrl}
-                     alt=""
-                     className="aspect-[4/3] w-full object-cover"
-                  />
-               ) : (
-                  <span className="block aspect-[4/3] w-full" />
-               )}
-            </button>
-
-            <div className="min-w-0 flex-1">
-               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <Link
-                     to={`/anglers/${entry.anglerId}`}
-                     className="g-tracked text-[19px] hover:text-teal-text"
-                  >
-                     {entry.displayName}
-                  </Link>
-                  <StateChip state={entry.state} />
-               </div>
-               <p className="mt-1 text-[15px]">
-                  {entry.speciesName ?? 'Species not given'}
-                  {figure ? (
-                     <>
-                        {' · '}
-                        <span className="num">{figure}</span>
-                        {typed ? (
-                           <span className="text-ink-3"> (typed {typed})</span>
-                        ) : null}
-                     </>
-                  ) : null}
-               </p>
-               <p className="num mt-0.5 text-[13px] text-ink-3">
-                  {formatStamp(entry.caughtAt)}
-                  {c.areaType !== 'ANYWHERE'
-                     ? ' · Waterbody shown; exact spot hidden.'
-                     : ''}
-               </p>
-               {entry.note ? (
-                  <p className="mt-1 max-w-[60ch] text-[14px] text-ink-2">
-                     {entry.note}
-                  </p>
-               ) : null}
-               {entry.state === 'HELD' && entry.flaggedBy ? (
-                  <p className="mt-1 text-[14px] text-ink-2">
-                     Flagged by {entry.flaggedBy}
-                     {entry.flagReason ? `: ${entry.flagReason}` : '.'}
-                  </p>
-               ) : null}
-               {entry.reviewNote ? (
-                  <p className="mt-1 text-[14px] text-ink-2">
-                     Organiser: {entry.reviewNote}
-                  </p>
-               ) : null}
-               <button
+      <Sheet open={open} onOpenChange={onOpenChange} title="Invite followers">
+         <div className="flex flex-col gap-4 p-4">
+            <h2 className="g text-[26px]">Invite followers</h2>
+            <Picker
+               multiple
+               variant="line"
+               label="Followers"
+               allLabel={
+                  followers === null
+                     ? 'Reading'
+                     : followers.length
+                       ? 'Pick who to invite'
+                       : 'Nobody follows you yet'
+               }
+               value={picked}
+               onChange={(next) => setPicked(next as string[])}
+               options={(followers ?? []).map((f) => ({
+                  value: f.id,
+                  label: f.displayName,
+                  hint: f.username ? `@${f.username}` : undefined,
+               }))}
+            />
+            <div className="flex items-center gap-3">
+               <Button
                   type="button"
-                  onClick={onToggle}
-                  aria-expanded={open}
-                  className="g-tracked mt-2 inline-flex min-h-11 items-center text-[15px] text-teal-text hover:opacity-80"
+                  disabled={!picked.length}
+                  onClick={() =>
+                     void inviteToCompetition(competitionId, picked).then(
+                        (r) => {
+                           setSent(r.sent);
+                           setPicked([]);
+                        }
+                     )
+                  }
                >
-                  {open ? 'Close' : 'The checks'}
-               </button>
+                  Send
+               </Button>
+               {sent !== null ? (
+                  <span className="text-[14px] text-ink-2">
+                     {sent === 1 ? '1 invitation sent.' : `${sent} sent.`}
+                  </span>
+               ) : null}
             </div>
          </div>
-
-         {open ? (
-            <div className="grid gap-5 pb-5 md:grid-cols-[minmax(0,1fr)_240px]">
-               <div>
-                  {entry.state === 'PENDING' ? (
-                     <p className="text-[15px] text-ink-2" role="status">
-                        Checking. A few seconds.
-                     </p>
-                  ) : entry.report.length === 0 ? (
-                     <p className="text-[15px] text-ink-2">
-                        Nothing was checked.
-                     </p>
-                  ) : (
-                     <ul className="flex flex-col gap-2">
-                        {entry.report.map((check) => (
-                           <li
-                              key={check.code}
-                              className="flex items-start gap-3 text-[15px]"
-                           >
-                              {check.status === 'pass' ? (
-                                 <CheckIcon
-                                    aria-label="Passed"
-                                    className="mt-0.5 size-5 shrink-0 text-teal-text"
-                                 />
-                              ) : check.status === 'flag' ? (
-                                 <FlagIcon
-                                    aria-label="Flagged"
-                                    className="mt-0.5 size-5 shrink-0 text-destructive"
-                                 />
-                              ) : (
-                                 <MinusIcon
-                                    aria-label="Not checked"
-                                    className="mt-0.5 size-5 shrink-0 text-ink-3"
-                                 />
-                              )}
-                              <span>
-                                 <span className="g-tracked mr-2 text-[17px]">
-                                    {CHECK_LABELS[check.code] ?? check.code}
-                                 </span>
-                                 <span className="text-ink-2">
-                                    {check.status === 'skip'
-                                       ? `Not checked. ${check.detail}`
-                                       : check.detail}
-                                 </span>
-                              </span>
-                           </li>
-                        ))}
-                     </ul>
-                  )}
-
-                  <div className="mt-4 flex flex-col gap-3">
-                     {entry.canReview ? (
-                        <div className="flex flex-wrap items-end gap-3">
-                           <TextField
-                              label="A note for the angler"
-                              value={note}
-                              maxLength={280}
-                              onChange={(event) => setNote(event.target.value)}
-                              className="min-w-[220px] flex-1"
-                           />
-                           {entry.state !== 'COUNTED' ? (
-                              <Button
-                                 type="button"
-                                 size="sm"
-                                 disabled={working}
-                                 onClick={() => onReview(entry, 'accept', note)}
-                              >
-                                 Accept entry
-                              </Button>
-                           ) : null}
-                           {entry.state !== 'EXCLUDED' ? (
-                              <Button
-                                 type="button"
-                                 size="sm"
-                                 variant="destructive"
-                                 disabled={working}
-                                 onClick={() =>
-                                    onReview(entry, 'exclude', note)
-                                 }
-                              >
-                                 Exclude
-                              </Button>
-                           ) : null}
-                        </div>
-                     ) : null}
-
-                     {entry.canFlag && entry.state === 'COUNTED' ? (
-                        !flagging ? (
-                           <button
-                              type="button"
-                              onClick={() => setFlagging(true)}
-                              className="g-tracked inline-flex min-h-11 items-center self-start text-[15px] text-ink-2 hover:text-ink"
-                           >
-                              Not right?
-                           </button>
-                        ) : (
-                           <div className="flex flex-wrap items-end gap-3">
-                              <TextField
-                                 label="What is not right"
-                                 value={reason}
-                                 maxLength={280}
-                                 onChange={(event) =>
-                                    setReason(event.target.value)
-                                 }
-                                 className="min-w-[220px] flex-1"
-                              />
-                              <Button
-                                 type="button"
-                                 size="sm"
-                                 variant="outline"
-                                 disabled={working || reason.trim().length < 3}
-                                 onClick={() => {
-                                    onFlag(entry, reason);
-                                    setFlagging(false);
-                                 }}
-                              >
-                                 Hold it for the organiser
-                              </Button>
-                           </div>
-                        )
-                     ) : null}
-
-                     {entry.yours && entry.state !== 'EXCLUDED' ? (
-                        <button
-                           type="button"
-                           disabled={working}
-                           onClick={() => onWithdraw(entry)}
-                           className="g-tracked inline-flex min-h-11 items-center self-start text-[15px] text-ink-2 hover:text-ink"
-                        >
-                           Withdraw this entry
-                        </button>
-                     ) : null}
-                  </div>
-               </div>
-
-               {entry.measureUrl ? (
-                  <figure>
-                     <img
-                        src={entry.measureUrl}
-                        alt={
-                           c.measure === 'LENGTH'
-                              ? 'The fish on the tape'
-                              : 'The fish on the scale'
-                        }
-                        className="w-full bg-black-block object-cover"
-                     />
-                     <figcaption className="mt-1 text-[13px] text-ink-3">
-                        {c.measure === 'LENGTH'
-                           ? 'On the tape.'
-                           : 'On the scale.'}
-                        {entry.readConfidence !== null &&
-                        entry.readValue !== null
-                           ? ` Read ${formatMeasure(entry.readValue, c.measure, units)}, ${Math.round(entry.readConfidence * 100)}% sure.`
-                           : ''}
-                     </figcaption>
-                  </figure>
-               ) : null}
-            </div>
-         ) : null}
-      </li>
+      </Sheet>
    );
 }

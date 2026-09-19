@@ -9,7 +9,8 @@ import { chromium } from 'playwright';
  * HOST=http://localhost:5173. OUT is where screenshots land.
  */
 export const HOST = process.env.HOST || 'https://fishlogger-client.vercel.app';
-export const OUT = process.env.OUT || new URL('./shots/', import.meta.url).pathname;
+export const OUT =
+   process.env.OUT || new URL('./shots/', import.meta.url).pathname;
 
 export const DESK = { width: 1440, height: 1000 };
 export const PHONE = { width: 390, height: 844 };
@@ -18,7 +19,9 @@ const UA =
    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 
 export async function launch() {
-   return chromium.launch({ args: ['--disable-blink-features=AutomationControlled'] });
+   return chromium.launch({
+      args: ['--disable-blink-features=AutomationControlled'],
+   });
 }
 
 export async function context(browser, viewport, extra = {}) {
@@ -32,7 +35,10 @@ export async function context(browser, viewport, extra = {}) {
    });
    /* THEME=night checks the night theme; the app reads 'day' | 'night'. */
    if (process.env.THEME) {
-      await ctx.addInitScript((t) => localStorage.setItem('theme', t), process.env.THEME);
+      await ctx.addInitScript(
+         (t) => localStorage.setItem('theme', t),
+         process.env.THEME
+      );
    }
    return ctx;
 }
@@ -51,13 +57,39 @@ export async function open(page, path, settle = 3000) {
    await page.waitForTimeout(settle);
 }
 
-/* The test angler the earlier audit scripts (verify15, verify16) sign in as. */
+/*
+ * The test angler the earlier audit scripts (verify15, verify16) sign in as.
+ *
+ * It waits for the form and then for the redirect off /sign-in rather than
+ * sleeping a fixed moment at each. A cold dev server takes longer than any
+ * fixed sleep to hand over the form, and a run that typed into nothing used
+ * to carry on quietly signed out: the map, the keep word and half of every
+ * card were simply missing and no check said why. Three goes, then it throws,
+ * because a signed-out run is worth stopping for.
+ */
 export async function signIn(page) {
-   await open(page, '/sign-in', 1500);
-   await page.fill('input[type=email]', 'owen@fishlogger.app');
-   await page.fill('input[type=password]', 'TestAngler2026!');
-   await page.click('button[type=submit]');
-   await page.waitForTimeout(3500);
+   let last;
+   for (let i = 0; i < 3; i++) {
+      try {
+         await page.goto(HOST + '/sign-in', {
+            waitUntil: 'load',
+            timeout: 60000,
+         });
+         await passChallenge(page);
+         await page.waitForSelector('input[type=email]', { timeout: 30000 });
+         await page.fill('input[type=email]', 'owen@fishlogger.app');
+         await page.fill('input[type=password]', 'TestAngler2026!');
+         await page.click('button[type=submit]');
+         await page.waitForURL((url) => !/\/sign-in/.test(url.pathname), {
+            timeout: 30000,
+         });
+         await page.waitForTimeout(1500);
+         return;
+      } catch (e) {
+         last = e;
+      }
+   }
+   throw new Error(`sign-in did not take after three goes: ${last}`);
 }
 
 /* A clipped shot from the top of the page, or the whole page. */
@@ -76,12 +108,20 @@ export async function shot(page, name, clip) {
  */
 export async function scrollShots(page, tag, max = 8) {
    const vh = page.viewportSize().height;
-   const total = await page.evaluate(() => document.documentElement.scrollHeight);
+   const total = await page.evaluate(
+      () => document.documentElement.scrollHeight
+   );
    const files = [];
-   for (let i = 0, y = 0; i < max && y < total; i++, y += Math.round(vh * 0.88)) {
+   for (
+      let i = 0, y = 0;
+      i < max && y < total;
+      i++, y += Math.round(vh * 0.88)
+   ) {
       await page.evaluate((y) => window.scrollTo(0, y), y);
       await page.waitForTimeout(500);
-      files.push(await shot(page, `${tag}-${i}`, { x: 0, y: 0, ...page.viewportSize() }));
+      files.push(
+         await shot(page, `${tag}-${i}`, { x: 0, y: 0, ...page.viewportSize() })
+      );
    }
    await page.evaluate(() => window.scrollTo(0, 0));
    return files;

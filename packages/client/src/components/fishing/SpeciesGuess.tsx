@@ -15,6 +15,11 @@ import type { Species } from '@/components/fishing/quicklog/species';
  * becomes a species the moment the angler takes it, so the catch can still
  * be scored. When the namer is not connected nothing is shown at all, which
  * is the right amount of fuss for a feature that is off.
+ *
+ * On the log it is drawn as a band butted against the bottom of the
+ * photograph, in black by day and a step lighter at night, so the namer reads
+ * as its own voice rather than as another field. Everywhere else, the edit
+ * form included, it stays a quiet group on the page's own ground.
  */
 export type SpeciesCandidate = {
    /* Null until the fish has a row in the species table. */
@@ -57,6 +62,10 @@ type GuessProps = {
    onPick: (candidate: SpeciesCandidate | null) => void;
    /* A fish that just became a species, for the form's own list. */
    onCreated?: (made: Species) => void;
+   /* The dark band under a photograph, rather than a group on the page. */
+   band?: boolean;
+   /* Room for the two names side by side, which only the wide card has. */
+   columns?: boolean;
    className?: string;
 };
 
@@ -71,6 +80,8 @@ function Guess({
    current,
    onPick,
    onCreated,
+   band = false,
+   columns = false,
    className,
 }: GuessProps) {
    const [result, setResult] =
@@ -94,9 +105,34 @@ function Guess({
 
    if (!imageUrl || dismissed) return null;
 
+   /*
+    * The band's own ground: black by day, a step up from black at night, so
+    * it still separates from the page under it. Drawn with the tokens rather
+    * than `.blk`, which lifts and outlines a card at night.
+    */
+   const bandGround =
+      'relative bg-black-block text-paper dark:bg-black-block-2';
+   const tab = (
+      <span
+         aria-hidden="true"
+         className="absolute top-0 right-0 size-0 border-t-[22px] border-l-[22px] border-t-teal border-l-transparent"
+      />
+   );
+
    /* While the namer looks: a quiet line, so the wait is seen to be a wait. */
    if (asking) {
-      return (
+      return band ? (
+         <div
+            className={cn(bandGround, 'flex h-[52px] items-center gap-3 px-4')}
+            role="status"
+            aria-live="polite"
+            data-namer="asking"
+         >
+            {tab}
+            <span className="shimmer h-[3px] w-10 shrink-0 bg-paper-2" />
+            <span className="text-[14px] text-paper-2">Naming the fish</span>
+         </div>
+      ) : (
          <div
             className={cn('flex items-center gap-3', className)}
             role="status"
@@ -122,7 +158,17 @@ function Guess({
    }
 
    if (!names.length) {
-      return (
+      return band ? (
+         <div
+            className={cn(bandGround, 'flex h-[52px] items-center px-4')}
+            data-namer="none"
+         >
+            {tab}
+            <span className="text-[14px] text-paper-2">
+               Could not name this one. Type it.
+            </span>
+         </div>
+      ) : (
          <p
             className={cn('text-[14px] text-ink-3', className)}
             data-namer="none"
@@ -165,11 +211,62 @@ function Guess({
       }
    };
 
+   const neither = () => {
+      onPick(null);
+      setDismissed(true);
+   };
+
    /*
-    * The label and the cross on one line; the names beneath as rows that
-    * take the full width on a phone and two equal columns from a tablet up.
-    * Nothing wraps and nothing is cut, whatever the fish is called.
+    * The band: the label and the word that refuses both on one line, then the
+    * two names as rows that take the full width. Nothing wraps and nothing is
+    * cut, whatever the fish is called; only the wide card puts them side by
+    * side.
     */
+   if (band) {
+      return (
+         <div
+            className={cn(bandGround, 'flex flex-col gap-2.5 px-4 pt-3.5 pb-4')}
+            role="group"
+            aria-label="The fish namer's guess"
+            data-namer="named"
+         >
+            {tab}
+            <div className="flex items-center justify-between gap-3 pr-5">
+               <span className="lab text-paper-2">Looks like</span>
+               <button
+                  type="button"
+                  disabled={adding !== null}
+                  onClick={neither}
+                  className="g-tracked text-[15px] text-paper-2 hover:text-paper disabled:opacity-60"
+               >
+                  Neither
+               </button>
+            </div>
+            <div className={cn('grid gap-2', columns && 'grid-cols-2')}>
+               {names.map((c) => (
+                  <button
+                     key={c.guess}
+                     type="button"
+                     disabled={adding !== null}
+                     onClick={() => void take(c)}
+                     className="flex h-11 items-center justify-between gap-2 border border-paper/40 px-3 text-left text-paper transition-colors duration-150 hover:border-teal disabled:opacity-60"
+                  >
+                     <span className="g-tracked truncate text-[18px]">
+                        {adding === c.guess ? 'Adding' : c.commonName}
+                     </span>
+                     <span className="num shrink-0 text-[13px] text-paper-2">
+                        {Math.round(c.confidence * 100)}%
+                     </span>
+                  </button>
+               ))}
+            </div>
+            {problem ? (
+               <p className="text-[14px] text-destructive">{problem}</p>
+            ) : null}
+         </div>
+      );
+   }
+
    return (
       <div
          className={cn('flex flex-col gap-2', className)}
@@ -182,10 +279,7 @@ function Guess({
             <button
                type="button"
                disabled={adding !== null}
-               onClick={() => {
-                  onPick(null);
-                  setDismissed(true);
-               }}
+               onClick={neither}
                aria-label="Neither. I will type the name"
                title="Neither"
                className="-mr-2 grid size-9 place-items-center text-ink-3 hover:text-ink"
