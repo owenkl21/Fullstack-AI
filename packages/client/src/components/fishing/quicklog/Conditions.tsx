@@ -32,16 +32,10 @@ export function Conditions({
              : null;
 
    return (
-      <div
-         aria-live="polite"
-         className={cn(
-            'flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1',
-            className
-         )}
-      >
+      <div aria-live="polite" className={cn('flex flex-col gap-1', className)}>
          <span className="lab">{label}</span>
          {phase === 'ready' && lines.length ? (
-            <span className="num text-right text-[15px] font-medium">
+            <span className="num text-[15px] font-medium">
                {lines.map((line) => line.value).join(' · ')}
             </span>
          ) : (

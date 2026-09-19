@@ -184,12 +184,12 @@ function Guess({
                   type="button"
                   disabled={adding !== null}
                   onClick={() => void take(c)}
-                  className="inline-flex h-10 items-center gap-2 border border-ink px-3 text-ink transition-colors duration-150 hover:bg-ink hover:text-background disabled:opacity-60"
+                  className="inline-flex h-9 items-center gap-1.5 border border-ink px-2.5 text-ink transition-colors duration-150 hover:bg-ink hover:text-background disabled:opacity-60"
                >
-                  <span className="g-tracked text-[16px]">
+                  <span className="g-tracked text-[15px]">
                      {adding === c.guess ? 'Adding' : c.commonName}
                   </span>
-                  <span className="num text-[12px] opacity-60">
+                  <span className="num text-[11px] opacity-60">
                      {Math.round(c.confidence * 100)}%
                   </span>
                </button>

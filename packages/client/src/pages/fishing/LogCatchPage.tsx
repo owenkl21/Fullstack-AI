@@ -1643,8 +1643,7 @@ export function CatchForm({
                      error={errors.caughtAt}
                      hint={
                         <>
-                           {zone ? `Your time, ${zone}.` : 'Your own time.'}{' '}
-                           Conditions are read for this hour at the pin.
+                           {zone ? `Your time, ${zone}.` : 'Your own time.'}
                            {photoSpan
                               ? ` The photographs run from ${clock(photoSpan.from)} to ${clock(photoSpan.to)}, so the log is kept as that stretch.`
                               : ''}

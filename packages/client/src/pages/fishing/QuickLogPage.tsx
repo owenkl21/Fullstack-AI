@@ -1113,11 +1113,7 @@ function QuickLog() {
                <h1 className="g text-[30px] leading-none md:text-[34px]">
                   Log a catch
                </h1>
-               {phone ? (
-                  <p className="mt-1.5 text-[14px] text-ink-2">
-                     Step {step} of 3
-                  </p>
-               ) : null}
+
                {phone ? (
                   <ol
                      aria-label="Steps"
