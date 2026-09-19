@@ -350,10 +350,20 @@ band, tides and the sun and moon; then the name and the mark arrived.
       away instead of being cut, and it is inked in the accent (screened over
       a teal ground by day, inverted and multiplied over it at night).
 
+## Done on 19 September
+
+- [x] **The fish namer is on.** Fishial's detector and classifier run on the
+      hub GPU as a service (0.6 s a photo), reached by Railway through a
+      Cloudflare quick tunnel, no Tailscale. `FISHIAL_URL` and `FISHIAL_TOKEN`
+      are set. Both log forms offer the best two names whether or not the
+      species table knows them; an unknown fish is offered by its common name
+      and becomes a species when taken, so the catch still scores. The tunnel
+      address changes when cloudflared restarts; the permanent fix is a domain
+      on Owen's Cloudflare account. Details in [13-fishial-on-the-hub.md](13-fishial-on-the-hub.md).
+
 ## Next, in order
 
-1. **Switch the readers on**: set `ANTHROPIC_API_KEY` on Railway for the
-    competition reader; stand up Fishial on the hub and set `FISHIAL_URL`.
+1. **Switch the competition reader on**: set `ANTHROPIC_API_KEY` on Railway.
 2. **The pin brief in Claude Design** (docs/redesign/12-design-brief-pins.md):
     once the SVGs come back, swap them into `kindPin` and the cluster disc.
 3. **Same water, properly**: the 600 m rule is a proxy. When spots carry a
