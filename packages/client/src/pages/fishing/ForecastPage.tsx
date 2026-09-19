@@ -569,14 +569,14 @@ function NowFacts({
                {readAt ? `Read ${readAt}` : 'The reading of the moment'}
             </p>
          </div>
-         <dl className="mt-1.5 grid grid-cols-4 gap-x-4">
+         <dl className="mt-1.5 grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4 sm:gap-x-4 sm:gap-y-0">
             {shown.map((fact, index) => (
                <div
                   key={fact.key}
                   className="fact min-w-0"
                   style={{ '--i': index } as CSSProperties}
                >
-                  <dt className="lab truncate text-ink-3">{fact.label}</dt>
+                  <dt className="lab text-ink-3">{fact.label}</dt>
                   <dd className="num text-[14px] leading-tight text-ink">
                      {fact.value}
                   </dd>

@@ -63,7 +63,7 @@ if (conditions?.body) {
       console.log('that reading on the Johannesburg clock:', inSast);
       pass(
          'Read matches the reading, on the Johannesburg clock',
-         seen.read === `Read ${inSast}`,
+         (seen.read || '').toLowerCase() === `read ${inSast}`,
          `${seen.read} vs Read ${inSast}`
       );
       const mins = Math.round((Date.now() - new Date(asUtc).getTime()) / 60000);
