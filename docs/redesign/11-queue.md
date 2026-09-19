@@ -382,6 +382,19 @@ band, tides and the sun and moon; then the name and the mark arrived.
       with no position says so on both forms. `audit/position.mjs` drives
       both forms on a phone and a desktop with a GPS-tagged photograph
       (Vaal Dam) and one without: 26 checks.
+- [x] **The log says less, and the namer is seen to work.** Owen: "there is no
+      indication that the fish identification is happening" and "it looks
+      cluttered". A quiet "Naming the fish" line with a shimmer stands in until
+      the names arrive; the names are one row ("Looks like", two chips, a cross
+      for neither), common names only. The map's search and controls sit on the
+      map (`MapLocationPicker compact`), the drag hint only shows while there
+      is no pin, the conditions are one line with the time in the label, the
+      photo block no longer says it is optional and its frame badge speaks only
+      when the photo needs placing, the header carries the step bar without a
+      sentence, the uploader no longer recites its formats, and the full form's
+      hints are shorter. Critiqued through frontend-design and the installed
+      taste and redesign skills (Owen rejected ui-ux-pro as slop). Baseline and
+      after shots: `audit/logshots.mjs` (TAG=before|after|after2).
 
 ## Next, in order
 
