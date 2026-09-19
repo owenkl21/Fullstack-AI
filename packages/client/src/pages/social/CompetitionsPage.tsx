@@ -385,7 +385,8 @@ function CompetitionCard({
                   {competition.species
                      ? `, ${competition.species.commonName} only`
                      : ''}
-                  {' · '}
+               </p>
+               <p className="text-[15px] text-ink-2">
                   {areaSentence(competition)}
                   {' · '}
                   <span className="num">

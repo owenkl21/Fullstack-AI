@@ -35,8 +35,10 @@ export function Conditions({
       <div aria-live="polite" className={cn('flex flex-col gap-1', className)}>
          <span className="lab">{label}</span>
          {phase === 'ready' && lines.length ? (
-            <span className="num text-[15px] font-medium">
-               {lines.map((line) => line.value).join(' · ')}
+            <span className="num flex flex-wrap gap-x-4 gap-y-0.5 text-[15px] font-medium">
+               {lines.map((line) => (
+                  <span key={line.key}>{line.value}</span>
+               ))}
             </span>
          ) : (
             <span className="text-[14px] text-ink-3">{note}</span>

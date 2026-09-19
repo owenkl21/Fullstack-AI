@@ -652,9 +652,15 @@ function QuickLog() {
            ? 'Your catch is public. Your exact spot stays private.'
            : 'Your catch is public, spot included.';
 
+   /* Numbered on the phone, where the sections are steps taken in order;
+      side by side on a desktop they are just sections. */
    const heading = (index: string, title: string, note?: string | null) => (
       <div className="mb-5 flex items-center gap-2.5">
-         <span className="g-tracked text-[19px] text-teal-text">{index}</span>
+         {phone ? (
+            <span className="g-tracked text-[19px] text-teal-text">
+               {index}
+            </span>
+         ) : null}
          <h2 className="g text-[22px] leading-none">{title}</h2>
          {note ? (
             <span className="ml-auto text-[12px] text-ink-2">{note}</span>

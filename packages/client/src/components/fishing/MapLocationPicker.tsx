@@ -94,7 +94,9 @@ const searchPlaces = async (
       }[];
    };
    return (places ?? []).map((p) => ({
-      label: [p.name, p.kind, p.region, p.country].filter(Boolean).join(' · '),
+      label: [p.name, [p.kind, p.region, p.country].filter(Boolean).join(', ')]
+         .filter(Boolean)
+         .join(' · '),
       lat: p.latitude,
       lng: p.longitude,
    }));

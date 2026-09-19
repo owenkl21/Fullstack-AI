@@ -123,13 +123,14 @@ function Saved() {
                                 ? `/sites/${row.post.site.id}`
                                 : '/';
                            const meta = [
-                              `by ${row.post.author.displayName}`,
-                              c?.length ? `${c.length} cm` : null,
-                              c?.site?.name ?? null,
+                              [
+                                 `by ${row.post.author.displayName}`,
+                                 c?.site?.name ?? null,
+                              ]
+                                 .filter(Boolean)
+                                 .join(', '),
                               `kept ${formatDay(row.savedAt)}`,
-                           ]
-                              .filter(Boolean)
-                              .join(' · ');
+                           ].join(' · ');
                            return (
                               <li
                                  key={row.id}

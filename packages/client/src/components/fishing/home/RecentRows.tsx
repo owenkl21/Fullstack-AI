@@ -39,9 +39,9 @@ export function RecentRows({
                const facts = [
                   formatStamp(entry.caughtAt),
                   entry.site?.name,
-                  weightMetric(entry.weight),
                ].filter(Boolean);
-               const length = lengthMetric(entry.length);
+               const figure =
+                  lengthMetric(entry.length) ?? weightMetric(entry.weight);
 
                return (
                   <li key={entry.id} className="border-t border-line">
@@ -67,8 +67,8 @@ export function RecentRows({
                               {facts.join(' · ')}
                            </span>
                         </span>
-                        {length ? (
-                           <span className="g num text-[24px]">{length}</span>
+                        {figure ? (
+                           <span className="g num text-[24px]">{figure}</span>
                         ) : (
                            <span className="text-[14px] text-ink-3">
                               Not measured

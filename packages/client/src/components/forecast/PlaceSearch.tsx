@@ -192,7 +192,7 @@ export function PlaceSearch({
                         >
                            {[hit.kind, hit.region, hit.country]
                               .filter(Boolean)
-                              .join(' · ')}
+                              .join(', ')}
                         </span>
                      </li>
                   ))}

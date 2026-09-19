@@ -1171,7 +1171,7 @@ export function CatchForm({
          <div className="flex min-w-0 flex-col gap-12">
             {/* ---------------- The fish ---------------- */}
             <section className="flex flex-col gap-6">
-               <GroupHeading step={1}>The fish</GroupHeading>
+               <GroupHeading>The fish</GroupHeading>
 
                {isEdit ? (
                   <div className="flex flex-col gap-3">
@@ -1396,7 +1396,7 @@ export function CatchForm({
 
             {/* ---------------- Where ---------------- */}
             <section className="flex flex-col gap-6">
-               <GroupHeading step={2}>Where</GroupHeading>
+               <GroupHeading>Where</GroupHeading>
 
                <div
                   role="radiogroup"
@@ -1631,7 +1631,7 @@ export function CatchForm({
 
             {/* ---------------- When and conditions ---------------- */}
             <section className="flex flex-col gap-6">
-               <GroupHeading step={3}>When</GroupHeading>
+               <GroupHeading>When</GroupHeading>
 
                <div>
                   <TextField
@@ -1662,7 +1662,7 @@ export function CatchForm({
 
             {/* ---------------- Gear and notes ---------------- */}
             <section className="flex flex-col gap-6">
-               <GroupHeading step={4}>Gear and notes</GroupHeading>
+               <GroupHeading>Gear and notes</GroupHeading>
 
                <div className="flex flex-col gap-3">
                   <TextField

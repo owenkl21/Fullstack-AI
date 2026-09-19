@@ -36,7 +36,7 @@ import type { FeedPostInView } from '@/components/feed/types';
 const textControl =
    'g-tracked inline-flex h-12 items-center text-[19px] transition-[color,opacity] duration-150 [transition-timing-function:var(--ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal';
 
-/** `Caught at Kalk Bay · Tue 15 Sep, 06:42 · 4 h ago`, built from what the post carries. */
+/** `Caught at Kalk Bay, Tue 15 Sep, 06:42 · 4 h ago`, built from what the post carries. */
 function contextSentence(post: FeedPostInView, showDistance: boolean) {
    const stamp = formatStamp(post.createdAt);
    const relative = formatRelative(post.createdAt);
@@ -48,15 +48,16 @@ function contextSentence(post: FeedPostInView, showDistance: boolean) {
     */
    const spot = post.catch?.site?.name ?? post.site?.name ?? null;
 
+   /* One dot a line: the place and time are one fact, the rest is another. */
+   const since = [relative, distance].filter(Boolean).join(', ');
    if (spot) {
-      return joinMeta([`Caught at ${spot}`, stamp, relative, distance]);
+      return joinMeta([
+         [`Caught at ${spot}`, stamp].filter(Boolean).join(', '),
+         since,
+      ]);
    }
 
-   return joinMeta([
-      stamp ? `Caught on ${stamp}` : 'Caught',
-      relative,
-      distance,
-   ]);
+   return joinMeta([stamp ? `Caught on ${stamp}` : 'Caught', since]);
 }
 
 function measurementLine(post: FeedPostInView) {
