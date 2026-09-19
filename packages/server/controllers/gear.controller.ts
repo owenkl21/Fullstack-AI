@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { getAuth } from '@clerk/express';
+import { getAuth } from '../lib/auth-context';
 import { createGearSchema, updateGearSchema } from '../schemas/gear.schema';
 import { gearService } from '../services/gear.service';
 

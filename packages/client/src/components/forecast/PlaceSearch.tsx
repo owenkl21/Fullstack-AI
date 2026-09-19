@@ -1,0 +1,232 @@
+import { MagnifyingGlassIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import axios from 'axios';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { searchPlaces, type PlaceHit } from './forecast-api';
+
+/*
+ * A place, by name.
+ *
+ * Typing "Kommetjie" should land on Kommetjie, not on a form. So the field
+ * looks things up as you type, after a short pause, and offers the few places
+ * that match with their province beside them, because there is more than one
+ * Melkbos and the wrong one is a long drive.
+ */
+export function PlaceSearch({
+   onPick,
+   onUseMine,
+   locating = false,
+   showMine = true,
+   near = null,
+   className,
+}: {
+   onPick: (place: PlaceHit) => void;
+   onUseMine: () => void;
+   locating?: boolean;
+   /** Off where the page already has its own way of going to the angler. */
+   showMine?: boolean;
+   /* Where the reader is, or is looking: of two Kommetjies, the near one first. */
+   near?: { latitude: number; longitude: number } | null;
+   className?: string;
+}) {
+   const id = useId();
+   const [query, setQuery] = useState('');
+   const [hits, setHits] = useState<PlaceHit[]>([]);
+   const [open, setOpen] = useState(false);
+   const [active, setActive] = useState(0);
+   const [searching, setSearching] = useState(false);
+   const box = useRef<HTMLDivElement>(null);
+
+   useEffect(() => {
+      const q = query.trim();
+      if (q.length < 2) {
+         setHits([]);
+         setSearching(false);
+         return;
+      }
+
+      const controller = new AbortController();
+      setSearching(true);
+      const timer = window.setTimeout(() => {
+         searchPlaces(q, controller.signal, near)
+            .then((found) => {
+               const sorted = near
+                  ? [...found].sort((a, b) => {
+                       const d = (p: PlaceHit) =>
+                          Math.hypot(
+                             p.latitude - near.latitude,
+                             (p.longitude - near.longitude) *
+                                Math.cos((near.latitude * Math.PI) / 180)
+                          );
+                       return d(a) - d(b);
+                    })
+                  : found;
+               setHits(sorted);
+               setActive(0);
+               setOpen(true);
+            })
+            .catch((error) => {
+               if (!axios.isCancel(error)) setHits([]);
+            })
+            .finally(() => setSearching(false));
+      }, 280);
+
+      return () => {
+         window.clearTimeout(timer);
+         controller.abort();
+      };
+   }, [query, near]);
+
+   /* A click anywhere else closes the list. */
+   useEffect(() => {
+      if (!open) return;
+      const away = (event: MouseEvent) => {
+         if (!box.current?.contains(event.target as Node)) setOpen(false);
+      };
+      document.addEventListener('mousedown', away);
+      return () => document.removeEventListener('mousedown', away);
+   }, [open]);
+
+   const choose = (place: PlaceHit) => {
+      onPick(place);
+      setQuery('');
+      setHits([]);
+      setOpen(false);
+   };
+
+   const listId = `${id}-list`;
+
+   /*
+    * The field and the locate control share one row on a phone. Two rows for
+    * two controls is forty four pixels of a screen that has a week of weather
+    * to fit in, so the control loses its words and keeps its mark: a square
+    * the size of a thumb, named for anyone listening. On a desk it is the
+    * worded button it has always been, and there the word stands alone,
+    * because a mark beside a label is two names for one thing.
+    */
+   return (
+      <div className={cn('flex items-start gap-2', className)}>
+         <div ref={box} className="relative min-w-0 flex-1 md:max-w-[420px]">
+            <label htmlFor={id} className="sr-only">
+               Search for a place
+            </label>
+            <MagnifyingGlassIcon
+               aria-hidden="true"
+               className="pointer-events-none absolute top-1/2 left-3.5 size-[18px] -translate-y-1/2 text-ink-3"
+            />
+            <input
+               id={id}
+               type="search"
+               role="combobox"
+               aria-expanded={open && hits.length > 0}
+               aria-controls={listId}
+               aria-autocomplete="list"
+               aria-activedescendant={
+                  open && hits[active]
+                     ? `${listId}-${hits[active].id}`
+                     : undefined
+               }
+               autoComplete="off"
+               value={query}
+               placeholder="A beach, a town, a headland"
+               onChange={(event) => setQuery(event.target.value)}
+               onFocus={() => hits.length && setOpen(true)}
+               onKeyDown={(event) => {
+                  if (!open || !hits.length) return;
+                  if (event.key === 'ArrowDown') {
+                     event.preventDefault();
+                     setActive((i) => Math.min(i + 1, hits.length - 1));
+                  } else if (event.key === 'ArrowUp') {
+                     event.preventDefault();
+                     setActive((i) => Math.max(i - 1, 0));
+                  } else if (event.key === 'Enter') {
+                     event.preventDefault();
+                     const hit = hits[active];
+                     if (hit) choose(hit);
+                  } else if (event.key === 'Escape') {
+                     setOpen(false);
+                  }
+               }}
+               className="input-line h-11 !pl-10 text-[16px]"
+            />
+
+            {open && (hits.length > 0 || searching) ? (
+               <ul
+                  id={listId}
+                  role="listbox"
+                  className="blk absolute right-0 left-0 z-40 mt-1 max-h-72 overflow-y-auto border border-line py-1"
+               >
+                  {hits.map((hit, index) => (
+                     <li
+                        key={hit.id}
+                        id={`${listId}-${hit.id}`}
+                        role="option"
+                        aria-selected={index === active}
+                        onMouseEnter={() => setActive(index)}
+                        onMouseDown={(event) => {
+                           event.preventDefault();
+                           choose(hit);
+                        }}
+                        onTouchEnd={(event) => {
+                           event.preventDefault();
+                           choose(hit);
+                        }}
+                        className={cn(
+                           'flex cursor-pointer items-baseline justify-between gap-3 px-3 py-2',
+                           index === active
+                              ? 'bg-ink text-background'
+                              : 'text-ink'
+                        )}
+                     >
+                        <span className="g-tracked text-[17px]">
+                           {hit.name}
+                        </span>
+                        <span
+                           className={cn(
+                              'truncate text-[14px]',
+                              index === active
+                                 ? 'text-background/80'
+                                 : 'text-ink-3'
+                           )}
+                        >
+                           {[hit.kind, hit.region, hit.country]
+                              .filter(Boolean)
+                              .join(', ')}
+                        </span>
+                     </li>
+                  ))}
+                  {searching && !hits.length ? (
+                     <li className="px-3 py-2 text-[14px] text-ink-3">
+                        Looking
+                     </li>
+                  ) : null}
+               </ul>
+            ) : null}
+         </div>
+
+         {showMine ? (
+            <>
+               <button
+                  type="button"
+                  onClick={onUseMine}
+                  disabled={locating}
+                  aria-label={locating ? 'Finding you' : 'Where I am'}
+                  className="flex size-11 shrink-0 items-center justify-center border border-line-2 text-ink transition-colors duration-150 [transition-timing-function:var(--ease)] hover:border-ink disabled:opacity-60 md:hidden"
+               >
+                  <MapPinIcon aria-hidden="true" className="size-5" />
+               </button>
+               <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onUseMine}
+                  disabled={locating}
+                  className="hidden h-11 md:inline-flex"
+               >
+                  {locating ? 'Finding you' : 'Where I am'}
+               </Button>
+            </>
+         ) : null}
+      </div>
+   );
+}

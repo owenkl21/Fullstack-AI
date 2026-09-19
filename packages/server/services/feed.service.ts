@@ -1,9 +1,17 @@
 import { prisma } from '../lib/prisma';
+import { notificationsService } from './notifications.service';
 import { uploadsService } from './uploads.service';
-import { userService } from './user.service';
+import { resolveAvatarReadUrls, userService } from './user.service';
 
 type FeedScope = 'GLOBAL' | 'NEARBY';
-type FeedType = 'CATCH' | 'SITE';
+/*
+ * The feed is catches. Spots used to post themselves too, which put the same
+ * mark in front of everyone twice: once when it was added and again under every
+ * fish caught there. `SITE` stays in the column's vocabulary because the rows
+ * written before this are still in the table, but nothing writes another one
+ * and the read path below hands none of them back.
+ */
+type FeedType = 'CATCH';
 
 const feedInclude = {
    author: {
@@ -13,24 +21,41 @@ const feedInclude = {
       select: {
          id: true,
          title: true,
+         /*
+          * The facts about the fish. Without these the feed sent a title and a
+          * photograph and nothing else, so the card's measurement line could
+          * never render: most catches carry no photograph, and those posts were
+          * a headline over a link with nothing in between.
+          */
+         length: true,
+         weight: true,
+         weightSource: true,
+         species: { select: { commonName: true } },
          images: {
             orderBy: { position: 'asc' as const },
             select: {
-               image: { select: { id: true, url: true, storageKey: true } },
+               image: {
+                  select: {
+                     id: true,
+                     url: true,
+                     storageKey: true,
+                     focusX: true,
+                     focusY: true,
+                  },
+               },
             },
          },
       },
    },
+   /*
+    * The spot the fish was taken at, named on the card. Its photographs are not
+    * selected any more: the card shows the fish, and signing read URLs for a
+    * gallery nothing renders cost a round trip per post.
+    */
    site: {
       select: {
          id: true,
          name: true,
-         images: {
-            orderBy: { position: 'asc' as const },
-            select: {
-               image: { select: { id: true, url: true, storageKey: true } },
-            },
-         },
       },
    },
    comments: {
@@ -50,11 +75,6 @@ const withResolvedFeedImageUrls = async <
             image: { id: string; url: string; storageKey: string };
          }>;
       } | null;
-      site: {
-         images: Array<{
-            image: { id: string; url: string; storageKey: string };
-         }>;
-      } | null;
    },
 >(
    post: T
@@ -69,11 +89,16 @@ const withResolvedFeedImageUrls = async <
                   entry.image.storageKey
                );
 
+               /* All three sizes. The card draws the 900px one and the browser
+                * never asks for the original, which is what turned a feed page
+                * from twenty eight megabytes into something a phone can hold. */
                return {
                   ...entry,
                   image: {
                      ...entry.image,
                      url: signed.readUrl,
+                     cardUrl: signed.cardReadUrl,
+                     thumbUrl: signed.thumbReadUrl,
                   },
                };
             } catch (error) {
@@ -91,32 +116,43 @@ const withResolvedFeedImageUrls = async <
       );
    };
 
-   const [catchImages, siteImages] = await Promise.all([
-      post.catch ? resolvePostImages(post.catch.images) : null,
-      post.site ? resolvePostImages(post.site.images) : null,
-   ]);
+   const catchImages = post.catch
+      ? await resolvePostImages(post.catch.images)
+      : null;
+
+   /* The screen names these lengthCm and weightKg, so the units travel with
+    * the numbers rather than living only in a comment. */
+   const fish = post.catch as
+      | (T['catch'] & {
+           length?: number | null;
+           weight?: number | null;
+           weightSource?: string | null;
+           species?: { commonName: string } | null;
+        })
+      | null;
 
    return {
       ...post,
-      catch: post.catch ? { ...post.catch, images: catchImages ?? [] } : null,
-      site: post.site ? { ...post.site, images: siteImages ?? [] } : null,
+      catch: fish
+         ? {
+              ...fish,
+              images: catchImages ?? [],
+              species: fish.species?.commonName ?? null,
+              lengthCm: fish.length ?? null,
+              weightKg: fish.weight ?? null,
+              weightSource: fish.weightSource ?? null,
+           }
+         : null,
    };
 };
 
-async function getUserId(clerkId: string) {
-   const existing = await prisma.user.findUnique({
-      where: { clerkId },
-      select: { id: true },
-   });
-
-   if (existing) {
-      return existing.id;
-   }
-
-   await userService.syncAuthenticatedUser(clerkId);
-
+/*
+ * The id on the request is this app's own User.id now, so this is an existence
+ * check rather than the lookup-and-sync-from-Clerk it used to be.
+ */
+async function getUserId(userId: string) {
    const user = await prisma.user.findUniqueOrThrow({
-      where: { clerkId },
+      where: { id: userId },
       select: { id: true },
    });
 
@@ -127,7 +163,6 @@ export const feedService = {
    async listFeed(input: {
       userId?: string;
       scope: FeedScope;
-      type?: FeedType;
       latitude?: number;
       longitude?: number;
       limit: number;
@@ -149,13 +184,21 @@ export const feedService = {
       const scopeWhere =
          input.scope === 'GLOBAL'
             ? { scope: 'GLOBAL' as const }
-            : { scope: { in: ['GLOBAL', 'NEARBY'] as const } };
+            : { scope: { in: ['GLOBAL', 'NEARBY'] as FeedScope[] } };
 
       const posts = await prisma.feedPost.findMany({
          where: {
             deletedAt: null,
+            /* Belt and braces: a private post should never have been created. */
+            visibility: { not: 'PRIVATE' },
+            /*
+             * Catches only, filtered here rather than at the write path alone,
+             * because the spot posts written before this rule are still in the
+             * table and a filter on the way in cannot reach them. Nothing is
+             * deleted; they simply stop being read.
+             */
+            type: 'CATCH' satisfies FeedType,
             ...scopeWhere,
-            ...(input.type ? { type: input.type } : {}),
             ...nearbyWhere,
          },
          include: feedInclude,
@@ -165,13 +208,34 @@ export const feedService = {
       });
 
       const postsWithResolvedImageUrls = await Promise.all(
-         posts.map((post: any) => withResolvedFeedImageUrls(post))
+         posts.map(async (post: any) => {
+            const resolved = await withResolvedFeedImageUrls(post);
+            /* The author's photograph is a storage key too; unsigned it is
+             * a broken image on every card. It is drawn at 40px, so the card
+             * is handed the thumb as well and reads that instead: this one
+             * line is the difference between a four megabyte avatar and a
+             * few kilobytes of it, twenty five times down a page. */
+            const avatar = await resolveAvatarReadUrls(
+               resolved.author?.avatarUrl ?? null
+            );
+
+            return {
+               ...resolved,
+               author: {
+                  ...resolved.author,
+                  avatarUrl: avatar.url,
+                  avatarCardUrl: avatar.cardUrl,
+                  avatarThumbUrl: avatar.thumbUrl,
+               },
+            };
+         })
       );
 
       if (!input.userId) {
          return postsWithResolvedImageUrls.map((post: any) => ({
             ...post,
             likedByMe: false,
+            savedByMe: false,
             authorFollowedByMe: false,
             authorIsMe: false,
          }));
@@ -187,6 +251,15 @@ export const feedService = {
          select: { postId: true },
       });
       const likedSet = new Set(likes.map((l: any) => l.postId));
+
+      const saves = await prisma.savedPost.findMany({
+         where: {
+            userId: viewerUserId,
+            postId: { in: postsWithResolvedImageUrls.map((p: any) => p.id) },
+         },
+         select: { postId: true },
+      });
+      const savedSet = new Set(saves.map((row: any) => row.postId));
 
       const follows = await prisma.follow.findMany({
          where: {
@@ -206,13 +279,14 @@ export const feedService = {
       return postsWithResolvedImageUrls.map((post: any) => ({
          ...post,
          likedByMe: likedSet.has(post.id),
+         savedByMe: savedSet.has(post.id),
          authorFollowedByMe: followingSet.has(post.author.id),
          authorIsMe: post.author.id === viewerUserId,
       }));
    },
 
    async createFeedPost(
-      clerkId: string,
+      userId: string,
       input: {
          type: FeedType;
          scope: FeedScope;
@@ -223,7 +297,7 @@ export const feedService = {
          longitude?: number | null;
       }
    ) {
-      const userId = await getUserId(clerkId);
+      await getUserId(userId); // throws if the user is gone
 
       return prisma.feedPost.create({
          data: {
@@ -241,11 +315,11 @@ export const feedService = {
    },
 
    async updateFeedPost(
-      clerkId: string,
+      userId: string,
       postId: string,
       input: { content?: string | null; scope?: FeedScope }
    ) {
-      const userId = await getUserId(clerkId);
+      await getUserId(userId); // throws if the user is gone
       const existing = await prisma.feedPost.findFirst({
          where: { id: postId, authorId: userId, deletedAt: null },
          select: { id: true },
@@ -262,8 +336,8 @@ export const feedService = {
       });
    },
 
-   async deleteFeedPost(clerkId: string, postId: string) {
-      const userId = await getUserId(clerkId);
+   async deleteFeedPost(userId: string, postId: string) {
+      await getUserId(userId); // throws if the user is gone
       const existing = await prisma.feedPost.findFirst({
          where: { id: postId, authorId: userId, deletedAt: null },
          select: { id: true },
@@ -281,18 +355,18 @@ export const feedService = {
       return { id: postId };
    },
 
-   async toggleLike(clerkId: string, postId: string) {
-      const userId = await getUserId(clerkId);
+   async toggleLike(userId: string, postId: string) {
+      await getUserId(userId); // throws if the user is gone
       const post = await prisma.feedPost.findFirst({
          where: { id: postId, deletedAt: null },
-         select: { id: true },
+         select: { id: true, authorId: true },
       });
 
       if (!post) {
          return null;
       }
 
-      return prisma.$transaction(async (tx: any) => {
+      const result = await prisma.$transaction(async (tx: any) => {
          const existing = await tx.feedLike.findUnique({
             where: { postId_userId: { postId, userId } },
             select: { id: true },
@@ -315,6 +389,16 @@ export const feedService = {
 
          return { liked: true };
       });
+
+      if (result.liked) {
+         await notificationsService.notify({
+            userId: post.authorId,
+            actorId: userId,
+            kind: 'LIKE',
+            postId,
+         });
+      }
+      return result;
    },
 
    async listComments(postId: string) {
@@ -327,18 +411,18 @@ export const feedService = {
       });
    },
 
-   async createComment(clerkId: string, postId: string, body: string) {
-      const userId = await getUserId(clerkId);
+   async createComment(userId: string, postId: string, body: string) {
+      await getUserId(userId); // throws if the user is gone
       const post = await prisma.feedPost.findFirst({
          where: { id: postId, deletedAt: null },
-         select: { id: true },
+         select: { id: true, authorId: true },
       });
 
       if (!post) {
          return null;
       }
 
-      return prisma.$transaction(async (tx: any) => {
+      const comment = await prisma.$transaction(async (tx: any) => {
          const comment = await tx.feedComment.create({
             data: {
                postId,
@@ -359,10 +443,19 @@ export const feedService = {
 
          return comment;
       });
+
+      await notificationsService.notify({
+         userId: post.authorId,
+         actorId: userId,
+         kind: 'COMMENT',
+         postId,
+         body,
+      });
+      return comment;
    },
 
-   async deleteComment(clerkId: string, commentId: string) {
-      const userId = await getUserId(clerkId);
+   async deleteComment(userId: string, commentId: string) {
+      await getUserId(userId); // throws if the user is gone
       const existing = await prisma.feedComment.findFirst({
          where: { id: commentId, userId, deletedAt: null },
          select: { id: true, postId: true },

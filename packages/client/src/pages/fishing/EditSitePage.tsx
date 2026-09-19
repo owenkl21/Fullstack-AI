@@ -1,212 +1,125 @@
 import axios from 'axios';
-import { useCallback, useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { FishingActionBar } from '@/components/fishing/FishingActionBar';
-import { LandingHeader } from '@/components/landing/LandingHeader';
-import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/use-toast';
-import { GoogleMapLocationPicker } from '@/components/fishing/GoogleMapLocationPicker';
+import { useDocumentTitle } from '@/lib/title';
+import { NotFoundPage } from '@/pages/NotFoundPage';
+import {
+   SpotForm,
+   SpotFormSkeleton,
+   type SpotValues,
+   type WaterType,
+} from './LogSitePage';
 
-type SiteEdit = {
-   name: string;
-   description: string | null;
-   latitude: number | null;
-   longitude: number | null;
-   waterType: string | null;
-   accessNotes: string | null;
-};
+type LoadState = 'loading' | 'ready' | 'missing' | 'error';
+
+const WATER_VALUES: WaterType[] = ['SALTWATER', 'FRESHWATER'];
+
+const asWaterType = (value: unknown): WaterType | '' =>
+   WATER_VALUES.find((water) => water === value) ?? '';
+
+const asText = (value: unknown) => (typeof value === 'string' ? value : '');
+
+const asCoordinate = (value: unknown) =>
+   typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
 
 export function EditSitePage() {
    const { siteId } = useParams();
-   const navigate = useNavigate();
-   const [item, setItem] = useState<SiteEdit | null>(null);
-   const [isSaving, setIsSaving] = useState(false);
-   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-   const [latitude, setLatitude] = useState('');
-   const [longitude, setLongitude] = useState('');
+   const [state, setState] = useState<LoadState>('loading');
+   const [values, setValues] = useState<SpotValues | null>(null);
+   const [attempt, setAttempt] = useState(0);
+   useDocumentTitle(values ? `Edit ${values.name}` : 'Edit a spot');
 
-   const setCoordinates = useCallback(
-      (nextLatitude: number, nextLongitude: number) => {
-         setLatitude(nextLatitude.toFixed(6));
-         setLongitude(nextLongitude.toFixed(6));
-      },
-      []
-   );
-
-   const detectCurrentLocation = () => {
-      if (!navigator.geolocation) {
-         toast({
-            title: 'Location is unavailable',
-            description: 'Your browser does not support geolocation.',
-            variant: 'error',
-         });
+   useEffect(() => {
+      if (!siteId) {
          return;
       }
 
-      setIsDetectingLocation(true);
-      navigator.geolocation.getCurrentPosition(
-         ({ coords }) => {
-            setCoordinates(coords.latitude, coords.longitude);
-            toast({
-               title: 'Location added',
-               description:
-                  'Latitude and longitude were filled from your device.',
-               variant: 'success',
-            });
-            setIsDetectingLocation(false);
-         },
-         () => {
-            toast({
-               title: 'Could not get your location',
-               description:
-                  'Please allow location access, or click the map to drop a pin.',
-               variant: 'error',
-            });
-            setIsDetectingLocation(false);
-         },
-         {
-            enableHighAccuracy: true,
-            timeout: 10000,
+      let isCancelled = false;
+      /* A skeleton that never resolves is a lie: say so after five seconds. */
+      const patience = window.setTimeout(() => {
+         if (!isCancelled) {
+            setState((current) => (current === 'loading' ? 'error' : current));
          }
-      );
-   };
+      }, 5000);
 
-   useEffect(() => {
       const load = async () => {
-         const { data } = await axios.get(`/api/sites/${siteId}`);
-         setItem(data.site);
-         setLatitude(
-            data.site.latitude !== null ? String(data.site.latitude) : ''
-         );
-         setLongitude(
-            data.site.longitude !== null ? String(data.site.longitude) : ''
-         );
+         try {
+            const { data } = await axios.get(`/api/sites/${siteId}`);
+            const site = data.site ?? {};
+
+            if (isCancelled) {
+               return;
+            }
+
+            setValues({
+               name: asText(site.name),
+               description: asText(site.description),
+               waterType: asWaterType(site.waterType),
+               accessNotes: asText(site.accessNotes),
+               latitude: asCoordinate(site.latitude),
+               longitude: asCoordinate(site.longitude),
+            });
+            setState('ready');
+         } catch (error) {
+            if (isCancelled) {
+               return;
+            }
+
+            if (axios.isAxiosError(error) && error.response?.status === 404) {
+               setState('missing');
+               return;
+            }
+
+            console.error(error);
+            setState('error');
+         }
       };
 
       void load();
-   }, [siteId]);
 
-   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (!siteId) return;
-      const formData = new FormData(event.currentTarget);
+      return () => {
+         isCancelled = true;
+         window.clearTimeout(patience);
+      };
+   }, [attempt, siteId]);
 
-      try {
-         setIsSaving(true);
-         await axios.put(`/api/sites/${siteId}`, {
-            name: String(formData.get('name') ?? ''),
-            description: String(formData.get('description') ?? '') || null,
-            latitude: Number(latitude) || null,
-            longitude: Number(longitude) || null,
-            waterType: String(formData.get('waterType') ?? '') || null,
-            accessNotes: String(formData.get('accessNotes') ?? '') || null,
-         });
-
-         toast({ title: 'Location updated', variant: 'success' });
-         navigate(`/sites/${siteId}`);
-      } catch (error) {
-         console.error(error);
-         toast({
-            title: 'Unable to update location',
-            description: 'Please check your values and try again.',
-            variant: 'error',
-         });
-      } finally {
-         setIsSaving(false);
-      }
+   const retry = () => {
+      setState('loading');
+      setAttempt((count) => count + 1);
    };
 
+   if (!siteId || state === 'missing') {
+      return <NotFoundPage />;
+   }
+
    return (
-      <div className="min-h-screen">
-         <LandingHeader />
-         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-            <FishingActionBar />
-            {!item ? (
-               <FishingBobberLoader label="Loading location..." />
-            ) : (
-               <form
-                  onSubmit={onSubmit}
-                  className="grid gap-3 rounded-lg border p-4"
-               >
-                  <h1 className="text-2xl font-semibold">Edit location</h1>
-                  <input
-                     name="name"
-                     placeholder="Site name"
-                     defaultValue={item.name}
-                     className="rounded border p-2"
-                     required
-                  />
-                  <textarea
-                     name="description"
-                     placeholder="Description"
-                     defaultValue={item.description ?? ''}
-                     className="rounded border p-2"
-                  />
-                  <div className="grid gap-2 rounded border p-3">
-                     <p className="text-sm font-medium">Location options</p>
-                     <div className="flex flex-wrap gap-2">
-                        <Button
-                           type="button"
-                           variant="outline"
-                           onClick={detectCurrentLocation}
-                           disabled={isDetectingLocation}
-                        >
-                           {isDetectingLocation
-                              ? 'Detecting location...'
-                              : 'Use my current location'}
-                        </Button>
-                     </div>
+      <RequireSignIn what="your spots">
+         <section className="mx-auto w-[min(1400px,100%-32px)] py-10 md:py-14">
+            <h1 className="g text-[44px] md:text-[56px]">
+               {values?.name ? `Edit ${values.name}` : 'Edit a spot'}
+            </h1>
+            <p className="mt-3 max-w-[52ch] text-ink-2">
+               Everything you recorded is here. Change what you need and save.
+            </p>
+            <div className="mt-10">
+               {state === 'loading' ? <SpotFormSkeleton /> : null}
+               {state === 'error' ? (
+                  <div className="grid justify-items-start gap-4">
+                     <p className="text-[15px] text-destructive">
+                        Could not load this spot.
+                     </p>
+                     <Button variant="outline" onClick={retry}>
+                        Try again
+                     </Button>
                   </div>
-                  <GoogleMapLocationPicker
-                     latitude={latitude}
-                     longitude={longitude}
-                     onChange={setCoordinates}
-                  />
-                  <div className="grid gap-3 sm:grid-cols-2">
-                     <input
-                        name="latitude"
-                        placeholder="Latitude"
-                        type="number"
-                        step="0.000001"
-                        value={latitude}
-                        onChange={(event) => setLatitude(event.target.value)}
-                        className="rounded border p-2"
-                     />
-                     <input
-                        name="longitude"
-                        placeholder="Longitude"
-                        type="number"
-                        step="0.000001"
-                        value={longitude}
-                        onChange={(event) => setLongitude(event.target.value)}
-                        className="rounded border p-2"
-                     />
-                  </div>
-                  <select
-                     name="waterType"
-                     defaultValue={item.waterType ?? ''}
-                     className="rounded border p-2"
-                  >
-                     <option value="">Optional water type</option>
-                     <option value="FRESHWATER">Freshwater</option>
-                     <option value="SALTWATER">Saltwater</option>
-                     <option value="BRACKISH">Brackish</option>
-                     <option value="OTHER">Other</option>
-                  </select>
-                  <textarea
-                     name="accessNotes"
-                     placeholder="Access notes"
-                     defaultValue={item.accessNotes ?? ''}
-                     className="rounded border p-2"
-                  />
-                  <Button type="submit" disabled={isSaving}>
-                     {isSaving ? 'Saving...' : 'Save changes'}
-                  </Button>
-               </form>
-            )}
-         </main>
-      </div>
+               ) : null}
+               {state === 'ready' && values ? (
+                  <SpotForm siteId={siteId} initial={values} />
+               ) : null}
+            </div>
+         </section>
+      </RequireSignIn>
    );
 }

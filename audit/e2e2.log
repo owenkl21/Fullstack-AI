@@ -1,0 +1,57 @@
+== signing in
+== feed
+  FAULT  feed scrolled: control covered: ["See the catch under a"]
+== catch record
+  FAULT  catch record: text cut off: ["+− Leaflet | Imagery © Esri, Maxar"]
+  FAULT  catch record: target under 40px: ["Leaflet 11px","Esri 11px","OpenSeaMap 11px"]
+== quick log
+  FAULT  log map open: text cut off: ["+− Leaflet | Imagery © Esri, Maxar"]
+  FAULT  log map open: target under 40px: ["Leaflet 15px","Esri 15px","OpenSeaMap 15px"]
+== map
+  map box {"w":390,"h":720,"top":60,"share":85}
+  FAULT  map: text cut off: ["5261287124+− Leaflet | Imagery © E"]
+  FAULT  map: target under 40px: ["Leaflet 11px","Esri 11px","OpenSeaMap 11px"]
+  search "Rooi-Els" -> ["Rooielsvillage · Overstrand Local Municipality, Western Cape · South Africa","Rooi-Elskloofrivierriver · Bergrivier Local Municipality, Western Cape · South Africa","Rooiels Riverriver · Overstrand Local Municipality, Western Cape · South Africa","Rooi-elsboswood · George, Western Cape · South Africa"]
+  search "Kanu" -> ["Kanufarm · Stellenbosch Local Municipality, Western Cape · South Africa","Kanusisriver · Khomas · Namibia","Kanubeb Ooshamlet · Khomas · Namibia","Kanushalt · Karas · Namibia"]
+  search "Theewaterskloof" -> ["Theewaterskloof Damdam · Theewaterskloof Local Municipality, Western Cape · South Africa","Theewaterskloof Damdam · Theewaterskloof Local Municipality, Western Cape · South Africa","Theewaterskloof Local Municipalityadministrative · Western Cape · South Africa"]
+== forecast
+  FAULT  forecast: wider than the screen: ["table.w-full border-collapse tex 1100px","thead. 1100px","tr.border-b border-line 1100px"]
+  FAULT  forecast other day: wider than the screen: ["table.w-full border-collapse tex 1100px","thead. 1100px","tr.border-b border-line 1100px"]
+  FAULT  forecast more: control covered: ["Fewer readings under a"]
+  FAULT  forecast more: wider than the screen: ["table.w-full border-collapse tex 1100px","thead. 1100px","tr.border-b border-line 1100px"]
+== my catches
+  FAULT  my catches: control covered: ["Galjoen under div"]
+  FAULT  my catches: target under 40px: ["Largemouth bass 21px","Catch 21px","Blacktail 21px","Elf 21px"]
+== my spots
+  FAULT  my spots: control covered: ["Slangkop, Kommetji under a"]
+  FAULT  my spots: target under 40px: ["Mimosa OD 21px","De Kelders 21px","Melkbosstrand 21px","Strandfontein 21px"]
+== my gear
+  FAULT  my gear: target under 40px: ["Kinetic Surf 13ft 21px","Sensor Surf 14ft 21px","Slammer IV 5500 21px","Saltist 6000 21px"]
+== profile
+== insights
+  FAULT  insights: wider than the screen: ["li.fact flex flex-none snap-s 774px","div.flex items-baseline justif 774px","ul.mt-3 flex items-end gap-2. 774px"]
+  FAULT  insights: target under 40px: ["Elf 19px","Blacktail 19px","Galjoen 19px","Garrick 19px"]
+== boards
+== competitions
+== kept
+== notifications
+
+================ 18 faults ================
+- feed scrolled: control covered: ["See the catch under a"]
+- catch record: text cut off: ["+− Leaflet | Imagery © Esri, Maxar"]
+- catch record: target under 40px: ["Leaflet 11px","Esri 11px","OpenSeaMap 11px"]
+- log map open: text cut off: ["+− Leaflet | Imagery © Esri, Maxar"]
+- log map open: target under 40px: ["Leaflet 15px","Esri 15px","OpenSeaMap 15px"]
+- map: text cut off: ["5261287124+− Leaflet | Imagery © E"]
+- map: target under 40px: ["Leaflet 11px","Esri 11px","OpenSeaMap 11px"]
+- forecast: wider than the screen: ["table.w-full border-collapse tex 1100px","thead. 1100px","tr.border-b border-line 1100px"]
+- forecast other day: wider than the screen: ["table.w-full border-collapse tex 1100px","thead. 1100px","tr.border-b border-line 1100px"]
+- forecast more: control covered: ["Fewer readings under a"]
+- forecast more: wider than the screen: ["table.w-full border-collapse tex 1100px","thead. 1100px","tr.border-b border-line 1100px"]
+- my catches: control covered: ["Galjoen under div"]
+- my catches: target under 40px: ["Largemouth bass 21px","Catch 21px","Blacktail 21px","Elf 21px"]
+- my spots: control covered: ["Slangkop, Kommetji under a"]
+- my spots: target under 40px: ["Mimosa OD 21px","De Kelders 21px","Melkbosstrand 21px","Strandfontein 21px"]
+- my gear: target under 40px: ["Kinetic Surf 13ft 21px","Sensor Surf 14ft 21px","Slammer IV 5500 21px","Saltist 6000 21px"]
+- insights: wider than the screen: ["li.fact flex flex-none snap-s 774px","div.flex items-baseline justif 774px","ul.mt-3 flex items-end gap-2. 774px"]
+- insights: target under 40px: ["Elf 19px","Blacktail 19px","Galjoen 19px","Garrick 19px"]

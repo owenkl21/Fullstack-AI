@@ -2,10 +2,23 @@ import OpenAI from 'openai';
 import { conversationRepository } from '../repositories/conversation.repository';
 import template from '../prompts/chatbot.txt';
 import { fishingService } from './fishing.service';
-// Initialize OpenAI client with API key from environment variables
-const client = new OpenAI({
-   apiKey: process.env.OPENAI_API_KEY,
-});
+
+let client: OpenAI | null = null;
+
+// Built on first use, the same shape as getS3Client in uploads.service.ts.
+// Constructing at module load throws when OPENAI_API_KEY is absent, which
+// takes the whole server down at boot rather than failing this one route.
+const getClient = () => {
+   if (client) {
+      return client;
+   }
+
+   client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+   });
+
+   return client;
+};
 
 // instructions for the chatbot, can be used to set the context of the conversation
 const instructions = template;
@@ -41,7 +54,7 @@ export const chatService = {
             strict: true,
          },
       ];
-      let response = await client.responses.create({
+      let response = await getClient().responses.create({
          model: 'gpt-4o-mini',
          instructions,
          input: prompt,
@@ -97,7 +110,7 @@ export const chatService = {
             })
          );
 
-         response = await client.responses.create({
+         response = await getClient().responses.create({
             model: 'gpt-4o-mini',
             instructions,
             tools,

@@ -1,16 +1,29 @@
 import axios from 'axios';
-import { Show } from '@clerk/react';
 import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { FishingActionBar } from '@/components/fishing/FishingActionBar';
-import { LandingHeader } from '@/components/landing/LandingHeader';
-import { R2ImagePicker } from '@/components/r2-image-picker';
-import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
+import { useParams } from 'react-router-dom';
+import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/use-toast';
+import { useDocumentTitle } from '@/lib/title';
+import { NotFoundPage } from '@/pages/NotFoundPage';
+import {
+   GearForm,
+   GearFormSkeleton,
+   type GearType,
+   type GearValues,
+} from './LogGearPage';
+import { useIsSignedIn } from '@/lib/auth-client';
 
-const GEAR_TYPES = [
+type LoadState = 'loading' | 'ready' | 'missing' | 'error';
+
+type GearRecord = {
+   id?: string;
+   name?: unknown;
+   brand?: unknown;
+   type?: unknown;
+   imageUrl?: unknown;
+};
+
+const GEAR_VALUES: GearType[] = [
    'ROD',
    'REEL',
    'BAIT',
@@ -18,131 +31,113 @@ const GEAR_TYPES = [
    'LINE',
    'HOOK',
    'WEIGHTS',
-] as const;
+   'RIG',
+];
 
-type GearItem = {
-   id: string;
-   name: string;
-   brand: string;
-   type: string;
-   imageUrl: string | null;
-};
+const asGearType = (value: unknown): GearType =>
+   GEAR_VALUES.find((kind) => kind === value) ?? 'ROD';
+
+const asText = (value: unknown) => (typeof value === 'string' ? value : '');
 
 export function EditGearPage() {
    const { gearId } = useParams();
-   const navigate = useNavigate();
-   const [gear, setGear] = useState<GearItem | null>(null);
-   const [images, setImages] = useState<{ storageKey: string; url: string }[]>(
-      []
-   );
+   const { isSignedIn } = useIsSignedIn();
+   const [state, setState] = useState<LoadState>('loading');
+   const [values, setValues] = useState<GearValues | null>(null);
+   const [attempt, setAttempt] = useState(0);
+   useDocumentTitle(values ? `Edit ${values.name}` : 'Edit gear');
 
+   /* There is no route for one piece of gear, so the locker answers for it. */
    useEffect(() => {
+      if (!isSignedIn || !gearId) {
+         return;
+      }
+
+      let isCancelled = false;
+      /* A skeleton that never resolves is a lie: say so after five seconds. */
+      const patience = window.setTimeout(() => {
+         if (!isCancelled) {
+            setState((current) => (current === 'loading' ? 'error' : current));
+         }
+      }, 5000);
+
       const load = async () => {
          try {
             const { data } = await axios.get('/api/gear/me');
             const found = (data.gear ?? []).find(
-               (entry: GearItem) => entry.id === gearId
+               (entry: GearRecord) => entry.id === gearId
             );
-            if (!found) {
-               toast({ title: 'Gear not found', variant: 'error' });
-               navigate('/gear/me');
+
+            if (isCancelled) {
                return;
             }
-            setGear(found);
+
+            if (!found) {
+               setState('missing');
+               return;
+            }
+
+            setValues({
+               name: asText(found.name),
+               brand: asText(found.brand),
+               type: asGearType(found.type),
+               imageUrl:
+                  typeof found.imageUrl === 'string' ? found.imageUrl : null,
+            });
+            setState('ready');
          } catch (error) {
+            if (isCancelled) {
+               return;
+            }
+
             console.error(error);
-            toast({ title: 'Unable to load gear', variant: 'error' });
+            setState('error');
          }
       };
 
       void load();
-   }, [gearId, navigate]);
 
-   const submitGear = async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (!gearId) return;
-
-      const formData = new FormData(event.currentTarget);
-      const payload: {
-         name: string;
-         brand: string;
-         type: string;
-         image?: { storageKey: string; url: string } | null;
-      } = {
-         name: String(formData.get('name') ?? ''),
-         brand: String(formData.get('brand') ?? ''),
-         type: String(formData.get('type') ?? 'ROD'),
+      return () => {
+         isCancelled = true;
+         window.clearTimeout(patience);
       };
+   }, [attempt, gearId, isSignedIn]);
 
-      if (images[0]) {
-         payload.image = images[0];
-      }
-
-      await axios.put(`/api/gear/${gearId}`, payload);
-
-      toast({ title: 'Gear updated', variant: 'success' });
-      navigate('/gear/me');
+   const retry = () => {
+      setState('loading');
+      setAttempt((count) => count + 1);
    };
 
+   if (!gearId || state === 'missing') {
+      return <NotFoundPage />;
+   }
+
    return (
-      <div className="min-h-screen">
-         <LandingHeader />
-         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-            <FishingActionBar />
-            <Show when="signed-in">
-               {gear ? (
-                  <form
-                     onSubmit={submitGear}
-                     className="grid gap-3 rounded-lg border p-4"
-                  >
-                     <h1 className="text-2xl font-semibold">Edit gear</h1>
-                     <input
-                        name="name"
-                        defaultValue={gear.name}
-                        className="rounded border p-2"
-                        required
-                     />
-                     <input
-                        name="brand"
-                        defaultValue={gear.brand}
-                        className="rounded border p-2"
-                        required
-                     />
-                     <select
-                        name="type"
-                        className="rounded border p-2"
-                        defaultValue={gear.type}
-                        required
-                     >
-                        {GEAR_TYPES.map((gearType) => (
-                           <option key={gearType} value={gearType}>
-                              {gearType.charAt(0) +
-                                 gearType.slice(1).toLowerCase()}
-                           </option>
-                        ))}
-                     </select>
-                     {gear.imageUrl && images.length === 0 ? (
-                        <img
-                           src={gear.imageUrl}
-                           alt={gear.name}
-                           className="h-40 w-40 rounded border object-cover"
-                        />
-                     ) : null}
-                     <R2ImagePicker
-                        scope="gear"
-                        label="Replace image"
-                        value={images}
-                        onChange={setImages}
-                        multiple={false}
-                        maxItems={1}
-                     />
-                     <Button type="submit">Save changes</Button>
-                  </form>
-               ) : (
-                  <FishingBobberLoader label="Loading gear..." />
-               )}
-            </Show>
-         </main>
-      </div>
+      <RequireSignIn what="your gear">
+         <section className="mx-auto w-[min(1400px,100%-32px)] py-10 md:py-14">
+            <h1 className="g text-[44px] md:text-[56px]">
+               {values?.name ? `Edit ${values.name}` : 'Edit gear'}
+            </h1>
+            <p className="mt-3 max-w-[52ch] text-ink-2">
+               Everything you recorded is here. Change what you need and save.
+            </p>
+            <div className="mt-10">
+               {state === 'loading' ? <GearFormSkeleton /> : null}
+               {state === 'error' ? (
+                  <div className="grid justify-items-start gap-4">
+                     <p className="text-[15px] text-destructive">
+                        Could not load this gear.
+                     </p>
+                     <Button variant="outline" onClick={retry}>
+                        Try again
+                     </Button>
+                  </div>
+               ) : null}
+               {state === 'ready' && values ? (
+                  <GearForm gearId={gearId} initial={values} />
+               ) : null}
+            </div>
+         </section>
+      </RequireSignIn>
    );
 }

@@ -1,20 +1,21 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import { toNodeHandler } from 'better-auth/node';
 import router from './routes';
-import { clerkMiddleware } from '@clerk/express';
+import { auth } from './lib/auth';
 import { prisma } from './lib/prisma';
-import { webhookController } from './controllers/webhook.controller';
 
 //reads variables from .env file and adds them to process.env
 dotenv.config();
 
 const app = express();
 
-app.post(
-   '/api/webhooks/clerk',
-   express.raw({ type: 'application/json' }),
-   webhookController.handleClerkWebhook
-);
+/*
+ * First, before anything that reads the body. better-auth needs the raw
+ * request stream, and a body parser consumes it before the handler ever runs.
+ * On Express 5 the wildcard is *splat, not *.
+ */
+app.all('/api/auth/*splat', toNodeHandler(auth));
 
 app.use(
    '/api/uploads/proxy',
@@ -25,7 +26,6 @@ app.use(
 );
 
 app.use(express.json());
-app.use(clerkMiddleware());
 app.use((req, res, next) => {
    const startedAt = Date.now();
 

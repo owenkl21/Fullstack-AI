@@ -1,0 +1,66 @@
+name: Deploy the server to Railway
+
+# Why this exists.
+#
+# Railway was never actually deploying on a push. Every deployment in the
+# project's history carries a cliAgentSessionId, which means every one was
+# triggered by hand from a laptop, and the repository has no webhooks at all.
+# The `source: github(...)` line in .railway/railway.ts only tells Railway where
+# the code comes from; it does not connect the repository to Railway's GitHub
+# App, and that connection is what a push needs in order to build anything.
+#
+# Connecting the App through the dashboard also works. This is here because it
+# lives in the repository, survives someone reinstalling the App, and leaves a
+# log of who deployed what and when.
+#
+# It needs one secret: RAILWAY_TOKEN, a project token from
+# Railway, Project Settings, Tokens. The token is scoped to this project only.
+
+on:
+   push:
+      branches: [main]
+      # The client is deployed by Vercel. Only rebuild the server when something
+      # the server actually serves has changed.
+      paths:
+         - 'packages/server/**'
+         - '.railway/**'
+         - 'package.json'
+         - 'bun.lock'
+         - '.github/workflows/deploy-server.yml'
+   workflow_dispatch:
+
+# A newer push should replace one that is still building, not queue behind it.
+concurrency:
+   group: deploy-server
+   cancel-in-progress: true
+
+jobs:
+   deploy:
+      runs-on: ubuntu-latest
+      steps:
+         - uses: actions/checkout@v5
+
+         - name: Install the Railway CLI
+           run: npm install -g @railway/cli
+
+         - name: Deploy
+           env:
+              RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+           run: railway up --service server --ci
+
+         - name: Check it answers
+           run: |
+              # The healthcheck Railway itself uses. A deploy that reports
+              # success but serves errors is worse than a failed one.
+              for attempt in $(seq 1 20); do
+                 code=$(curl -s -o /dev/null -w '%{http_code}' \
+                    https://server-production-a002.up.railway.app/api/hello || true)
+                 if [ "$code" = "200" ]; then
+                    echo "server is answering"
+                    exit 0
+                 fi
+                 echo "attempt $attempt: $code"
+                 sleep 15
+              done
+              echo "the server never came back healthy"
+              exit 1

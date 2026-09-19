@@ -1,13 +1,17 @@
-import { FishingActionBar } from '@/components/fishing/FishingActionBar';
 import { LandingPage } from '@/components/landing/LandingPage';
+import { FeedPage } from '@/pages/fishing/FeedPage';
+import { SignedIn, SignedOut } from '@/components/shell/Signed';
 
+/** Signed out: the landing page. Signed in: the feed, never the marketing page. */
 export function HomePage() {
    return (
-      <div className="scroll-smooth">
-         <LandingPage />
-         <section className="mx-auto w-full max-w-6xl px-4 pb-16">
-            <FishingActionBar />
-         </section>
-      </div>
+      <>
+         <SignedOut>
+            <LandingPage />
+         </SignedOut>
+         <SignedIn>
+            <FeedPage />
+         </SignedIn>
+      </>
    );
 }

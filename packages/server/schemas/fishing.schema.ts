@@ -7,6 +7,12 @@ export const fishingRequestSchema = z.object({
 export const weatherLookupSchema = z.object({
    latitude: z.coerce.number().min(-90).max(90),
    longitude: z.coerce.number().min(-180).max(180),
+   /*
+    * The moment to read for. A catch logged from the couch that night, or a
+    * week later from a photograph, wants the conditions at the hour it was
+    * caught, not the hour it was typed in. Absent, it means now.
+    */
+   at: z.coerce.date().optional(),
 });
 
 const optionalTrimmedString = z
@@ -20,12 +26,24 @@ const optionalTrimmedString = z
 const imageInputSchema = z.object({
    storageKey: z.string().trim().min(1).max(512),
    url: z.string().trim().url(),
+   /* The focal point, as fractions across and down; absent means the middle. */
+   focusX: z.coerce.number().min(0).max(1).optional().nullable(),
+   focusY: z.coerce.number().min(0).max(1).optional().nullable(),
 });
+
+/* A figure that may be absent either way: missing, or present and null. */
+const maybeNumber = z.number().optional().nullable();
 
 const weatherSnapshotSchema = z
    .object({
       weatherCondition: z.object({
-         iconBaseUri: z.string().trim().url(),
+         /*
+          * Not a URL any more. This shape dates from the Google provider,
+          * which sent an icon address; Open-Meteo sends none and the client
+          * passes an empty string, and demanding a URL here meant every catch
+          * saved with its conditions attached was refused with a 400.
+          */
+         iconBaseUri: z.string().trim().max(512),
          description: z.object({ text: z.string().trim().min(1).max(120) }),
       }),
       temperature: z.object({
@@ -34,9 +52,13 @@ const weatherSnapshotSchema = z
       }),
       precipitation: z.object({
          probability: z.object({ percent: z.coerce.number().min(0).max(100) }),
+         amountMm: maybeNumber,
       }),
       wind: z.object({
-         direction: z.object({ cardinal: z.string().trim().min(1).max(40) }),
+         direction: z.object({
+            cardinal: z.string().trim().min(1).max(40),
+            degrees: maybeNumber,
+         }),
          speed: z.object({
             value: z.coerce.number(),
             unit: z.string().trim().min(1).max(60),
@@ -47,6 +69,51 @@ const weatherSnapshotSchema = z
          }),
       }),
       cloudCover: z.coerce.number(),
+
+      /*
+       * The rest of a reading, all optional. The block above is what every
+       * client has always sent; this is what a client sends when it read
+       * Open-Meteo itself because the server could not, so the record still
+       * gets the sea, the moon and the pressure. `observedAt` is the hour it
+       * read, and is what marks the snapshot as a full reading.
+       */
+      observedAt: z.string().trim().max(40).optional().nullable(),
+      thunder: z.object({ cape: maybeNumber }).optional().nullable(),
+      airPressure: z
+         .object({ meanSeaLevelMillibars: maybeNumber })
+         .optional()
+         .nullable(),
+      feelsLike: z.object({ degrees: maybeNumber }).optional().nullable(),
+      dewPoint: z.object({ degrees: maybeNumber }).optional().nullable(),
+      relativeHumidity: maybeNumber,
+      visibilityM: maybeNumber,
+      uvIndex: maybeNumber,
+      isDaytime: z.boolean().optional().nullable(),
+      sun: z
+         .object({
+            rise: z.string().trim().max(40).optional().nullable(),
+            set: z.string().trim().max(40).optional().nullable(),
+         })
+         .optional()
+         .nullable(),
+      moon: z
+         .object({
+            fraction: z.number(),
+            illumination: z.number(),
+            name: z.string().trim().max(40),
+            spring: z.boolean(),
+         })
+         .optional()
+         .nullable(),
+      sea: z
+         .object({
+            surfaceTemperatureC: maybeNumber,
+            waveHeightM: maybeNumber,
+            swellHeightM: maybeNumber,
+            swellPeriodS: maybeNumber,
+         })
+         .optional()
+         .nullable(),
    })
    .optional()
    .nullable();
@@ -55,7 +122,29 @@ const catchPayloadSchema = z.object({
    title: z.string().trim().min(2).max(120),
    notes: z.string().trim().min(1).max(2000).optional().nullable(),
    caughtAt: z.coerce.date(),
+   caughtUntil: z.coerce.date().optional().nullable(),
+   lengthSource: z.enum(['EYE', 'TAPE']).optional(),
+   /* Logged for a competition, with the figure read off the photograph. */
+   competitionId: z.string().trim().min(1).optional().nullable(),
+   readMeasure: z.number().optional().nullable(),
+   readMeasureUnit: z.enum(['cm', 'in', 'kg', 'lb']).optional().nullable(),
+   readConfidence: z.number().min(0).max(1).optional().nullable(),
+   readNote: z.string().trim().max(280).optional().nullable(),
+   weightSource: z.enum(['LENGTH', 'SCALE', 'EYE']).optional(),
    siteId: z.string().trim().min(1).optional().nullable(),
+   speciesId: z.string().trim().min(1).optional().nullable(),
+   /*
+    * Where exactly, when it is not simply "the spot". A saved spot is a place
+    * you go back to; a pin is where this one fish came out, which can be a
+    * hundred metres along the ledge from it, or nowhere near any saved spot at
+    * all when a catch is logged after the fact.
+    */
+   latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
+   longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
+   released: z.coerce.boolean().optional(),
+   /* Show the fish, withhold the gully it came from. */
+   hideLocation: z.coerce.boolean().optional(),
+   visibility: z.enum(['PRIVATE', 'GROUPS', 'PUBLIC']).optional(),
    weight: z.coerce.number().positive().optional().nullable(),
    length: z.coerce.number().positive().optional().nullable(),
    count: z.coerce.number().int().positive().max(999).optional(),
@@ -74,6 +163,7 @@ export const updateCatchSchema = catchPayloadSchema;
 
 const fishingSitePayloadSchema = z.object({
    name: z.string().trim().min(2).max(120),
+   visibility: z.enum(['PRIVATE', 'GROUPS', 'PUBLIC']).optional(),
    description: z.string().trim().min(1).max(2000).optional().nullable(),
    latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
    longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
@@ -89,3 +179,14 @@ export const createFishingSiteSchema = fishingSitePayloadSchema.extend({
 });
 
 export const updateFishingSiteSchema = fishingSitePayloadSchema;
+
+export const speciesSearchSchema = z.object({
+   q: z.string().trim().max(120).optional(),
+   limit: z.coerce.number().int().positive().max(50).optional().default(20),
+});
+
+export const createSpeciesSchema = z.object({
+   name: z.string().trim().min(2).max(80),
+   /* From the fish namer, which speaks in scientific names. */
+   scientificName: z.string().trim().min(3).max(120).nullish(),
+});

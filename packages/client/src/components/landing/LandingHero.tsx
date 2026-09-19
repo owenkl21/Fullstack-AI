@@ -1,100 +1,99 @@
-import {
-   ArrowUpRight,
-   Compass,
-   MapPinned,
-   Sparkles,
-   WandSparkles,
-} from 'lucide-react';
-
+import { useEffect, useRef, useState } from 'react';
+import { TornEdge } from '@/components/brand/TornEdge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import { ANCHOR } from './layout';
+import { photos } from './photos';
+import { useParallaxFallback } from './useParallaxFallback';
+import { Link } from 'react-router-dom';
 
-const statCards = [
-   { icon: MapPinned, label: 'Mapped locations', value: '1,200+' },
-   { icon: Compass, label: 'Trip plans generated', value: '4,800+' },
-   { icon: Sparkles, label: 'Smart insights shared', value: '12k+' },
-];
-
+/*
+ * One photograph edge to edge, the promise over it, and the single teal action. The
+ * three lines arrive 120ms apart once the page has painted.
+ */
 export function LandingHero() {
+   const band = useRef<HTMLDivElement>(null);
+   useParallaxFallback(band, 0.28);
+
+   const [entered, setEntered] = useState(false);
+   useEffect(() => {
+      // A short timer rather than animation frames: frames pause in a background tab,
+      // and the promise must be on screen the moment the page is looked at.
+      const timer = window.setTimeout(() => setEntered(true), 60);
+      return () => window.clearTimeout(timer);
+   }, []);
+
+   const rise = (delay: string) => ({
+      className: cn(
+         'transition-[opacity,transform]',
+         entered ? 'translate-y-0 opacity-100' : 'translate-y-[22px] opacity-0'
+      ),
+      style: {
+         transitionDuration: '0.7s, 0.8s',
+         transitionTimingFunction: 'var(--ease)',
+         transitionDelay: entered ? delay : '0s',
+      },
+   });
+
+   const headline = rise('0s');
+   const line = rise('0.12s');
+   const action = rise('0.24s');
+
    return (
       <section
          id="top"
-         className="relative overflow-hidden border-b border-border/60 bg-gradient-to-b from-primary/10 via-background to-background"
+         className={cn(
+            'relative h-[clamp(600px,calc(100vh-60px),760px)] overflow-hidden bg-black-block text-paper md:h-[clamp(560px,calc(100dvh-60px),860px)]',
+            ANCHOR
+         )}
       >
-         <div className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24 lg:px-8">
-            <div className="relative space-y-6 text-left">
-               <p className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                  <WandSparkles className="size-3.5" />
-                  Inspired by modern UI libraries
-               </p>
-               <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">
-                  Plan, log, and relive your best fishing days with a premium
-                  UI.
-               </h1>
-               <p className="max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-                  We redesigned the landing experience with richer color, glassy
-                  surfaces, and modular sections ready for your illustrations,
-                  product renders, and future marketing assets.
-               </p>
-               <div className="flex flex-wrap gap-3">
-                  <Button size="lg" className="shadow-lg shadow-primary/35">
-                     Get early access
-                  </Button>
-                  <Button size="lg" variant="outline">
-                     View product tour
-                  </Button>
-               </div>
-               <div className="rounded-2xl border border-dashed border-primary/40 bg-card/60 p-4 backdrop-blur">
-                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary/80">
-                     Hero illustration slot
-                  </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                     Drop a 16:10 fishing scene, app dashboard mockup, or motion
-                     artwork here.
-                  </p>
-               </div>
-            </div>
-
-            <div className="relative space-y-4">
-               <Card className="border-primary/20 bg-card/80 shadow-xl backdrop-blur">
-                  <CardHeader className="space-y-4">
-                     <CardTitle className="flex items-center justify-between text-base">
-                        Live activity panel
-                        <ArrowUpRight className="size-4 text-primary" />
-                     </CardTitle>
-                     <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground">
-                           Illustration slot A
-                        </div>
-                        <div className="rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground">
-                           Illustration slot B
-                        </div>
-                     </div>
-                  </CardHeader>
-               </Card>
-
-               <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-                  {statCards.map(({ icon: Icon, label, value }) => (
-                     <Card
-                        key={label}
-                        className="border-primary/15 bg-card/75 backdrop-blur"
-                     >
-                        <CardHeader className="flex flex-row items-center justify-between gap-4 pb-0">
-                           <CardTitle className="text-sm font-medium text-muted-foreground">
-                              {label}
-                           </CardTitle>
-                           <Icon className="size-5 text-primary" />
-                        </CardHeader>
-                        <CardContent>
-                           <p className="text-3xl font-semibold tracking-tight">
-                              {value}
-                           </p>
-                        </CardContent>
-                     </Card>
-                  ))}
-               </div>
-            </div>
+         <div
+            ref={band}
+            className="parallax-hero absolute inset-x-0 top-[-12%] bottom-0"
+         >
+            <img
+               src={photos.heroSpot}
+               alt="An angler casting from the rocks at sunset"
+               fetchPriority="high"
+               className="h-full w-full object-cover object-[50%_45%]"
+            />
          </div>
+         <div className="scrim-hero absolute inset-0" aria-hidden="true" />
+
+         <div className="absolute inset-x-0 top-0 bottom-[84px] z-[2] flex flex-col items-center justify-center gap-3.5 px-6 text-center md:bottom-[90px] md:gap-[18px]">
+            <h1
+               className={cn(
+                  headline.className,
+                  'g max-w-[30ch] text-[clamp(52px,17vw,72px)] text-balance [text-shadow:0_2px_24px_rgba(0,0,0,0.35)] md:text-[clamp(48px,6.6vw,96px)]'
+               )}
+               style={headline.style}
+            >
+               Every fish. Every condition. The whole season.
+            </h1>
+            <p
+               className={cn(
+                  line.className,
+                  'max-w-[52ch] text-[16px] text-paper text-pretty [text-shadow:0_1px_14px_rgba(0,0,0,0.55)] md:text-[18px]'
+               )}
+               style={line.style}
+            >
+               One tap stamps the place, the minute and the weather. The record
+               builds itself before the fish goes back.
+            </p>
+            <Button
+               size="lg"
+               className={cn(
+                  action.className,
+                  'md:h-[52px] md:px-7 md:text-[26px]'
+               )}
+               style={action.style}
+               asChild
+            >
+               <Link to="/sign-up">Start your log</Link>
+            </Button>
+         </div>
+
+         <TornEdge fill="bg" seed={5} />
       </section>
    );
 }

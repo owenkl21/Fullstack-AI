@@ -13,13 +13,10 @@ if (!databaseUrl) {
 
 const parsed = new URL(databaseUrl);
 
-const adapter = new PrismaMariaDb({
-   host: parsed.hostname,
-   port: parsed.port ? Number(parsed.port) : 3306,
-   user: decodeURIComponent(parsed.username),
-   password: decodeURIComponent(parsed.password),
-   database: parsed.pathname.replace(/^\//, ''),
-});
+// Pass the URL through whole. Destructuring it into host/port/user/password
+// silently drops every query parameter, which is where a hosted MySQL puts
+// sslaccept, connectionLimit and connectTimeout.
+const adapter = new PrismaMariaDb(databaseUrl);
 
 const baseLogs: Prisma.LogLevel[] = isDevelopment
    ? ['query', 'warn', 'error']

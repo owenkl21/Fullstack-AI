@@ -1,7 +1,11 @@
-type GoogleMapsWindow = NonNullable<Window['google']>;
+/*
+ * What a link from Maps carries, and what a pair of typed fields means.
+ * Nothing here talks to Google: parsing a pasted link is a regex over a
+ * string, with no network call and no key. The map itself is Leaflet, in
+ * lib/leaflet.ts.
+ */
 
-let googleMapsScriptPromise: Promise<GoogleMapsWindow> | null = null;
-
+/** Pulls a position out of a link copied from Google Maps, in any of its shapes. */
 export const parseGoogleMapsCoordinates = (mapsLink: string) => {
    const decodedLink = decodeURIComponent(mapsLink);
    const patterns = [
@@ -35,37 +39,36 @@ export const parseGoogleMapsCoordinates = (mapsLink: string) => {
    return null;
 };
 
-export const loadGoogleMapsScript = async () => {
-   if (window.google?.maps) {
-      return window.google;
+/* ---------- Coordinates as the forms handle them ---------- */
+
+export type MapPosition = { lat: number; lng: number };
+
+/** A pair of typed fields becomes a position only when both are real and in range. */
+export const readPosition = (
+   latitude: string,
+   longitude: string
+): MapPosition | null => {
+   if (!latitude.trim() || !longitude.trim()) {
+      return null;
    }
 
-   if (googleMapsScriptPromise) {
-      return googleMapsScriptPromise;
+   const lat = Number(latitude);
+   const lng = Number(longitude);
+
+   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null;
    }
 
-   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-   if (!apiKey) {
-      throw new Error('Google Maps API key is missing.');
+   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return null;
    }
 
-   googleMapsScriptPromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-         if (!window.google) {
-            reject(new Error('Google Maps failed to initialize.'));
-            return;
-         }
-
-         resolve(window.google);
-      };
-      script.onerror = () => reject(new Error('Failed to load Google Maps.'));
-      document.head.appendChild(script);
-   });
-
-   return googleMapsScriptPromise;
+   return { lat, lng };
 };
+
+/**
+ * Five decimals is about a metre, which is finer than any fix the phone gives
+ * and as fine as a pin dropped by hand can honestly claim. The sixth decimal
+ * was a tenth of a metre printed against a position good to thirty.
+ */
+export const formatCoordinate = (value: number) => value.toFixed(5);

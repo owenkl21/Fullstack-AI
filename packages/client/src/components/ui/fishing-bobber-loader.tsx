@@ -1,34 +1,39 @@
 import { cn } from '@/lib/utils';
 
-type FishingBobberLoaderProps = {
+/*
+ * The bobber is gone. This keeps the old import working as a static, content-shaped
+ * skeleton until each page gets its own. No spinner, no shimmer, no float.
+ */
+export function FishingBobberLoader({
+   label = 'Loading',
+   className,
+   rows = 3,
+   compact = false,
+}: {
    label?: string;
    className?: string;
+   rows?: number;
    compact?: boolean;
-};
-
-export function FishingBobberLoader({
-   label = 'Loading...',
-   className,
-   compact = false,
-}: FishingBobberLoaderProps) {
+}) {
    return (
       <div
-         className={cn(
-            'flex flex-col items-center justify-center gap-3 rounded-lg border border-border bg-muted/20 p-4 text-muted-foreground',
-            compact &&
-               'inline-flex flex-row gap-2 border-none bg-transparent p-0',
-            className
-         )}
          role="status"
-         aria-live="polite"
+         aria-label={label}
+         className={cn('flex flex-col', className)}
       >
-         <div className="relative h-12 w-12">
-            <div className="absolute left-1/2 top-0 h-4 w-4 -translate-x-1/2 rounded-full border border-red-200 bg-red-500 shadow-sm" />
-            <div className="absolute left-1/2 top-4 h-3 w-0.5 -translate-x-1/2 rounded-full bg-slate-500" />
-            <div className="absolute left-1/2 top-6 h-6 w-6 -translate-x-1/2 rounded-full border border-white/60 bg-white bobber-float" />
-            <div className="absolute left-1/2 top-9 h-2 w-8 -translate-x-1/2 rounded-full bg-sky-400/50 blur-[1px] bobber-ripple" />
-         </div>
-         <p className="text-sm">{label}</p>
+         {Array.from({ length: compact ? 1 : rows }).map((_, i) => (
+            <div
+               key={i}
+               className="flex items-center gap-3 border-t border-line px-4 py-3"
+            >
+               <div className="size-[52px] shrink-0 bg-bg-2" />
+               <div className="flex flex-1 flex-col gap-2">
+                  <div className="h-5 w-2/5 bg-bg-2" />
+                  <div className="h-4 w-4/5 bg-bg-2" />
+               </div>
+            </div>
+         ))}
+         <span className="sr-only">{label}</span>
       </div>
    );
 }

@@ -1,168 +1,342 @@
 import axios from 'axios';
-import { Show } from '@clerk/react';
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FishingActionBar } from '@/components/fishing/FishingActionBar';
-import { LandingHeader } from '@/components/landing/LandingHeader';
-import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
+import { TrashIcon } from '@heroicons/react/24/outline';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useRevealIn } from '@/components/brand/Reveal';
+import { GearRow, type GearRowItem } from '@/components/fishing/rows/GearRow';
+import { RowList } from '@/components/fishing/rows/Row';
+import {
+   GEAR_TYPE_ORDER,
+   gearTypeWords,
+   plural,
+} from '@/components/fishing/rows/format';
+import { EmptyState } from '@/components/states/EmptyState';
+import { InlineError } from '@/components/states/InlineError';
+import { ListSkeleton } from '@/components/states/ListSkeleton';
+import { NoMatchState } from '@/components/states/NoMatchState';
+import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
+import {
+   Dialog,
+   DialogContent,
+   DialogDescription,
+   DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from '@/components/ui/use-toast';
+import { useDocumentTitle } from '@/lib/title';
+import { SearchField } from '@/components/fishing/rows/SearchField';
 
-type GearItem = {
-   id: string;
-   name: string;
-   brand: string;
-   type: string;
-   imageUrl: string | null;
-};
+/*
+ * The tackle box, grouped the way it is stored: rods with rods, reels with reels,
+ * each heading carrying its count. Delete stays on the row because gear has no
+ * record of its own yet, and the confirmation says what deleting actually costs.
+ */
+
+type GearItem = GearRowItem;
+
+type LoadStatus = 'loading' | 'ready' | 'error';
+
+const LOAD_FAILED = 'Could not load your gear.';
 
 export function MyGearPage() {
-   const pageSize = 10;
-   const [items, setItems] = useState<GearItem[]>([]);
-   const [searchTerm, setSearchTerm] = useState('');
-   const [page, setPage] = useState(1);
-   const [isLoading, setIsLoading] = useState(true);
+   useDocumentTitle('My gear');
 
-   const filteredItems = useMemo(() => {
-      const query = searchTerm.trim().toLowerCase();
-      if (!query) {
+   return (
+      <RequireSignIn what="your gear">
+         <MyGearList />
+      </RequireSignIn>
+   );
+}
+
+function MyGearList() {
+   const root = useRef<HTMLElement>(null);
+   useRevealIn(root);
+   const heading = useRef<HTMLHeadingElement>(null);
+
+   const [params, setParams] = useSearchParams();
+   const [items, setItems] = useState<GearItem[]>([]);
+   const [status, setStatus] = useState<LoadStatus>('loading');
+   const [pending, setPending] = useState<GearItem | null>(null);
+   const [isDeleting, setIsDeleting] = useState(false);
+   const [deleteError, setDeleteError] = useState('');
+
+   const query = params.get('q') ?? '';
+
+   const [attempt, setAttempt] = useState(0);
+
+   useEffect(() => {
+      let cancelled = false;
+
+      axios
+         .get('/api/gear/me')
+         .then(({ data }) => {
+            if (cancelled) {
+               return;
+            }
+
+            setItems(data.gear ?? []);
+            setStatus('ready');
+         })
+         .catch((error: unknown) => {
+            if (cancelled) {
+               return;
+            }
+
+            console.error(error);
+            setStatus('error');
+         });
+
+      return () => {
+         cancelled = true;
+      };
+   }, [attempt]);
+
+   /* Try again keeps the skeleton honest: the count moves, so the skeleton remounts
+    * and starts its five seconds over rather than staying on the old error. */
+   const retry = useCallback(() => {
+      setStatus('loading');
+      setAttempt((current) => current + 1);
+   }, []);
+
+   const setQuery = useCallback(
+      (value: string) => {
+         setParams(
+            (previous) => {
+               const next = new URLSearchParams(previous);
+               if (value) {
+                  next.set('q', value);
+               } else {
+                  next.delete('q');
+               }
+               return next;
+            },
+            { replace: true }
+         );
+      },
+      [setParams]
+   );
+
+   const filtered = useMemo(() => {
+      const needle = query.trim().toLowerCase();
+      if (!needle) {
          return items;
       }
 
       return items.filter((entry) =>
-         [entry.name, entry.brand, entry.type].some((value) =>
-            value.toLowerCase().includes(query)
+         [entry.name, entry.brand, gearTypeWords(entry.type).one].some(
+            (value) => value.toLowerCase().includes(needle)
          )
       );
-   }, [items, searchTerm]);
+   }, [items, query]);
 
-   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
-   const pagedItems = filteredItems.slice(
-      (page - 1) * pageSize,
-      page * pageSize
-   );
+   const groups = useMemo(() => {
+      const byType = new Map<string, GearItem[]>();
 
-   useEffect(() => {
-      const load = async () => {
-         try {
-            setIsLoading(true);
-            const { data } = await axios.get('/api/gear/me');
-            setItems(data.gear ?? []);
-         } catch (error) {
-            console.error(error);
-            toast({ title: 'Unable to load your gear', variant: 'error' });
-         } finally {
-            setIsLoading(false);
+      filtered.forEach((entry) => {
+         const key = (entry.type ?? '').toUpperCase();
+         const bucket = byType.get(key);
+         if (bucket) {
+            bucket.push(entry);
+         } else {
+            byType.set(key, [entry]);
          }
-      };
+      });
 
-      void load();
+      return Array.from(byType.entries()).sort((a, b) => {
+         const left = GEAR_TYPE_ORDER.indexOf(a[0]);
+         const right = GEAR_TYPE_ORDER.indexOf(b[0]);
+         return (
+            (left === -1 ? GEAR_TYPE_ORDER.length : left) -
+            (right === -1 ? GEAR_TYPE_ORDER.length : right)
+         );
+      });
+   }, [filtered]);
+
+   const closeDialog = useCallback(() => {
+      setPending(null);
+      setDeleteError('');
    }, []);
 
-   useEffect(() => {
-      setPage(1);
-   }, [searchTerm]);
-
-   useEffect(() => {
-      if (page > totalPages) {
-         setPage(totalPages);
-      }
-   }, [page, totalPages]);
-
-   const deleteGear = async (gearId: string) => {
-      if (!window.confirm('Delete this gear item?')) {
+   const confirmDelete = useCallback(async () => {
+      if (!pending) {
          return;
       }
 
-      await axios.delete(`/api/gear/${gearId}`);
-      setItems((prev) => prev.filter((entry) => entry.id !== gearId));
-      toast({ title: 'Gear deleted', variant: 'success' });
-   };
+      try {
+         setIsDeleting(true);
+         setDeleteError('');
+         await axios.delete(`/api/gear/${pending.id}`);
+         setItems((previous) =>
+            previous.filter((entry) => entry.id !== pending.id)
+         );
+         toast({
+            title: `${pending.name} deleted.`,
+            description: 'It is off every catch it was used on.',
+            variant: 'success',
+         });
+         closeDialog();
+         heading.current?.focus();
+      } catch (error) {
+         console.error(error);
+         setDeleteError('Not deleted. Check your connection and try again.');
+      } finally {
+         setIsDeleting(false);
+      }
+   }, [closeDialog, pending]);
+
+   const total = plural(items.length, 'item');
+   const countLine = query.trim() ? `${filtered.length} of ${total}` : total;
 
    return (
-      <div className="min-h-screen">
-         <LandingHeader />
-         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-            <FishingActionBar />
-            <Show when="signed-in">
-               <section className="space-y-3 rounded-lg border p-4">
-                  <h1 className="text-2xl font-semibold">My gear</h1>
-                  <input
-                     className="w-full rounded border px-3 py-2 text-sm"
-                     value={searchTerm}
-                     onChange={(event) => setSearchTerm(event.target.value)}
-                     placeholder="Search gear"
-                  />
-                  {isLoading ? (
-                     <FishingBobberLoader label="Loading your gear..." />
-                  ) : filteredItems.length === 0 ? (
-                     <p className="text-sm text-muted-foreground">
-                        No gear found.
-                     </p>
-                  ) : (
-                     pagedItems.map((entry) => (
-                        <div
-                           key={entry.id}
-                           className="flex flex-wrap items-center justify-between gap-3 rounded border p-3"
-                        >
-                           <div className="flex items-center gap-3">
-                              {entry.imageUrl ? (
-                                 <img
-                                    src={entry.imageUrl}
-                                    alt={entry.name}
-                                    className="h-12 w-12 rounded border object-cover"
-                                 />
-                              ) : null}
-                              <div>
-                                 <p className="font-medium">{entry.name}</p>
-                                 <p className="text-sm text-muted-foreground">
-                                    {entry.brand} • {entry.type.toLowerCase()}
-                                 </p>
-                              </div>
-                           </div>
-                           <div className="flex gap-2">
-                              <Button asChild size="sm" variant="outline">
-                                 <Link to={`/gear/${entry.id}/edit`}>Edit</Link>
-                              </Button>
-                              <Button
-                                 size="sm"
-                                 variant="destructive"
-                                 onClick={() => void deleteGear(entry.id)}
-                              >
-                                 Delete
-                              </Button>
-                           </div>
-                        </div>
-                     ))
-                  )}
-                  {filteredItems.length > pageSize ? (
-                     <div className="flex items-center justify-between pt-2">
-                        <p className="text-sm text-muted-foreground">
-                           Page {page} of {totalPages}
-                        </p>
-                        <div className="flex gap-2">
-                           <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={page === 1}
-                              onClick={() => setPage((current) => current - 1)}
-                           >
-                              Previous
-                           </Button>
-                           <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={page === totalPages}
-                              onClick={() => setPage((current) => current + 1)}
-                           >
-                              Next
-                           </Button>
-                        </div>
-                     </div>
+      <section
+         ref={root}
+         className="mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14"
+      >
+         <header className="rv">
+            <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                  <h1
+                     ref={heading}
+                     tabIndex={-1}
+                     className="g text-[44px] md:text-[56px]"
+                  >
+                     My gear
+                  </h1>
+                  {status === 'ready' ? (
+                     <p className="lab num">{countLine}</p>
                   ) : null}
-               </section>
-            </Show>
-         </main>
-      </div>
+               </div>
+               {status === 'ready' && items.length > 0 ? (
+                  <Button asChild>
+                     <Link to="/gear/new">Add gear</Link>
+                  </Button>
+               ) : null}
+            </div>
+
+            {status === 'ready' && items.length > 0 ? (
+               <div className="mt-8">
+                  <SearchField
+                     id="gear-search"
+                     label="Search your gear"
+                     placeholder="Rod, reel or line"
+                     value={query}
+                     onChange={(next) => setQuery(next)}
+                  />
+               </div>
+            ) : null}
+         </header>
+
+         <div className="mt-8">
+            {status === 'loading' ? (
+               <ListSkeleton
+                  key={attempt}
+                  label="Loading your gear"
+                  errorMessage={LOAD_FAILED}
+                  onRetry={retry}
+               />
+            ) : status === 'error' ? (
+               <InlineError message={LOAD_FAILED} onRetry={retry} />
+            ) : items.length === 0 ? (
+               <EmptyState
+                  sentence="No gear logged yet, so no catch can say what it was taken on."
+                  actionLabel="Add gear"
+                  to="/gear/new"
+               />
+            ) : filtered.length === 0 ? (
+               <NoMatchState
+                  sentence="No gear matches that search."
+                  onClear={() => setQuery('')}
+               />
+            ) : (
+               <div className="flex flex-col gap-10">
+                  {groups.map(([type, gear]) => {
+                     const words = gearTypeWords(type);
+                     return (
+                        <section key={type || 'other'}>
+                           <h2 className="g text-[30px]">
+                              {gear.length === 1 ? words.one : words.many}{' '}
+                              <span className="num text-ink-3">
+                                 ({gear.length})
+                              </span>
+                           </h2>
+                           <RowList className="mt-3">
+                              {gear.map((entry) => (
+                                 <GearRow
+                                    key={entry.id}
+                                    item={entry}
+                                    trailing={
+                                       /*
+                                        * The word "Delete" printed once per row
+                                        * was the loudest thing on a page of
+                                        * gear, and it read as the point of the
+                                        * list. Repeated down a list a
+                                        * destructive control is a mark, not a
+                                        * sentence; the label says which rod it
+                                        * would take, and the dialog behind it is
+                                        * unchanged.
+                                        */
+                                       <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon"
+                                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                          aria-label={`Delete ${entry.name}`}
+                                          onClick={() => setPending(entry)}
+                                       >
+                                          <TrashIcon aria-hidden="true" />
+                                       </Button>
+                                    }
+                                 />
+                              ))}
+                           </RowList>
+                        </section>
+                     );
+                  })}
+               </div>
+            )}
+         </div>
+
+         <Dialog
+            open={Boolean(pending)}
+            onOpenChange={(open) => {
+               if (!open) {
+                  closeDialog();
+               }
+            }}
+         >
+            <DialogContent className="gap-0 sm:max-w-[480px]">
+               <DialogTitle className="g text-[30px] font-normal">
+                  Delete {pending?.name}?
+               </DialogTitle>
+               <DialogDescription className="mt-3 text-base">
+                  It comes off every catch it was used on, and that cannot be
+                  undone.
+               </DialogDescription>
+               {deleteError ? (
+                  <p role="alert" className="mt-4 text-sm text-destructive">
+                     {deleteError}
+                  </p>
+               ) : null}
+               <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <Button
+                     type="button"
+                     variant="destructive"
+                     disabled={isDeleting}
+                     onClick={() => void confirmDelete()}
+                  >
+                     {isDeleting ? 'Deleting' : 'Delete'}
+                  </Button>
+                  <Button
+                     type="button"
+                     variant="ghost"
+                     className="text-paper-2 hover:bg-paper/10 hover:text-paper"
+                     onClick={closeDialog}
+                  >
+                     Cancel
+                  </Button>
+               </div>
+            </DialogContent>
+         </Dialog>
+      </section>
    );
 }
