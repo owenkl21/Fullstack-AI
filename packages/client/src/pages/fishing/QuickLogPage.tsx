@@ -43,6 +43,17 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { readPhotoMeta } from '@/lib/exif';
 import { formatMetres, nearestSpot, type SpotLike } from '@/lib/geo';
 import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
+import {
+   enterCompetition,
+   fetchCompetition,
+   submitEntry,
+   type Competition,
+} from '@/components/social/competitions-api';
+import {
+   CompetitionBanner,
+   CompetitionEntryFields,
+} from '@/components/fishing/CompetitionEntryFields';
+import { entryProblem } from '@/components/fishing/competition-entry';
 import { SpeciesCombobox } from '@/components/fishing/SpeciesCombobox';
 import { Picker } from '@/components/ui/picker';
 import { AddGearInline } from '@/components/fishing/AddGearInline';
@@ -152,6 +163,7 @@ function QuickLog() {
 
    const onPhotoFile = (file: File) => {
       void readPhotoMeta(file).then((meta) => {
+         photoTakenAt.current = meta.takenAt;
          if (meta.takenAt && timeSource !== 'typed') {
             setStampedAt(meta.takenAt);
             setTimeSource('photo');
@@ -190,6 +202,43 @@ function QuickLog() {
    const [typed, setTyped] = useState('');
    const [speciesError, setSpeciesError] = useState<string | null>(null);
    const speciesInput = useRef<HTMLInputElement>(null);
+
+   /*
+    * Entering a competition: the same log, preset for it, with two more
+    * asks. The photograph of the fish on the tape or scale, and one sentence
+    * to tick about where it was caught. The species is locked when the
+    * competition is for one fish. The entry is written after the catch.
+    */
+   const competitionId = params.get('competition');
+   const [competition, setCompetition] = useState<Competition | null>(null);
+   const [competitionEntered, setCompetitionEntered] = useState(false);
+   const [measurePhoto, setMeasurePhoto] = useState<UploadedPhoto | null>(null);
+   const [measureBusy, setMeasureBusy] = useState(false);
+   const [areaConfirmed, setAreaConfirmed] = useState(false);
+   const [entryIssue, setEntryIssue] = useState<string | null>(null);
+   /* What the camera wrote in the hero photo, for the window check. */
+   const photoTakenAt = useRef<Date | null>(null);
+   useEffect(() => {
+      if (!competitionId) return;
+      const controller = new AbortController();
+      fetchCompetition(competitionId, controller.signal)
+         .then((detail) => {
+            setCompetition(detail.competition);
+            setCompetitionEntered(detail.you.entered);
+            if (detail.competition.species) {
+               setChosen(detail.competition.species.commonName);
+               setTyped('');
+            }
+         })
+         .catch(() =>
+            toast({
+               title: 'Could not read the competition.',
+               description: 'The catch still logs as usual.',
+               variant: 'error',
+            })
+         );
+      return () => controller.abort();
+   }, [competitionId]);
 
    const [length, setLength] = useState('');
    const [lengthUnit, setLengthUnit] = useState<MeasureUnit>('cm');
@@ -417,6 +466,33 @@ function QuickLog() {
       const lengthCm = toMetricValue(length, lengthUnit);
       const weightKg = toMetricValue(weight, weightUnit);
 
+      /* What the competition judges, metric, and whether it can be entered. */
+      const declaredValue = !competition
+         ? null
+         : competition.rule === 'SPECIES_VARIETY'
+           ? null
+           : competition.measure === 'LENGTH'
+             ? lengthCm
+             : weightKg;
+      if (competition) {
+         const problem = entryProblem(
+            competition,
+            measurePhoto,
+            areaConfirmed,
+            declaredValue
+         );
+         setEntryIssue(problem);
+         if (problem) {
+            toast({
+               title: 'Not entered yet.',
+               description: problem,
+               variant: 'error',
+            });
+            if (phone) setStep(competition.rule === 'SPECIES_VARIETY' ? 3 : 2);
+            return;
+         }
+      }
+
       try {
          setIsSaving(true);
 
@@ -454,8 +530,15 @@ function QuickLog() {
             weatherSnapshot: toSavableSnapshot(snapshot),
             length: lengthCm,
             weight: weightKg,
-            lengthSource,
-            weightSource,
+            /* A competition entry's figure came off the tape or the scale. */
+            lengthSource:
+               competition?.measure === 'LENGTH' && declaredValue !== null
+                  ? 'TAPE'
+                  : lengthSource,
+            weightSource:
+               competition?.measure === 'WEIGHT' && declaredValue !== null
+                  ? 'SCALE'
+                  : weightSource,
             images: photo ? [photo] : [],
             gearIds,
             released: released === 'RELEASED',
@@ -465,6 +548,45 @@ function QuickLog() {
             '/api/catches',
             payload
          );
+
+         if (competition) {
+            /* The catch is in; now the entry, and the competition's page. */
+            try {
+               if (!competitionEntered) await enterCompetition(competition.id);
+               await submitEntry(competition.id, {
+                  catchId: data.catch.id,
+                  measureImage: measurePhoto
+                     ? {
+                          storageKey: measurePhoto.storageKey,
+                          url: measurePhoto.url,
+                       }
+                     : null,
+                  declaredValue,
+                  areaConfirmed,
+                  photoTakenAt: photoTakenAt.current?.toISOString() ?? null,
+                  note: notes.trim() || null,
+               });
+               toast({
+                  title:
+                     competition.checks === 'REVIEW'
+                        ? 'Catch submitted for organiser review.'
+                        : 'Catch submitted. Standings updated.',
+                  variant: 'success',
+               });
+               if (draftId) removeDraft(draftId);
+               navigate(`/competitions/${competition.id}`, { replace: true });
+            } catch {
+               toast({
+                  title: 'Catch saved, not entered.',
+                  description:
+                     'The catch is in your log. Enter it again from the competition page.',
+                  variant: 'error',
+               });
+               navigate(`/catches/${data.catch.id}`, { replace: true });
+            }
+            return;
+         }
+
          toast({
             title: `Catch saved. ${[
                title,
@@ -526,7 +648,19 @@ function QuickLog() {
 
    /* ---- The blocks, each drawn once, placed by the screen ---------------- */
 
-   const speciesBlock = (
+   const speciesBlock = competition?.species ? (
+      <div>
+         <span className="lab mb-2 block">Species</span>
+         <div className="flex items-center justify-between gap-3 border border-ink px-3 py-2">
+            <span className="g-tracked text-[21px]">
+               {competition.species.commonName}
+            </span>
+            <span className="text-[13px] text-ink-3">
+               The competition's fish
+            </span>
+         </div>
+      </div>
+   ) : (
       <div>
          <span className="lab mb-2 block">Species</span>
          <SpeciesCombobox
@@ -559,6 +693,28 @@ function QuickLog() {
          />
       </div>
    );
+
+   const competitionBanner = competition ? (
+      <CompetitionBanner competition={competition} />
+   ) : null;
+
+   const competitionBlock = competition ? (
+      <CompetitionEntryFields
+         competition={competition}
+         measurePhoto={measurePhoto}
+         onMeasurePhoto={(next) => {
+            setMeasurePhoto(next);
+            setEntryIssue(null);
+         }}
+         onMeasureBusy={setMeasureBusy}
+         areaConfirmed={areaConfirmed}
+         onAreaConfirmed={(next) => {
+            setAreaConfirmed(next);
+            setEntryIssue(null);
+         }}
+         problem={entryIssue}
+      />
+   ) : null;
 
    const photoBlock = (
       <PhotoBlock
@@ -899,10 +1055,18 @@ function QuickLog() {
       <button
          type="button"
          onClick={() => void save()}
-         disabled={photoBusy || isSaving}
+         disabled={photoBusy || measureBusy || isSaving}
          className="g-tracked flex min-h-[52px] w-full items-center justify-center bg-teal px-7 text-[22px] text-teal-ink transition-[filter] duration-150 hover:brightness-95 disabled:opacity-60 md:w-auto md:min-w-[222px]"
       >
-         {isSaving ? 'Saving' : photoBusy ? 'Sending the photo' : 'Save catch'}
+         {isSaving
+            ? 'Saving'
+            : photoBusy || measureBusy
+              ? 'Sending the photo'
+              : competition
+                ? competition.checks === 'REVIEW'
+                   ? 'Submit for review'
+                   : 'Submit and update standings'
+                : 'Save catch'}
       </button>
    );
 
@@ -985,6 +1149,7 @@ function QuickLog() {
                {step === 1 ? (
                   <div className="flex flex-col gap-6">
                      {heading('01', current.title)}
+                     {competitionBanner}
                      {photoBlock}
                      {speciesBlock}
                      {whenWhereBlock}
@@ -993,6 +1158,7 @@ function QuickLog() {
                   <div className="flex flex-col gap-6">
                      {heading('02', current.title)}
                      {measureBlock}
+                     {competitionBlock}
                      {fishBlock}
                      <div>
                         <span className="lab mb-3 block">
@@ -1012,9 +1178,15 @@ function QuickLog() {
             <div className="grid gap-7 px-4 py-6 md:grid-cols-[minmax(0,1.62fr)_minmax(0,1fr)] md:gap-9 md:px-7 xl:gap-12 xl:px-9">
                <div className="min-w-0">
                   {heading('01', 'The catch')}
+                  {competitionBanner ? (
+                     <div className="mb-5">{competitionBanner}</div>
+                  ) : null}
                   {speciesBlock}
                   <div className="mt-5">{photoBlock}</div>
                   <div className="mt-6">{measureBlock}</div>
+                  {competitionBlock ? (
+                     <div className="mt-6">{competitionBlock}</div>
+                  ) : null}
                   <div className="mt-5">{fishBlock}</div>
                   <div className="mt-6">{gearFold}</div>
                </div>

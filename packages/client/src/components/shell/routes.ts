@@ -6,7 +6,12 @@
  * teal save bar, and two teal blocks fighting over one corner of a phone is
  * worse than no navigation for the length of one form.
  */
-export const TASK_ROUTES = ['/log', '/catches/new', '/catches/:catchId/edit'];
+export const TASK_ROUTES = [
+   '/log',
+   '/catches/new',
+   '/catches/:catchId/edit',
+   '/competitions/new',
+];
 
 /*
  * A pattern is matched a segment at a time rather than by a regular

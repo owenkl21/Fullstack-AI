@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { useEffect, useState } from 'react';
 import {
    fetchCompetitions,
@@ -6,17 +5,22 @@ import {
 } from '@/components/social/competitions-api';
 import { Button } from '@/components/ui/button';
 import { Picker } from '@/components/ui/picker';
-import { cn } from '@/lib/utils';
+import type { UploadedPhoto } from '@/components/fishing/quicklog/PhotoBlock';
+import {
+   CompetitionBanner,
+   CompetitionEntryFields,
+} from '@/components/fishing/CompetitionEntryFields';
 
 /*
- * Entering a catch in a competition.
+ * Entering a catch in a competition, from the full catch form.
  *
- * Pick the competition, then the figure it judges is read off the
- * photograph: the fish on a tape for a length competition, on a scale for
- * a weight one. The reader is asked for what it can actually see and how
- * sure it is, and under sixty per cent it is sent back for a clearer
- * picture rather than trusted. What it read is what goes on the record.
+ * Pick one of the running competitions you are in, add the photograph of the
+ * fish on the tape or scale, tick the sentence about where it was caught. The
+ * entry is written after the catch is, and the checks run on the server: the
+ * figure is read off the photograph there, so nothing is read here first.
  */
+
+/* Kept for anything that still names it; the reader no longer runs here. */
 export type Reading = {
    measure: 'LENGTH' | 'WEIGHT';
    value: number;
@@ -25,47 +29,33 @@ export type Reading = {
    note: string;
 };
 
-type RawReading = {
-   value: number | null;
-   unit: 'cm' | 'in' | 'kg' | 'lb' | null;
-   confidence: number;
-   seen: 'tape' | 'scale' | 'none';
-   note: string;
-};
-
-const SURE_ENOUGH = 0.6;
-
 export function CompetitionEntry({
    competitionId,
    onCompetition,
-   imageUrl,
-   reading,
-   onReading,
+   measurePhoto,
+   onMeasurePhoto,
+   onMeasureBusy,
+   areaConfirmed,
+   onAreaConfirmed,
+   problem,
 }: {
    competitionId: string | null;
-   onCompetition: (id: string | null) => void;
-   /* The first photograph of the catch, once it has gone up. */
-   imageUrl: string | null;
-   reading: Reading | null;
-   onReading: (reading: Reading | null) => void;
+   onCompetition: (id: string | null, competition: Competition | null) => void;
+   measurePhoto: UploadedPhoto | null;
+   onMeasurePhoto: (photo: UploadedPhoto | null) => void;
+   onMeasureBusy: (busy: boolean) => void;
+   areaConfirmed: boolean;
+   onAreaConfirmed: (confirmed: boolean) => void;
+   problem?: string | null;
 }) {
    const [open, setOpen] = useState(competitionId !== null);
    const [running, setRunning] = useState<Competition[] | null>(null);
-   const [busy, setBusy] = useState(false);
-   const [problem, setProblem] = useState<string | null>(null);
-   const [off, setOff] = useState(false);
 
    useEffect(() => {
       if (!open || running) return;
       const controller = new AbortController();
-      fetchCompetitions(controller.signal, 1)
+      fetchCompetitions(controller.signal, 1, 'mine')
          .then((result) =>
-            /*
-             * Running ones, and whichever this catch is already in: an edit
-             * of a catch entered in a competition that has since closed must
-             * still show that entry, or the only control left would be the
-             * one that drops it.
-             */
             setRunning(
                result.items.filter(
                   (c) =>
@@ -76,52 +66,9 @@ export function CompetitionEntry({
          )
          .catch(() => setRunning([]));
       return () => controller.abort();
-   }, [open, running]);
+   }, [open, running, competitionId]);
 
    const chosen = running?.find((c) => c.id === competitionId) ?? null;
-
-   const read = async () => {
-      if (!chosen || !imageUrl) return;
-      setBusy(true);
-      setProblem(null);
-      try {
-         const { data } = await axios.post<{ reading: RawReading }>(
-            '/api/vision/read',
-            { imageUrl, measure: chosen.measure }
-         );
-         const r = data.reading;
-         const wantsLength = chosen.measure === 'LENGTH';
-         const unitFits =
-            r.unit !== null &&
-            (wantsLength
-               ? r.unit === 'cm' || r.unit === 'in'
-               : r.unit === 'kg' || r.unit === 'lb');
-         if (r.value === null || !unitFits || r.confidence < SURE_ENOUGH) {
-            onReading(null);
-            setProblem(
-               r.seen === 'none'
-                  ? `No ${wantsLength ? 'tape' : 'scale'} in the picture. Take one with the fish on the ${wantsLength ? 'tape' : 'scale'} and the figure readable.`
-                  : `Could not read it well enough (${Math.round(r.confidence * 100)}% sure). ${r.note} Take a clearer one.`
-            );
-            return;
-         }
-         onReading({
-            measure: chosen.measure,
-            value: r.value,
-            unit: r.unit as Reading['unit'],
-            confidence: r.confidence,
-            note: r.note,
-         });
-      } catch (error) {
-         if (axios.isAxiosError(error) && error.response?.status === 503) {
-            setOff(true);
-         } else {
-            setProblem('The photo could not be read just now. Try again.');
-         }
-      } finally {
-         setBusy(false);
-      }
-   };
 
    return (
       <div>
@@ -147,7 +94,11 @@ export function CompetitionEntry({
                      }
                      value={competitionId ?? ''}
                      onChange={(next) => {
-                        onCompetition((next as string) || null);
+                        const id = (next as string) || null;
+                        onCompetition(
+                           id,
+                           running?.find((c) => c.id === id) ?? null
+                        );
                      }}
                      options={(running ?? []).map((c) => ({
                         value: c.id,
@@ -159,7 +110,7 @@ export function CompetitionEntry({
                   <button
                      type="button"
                      onClick={() => {
-                        onCompetition(null);
+                        onCompetition(null, null);
                         setOpen(false);
                      }}
                      className="g-tracked inline-flex h-11 items-center text-[15px] text-ink-2 hover:text-ink"
@@ -169,61 +120,18 @@ export function CompetitionEntry({
                </div>
 
                {chosen ? (
-                  <div className="flex flex-col gap-3 border-l-[3px] border-teal bg-bg-2 px-4 py-3">
-                     <p className="text-[15px] text-ink-2">
-                        {chosen.name} is judged on{' '}
-                        {chosen.measure === 'LENGTH' ? 'length' : 'weight'}. Add
-                        a photograph of the fish{' '}
-                        {chosen.measure === 'LENGTH'
-                           ? 'lying along a tape or ruler with the figure at its nose or tail readable'
-                           : 'on the scale with the display readable'}
-                        , then read it off. What is read is what is entered.
-                     </p>
-                     {reading ? (
-                        <p className="text-[15px]">
-                           Read {reading.value} {reading.unit} off the
-                           photograph, {Math.round(reading.confidence * 100)}%
-                           sure.{' '}
-                           <span className="text-ink-3">{reading.note}</span>
-                        </p>
-                     ) : null}
-                     {problem ? (
-                        <p
-                           role="alert"
-                           className="text-[15px] text-destructive"
-                        >
-                           {problem}
-                        </p>
-                     ) : null}
-                     {off ? (
-                        <p className="text-[15px] text-ink-2">
-                           The photo cannot be read yet. The entry still saves
-                           and the organiser checks the picture.
-                        </p>
-                     ) : (
-                        <div>
-                           <Button
-                              type="button"
-                              variant={reading ? 'outline' : 'default'}
-                              size="sm"
-                              disabled={!imageUrl || busy}
-                              onClick={() => void read()}
-                              className={cn(!imageUrl && 'opacity-60')}
-                           >
-                              {busy
-                                 ? 'Reading'
-                                 : reading
-                                   ? 'Read it again'
-                                   : `Read the ${chosen.measure === 'LENGTH' ? 'length' : 'weight'} off the photo`}
-                           </Button>
-                           {!imageUrl ? (
-                              <p className="mt-2 text-[14px] text-ink-3">
-                                 Add the photograph first.
-                              </p>
-                           ) : null}
-                        </div>
-                     )}
-                  </div>
+                  <>
+                     <CompetitionBanner competition={chosen} />
+                     <CompetitionEntryFields
+                        competition={chosen}
+                        measurePhoto={measurePhoto}
+                        onMeasurePhoto={onMeasurePhoto}
+                        onMeasureBusy={onMeasureBusy}
+                        areaConfirmed={areaConfirmed}
+                        onAreaConfirmed={onAreaConfirmed}
+                        problem={problem}
+                     />
+                  </>
                ) : null}
             </div>
          )}

@@ -25,6 +25,10 @@ export function PhotoBlock({
    onBusyChange,
    onFile,
    initial = null,
+   title = 'Add a catch photo',
+   hint = 'Optional. You can add one later.',
+   frameNote = 'As the feed shows it.',
+   idPrefix = 'quicklog-photo',
 }: {
    onChange: (photo: UploadedPhoto | null) => void;
    onBusyChange: (busy: boolean) => void;
@@ -32,6 +36,13 @@ export function PhotoBlock({
    onFile?: (file: File) => void;
    /* A photo already sent up, when a draft is reopened. */
    initial?: UploadedPhoto | null;
+   /* The words on the empty block: what photo, and whether it can wait. */
+   title?: string;
+   hint?: string;
+   /* The corner note on the picture once it is in. */
+   frameNote?: string;
+   /* Two blocks on one page need two sets of ids. */
+   idPrefix?: string;
 }) {
    const phone = usePhone();
    const inputRef = useRef<HTMLInputElement>(null);
@@ -219,7 +230,7 @@ export function PhotoBlock({
    return (
       <div className="flex flex-col gap-2">
          <div
-            id="quicklog-photo-zone"
+            id={`${idPrefix}-zone`}
             ref={preview ? frameRef : undefined}
             role={preview ? 'img' : undefined}
             aria-label={
@@ -271,7 +282,7 @@ export function PhotoBlock({
             ) : null}
             <input
                ref={inputRef}
-               id="quicklog-photo"
+               id={idPrefix}
                type="file"
                accept={ACCEPTED.join(',')}
                capture="environment"
@@ -291,12 +302,8 @@ export function PhotoBlock({
             />
             {!preview ? (
                <div className="relative z-[1] min-w-0">
-                  <h3 className="g text-[22px] leading-none">
-                     Add a catch photo
-                  </h3>
-                  <p className="mt-1 text-[14px] text-paper-2">
-                     Optional. You can add one later.
-                  </p>
+                  <h3 className="g text-[22px] leading-none">{title}</h3>
+                  <p className="mt-1 text-[14px] text-paper-2">{hint}</p>
                   {/*
                    * The camera first on a phone, because the camera is why the
                    * phone is out. On a desktop there is no camera to open, so
@@ -331,8 +338,8 @@ export function PhotoBlock({
                <>
                   <span className="pointer-events-none absolute top-2.5 left-2.5 z-[1] bg-ink/80 px-2 py-1 text-[14px] text-paper">
                      {ratio !== null && Math.abs(ratio - FRAME) > 0.02
-                        ? 'As the feed shows it. Drag to place.'
-                        : 'As the feed shows it.'}
+                        ? `${frameNote} Drag to place.`
+                        : frameNote}
                   </span>
                   <div
                      className="absolute right-2.5 bottom-2.5 z-[1] flex items-center gap-3 bg-ink px-2.5"

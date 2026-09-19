@@ -28,10 +28,13 @@ import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
 import { SpeciesCombobox } from '@/components/fishing/SpeciesCombobox';
 import { readDraft, removeDraft, saveDraft } from '@/lib/drafts';
 import { useSearchParams } from 'react-router-dom';
+import { CompetitionEntry } from '@/components/fishing/CompetitionEntry';
+import { entryProblem } from '@/components/fishing/competition-entry';
+import type { UploadedPhoto } from '@/components/fishing/quicklog/PhotoBlock';
 import {
-   CompetitionEntry,
-   type Reading,
-} from '@/components/fishing/CompetitionEntry';
+   submitEntry,
+   type Competition,
+} from '@/components/social/competitions-api';
 import { ChoiceGroup, TextArea, TextField } from '@/components/ui/field';
 import { Fold } from '@/components/ui/fold';
 import { MeasureField } from '@/components/fishing/quicklog/MeasureField';
@@ -90,8 +93,6 @@ type SpotMode = 'here' | 'saved' | 'new';
 type LengthUnit = 'cm' | 'in';
 type WeightUnit = 'kg' | 'lb';
 
-const CM_PER_INCH = 2.54;
-const KG_PER_POUND = 0.453592;
 const NOTES_LIMIT = 2000;
 /*
  * Gear, in the order it is picked up: the rod, the reel, the line, then what
@@ -327,7 +328,16 @@ export function CatchForm({
    const [released, setReleased] = useState<'KEPT' | 'RELEASED'>(
       initial?.released ? 'RELEASED' : 'KEPT'
    );
-   const [reading, setReading] = useState<Reading | null>(null);
+   /*
+    * Entering it in a competition. The competition itself, the photograph of
+    * the fish on the tape or scale, and the sentence about the area. The
+    * entry is written after the catch is, and the checks run on the server.
+    */
+   const [competition, setCompetition] = useState<Competition | null>(null);
+   const [measurePhoto, setMeasurePhoto] = useState<UploadedPhoto | null>(null);
+   const [measureBusy, setMeasureBusy] = useState(false);
+   const [areaConfirmed, setAreaConfirmed] = useState(false);
+   const [entryIssue, setEntryIssue] = useState<string | null>(null);
    const [photoTimes, setPhotoTimes] = useState<Date[]>([]);
    const caughtAtEdited = useRef(isEdit);
    const photoSpan = useMemo(() => {
@@ -814,17 +824,12 @@ export function CatchForm({
       return {
          title: species.trim(),
          caughtAt: parsedCaughtAt ? parsedCaughtAt.toISOString() : '',
-         lengthSource: reading?.measure === 'LENGTH' ? 'TAPE' : lengthSource,
-         weightSource: reading?.measure === 'WEIGHT' ? 'SCALE' : weightSource,
+         /* A competition entry's figure came off the tape or the scale. */
+         lengthSource:
+            competition?.measure === 'LENGTH' ? 'TAPE' : lengthSource,
+         weightSource:
+            competition?.measure === 'WEIGHT' ? 'SCALE' : weightSource,
          competitionId: competitionId ?? null,
-         ...(reading
-            ? {
-                 readMeasure: reading.value,
-                 readMeasureUnit: reading.unit,
-                 readConfidence: reading.confidence,
-                 readNote: reading.note,
-              }
-            : {}),
          caughtUntil:
             Number(countValue) > 1 && photoSpan
                ? photoSpan.to.toISOString()
@@ -928,7 +933,7 @@ export function CatchForm({
    const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
 
-      if (isSaving || isPhotoUploading) {
+      if (isSaving || isPhotoUploading || measureBusy) {
          return;
       }
 
@@ -998,10 +1003,74 @@ export function CatchForm({
             return;
          }
 
+         /* What the competition judges, metric, and whether it can be entered. */
+         const declaredValue = !competition
+            ? null
+            : competition.rule === 'SPECIES_VARIETY'
+              ? null
+              : competition.measure === 'LENGTH'
+                ? lengthInCm()
+                : weightInKg();
+         if (competition && competitionId) {
+            const problem = entryProblem(
+               competition,
+               measurePhoto,
+               areaConfirmed,
+               declaredValue
+            );
+            setEntryIssue(problem);
+            if (problem) {
+               toast({
+                  title: 'Not entered yet.',
+                  description: problem,
+                  variant: 'error',
+               });
+               return;
+            }
+         }
+
          const { data } = await axios.post('/api/catches', {
             ...payload,
             images,
          });
+
+         if (competition && competitionId) {
+            /* The catch is in; now the entry, and the competition's page. */
+            try {
+               await submitEntry(competition.id, {
+                  catchId: data.catch.id,
+                  measureImage: measurePhoto
+                     ? {
+                          storageKey: measurePhoto.storageKey,
+                          url: measurePhoto.url,
+                       }
+                     : null,
+                  declaredValue,
+                  areaConfirmed,
+                  photoTakenAt: photoTimes[0]?.toISOString() ?? null,
+                  note: notes.trim() || null,
+               });
+               toast({
+                  title:
+                     competition.checks === 'REVIEW'
+                        ? 'Catch submitted for organiser review.'
+                        : 'Catch submitted. Standings updated.',
+                  variant: 'success',
+               });
+               if (draftId) removeDraft(draftId);
+               navigate(`/competitions/${competition.id}`, { replace: true });
+            } catch {
+               toast({
+                  title: 'Catch saved, not entered.',
+                  description:
+                     'The catch is in your log. Enter it again from the competition page.',
+                  variant: 'error',
+               });
+               navigate(`/catches/${data.catch.id}`, { replace: true });
+            }
+            return;
+         }
+
          toast({
             title: 'Catch saved.',
             description: successSentence(payload),
@@ -1048,7 +1117,7 @@ export function CatchForm({
 
    const zone = zoneName();
    const caughtAtDate = fromLocalInputValue(caughtAt);
-   const isBusy = isSaving || isPhotoUploading;
+   const isBusy = isSaving || isPhotoUploading || measureBusy;
    /*
     * The first photograph, whether it went up in this sitting or came back
     * with the catch. An edit cannot change photos yet, so the ones already on
@@ -1150,7 +1219,6 @@ export function CatchForm({
                      id="length"
                      label="Length"
                      fieldName="length"
-                     readOnly={reading?.measure === 'LENGTH'}
                      sources={[
                         { value: 'EYE', label: 'By eye' },
                         { value: 'TAPE', label: 'On a tape' },
@@ -1171,7 +1239,6 @@ export function CatchForm({
                      id="weight"
                      label="Weight"
                      fieldName="weight"
-                     readOnly={reading?.measure === 'WEIGHT'}
                      sources={[
                         { value: 'EYE', label: 'By eye' },
                         { value: 'SCALE', label: 'On a scale' },
@@ -1260,61 +1327,32 @@ export function CatchForm({
                 * Last in the section, because it opens into a panel of its
                 * own: anything under it would read as its contents.
                 */}
-               <CompetitionEntry
-                  competitionId={competitionId}
-                  onCompetition={(id) => {
-                     setCompetitionId(id);
-
-                     if (!id) setReading(null);
-                  }}
-                  imageUrl={firstPhoto}
-                  reading={reading}
-                  onReading={(next) => {
-                     setReading(next);
-
-                     if (!next) return;
-
-                     if (next.measure === 'LENGTH') {
-                        const cm =
-                           next.unit === 'in'
-                              ? next.value * CM_PER_INCH
-                              : next.value;
-
-                        setLengthValue(
-                           String(
-                              round(
-                                 lengthUnit === 'in' ? cm / CM_PER_INCH : cm,
-                                 1
-                              )
-                           )
-                        );
-
-                        setErrors((current) => ({
-                           ...current,
-                           length: undefined,
-                        }));
-                     } else {
-                        const kg =
-                           next.unit === 'lb'
-                              ? next.value * KG_PER_POUND
-                              : next.value;
-
-                        setWeightValue(
-                           String(
-                              round(
-                                 weightUnit === 'lb' ? kg / KG_PER_POUND : kg,
-                                 2
-                              )
-                           )
-                        );
-
-                        setErrors((current) => ({
-                           ...current,
-                           weight: undefined,
-                        }));
-                     }
-                  }}
-               />
+               {!isEdit ? (
+                  <CompetitionEntry
+                     competitionId={competitionId}
+                     onCompetition={(id, chosen) => {
+                        setCompetitionId(id);
+                        setCompetition(chosen);
+                        setEntryIssue(null);
+                        if (!id) {
+                           setMeasurePhoto(null);
+                           setAreaConfirmed(false);
+                        }
+                     }}
+                     measurePhoto={measurePhoto}
+                     onMeasurePhoto={(next) => {
+                        setMeasurePhoto(next);
+                        setEntryIssue(null);
+                     }}
+                     onMeasureBusy={setMeasureBusy}
+                     areaConfirmed={areaConfirmed}
+                     onAreaConfirmed={(next) => {
+                        setAreaConfirmed(next);
+                        setEntryIssue(null);
+                     }}
+                     problem={entryIssue}
+                  />
+               ) : null}
             </section>
 
             <hr className="rule-dashed" />

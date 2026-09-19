@@ -128,6 +128,16 @@ const CompetitionsPage = lazyRoute(() =>
       default: m.CompetitionsPage,
    }))
 );
+const NewCompetitionPage = lazyRoute(() =>
+   import('@/pages/social/NewCompetitionPage').then((m) => ({
+      default: m.NewCompetitionPage,
+   }))
+);
+const CompetitionPage = lazyRoute(() =>
+   import('@/pages/social/CompetitionPage').then((m) => ({
+      default: m.CompetitionPage,
+   }))
+);
 const BoardsPage = lazyRoute(() =>
    import('@/pages/social/BoardsPage').then((m) => ({ default: m.BoardsPage }))
 );
@@ -168,6 +178,11 @@ function App() {
             <Route path="/insights" element={<InsightsPage />} />
             <Route path="/boards" element={<BoardsPage />} />
             <Route path="/competitions" element={<CompetitionsPage />} />
+            <Route path="/competitions/new" element={<NewCompetitionPage />} />
+            <Route
+               path="/competitions/:competitionId"
+               element={<CompetitionPage />}
+            />
             <Route path="*" element={<NotFoundPage />} />
          </Route>
       </Routes>
