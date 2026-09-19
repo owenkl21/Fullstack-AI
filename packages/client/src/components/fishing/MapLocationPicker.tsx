@@ -578,6 +578,14 @@ export function MapLocationPicker({
                   /* The base is on the element so the night rule can leave a
                      photograph alone and only invert the drawn maps. */
                   data-base={base}
+                  /* Where the pin stands and what it stands on, readable by
+                     the audit scripts without reaching into Leaflet. */
+                  data-pin={
+                     position
+                        ? `${position.lat.toFixed(5)},${position.lng.toFixed(5)}`
+                        : ''
+                  }
+                  data-source={source ?? ''}
                   className={cn(
                      'map-surface relative h-[280px] overflow-hidden border border-line border-t-0 md:h-[320px]',
                      mapClassName

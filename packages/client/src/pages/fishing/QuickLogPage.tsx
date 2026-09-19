@@ -41,7 +41,7 @@ import { Segment } from '@/components/fishing/quicklog/Segment';
 import { CaughtAt } from '@/components/fishing/quicklog/CaughtAt';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { readPhotoMeta } from '@/lib/exif';
-import { formatMetres, nearestSpot, type SpotLike } from '@/lib/geo';
+import { distanceM, formatMetres, nearestSpot, type SpotLike } from '@/lib/geo';
 import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
 import {
    enterCompetition,
@@ -123,6 +123,11 @@ function QuickLog() {
          .catch(() => undefined);
       return () => controller.abort();
    }, []);
+   /* The current answer, for the photo handler, which runs after a read. */
+   const whereRef = useRef<Where | null>(null);
+   useEffect(() => {
+      whereRef.current = where;
+   }, [where]);
    const near = useMemo(() => nearestSpot(spots, where), [spots, where]);
    const [notThatSpot, setNotThatSpot] = useState<string | null>(null);
    const filedUnder = near && notThatSpot !== near.spot.id ? near.spot : null;
@@ -142,11 +147,14 @@ function QuickLog() {
    const [spotName, setSpotName] = useState('');
    const [savingSpot, setSavingSpot] = useState(false);
    /*
-    * The map is folded away while the position is already known. Asking for
-    * it back opens it in place; Done folds it again. With no position there
-    * is nothing to fold, so it opens itself.
+    * A photograph's own position that arrived after the angler had already
+    * put the pin down by hand. Their pin stands; the photograph's place is
+    * offered beside it rather than taking over.
     */
-   const [pinOpen, setPinOpen] = useState(false);
+   const [photoPlace, setPhotoPlace] = useState<{
+      latitude: number;
+      longitude: number;
+   } | null>(null);
    /* Which of the three phone screens is up. */
    const [step, setStep] = useState(1);
    const phone = usePhone();
@@ -169,20 +177,24 @@ function QuickLog() {
             setTimeSource('photo');
          }
          if (meta.latitude !== null && meta.longitude !== null) {
-            /* The photograph knows where it was taken. It moves the pin;
-             * the pin can still be moved afterwards. */
-            setWhere({
+            const place = {
                latitude: meta.latitude,
                longitude: meta.longitude,
-               source: 'photo',
-            });
+            };
             setPhotoWithoutPosition(false);
             /*
-             * And the map opens with it. A position that lands while the map
-             * is folded away is a line of numbers changing on its own, which
-             * is why this read as broken: nothing was seen to move.
+             * The photograph knows where it was taken. It beats the phone's
+             * fix, which only says where the phone is now, and the map is
+             * always on screen so the pin is seen to move. A pin the angler
+             * put down by hand is their answer: the photograph's place is
+             * offered next to it, one tap to take it.
              */
-            setPinOpen(true);
+            if (whereRef.current?.source === 'pin') {
+               setPhotoPlace(place);
+            } else {
+               setWhere({ ...place, source: 'photo' });
+               setPhotoPlace(null);
+            }
          } else if (meta.takenAt) {
             setPhotoWithoutPosition(true);
          }
@@ -863,29 +875,9 @@ function QuickLog() {
       </div>
    );
 
-   /*
-    * With no position at all there is nothing to fold, so the map is open;
-    * but only once it is known that no fix is coming (refused, unsupported,
-    * or nothing after six seconds), never while the phone is still finding
-    * one. A fix and its status land in one render while `where` follows a
-    * beat later, so excluding "seeking" alone would still mount a map for a
-    * frame on the ordinary happy path.
-    */
-   const noFixComing =
-      fixStatus === 'denied' ||
-      fixStatus === 'unsupported' ||
-      fixStatus === 'waiting';
-   const mapOpen = pinOpen || (!where && noFixComing);
-   /*
-    * Once the map is on screen it stays until the angler says Done. A late
-    * fix arriving while they are moving it must not pull it out from under
-    * their finger; the fix still lands in `where`, and the map follows it.
-    */
-   useEffect(() => {
-      /* A latch, set from a derived value: the one render it costs is the point. */
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (mapOpen) setPinOpen(true);
-   }, [mapOpen]);
+   /* How far the photograph's place is from the pin, in words. */
+   const photoPlaceAway =
+      photoPlace && where ? formatMetres(distanceM(where, photoPlace)) : null;
 
    const whenWhereBlock = (
       <div className="border-t-2 border-teal bg-bg-2 p-4 md:p-5">
@@ -899,28 +891,21 @@ function QuickLog() {
          />
 
          {/*
-          * One line for a position that is already known, and the map only
-          * when it is asked for. The phone usually knows where the fish came
-          * out before the angler has named it, and a map that takes half the
-          * screen to confirm what is already right is a map in the way.
+          * The map is always on screen, small, with the pin on whatever is
+          * known: the phone's fix, the photograph's place, or where the
+          * angler put it. The line above it says which. A position that
+          * changes is seen to move, which is the whole point of a map.
           */}
          <div className="mt-4">
-            {where ? (
-               <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                  <span className="num text-[14px] text-ink">{whereLine}</span>
-                  <button
-                     type="button"
-                     aria-expanded={pinOpen}
-                     aria-controls="quicklog-pin"
-                     onClick={() => setPinOpen((open) => !open)}
-                     className="g-tracked inline-flex min-h-11 items-center text-[15px] text-teal-text hover:opacity-80"
-                  >
-                     {pinOpen ? 'Done' : 'Move the pin'}
-                  </button>
-               </div>
-            ) : (
-               <p className="text-[14px] text-ink-3">{whereLine}</p>
-            )}
+            <p
+               className={cn(
+                  'num text-[14px]',
+                  where ? 'text-ink' : 'text-ink-3'
+               )}
+               data-where-source={where?.source ?? ''}
+            >
+               {whereLine}
+            </p>
 
             {photoWithoutPosition ? (
                <p className="mt-2 text-[14px] text-ink-3">
@@ -929,22 +914,38 @@ function QuickLog() {
                </p>
             ) : null}
 
-            {mapOpen ? (
-               <div id="quicklog-pin" className="mt-3">
-                  <MapLocationPicker
-                     readout={false}
-                     latitude={where ? String(where.latitude) : ''}
-                     longitude={where ? String(where.longitude) : ''}
-                     onChange={(latitude, longitude) => {
-                        setWhere({ latitude, longitude, source: 'pin' });
-                        /* Moving the pin is using the map; it stays open
-                           until the angler says it can go. */
-                        setPinOpen(true);
-                        setPhotoWithoutPosition(false);
+            {photoPlace ? (
+               <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[14px]">
+                  <span className="text-ink-2">
+                     The photograph was taken {photoPlaceAway} from your pin.
+                  </span>
+                  <button
+                     type="button"
+                     onClick={() => {
+                        setWhere({ ...photoPlace, source: 'photo' });
+                        setPhotoPlace(null);
                      }}
-                  />
+                     className="g-tracked inline-flex min-h-11 items-center text-[15px] text-teal-text hover:opacity-80"
+                  >
+                     Use the photograph's place
+                  </button>
                </div>
             ) : null}
+
+            <div id="quicklog-pin" className="mt-3">
+               <MapLocationPicker
+                  readout={false}
+                  mapClassName="h-[220px] md:h-[260px]"
+                  latitude={where ? String(where.latitude) : ''}
+                  longitude={where ? String(where.longitude) : ''}
+                  source={whereSource}
+                  onChange={(latitude, longitude) => {
+                     setWhere({ latitude, longitude, source: 'pin' });
+                     setPhotoPlace(null);
+                     setPhotoWithoutPosition(false);
+                  }}
+               />
+            </div>
          </div>
 
          {near ? (

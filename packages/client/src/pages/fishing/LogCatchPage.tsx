@@ -23,7 +23,7 @@ import {
 } from '@/components/fishing/quicklog/species';
 import { AddGearInline } from '@/components/fishing/AddGearInline';
 import { readPhotoMeta } from '@/lib/exif';
-import { formatMetres, nearestSpot } from '@/lib/geo';
+import { distanceM, formatMetres, nearestSpot } from '@/lib/geo';
 import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
 import { SpeciesCombobox } from '@/components/fishing/SpeciesCombobox';
 import { readDraft, removeDraft, saveDraft } from '@/lib/drafts';
@@ -274,10 +274,13 @@ export function CatchForm({
    );
    /*
     * Whether the angler has answered the where question themselves, by
-    * picking a saved spot or putting a pin down. A photograph's own position
-    * fills a blank; it never overrules an answer.
+    * picking a saved spot or putting a pin down by hand. A photograph's own
+    * position beats the phone's fix, which only says where the phone is now,
+    * but it never overrules an answer.
     */
    const spotChosen = useRef(Boolean(initial?.siteId) || startsWithPin);
+   /* A line under the map saying why the pin moved to the photograph. */
+   const [photoNote, setPhotoNote] = useState<string | null>(null);
    /* Named under the map, the way the record names every other source. */
    const [positionFromPhoto, setPositionFromPhoto] = useState(false);
    const [savedSiteId, setSavedSiteId] = useState(initial?.siteId ?? '');
@@ -374,10 +377,21 @@ export function CatchForm({
                (meta) => meta.latitude !== null && meta.longitude !== null
             );
             if (!placed || spotChosen.current) return;
+            const photoAt = {
+               latitude: placed.latitude!,
+               longitude: placed.longitude!,
+            };
+            /* The phone's fix only says where the phone is now. */
+            const phoneAt = spotMode === 'here' ? herePosition : null;
             setSpotMode('new');
-            setNewLatitude(placed.latitude!.toFixed(6));
-            setNewLongitude(placed.longitude!.toFixed(6));
+            setNewLatitude(photoAt.latitude.toFixed(6));
+            setNewLongitude(photoAt.longitude.toFixed(6));
             setPositionFromPhoto(true);
+            setPhotoNote(
+               phoneAt
+                  ? `The pin is on the photograph's own place, ${formatMetres(distanceM(phoneAt, photoAt))} from where your phone is now. Drag it if that is not where the fish came out.`
+                  : "The pin is on the photograph's own place. Drag it if that is not where the fish came out."
+            );
             setErrors((current) => ({ ...current, spot: undefined }));
          }
       );
@@ -524,8 +538,22 @@ export function CatchForm({
       );
    }, []);
 
+   /*
+    * The form opens on "the spot I am at", so the fix is asked for at once
+    * and the map is on screen with the pin on it, rather than waiting for a
+    * tap on a button that says what is already chosen.
+    */
+   useEffect(() => {
+      if (!isEdit && spotMode === 'here' && hereState === 'idle') {
+         askForPosition();
+      }
+   }, [isEdit, spotMode, hereState, askForPosition]);
+
    const chooseSpotMode = (next: SpotMode) => {
-      spotChosen.current = true;
+      /* Picking a saved spot is an answer; "the spot I am at" and "a new
+       * spot" only say where the answer will come from. */
+      spotChosen.current = next === 'saved';
+      setPhotoNote(null);
       setSpotMode(next);
       setErrors((current) => ({ ...current, spot: undefined }));
       // The position is only ever asked for when this is the choice made.
@@ -540,6 +568,7 @@ export function CatchForm({
       (latitude: number, longitude: number) => {
          spotChosen.current = true;
          setPositionFromPhoto(false);
+         setPhotoNote(null);
          setNewLatitude(latitude.toFixed(6));
          setNewLongitude(longitude.toFixed(6));
          setErrors((current) => ({ ...current, spot: undefined }));
@@ -1571,6 +1600,11 @@ export function CatchForm({
                            onChange={setNewCoordinates}
                         />
                         <FieldError id="spot-error" message={errors.spot} />
+                        {photoNote ? (
+                           <p className="mt-2 text-[14px] text-ink-3">
+                              {photoNote}
+                           </p>
+                        ) : null}
                      </div>
                   </div>
                ) : null}
