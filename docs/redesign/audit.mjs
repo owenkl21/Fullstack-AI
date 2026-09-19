@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
-const SITE = 'https://fishlogger-client.vercel.app';
+const SITE = 'https://fisherfeed.com';
 const EMAIL = 'owen@fishlogger.app';
 const PASS = 'TestAngler2026!';
 const findings = [];

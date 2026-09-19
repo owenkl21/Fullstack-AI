@@ -8,7 +8,7 @@ import { chromium } from 'playwright';
  * HOST picks the site: the live deploy by default, or a local dev server with
  * HOST=http://localhost:5173. OUT is where screenshots land.
  */
-export const HOST = process.env.HOST || 'https://fishlogger-client.vercel.app';
+export const HOST = process.env.HOST || 'https://fisherfeed.com';
 export const OUT =
    process.env.OUT || new URL('./shots/', import.meta.url).pathname;
 

@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-const HOST = process.env.HOST || 'https://fishlogger-client.vercel.app';
+const HOST = process.env.HOST || 'https://fisherfeed.com';
 const OUT = process.env.OUT;
 const b = await chromium.launch({ args: ['--disable-blink-features=AutomationControlled'] });
 const passChallenge = async (page) => { for (let i = 0; i < 10; i++) { if (!/Security Checkpoint/.test(await page.title())) return; await page.waitForTimeout(1500); } };

@@ -14,7 +14,7 @@
 import axios from 'axios';
 
 const USER_AGENT =
-   'fishlogger/1.0 (South African shore fishing log; github.com/owenkl21/fishlogger)';
+   'fisherfeed/1.0 (South African shore fishing log; github.com/owenkl21/fishlogger)';
 
 export interface Coordinates {
    latitude: number;

@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-const HOST='https://fishlogger-client.vercel.app';
+const HOST='https://fisherfeed.com';
 const OUT=new URL('./shots/', import.meta.url).pathname;
 const b=await chromium.launch({ channel: 'chromium', args: ['--disable-blink-features=AutomationControlled'] });
 const ctx=await b.newContext({userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',viewport:{width:1440,height:1000},permissions:['geolocation'],geolocation:{latitude:-34.13,longitude:18.33}});

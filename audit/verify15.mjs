@@ -1,5 +1,5 @@
 import { chromium } from 'playwright';
-const HOST='https://fishlogger-client.vercel.app';
+const HOST='https://fisherfeed.com';
 const OUT=new URL('./shots/', import.meta.url).pathname;
 /* Vercel puts a browser challenge in front of the site now. Headless shell
    fails it; full Chromium with a normal UA passes it after a few seconds. */

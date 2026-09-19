@@ -29,7 +29,7 @@ const ENDPOINTS = [
 ];
 
 const USER_AGENT =
-   'fishlogger/1.0 (South African shore fishing log; github.com/owenkl21/fishlogger)';
+   'fisherfeed/1.0 (South African shore fishing log; github.com/owenkl21/fishlogger)';
 
 const FALLBACK: Record<Place['kind'], string> = {
    ramp: 'Slipway',

@@ -64,7 +64,7 @@ const MARINE_FIELDS = [
  * the start of the body are logged on the way out, because "no reading" on its
  * own cost an afternoon of guessing.
  */
-const UA = 'fishlogger/1.0 (rock and surf fishing log; non-commercial)';
+const UA = 'fisherfeed/1.0 (rock and surf fishing log; non-commercial)';
 const TRIES = 3;
 
 async function getJson<T>(url: string, attempt = 1): Promise<T | null> {

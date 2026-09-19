@@ -229,7 +229,7 @@ Cloudflare dashboard, R2, the `fishing-ai` bucket, Settings, CORS policy, Edit:
 [
    {
       "AllowedOrigins": [
-         "https://fishlogger-client.vercel.app",
+         "https://fisherfeed.com",
          "http://localhost:5173"
       ],
       "AllowedMethods": ["PUT", "GET"],

@@ -1,5 +1,5 @@
 {
-   "name": "fishlogger-audit",
+   "name": "fisherfeed-audit",
    "private": true,
    "type": "module",
    "description": "Playwright checks against the live site. Run a script with `node audit/<name>.mjs` after `npm i` in this folder.",

@@ -32,8 +32,7 @@ export default defineConfig({
             configure: (proxy) => {
                if (!process.env.VITE_API_TARGET) return;
                const origin =
-                  process.env.VITE_APP_ORIGIN ||
-                  'https://fishlogger-client.vercel.app';
+                  process.env.VITE_APP_ORIGIN || 'https://fisherfeed.com';
                proxy.on('proxyReq', (req) => {
                   if (req.getHeader('origin')) req.setHeader('origin', origin);
                   req.setHeader('referer', `${origin}/`);
