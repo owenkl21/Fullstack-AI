@@ -176,24 +176,27 @@ function Guess({
          aria-label="The fish namer's guess"
          data-namer="named"
       >
-         <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[14px] text-ink-3">Looks like</span>
-            {names.map((c) => (
-               <button
-                  key={c.guess}
-                  type="button"
-                  disabled={adding !== null}
-                  onClick={() => void take(c)}
-                  className="inline-flex h-9 items-center gap-1.5 border border-ink px-2.5 text-ink transition-colors duration-150 hover:bg-ink hover:text-background disabled:opacity-60"
-               >
-                  <span className="g-tracked text-[15px]">
-                     {adding === c.guess ? 'Adding' : c.commonName}
-                  </span>
-                  <span className="num text-[11px] opacity-60">
-                     {Math.round(c.confidence * 100)}%
-                  </span>
-               </button>
-            ))}
+         <div className="flex items-start gap-2">
+            <div className="flex flex-1 flex-wrap items-center gap-2">
+               <span className="text-[14px] text-ink-3">Looks like</span>
+               {names.map((c) => (
+                  <button
+                     key={c.guess}
+                     type="button"
+                     disabled={adding !== null}
+                     onClick={() => void take(c)}
+                     className="inline-flex h-9 items-center gap-1.5 border border-ink px-2.5 text-ink transition-colors duration-150 hover:bg-ink hover:text-background disabled:opacity-60"
+                  >
+                     <span className="g-tracked text-[15px]">
+                        {adding === c.guess ? 'Adding' : c.commonName}
+                     </span>
+                     <span className="num text-[11px] opacity-60">
+                        {Math.round(c.confidence * 100)}%
+                     </span>
+                  </button>
+               ))}
+            </div>
+            {/* Neither: stays on the first line while the names wrap beside it. */}
             <button
                type="button"
                disabled={adding !== null}
@@ -203,7 +206,7 @@ function Guess({
                }}
                aria-label="Neither. I will type the name"
                title="Neither"
-               className="grid size-10 place-items-center text-ink-3 hover:text-ink"
+               className="grid size-9 shrink-0 place-items-center text-ink-3 hover:text-ink"
             >
                <XMarkIcon aria-hidden="true" className="size-5" />
             </button>
