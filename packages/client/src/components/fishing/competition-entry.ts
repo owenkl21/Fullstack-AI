@@ -24,8 +24,13 @@ export function entryProblem(
    competition: Competition,
    measurePhoto: UploadedPhoto | null,
    areaConfirmed: boolean,
-   declaredValue: number | null
+   declaredValue: number | null,
+   /* The catch photo for the board; every entry carries one. */
+   hasHeroPhoto = true
 ) {
+   if (!hasHeroPhoto) {
+      return 'Add the catch photo. It is the one that goes on the board.';
+   }
    if (needsMeasurePhoto(competition) && !measurePhoto) {
       return competition.measure === 'LENGTH'
          ? 'Add the photograph of the fish on the tape.'

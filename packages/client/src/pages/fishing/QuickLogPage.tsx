@@ -479,7 +479,8 @@ function QuickLog() {
             competition,
             measurePhoto,
             areaConfirmed,
-            declaredValue
+            declaredValue,
+            photo !== null
          );
          setEntryIssue(problem);
          if (problem) {
@@ -722,6 +723,11 @@ function QuickLog() {
          onChange={setPhoto}
          onBusyChange={setPhotoBusy}
          onFile={onPhotoFile}
+         hint={
+            competition
+               ? 'Required for the competition. This is the picture that goes on the board.'
+               : undefined
+         }
       />
    );
 

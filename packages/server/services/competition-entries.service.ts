@@ -887,7 +887,8 @@ export const entriesService = {
       viewer: { id: string | null; organiser: boolean; entrant: boolean }
    ): Promise<ShapedEntry> {
       const [heroUrl, measureUrl] = await Promise.all([
-         readUrl(entry.heroImageKey, entry.heroImageUrl, 'card'),
+         /* The full picture: not every upload has a card-size variant. */
+         readUrl(entry.heroImageKey, entry.heroImageUrl),
          readUrl(entry.measureImageKey, entry.measureImageUrl),
       ]);
       let flaggedBy: string | null = null;
