@@ -41,6 +41,12 @@ type MapLocationPickerProps = {
     * is the one place that says what this pin is standing on.
     */
    source?: string | null;
+   /*
+    * A small map inside a form: the search folds behind a button on the map,
+    * the locate and base controls sit on the map too, and nothing is said
+    * under it. The quick log uses this; the full form has room for the rest.
+    */
+   compact?: boolean;
 };
 
 /* The country the first anglers fish, rather than a continent they do not. */
@@ -137,6 +143,7 @@ export function MapLocationPicker({
    mapClassName,
    readout: showReadout = true,
    source = null,
+   compact = false,
 }: MapLocationPickerProps) {
    const fieldId = useId();
    const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -157,6 +164,7 @@ export function MapLocationPicker({
    const [note, setNote] = useState<string | null>(null);
    const [problem, setProblem] = useState<string | null>(null);
    const [query, setQuery] = useState('');
+   const [searchOpen, setSearchOpen] = useState(false);
    const [found, setFound] = useState<Found[] | null>(null);
    const [searching, setSearching] = useState(false);
    /* The typed fields hold a draft only while they are being typed in. */
@@ -453,9 +461,8 @@ export function MapLocationPicker({
    const control =
       'grid h-11 place-items-center border border-line bg-background text-ink transition-[transform,background-color] duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2 active:scale-[0.96] disabled:opacity-50';
 
-   const hint = hasPin
-      ? 'Drag the pin, or tap the map, to move it.'
-      : 'Tap the map to drop the pin.';
+   /* Said only while there is nothing on the map; a pin explains itself. */
+   const hint = hasPin ? null : 'Tap the map to drop the pin.';
 
    /*
     * The search sits on top of the map and shares its edge, so the two read as
@@ -535,6 +542,68 @@ export function MapLocationPicker({
       </form>
    );
 
+   const BASE_SHORT: Record<BaseLayer, string> = {
+      satellite: 'Sat',
+      terrain: 'Ter',
+      plain: 'Map',
+      streets: 'Str',
+   };
+   /* On the map, top right, for the compact form: search, where I am, base. */
+   const overlay = (
+      <div className="absolute top-2 right-2 z-[500] flex flex-col gap-2">
+         <button
+            type="button"
+            onClick={() => {
+               setSearchOpen((open) => !open);
+               if (!searchOpen) {
+                  requestAnimationFrame(() =>
+                     document
+                        .querySelector<HTMLInputElement>(
+                           `#${CSS.escape(fieldId)}-search`
+                        )
+                        ?.focus()
+                  );
+               }
+            }}
+            aria-expanded={searchOpen}
+            aria-label="Search for a place"
+            title="Search for a place"
+            className={cn(control, 'size-10')}
+         >
+            <MagnifyingGlassIcon
+               className="size-5"
+               strokeWidth={1.5}
+               aria-hidden="true"
+            />
+         </button>
+         <button
+            type="button"
+            onClick={useMyPosition}
+            disabled={isLocating}
+            aria-label={
+               isLocating ? 'Finding your position' : 'Put the pin where I am'
+            }
+            title="Put the pin where I am"
+            className={cn(control, 'size-10')}
+         >
+            <ViewfinderCircleIcon
+               className="size-5"
+               strokeWidth={1.5}
+               aria-hidden="true"
+            />
+         </button>
+         <button
+            type="button"
+            onClick={cycleBase}
+            aria-label={`Base map: ${baseLabel}. Change`}
+            title={`Base map: ${baseLabel}`}
+            className={cn(control, 'g-tracked size-10 text-[12px]')}
+         >
+            {BASE_SHORT[base]}
+         </button>
+      </div>
+   );
+
    /* Under the map, in flow: where I am, and which map to draw. */
    const controls = (
       <div className="mt-2 flex gap-2">
@@ -573,7 +642,7 @@ export function MapLocationPicker({
             </p>
          ) : (
             <div className="flex flex-col">
-               {form}
+               {compact ? (searchOpen ? form : null) : form}
                <div
                   /* The base is on the element so the night rule can leave a
                      photograph alone and only invert the drawn maps. */
@@ -587,13 +656,15 @@ export function MapLocationPicker({
                   }
                   data-source={source ?? ''}
                   className={cn(
-                     'map-surface relative h-[280px] overflow-hidden border border-line border-t-0 md:h-[320px]',
+                     'map-surface relative h-[280px] overflow-hidden border border-line md:h-[320px]',
+                     compact && !searchOpen ? '' : 'border-t-0',
                      mapClassName
                   )}
                >
                   <div ref={mapContainerRef} className="absolute inset-0" />
+                  {compact ? overlay : null}
                </div>
-               {controls}
+               {compact ? null : controls}
             </div>
          )}
 
@@ -655,7 +726,7 @@ export function MapLocationPicker({
                   </span>
                </p>
             ) : null}
-            {!mapFailed ? (
+            {!mapFailed && hint && !compact ? (
                <p className="text-[14px] text-ink-3">{hint}</p>
             ) : null}
          </div>

@@ -26,8 +26,8 @@ export function PhotoBlock({
    onFile,
    initial = null,
    title = 'Add a catch photo',
-   hint = 'Optional. You can add one later.',
-   frameNote = 'As the feed shows it.',
+   hint = '',
+   frameNote = '',
    idPrefix = 'quicklog-photo',
 }: {
    onChange: (photo: UploadedPhoto | null) => void;
@@ -303,7 +303,9 @@ export function PhotoBlock({
             {!preview ? (
                <div className="relative z-[1] min-w-0">
                   <h3 className="g text-[22px] leading-none">{title}</h3>
-                  <p className="mt-1 text-[14px] text-paper-2">{hint}</p>
+                  {hint ? (
+                     <p className="mt-1 text-[14px] text-paper-2">{hint}</p>
+                  ) : null}
                   {/*
                    * The camera first on a phone, because the camera is why the
                    * phone is out. On a desktop there is no camera to open, so
@@ -336,11 +338,19 @@ export function PhotoBlock({
                </div>
             ) : (
                <>
-                  <span className="pointer-events-none absolute top-2.5 left-2.5 z-[1] bg-ink/80 px-2 py-1 text-[14px] text-paper">
-                     {ratio !== null && Math.abs(ratio - FRAME) > 0.02
-                        ? `${frameNote} Drag to place.`
-                        : frameNote}
-                  </span>
+                  {(() => {
+                     /* Only something worth saying: how to place a photo that
+                        does not fit the frame, or a note the parent asked for. */
+                     const text =
+                        ratio !== null && Math.abs(ratio - FRAME) > 0.02
+                           ? 'Drag to place.'
+                           : frameNote;
+                     return text ? (
+                        <span className="pointer-events-none absolute top-2.5 left-2.5 z-[1] bg-ink/80 px-2 py-1 text-[14px] text-paper">
+                           {text}
+                        </span>
+                     ) : null;
+                  })()}
                   <div
                      className="absolute right-2.5 bottom-2.5 z-[1] flex items-center gap-3 bg-ink px-2.5"
                      onPointerDown={(event) => event.stopPropagation()}

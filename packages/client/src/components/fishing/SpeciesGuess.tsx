@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { Species } from '@/components/fishing/quicklog/species';
@@ -7,8 +8,9 @@ import type { Species } from '@/components/fishing/quicklog/species';
  * "Is this a galjoen, or a blacktail?"
  *
  * After a photograph goes up the fish namer on the hub is asked for its two
- * best guesses. They are offered, never applied: the angler taps one, or
- * types their own name below. A guess the species table does not have yet is
+ * best guesses. The asking is shown, briefly, so the wait reads as a wait.
+ * The names are offered, never applied: the angler taps one, or types their
+ * own name below. A guess the species table does not have yet is
  * offered all the same, by its common name where the namer knows one, and
  * becomes a species the moment the angler takes it, so the catch can still
  * be scored. When the namer is not connected nothing is shown at all, which
@@ -73,6 +75,7 @@ function Guess({
 }: GuessProps) {
    const [result, setResult] =
       useState<Awaited<ReturnType<typeof guessSpecies>>>(null);
+   const [asking, setAsking] = useState(true);
    const [dismissed, setDismissed] = useState(false);
    const [adding, setAdding] = useState<string | null>(null);
    const [problem, setProblem] = useState<string | null>(null);
@@ -81,20 +84,52 @@ function Guess({
       if (!imageUrl) return;
       const controller = new AbortController();
       guessSpecies(imageUrl, controller.signal)
-         .then(setResult)
+         .then((found) => {
+            setResult(found);
+            setAsking(false);
+         })
          .catch(() => undefined);
       return () => controller.abort();
    }, [imageUrl]);
 
-   if (!result || dismissed) return null;
+   if (!imageUrl || dismissed) return null;
+
+   /* While the namer looks: a quiet line, so the wait is seen to be a wait. */
+   if (asking) {
+      return (
+         <div
+            className={cn('flex items-center gap-3', className)}
+            role="status"
+            aria-live="polite"
+            data-namer="asking"
+         >
+            <span className="shimmer h-[3px] w-10 shrink-0 bg-line" />
+            <span className="text-[14px] text-ink-3">Naming the fish</span>
+         </div>
+      );
+   }
+
+   /* The namer is not connected: nothing to say. */
+   if (!result) return null;
+
    const names = result.candidates.slice(0, 2);
-   if (!names.length) return null;
    if (
       names.some(
          (c) => c.commonName.toLowerCase() === current.trim().toLowerCase()
       )
    ) {
       return null;
+   }
+
+   if (!names.length) {
+      return (
+         <p
+            className={cn('text-[14px] text-ink-3', className)}
+            data-namer="none"
+         >
+            Could not name this one. Type it.
+         </p>
+      );
    }
 
    const take = async (candidate: SpeciesCandidate) => {
@@ -124,51 +159,39 @@ function Guess({
          });
          setDismissed(true);
       } catch {
-         setProblem('Could not add that species. Try again, or type the name.');
+         setProblem('Could not add that species. Type the name instead.');
       } finally {
          setAdding(null);
       }
    };
 
+   /*
+    * One row: what it looks like, the two names to tap, and a cross to say
+    * neither. The names are the whole message, so there is no sentence.
+    */
    return (
       <div
-         className={cn(
-            'flex flex-col gap-2 border-l-[3px] border-teal bg-bg-2 px-4 py-3',
-            className
-         )}
+         className={cn('flex flex-col gap-2', className)}
          role="group"
          aria-label="The fish namer's guess"
+         data-namer="named"
       >
-         <p className="text-[15px] text-ink-2">
-            Is this{' '}
-            {names.map((c, i) => (
-               <span key={c.guess}>
-                  {i > 0 ? ' or ' : ''}
-                  <span className="g-tracked text-[17px] text-ink">
-                     {c.commonName}
-                  </span>
-               </span>
-            ))}
-            ?
-         </p>
-         <div className="flex flex-wrap gap-2">
+         <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[14px] text-ink-3">Looks like</span>
             {names.map((c) => (
                <button
                   key={c.guess}
                   type="button"
                   disabled={adding !== null}
                   onClick={() => void take(c)}
-                  className="inline-flex h-11 items-center gap-2 border border-ink px-4 text-ink transition-colors duration-150 hover:bg-ink hover:text-background disabled:opacity-60"
+                  className="inline-flex h-10 items-center gap-2 border border-ink px-3 text-ink transition-colors duration-150 hover:bg-ink hover:text-background disabled:opacity-60"
                >
-                  <span className="g-tracked text-[17px]">
+                  <span className="g-tracked text-[16px]">
                      {adding === c.guess ? 'Adding' : c.commonName}
                   </span>
-                  <span className="num text-[13px] opacity-60">
+                  <span className="num text-[12px] opacity-60">
                      {Math.round(c.confidence * 100)}%
                   </span>
-                  {c.learned ? (
-                     <span className="text-[12px] text-teal-text">learned</span>
-                  ) : null}
                </button>
             ))}
             <button
@@ -178,13 +201,15 @@ function Guess({
                   onPick(null);
                   setDismissed(true);
                }}
-               className="g-tracked inline-flex h-11 items-center px-2 text-[17px] text-ink-2 hover:text-ink"
+               aria-label="Neither. I will type the name"
+               title="Neither"
+               className="grid size-10 place-items-center text-ink-3 hover:text-ink"
             >
-               Neither, I will type it
+               <XMarkIcon aria-hidden="true" className="size-5" />
             </button>
          </div>
          {problem ? (
-            <p className="text-[15px] text-destructive">{problem}</p>
+            <p className="text-[14px] text-destructive">{problem}</p>
          ) : null}
       </div>
    );

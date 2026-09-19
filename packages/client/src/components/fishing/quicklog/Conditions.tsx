@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 /*
- * The conditions arriving a line at a time once the fix is in, so the angler can
- * see the weather being stamped and then put the phone away. None of it can hold up
- * the save.
+ * The conditions, stamped on the catch the moment there is a fix. One line:
+ * the readings run together, and the label says when they were taken. None
+ * of it can hold up the save, and none of it needs a sentence of its own.
  */
 export type ConditionsPhase = 'waiting' | 'loading' | 'ready' | 'missing';
 
@@ -14,57 +13,40 @@ export function Conditions({
    phase,
    lines,
    takenAt,
+   className,
 }: {
    phase: ConditionsPhase;
    lines: ConditionLine[];
    takenAt: string | null;
+   className?: string;
 }) {
-   // The first line is there as soon as the readings are; the rest follow it.
-   const [revealed, setRevealed] = useState(0);
-
-   useEffect(() => {
-      if (lines.length < 2) {
-         return;
-      }
-      let shown = 0;
-      const timer = window.setInterval(() => {
-         shown += 1;
-         setRevealed(shown);
-         if (shown >= lines.length - 1) {
-            window.clearInterval(timer);
-         }
-      }, 260);
-      return () => window.clearInterval(timer);
-   }, [lines]);
-
+   const label =
+      phase === 'ready' && takenAt ? `Conditions at ${takenAt}` : 'Conditions';
    const note =
       phase === 'waiting'
-         ? 'Conditions are stamped as soon as there is a fix.'
+         ? 'Stamped once there is a fix.'
          : phase === 'loading'
-           ? 'Reading the conditions'
-           : phase === 'ready'
-             ? takenAt
-                ? `Conditions taken ${takenAt}. You can put the phone away now.`
-                : 'Conditions taken. You can put the phone away now.'
-             : 'Conditions not recorded here. The catch still saves.';
+           ? 'Reading'
+           : phase === 'missing'
+             ? 'Not recorded here.'
+             : null;
 
    return (
-      <div className="flex flex-col gap-1" aria-live="polite">
-         {lines.map((line, index) => (
-            <div
-               key={line.key}
-               className={cn(
-                  'flex items-baseline justify-between gap-3 text-[15px] transition-[opacity,transform] duration-[400ms] [transition-timing-function:var(--ease)]',
-                  index <= revealed
-                     ? 'translate-y-0 opacity-100'
-                     : 'translate-y-1.5 opacity-0'
-               )}
-            >
-               <span className="lab">{line.key}</span>
-               <span className="num font-medium">{line.value}</span>
-            </div>
-         ))}
-         <p className="text-[14px] text-ink-3">{note}</p>
+      <div
+         aria-live="polite"
+         className={cn(
+            'flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1',
+            className
+         )}
+      >
+         <span className="lab">{label}</span>
+         {phase === 'ready' && lines.length ? (
+            <span className="num text-right text-[15px] font-medium">
+               {lines.map((line) => line.value).join(' · ')}
+            </span>
+         ) : (
+            <span className="text-[14px] text-ink-3">{note}</span>
+         )}
       </div>
    );
 }

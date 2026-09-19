@@ -938,6 +938,7 @@ function QuickLog() {
             <div id="quicklog-pin" className="mt-3">
                <MapLocationPicker
                   readout={false}
+                  compact
                   mapClassName="h-[220px] md:h-[260px]"
                   latitude={where ? String(where.latitude) : ''}
                   longitude={where ? String(where.longitude) : ''}
@@ -1112,11 +1113,11 @@ function QuickLog() {
                <h1 className="g text-[30px] leading-none md:text-[34px]">
                   Log a catch
                </h1>
-               <p className="mt-1.5 max-w-[36ch] text-[14px] text-ink-2">
-                  {phone
-                     ? `Step ${step} of 3. ${current.hint}.`
-                     : 'Start with the species. Everything else is optional.'}
-               </p>
+               {phone ? (
+                  <p className="mt-1.5 text-[14px] text-ink-2">
+                     Step {step} of 3
+                  </p>
+               ) : null}
                {phone ? (
                   <ol
                      aria-label="Steps"

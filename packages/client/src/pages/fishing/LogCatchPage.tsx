@@ -1312,7 +1312,7 @@ export function CatchForm({
                   autoComplete="off"
                   numeric
                   className="max-w-[200px]"
-                  hint="Fish of this kind on this log."
+                  hint={undefined}
                   value={countValue}
                   error={errors.count}
                   onChange={(event) => setCountValue(event.target.value)}
@@ -1350,7 +1350,7 @@ export function CatchForm({
                         numeric
                         value={waterTempValue}
                         error={errors.waterTemp}
-                        hint="Left blank, the sea model's reading for the hour is kept instead."
+                        hint="Blank keeps the sea model's reading."
                         onChange={(event) =>
                            setWaterTempValue(event.target.value)
                         }
@@ -1599,7 +1599,7 @@ export function CatchForm({
                            maxLength={TITLE_LIMIT}
                            autoComplete="off"
                            error={errors.newSpotName}
-                           hint="Name it and it is saved as a spot to go back to. Leave it blank and only this catch keeps the pin."
+                           hint="Name it to keep it as a spot."
                            onChange={(event) =>
                               setNewSpotName(event.target.value)
                            }
@@ -2052,9 +2052,6 @@ export function LogCatchPage() {
                   <XMarkIcon className="size-5" aria-hidden="true" />
                </button>
             </div>
-            <p className="mt-3 max-w-[52ch] text-ink-2">
-               Everything here is optional except the fish and the time.
-            </p>
             <div className="mt-10">
                <CatchForm
                   key={draftId ?? 'new'}
