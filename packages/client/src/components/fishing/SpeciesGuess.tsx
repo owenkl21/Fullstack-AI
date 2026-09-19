@@ -130,10 +130,6 @@ function Guess({
       }
    };
 
-   const showsLatin = (c: SpeciesCandidate) =>
-      c.scientificName &&
-      c.scientificName.toLowerCase() !== c.commonName.toLowerCase();
-
    return (
       <div
          className={cn(
@@ -167,11 +163,6 @@ function Guess({
                   <span className="g-tracked text-[17px]">
                      {adding === c.guess ? 'Adding' : c.commonName}
                   </span>
-                  {showsLatin(c) ? (
-                     <span className="hidden text-[13px] italic opacity-60 sm:inline">
-                        {c.scientificName}
-                     </span>
-                  ) : null}
                   <span className="num text-[13px] opacity-60">
                      {Math.round(c.confidence * 100)}%
                   </span>
