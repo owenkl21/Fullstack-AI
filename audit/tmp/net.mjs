@@ -1,0 +1,13 @@
+import { launch, context, open, signIn } from '../lib.mjs';
+const b = await launch();
+const ctx = await context(b, { width: 390, height: 844 });
+const page = await ctx.newPage();
+const log = [];
+page.on('response', (r) => { if (r.url().includes('/api/')) log.push(`${r.status()} ${r.url().replace(/^https?:\/\/[^/]+/, '')}`); });
+await signIn(page);
+console.log('--- sign in ---'); console.log(log.join('\n')); log.length = 0;
+await open(page, '/profile', 4000);
+console.log('--- /profile ---'); console.log(log.join('\n')); log.length = 0;
+await open(page, '/insights', 4500);
+console.log('--- /insights ---'); console.log(log.join('\n'));
+await b.close();
