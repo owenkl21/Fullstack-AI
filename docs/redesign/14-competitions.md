@@ -183,6 +183,22 @@ Everything under `requireApiAuth`.
 - Unchanged: join, leave, invite, invites, answer invite, followers.
 - Hub: `POST /identify` takes `returnEmbedding: true` and adds `embedding`.
 
+## Where it stands (19 September 2026, evening)
+
+Shipped and checked on the live deploy, phone and desktop, with the test
+account (`audit/comps.mjs` takes the screenshots): the list with its tabs,
+starting one in five steps, the competition page with provisional standings,
+the entries and their six checks, accept and exclude, "Not right?", and the
+quick log in competition mode with both photos and the sentence to tick. The
+server side ran end to end: an entry with the namer agreeing on the species,
+held as unverified because the reader has no key, accepted onto the board,
+then excluded. A private "Namer test (ignore)" competition on the test
+account is left over; there is no delete for a competition yet.
+
+**Still needs Owen:** `ANTHROPIC_API_KEY` on the Railway `server` service.
+Until it is set the figure check is "not checked" and every entry in a
+weight or length competition is held for the organiser.
+
 ## Order of work
 
 1. Schema and server: the entry model, submit and verify, standings from

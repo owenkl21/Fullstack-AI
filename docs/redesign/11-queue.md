@@ -365,6 +365,13 @@ band, tides and the sun and moon; then the name and the mark arrived.
       and consults the gallery on every question. A fish the model does not
       know is offered after two confirmed catches. Also fixed: the classifier
       had been fed BGR instead of RGB.
+- [x] **Competitions, the flow from Owen's prototype with verification.**
+      Entries are frozen rows checked six ways (fish, species, figure, window,
+      area, duplicate); pass and it counts, any flag holds it for the
+      organiser; entrants can flag. List with tabs, a five-step start, a
+      competition page, and the quick log in competition mode with two photos.
+      Plan and state in [14-competitions.md](14-competitions.md). Needs
+      `ANTHROPIC_API_KEY` on Railway for the figure check.
 
 ## Next, in order
 
