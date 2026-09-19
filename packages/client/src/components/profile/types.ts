@@ -35,7 +35,6 @@ export type UserProfile = {
 
 export type ProfileResponse = {
    profile: UserProfile;
-   storage?: 'database' | 'clerk_fallback';
 };
 
 export type ConnectionUser = {
@@ -53,6 +52,10 @@ export type ProfileTallies = {
    bestLengthCm: number | null;
    bestCatchId: string | null;
    bestCatchTitle: string | null;
+   /* The earliest fish in the log, which is what "fishing since" means. The
+    * account's own createdAt is when they signed up, which on an angler who
+    * wrote up an old season reads years out. */
+   firstCaughtAt: string | null;
 };
 
 export const plural = (count: number, one: string, many = `${one}s`) =>

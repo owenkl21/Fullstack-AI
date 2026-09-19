@@ -1784,3 +1784,97 @@ h1[tabindex='-1']:focus:not(:focus-visible),
       transition: none;
    }
 }
+
+/* ---- A field under a thumb never zooms the page ----------------------------- */
+/*
+ * iOS zooms the whole page when a form control smaller than 16px takes focus,
+ * and it never zooms back out. A route change inside the app is not a document
+ * load, so the scale carries on to the next screen: tap the 14px measure select
+ * on the log, walk to the map, and the map is drawn magnified. The viewport meta
+ * keeps pinch zoom on purpose (no maximum-scale, no user-scalable), so the floor
+ * belongs on the controls.
+ *
+ * These rules sit outside @layer on purpose. Tailwind v4 puts every utility in
+ * @layer utilities, and unlayered CSS beats layered CSS whatever the specificity,
+ * so this wins over text-[14px] with no !important anywhere in the file. It is
+ * also why one blanket `input { font-size: 16px }` would be wrong: it would beat
+ * text-[28px] just as easily and shrink the measure box to a caption. Hence two
+ * narrow rules, one for controls that ask for less than 16px and one for controls
+ * that ask for nothing at all. Neither can lower a size that was asked for.
+ *
+ * Coarse pointer only. A mouse never triggers the zoom, so the desktop keeps
+ * every size the design chose.
+ */
+@media (pointer: coarse) {
+   /*
+    * Controls that name a size below 16px, named by token so the next field
+    * written with text-sm or text-[13px] is covered the day it lands.
+    */
+   :is(input, select, textarea, [role='combobox']):is(
+      [class*='text-[10px]'],
+      [class*='text-[11px]'],
+      [class*='text-[12px]'],
+      [class*='text-[13px]'],
+      [class*='text-[14px]'],
+      [class*='text-[15px]'],
+      [class*='text-xs'],
+      [class*='text-sm']
+   ) {
+      font-size: 16px;
+   }
+
+   /*
+    * Controls that name no size at all, which includes one inheriting a small
+    * size from whatever it sits in. Every control that does name a size steps
+    * out of the way, so this can only raise.
+    */
+   :is(input, select, textarea, [role='combobox']):not(
+      [class*='text-['],
+      [class*='text-xs'],
+      [class*='text-sm'],
+      [class*='text-base'],
+      [class*='text-lg'],
+      [class*='text-xl'],
+      [class*='text-2xl'],
+      [class*='text-3xl'],
+      [class*='text-4xl'],
+      [class*='text-5xl'],
+      [class*='text-6xl'],
+      [class*='text-7xl']
+   ) {
+      font-size: 16px;
+   }
+}
+
+/* ---- Two taps on a control are two taps, not a zoom ------------------------- */
+/*
+ * Safari zooms on a double tap, and it does that over the map's own furniture
+ * too: two quick taps on the search bar or the Mark control magnify the page,
+ * which reads as the map zooming under your finger. manipulation keeps pan and
+ * pinch and drops only the double tap, along with the wait that Safari holds a
+ * tap for while it watches for the second one, so every control answers sooner.
+ *
+ * Anything that states its own touch behaviour is left alone: the fader, the
+ * carousel, the scrollbar thumb and the drag to crop photo all depend on
+ * touch-none or touch-pan-y, and an unlayered rule would beat those utilities.
+ * Leaflet's own container and panes are untouched; they are divs, and Leaflet
+ * sets touch-action on them itself.
+ */
+@media (pointer: coarse) {
+   :is(
+      button,
+      a[href],
+      label,
+      summary,
+      input,
+      select,
+      textarea,
+      [role='button'],
+      [role='tab'],
+      [role='switch'],
+      [role='combobox'],
+      [role='option']
+   ):not([class*='touch-']) {
+      touch-action: manipulation;
+   }
+}

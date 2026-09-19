@@ -11,22 +11,23 @@ import { cn } from '@/lib/utils';
  * The controls, on the map rather than under it.
  *
  * Three rows of chips under the map meant setting a filter and scrolling
- * back up to see what it did. Now everything sits over the map's top left on
- * a desktop, and in one row under the map on a phone: the base and what
- * shows in one panel, the fish in another, a pin button that arms the next
- * tap to drop a mark, a way back to where you are standing, and a way to log
- * a catch at the centre.
+ * back up to see what it did. Now everything sits over the map: on a desktop
+ * in one row, on a phone in one bar under the thumb, and every panel rises
+ * from the bottom of the screen as a sheet.
  *
- * Every one of them carries its word. They used to carry a word and an icon
- * of the same thing, which says it twice and is the one thing the house rules
- * forbid outright; the icons are gone and the words do the work. The map's
- * own icon-only controls are the zoom, the legend and, on a desktop, locate,
- * each with a label a screen reader can read.
+ * The fish filter used to hold a cell of its own in the phone bar, where a
+ * five column grid gave it seventy four pixels and a chosen species came out
+ * as "FIS G. [1]" on two clipped lines. It lives in the layers sheet now,
+ * which has the room, and the bar says how many are chosen.
+ *
+ * Every control carries its word. They used to carry a word and an icon of
+ * the same thing, which says it twice and is the one thing the house rules
+ * forbid outright; the icons are gone and the words do the work.
  */
 type Layers = { others: boolean; marks: boolean; places: boolean };
 
 const control =
-   'g-tracked inline-flex h-11 items-center border border-line bg-background px-3.5 text-[15px] text-ink transition-[background-color,border-color,transform] duration-150 [transition-timing-function:var(--ease)] hover:border-ink active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal data-[state=open]:border-ink';
+   'g-tracked inline-flex h-11 shrink-0 items-center whitespace-nowrap border border-line bg-background px-3.5 text-[15px] text-ink transition-[background-color,border-color,transform] duration-150 [transition-timing-function:var(--ease)] hover:border-ink active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal data-[state=open]:border-ink';
 
 export function MapToolbar({
    base,
@@ -42,6 +43,7 @@ export function MapToolbar({
    onLocate,
    locating = false,
    placement = 'overlay',
+   anchor = 'top',
    className,
 }: {
    base: BaseLayer;
@@ -54,19 +56,18 @@ export function MapToolbar({
    dropping: boolean;
    onDrop: () => void;
    onLogHere: () => void;
-   /*
-    * Where the angler is standing. Only the bar carries it: on a desktop the
-    * map floats its own round locate control, which has nowhere to collide.
-    */
+   /* Where the angler is standing. The bar always carries it; the overlay
+      carries it on the map that is a whole screen and has no other copy. */
    onLocate?: () => void;
    locating?: boolean;
    /*
-    * Where it sits. Over the map on a desktop; under the map on a phone,
-    * as a bar, so the map itself is clear for fingers, every panel rises from
-    * the bottom of the screen, and nothing floats where the fixed bar at the
-    * foot of the screen would cut it in half.
+    * Where it sits. Over the map on a desktop; under the thumb on a phone,
+    * as a bar, so the map itself is clear for fingers and nothing floats
+    * where the fixed bar at the foot of the screen would cut it in half.
     */
    placement?: 'overlay' | 'bar';
+   /* On a full screen map the row stands at the foot, like the phone's bar. */
+   anchor?: 'top' | 'bottom';
    /** Where the bar is put, for the page that floats it on the map itself. */
    className?: string;
 }) {
@@ -79,265 +80,245 @@ export function MapToolbar({
     * tracked field label, and these are controls a wet thumb has to read.
     */
    const barButton =
-      'g-tracked flex min-h-12 items-center justify-center bg-background px-1 text-center text-[14px] leading-tight text-ink transition-colors duration-100 hover:bg-bg-2';
+      'g-tracked flex min-h-12 items-center justify-center gap-1.5 bg-background px-1 text-center text-[14px] leading-tight text-ink transition-colors duration-100 hover:bg-bg-2';
+
+   /* The fish filter, where there is room for it: inside the sheet. */
+   const fish =
+      phone && speciesOptions.length ? (
+         <>
+            <span className="lab mt-4 block text-ink-3">Fish</span>
+            {/* No scroll of its own: the sheet already scrolls, and a list
+                that scrolls inside a panel that scrolls is two thumbs. */}
+            <ul className="mt-1.5 flex flex-col">
+               <li>
+                  <button
+                     type="button"
+                     role="radio"
+                     aria-checked={species.length === 0}
+                     onClick={() => onSpecies([])}
+                     className="flex min-h-11 w-full items-center gap-3 text-left hover:bg-bg-2"
+                  >
+                     <span
+                        aria-hidden="true"
+                        className={cn(
+                           'grid size-5 shrink-0 place-items-center border',
+                           species.length === 0
+                              ? 'border-ink bg-ink'
+                              : 'border-line-2'
+                        )}
+                     >
+                        {species.length === 0 ? (
+                           <span className="size-2 bg-background" />
+                        ) : null}
+                     </span>
+                     <span className="g-tracked text-[16px]">Any fish</span>
+                  </button>
+               </li>
+               {speciesOptions.map((option) => {
+                  const on = species.includes(option.value);
+                  return (
+                     <li key={option.value}>
+                        <button
+                           type="button"
+                           role="checkbox"
+                           aria-checked={on}
+                           onClick={() =>
+                              onSpecies(
+                                 on
+                                    ? species.filter((s) => s !== option.value)
+                                    : [...species, option.value]
+                              )
+                           }
+                           className="flex min-h-11 w-full items-center gap-3 text-left hover:bg-bg-2"
+                        >
+                           <span
+                              aria-hidden="true"
+                              className={cn(
+                                 'grid size-5 shrink-0 place-items-center border',
+                                 on ? 'border-ink bg-ink' : 'border-line-2'
+                              )}
+                           >
+                              {on ? (
+                                 <span className="size-2 bg-background" />
+                              ) : null}
+                           </span>
+                           <span className="g-tracked text-[16px]">
+                              {option.label}
+                           </span>
+                        </button>
+                     </li>
+                  );
+               })}
+            </ul>
+         </>
+      ) : null;
+
+   /* Base, layers, fish and the legend: the one panel, sheet or popover. */
+   const panel = (
+      <div className="thread-scroll min-h-0 overflow-y-auto p-3">
+         <span className="lab text-ink-3">Base</span>
+         <div role="radiogroup" className="mt-1.5 grid grid-cols-2 gap-1.5">
+            {BASE_LAYERS.map((option) => (
+               <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={base === option.value}
+                  onClick={() => onBase(option.value)}
+                  className={cn(
+                     'g-tracked h-10 border text-[15px] transition-colors duration-100',
+                     base === option.value
+                        ? 'border-ink bg-ink text-background'
+                        : 'border-line text-ink-2 hover:border-ink hover:text-ink'
+                  )}
+               >
+                  {option.label}
+               </button>
+            ))}
+         </div>
+         <span className="lab mt-4 block text-ink-3">Show</span>
+         <ul className="mt-1.5 flex flex-col">
+            {(
+               [
+                  ['others', 'Other anglers’ spots'],
+                  ['marks', 'My private marks'],
+                  ['places', 'Slipways, harbours and shops'],
+               ] as [keyof Layers, string][]
+            ).map(([key, text]) => (
+               <li key={key}>
+                  <button
+                     type="button"
+                     role="checkbox"
+                     aria-checked={layers[key]}
+                     onClick={() => onLayer(key)}
+                     className="flex min-h-11 w-full items-center gap-3 text-left hover:bg-bg-2"
+                  >
+                     <span
+                        aria-hidden="true"
+                        className={cn(
+                           'grid size-5 shrink-0 place-items-center border',
+                           layers[key] ? 'border-ink bg-ink' : 'border-line-2'
+                        )}
+                     >
+                        {layers[key] ? (
+                           <span className="size-2 bg-background" />
+                        ) : null}
+                     </span>
+                     <span className="g-tracked text-[16px]">{text}</span>
+                  </button>
+               </li>
+            ))}
+         </ul>
+         {fish}
+         {phone ? (
+            <>
+               <span className="lab mt-4 block text-ink-3">The pins</span>
+               <ul className="mt-1.5 flex flex-col gap-1.5">
+                  {LEGEND.map((row) => (
+                     <li key={row.key} className="flex items-center gap-3">
+                        <LegendMark fill={row.fill} shape={row.shape} />
+                        <span className="text-[14px]">{row.label}</span>
+                     </li>
+                  ))}
+               </ul>
+               <button
+                  type="button"
+                  onClick={() => setLayersOpen(false)}
+                  className="g-tracked mt-4 flex h-11 w-full items-center justify-center bg-ink text-[16px] text-background"
+               >
+                  Done
+               </button>
+            </>
+         ) : null}
+      </div>
+   );
+
+   /* What the Layers control says: the base on a desktop, the word on a
+      phone, and the fish count when anything is filtered, so a bar cell
+      never hides a filter that is on. */
+   const layersLabel = bar ? (
+      <>
+         <span>Layers</span>
+         {species.length ? (
+            <span className="num grid size-5 shrink-0 place-items-center bg-ink text-[12px] text-background">
+               {species.length}
+            </span>
+         ) : null}
+      </>
+   ) : (
+      <span>
+         {BASE_LAYERS.find((b) => b.value === base)?.label ?? 'Layers'}
+         <span className="ml-1.5 text-ink-3">{shown} on</span>
+      </span>
+   );
 
    return (
       <div
          className={cn(
             bar
-               ? 'grid grid-cols-5 gap-px border border-line bg-line'
-               : 'absolute top-3 left-3 z-[500] flex flex-wrap items-start gap-2 pr-16',
+               ? 'grid grid-cols-4 gap-px border border-line bg-line'
+               : /*
+                  * One line, at its own width. An absolutely positioned flex
+                  * row that is allowed to wrap takes the width of its widest
+                  * item rather than the sum of them, so this row broke in two
+                  * over the water on a 1440 screen for no reason a reader
+                  * could see. There is always room for five controls.
+                  */
+                 anchor === 'bottom'
+                 ? 'absolute bottom-8 left-3 z-[500] flex w-max flex-nowrap items-center gap-2'
+                 : 'absolute top-3 left-3 z-[500] flex w-max flex-nowrap items-start gap-2 pr-16',
             className
          )}
       >
          {phone ? (
             <>
                <button
-                  onClick={phone ? () => setLayersOpen(true) : undefined}
+                  onClick={() => setLayersOpen(true)}
                   type="button"
                   className={bar ? barButton : control}
                >
-                  {bar ? (
-                     <span>Layers</span>
-                  ) : (
-                     <span>
-                        {BASE_LAYERS.find((b) => b.value === base)?.label ??
-                           'Layers'}
-                        <span className="ml-1.5 text-ink-3">{shown} on</span>
-                     </span>
-                  )}
+                  {layersLabel}
                </button>
                <Sheet
                   open={layersOpen}
                   onOpenChange={setLayersOpen}
                   title="Map layers"
                >
-                  <div className="thread-scroll min-h-0 overflow-y-auto p-3">
-                     <span className="lab text-ink-3">Base</span>
-                     <div
-                        role="radiogroup"
-                        className="mt-1.5 grid grid-cols-2 gap-1.5"
-                     >
-                        {BASE_LAYERS.map((option) => (
-                           <button
-                              key={option.value}
-                              type="button"
-                              role="radio"
-                              aria-checked={base === option.value}
-                              onClick={() => onBase(option.value)}
-                              className={cn(
-                                 'g-tracked h-10 border text-[15px] transition-colors duration-100',
-                                 base === option.value
-                                    ? 'border-ink bg-ink text-background'
-                                    : 'border-line text-ink-2 hover:border-ink hover:text-ink'
-                              )}
-                           >
-                              {option.label}
-                           </button>
-                        ))}
-                     </div>
-                     <span className="lab mt-4 block text-ink-3">Show</span>
-                     <ul className="mt-1.5 flex flex-col">
-                        {(
-                           [
-                              ['others', 'Other anglers’ spots'],
-                              ['marks', 'My private marks'],
-                              ['places', 'Slipways, harbours and shops'],
-                           ] as [keyof Layers, string][]
-                        ).map(([key, text]) => (
-                           <li key={key}>
-                              <button
-                                 type="button"
-                                 role="checkbox"
-                                 aria-checked={layers[key]}
-                                 onClick={() => onLayer(key)}
-                                 className="flex min-h-11 w-full items-center gap-3 text-left hover:bg-bg-2"
-                              >
-                                 <span
-                                    aria-hidden="true"
-                                    className={cn(
-                                       'grid size-5 shrink-0 place-items-center border',
-                                       layers[key]
-                                          ? 'border-ink bg-ink'
-                                          : 'border-line-2'
-                                    )}
-                                 >
-                                    {layers[key] ? (
-                                       <span className="size-2 bg-background" />
-                                    ) : null}
-                                 </span>
-                                 <span className="g-tracked text-[16px]">
-                                    {text}
-                                 </span>
-                              </button>
-                           </li>
-                        ))}
-                     </ul>
-                     {phone ? (
-                        <>
-                           <span className="lab mt-4 block text-ink-3">
-                              The pins
-                           </span>
-                           <ul className="mt-1.5 flex flex-col gap-1.5">
-                              {LEGEND.map((row) => (
-                                 <li
-                                    key={row.key}
-                                    className="flex items-center gap-3"
-                                 >
-                                    <LegendMark
-                                       fill={row.fill}
-                                       shape={row.shape}
-                                    />
-                                    <span className="text-[14px]">
-                                       {row.label}
-                                    </span>
-                                 </li>
-                              ))}
-                           </ul>
-                           <button
-                              type="button"
-                              onClick={() => setLayersOpen(false)}
-                              className="g-tracked mt-4 flex h-11 w-full items-center justify-center bg-ink text-[16px] text-background"
-                           >
-                              Done
-                           </button>
-                        </>
-                     ) : null}
-                  </div>
+                  {panel}
                </Sheet>
             </>
          ) : (
             <Popover.Root open={layersOpen} onOpenChange={setLayersOpen}>
                <Popover.Trigger asChild>
                   <button type="button" className={bar ? barButton : control}>
-                     {bar ? (
-                        <span>Layers</span>
-                     ) : (
-                        <span>
-                           {BASE_LAYERS.find((b) => b.value === base)?.label ??
-                              'Layers'}
-                           <span className="ml-1.5 text-ink-3">{shown} on</span>
-                        </span>
-                     )}
+                     {layersLabel}
                   </button>
                </Popover.Trigger>
                <Popover.Portal>
                   <Popover.Content
                      align="start"
+                     side={anchor === 'bottom' ? 'top' : 'bottom'}
                      sideOffset={6}
                      collisionPadding={12}
-                     className="z-[1000] w-[min(300px,calc(100vw-24px))] border border-line-2 bg-background p-3 text-ink"
+                     className="z-[1000] w-[min(300px,calc(100vw-24px))] border border-line-2 bg-background p-0 text-ink"
                   >
-                     <span className="lab text-ink-3">Base</span>
-                     <div
-                        role="radiogroup"
-                        className="mt-1.5 grid grid-cols-2 gap-1.5"
-                     >
-                        {BASE_LAYERS.map((option) => (
-                           <button
-                              key={option.value}
-                              type="button"
-                              role="radio"
-                              aria-checked={base === option.value}
-                              onClick={() => onBase(option.value)}
-                              className={cn(
-                                 'g-tracked h-10 border text-[15px] transition-colors duration-100',
-                                 base === option.value
-                                    ? 'border-ink bg-ink text-background'
-                                    : 'border-line text-ink-2 hover:border-ink hover:text-ink'
-                              )}
-                           >
-                              {option.label}
-                           </button>
-                        ))}
-                     </div>
-                     <span className="lab mt-4 block text-ink-3">Show</span>
-                     <ul className="mt-1.5 flex flex-col">
-                        {(
-                           [
-                              ['others', 'Other anglers’ spots'],
-                              ['marks', 'My private marks'],
-                              ['places', 'Slipways, harbours and shops'],
-                           ] as [keyof Layers, string][]
-                        ).map(([key, text]) => (
-                           <li key={key}>
-                              <button
-                                 type="button"
-                                 role="checkbox"
-                                 aria-checked={layers[key]}
-                                 onClick={() => onLayer(key)}
-                                 className="flex min-h-11 w-full items-center gap-3 text-left hover:bg-bg-2"
-                              >
-                                 <span
-                                    aria-hidden="true"
-                                    className={cn(
-                                       'grid size-5 shrink-0 place-items-center border',
-                                       layers[key]
-                                          ? 'border-ink bg-ink'
-                                          : 'border-line-2'
-                                    )}
-                                 >
-                                    {layers[key] ? (
-                                       <span className="size-2 bg-background" />
-                                    ) : null}
-                                 </span>
-                                 <span className="g-tracked text-[16px]">
-                                    {text}
-                                 </span>
-                              </button>
-                           </li>
-                        ))}
-                     </ul>
-                     {phone ? (
-                        <>
-                           <span className="lab mt-4 block text-ink-3">
-                              The pins
-                           </span>
-                           <ul className="mt-1.5 flex flex-col gap-1.5">
-                              {LEGEND.map((row) => (
-                                 <li
-                                    key={row.key}
-                                    className="flex items-center gap-3"
-                                 >
-                                    <LegendMark
-                                       fill={row.fill}
-                                       shape={row.shape}
-                                    />
-                                    <span className="text-[14px]">
-                                       {row.label}
-                                    </span>
-                                 </li>
-                              ))}
-                           </ul>
-                           <button
-                              type="button"
-                              onClick={() => setLayersOpen(false)}
-                              className="g-tracked mt-4 flex h-11 w-full items-center justify-center bg-ink text-[16px] text-background"
-                           >
-                              Done
-                           </button>
-                        </>
-                     ) : null}
+                     {panel}
                   </Popover.Content>
                </Popover.Portal>
             </Popover.Root>
          )}
 
-         {speciesOptions.length ? (
+         {!bar && speciesOptions.length ? (
             <Picker
-               size={bar ? 'sm' : 'md'}
+               size="md"
                multiple
                label="Fish"
                allLabel="Any"
                value={species}
                onChange={(next) => onSpecies(next as string[])}
                options={speciesOptions}
-               className={bar ? 'min-h-12 border-0 px-1' : 'max-w-[200px]'}
+               className="w-auto max-w-[200px] shrink-0"
             />
-         ) : bar ? (
-            /* The filter with nothing to filter yet. It keeps its cell so the
-               row does not reshuffle the moment a species arrives. */
-            <span className={cn(barButton, 'text-ink-3')}>Fish</span>
          ) : null}
 
          <button
@@ -359,11 +340,14 @@ export function MapToolbar({
             )}
          </button>
 
-         {bar && onLocate ? (
+         {onLocate ? (
             <button
                type="button"
                onClick={onLocate}
-               className={cn(barButton, locating && 'text-teal')}
+               className={cn(
+                  bar ? barButton : control,
+                  locating && 'text-teal-text'
+               )}
             >
                <span>{locating ? 'Finding' : 'Locate'}</span>
             </button>

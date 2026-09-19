@@ -31,6 +31,7 @@ import {
    readUnitSystem,
    tempIn,
    unitOf,
+   type UnitSystem,
 } from '@/lib/units';
 import { cn } from '@/lib/utils';
 
@@ -102,6 +103,25 @@ const tally = <K extends string>(
       count: counts.get(key) ?? 0,
    }));
 };
+
+/*
+ * The water buckets are held in Celsius, because that is what the log stores.
+ * The label is written in whatever the reader reads in, so the bucket edges
+ * move with the unit instead of being stamped °C for everyone.
+ */
+const waterLabel = (bucket: string, system: UnitSystem) =>
+   `${bucket.replace(/\d+/g, (edge) => String(tempIn(Number(edge), system)))} ${unitOf('temp', system)}`;
+
+/* A log carries conditions when anything was stored with it, which is not the
+ * same as the log having a position. */
+const hasConditions = (e: CatchSummary) =>
+   Boolean(e.weatherConditionText) ||
+   Boolean(e.weatherWindDirectionCardinal) ||
+   typeof e.weatherAirPressureMeanSeaLevelMillibars === 'number' ||
+   typeof e.weatherSeaSurfaceTemperatureC === 'number' ||
+   typeof e.waterTemp === 'number' ||
+   typeof e.weatherIsDaytime === 'boolean' ||
+   Boolean(e.weatherMoonPhase);
 
 /* Sixteen compass points folded into eight, for a rose a thumb can read. */
 const fold = (cardinal: string | null | undefined) => {
@@ -229,7 +249,7 @@ function Insights() {
                         ? '18 to 20'
                         : 'Over 20';
             },
-            (k) => `${k} ${unitOf('temp', 'METRIC')}`
+            (k) => waterLabel(k, system)
          ),
          sky: tally(
             ['Clear', 'Cloudy', 'Overcast', 'Rain', 'Fog'],
@@ -251,8 +271,11 @@ function Insights() {
                  ? 'Day'
                  : 'Night'
          ),
+         /* How many logs these five charts are drawn from, which is not the
+          * same as how many fish are in the log. */
+         withConditions: catches.filter(hasConditions).length,
       };
-   }, [catches]);
+   }, [catches, system]);
 
    const tables = useMemo(() => {
       if (!catches) return null;
@@ -381,6 +404,17 @@ function Insights() {
    const earned = progress.badges.filter((b) => b.earned);
    const bestHour = charts.hour.reduce((a, b) => (b.count > a.count ? b : a));
    const bestWind = charts.wind.reduce((a, b) => (b.count > a.count ? b : a));
+   /*
+    * The first fish in the log. The catches endpoint is ordered by the day a
+    * log was written, not the day it was caught, so the last row of the list
+    * is whichever old fish was typed up last, not the oldest fish.
+    */
+   const firstAt = catches.reduce<string | null>(
+      (earliest, entry) =>
+         !earliest || entry.caughtAt < earliest ? entry.caughtAt : earliest,
+      null
+   );
+   const firstDay = firstAt ? formatDay(firstAt) : null;
 
    return (
       <section className="relative mx-auto w-[min(1680px,100%-32px)] pb-8 md:pb-12">
@@ -390,8 +424,8 @@ function Insights() {
             aside={
                <span className="num">
                   {plural(f.catches, 'log', 'logs')},{' '}
-                  {plural(f.fish, 'fish', 'fish')}, since{' '}
-                  {formatDay(catches[catches.length - 1]?.caughtAt ?? '')}
+                  {plural(f.fish, 'fish', 'fish')}
+                  {firstDay ? `, since ${firstDay}` : ''}
                </span>
             }
          />
@@ -565,8 +599,11 @@ function Insights() {
                   title="Wind from"
                   bars={charts.wind}
                   sentence={
-                     bestWind.count
-                        ? `Most fish on a ${bestWind.label} wind.`
+                     /* Four logs carry a wind and each one blew from a
+                        different quarter, so there is no "most" to report.
+                        A tie of one is not a finding. */
+                     bestWind.count > 1
+                        ? `Most fish on a ${bestWind.label} wind, ${bestWind.count} of them.`
                         : null
                   }
                   icon={
@@ -586,19 +623,23 @@ function Insights() {
                </div>
             </div>
             <p className="mt-4 text-[14px] text-ink-3">
-               Counted from the conditions stored on each log. A catch logged
-               without a position has none.
+               {charts.withConditions === 0
+                  ? 'No log carries stored conditions yet, so there is nothing to count here.'
+                  : `Counted from ${plural(charts.withConditions, 'log', 'logs')} of ${f.catches} that carry stored conditions.`}
             </p>
          </Section>
 
          {/* ---- What and where ---- */}
          <Section title="What and where">
             <div className="grid gap-x-10 gap-y-10 lg:grid-cols-3">
+               {/* No species link: /catches/me reads a text search and a
+                   year, and nothing else, so ?species= landed on the whole
+                   log. A name that opens the same page it was on is worse
+                   than a name that stays put. */}
                <Table
                   title="By species"
                   rows={tables.species}
                   system={system}
-                  href={(id) => `/catches/me?species=${id}`}
                />
                <Table
                   title="By spot"
@@ -698,6 +739,12 @@ function Table({
    system: ReturnType<typeof readUnitSystem>;
    href?: (id: string) => string;
 }) {
+   /*
+    * The layout is fixed, so the name column is what is left after the three
+    * small ones rather than whatever the browser felt like. At three columns
+    * on a desktop the names were being cut to twelve characters, WHITE
+    * STEENI, while the figures beside them kept all the room they wanted.
+    */
    return (
       <div className="min-w-0">
          <h3 className="lab text-ink-3">{title}</h3>
@@ -706,7 +753,7 @@ function Table({
                Nothing recorded under this yet.
             </NoData>
          ) : (
-            <table className="mt-2 w-full border-collapse text-[14px]">
+            <table className="mt-2 w-full table-fixed border-collapse text-[14px]">
                <thead>
                   <tr className="border-b border-ink text-left">
                      <th
@@ -717,19 +764,19 @@ function Table({
                      </th>
                      <th
                         scope="col"
-                        className="lab py-1.5 text-right font-normal text-ink-3"
+                        className="lab w-14 py-1.5 text-right font-normal text-ink-3"
                      >
                         Fish
                      </th>
                      <th
                         scope="col"
-                        className="lab py-1.5 text-right font-normal text-ink-3"
+                        className="lab w-24 py-1.5 text-right font-normal text-ink-3"
                      >
                         Best
                      </th>
                      <th
                         scope="col"
-                        className="lab hidden py-1.5 text-right font-normal text-ink-3 sm:table-cell"
+                        className="lab hidden w-32 py-1.5 text-right font-normal text-ink-3 sm:table-cell"
                      >
                         Last
                      </th>
@@ -749,7 +796,7 @@ function Table({
                             a row without a link keeps it. */}
                         <td
                            className={cn(
-                              'max-w-0 truncate pr-2',
+                              'truncate pr-2',
                               href && row.id ? 'py-0' : 'py-2'
                            )}
                         >
@@ -785,6 +832,3 @@ function Table({
       </div>
    );
 }
-
-/* Keeps the unused import honest until the water chart takes a reader unit. */
-void tempIn;

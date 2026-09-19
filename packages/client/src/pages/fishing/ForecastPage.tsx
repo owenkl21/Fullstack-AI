@@ -1,11 +1,18 @@
 import { PageHead } from '@/components/brand/PageHead';
 import axios from 'axios';
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import {
+   useEffect,
+   useMemo,
+   useRef,
+   useState,
+   type CSSProperties,
+} from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DayStrip } from '@/components/forecast/DayStrip';
 import { HourGrid } from '@/components/forecast/HourGrid';
 import { PlaceSearch } from '@/components/forecast/PlaceSearch';
 import {
+   clockAtPlace,
    fetchForecast,
    localHourNow,
    namePlace,
@@ -13,7 +20,6 @@ import {
    type ForecastDay,
    type PlaceHit,
 } from '@/components/forecast/forecast-api';
-import { formatClock } from '@/components/fishing/record/format';
 import { Button } from '@/components/ui/button';
 import { usePosition } from '@/lib/position';
 import { useIsSignedIn } from '@/lib/auth-client';
@@ -78,6 +84,25 @@ export function ForecastPage() {
     */
    const { isSignedIn } = useIsSignedIn();
    const [now, setNow] = useState<WeatherSnapshot | null>(null);
+   const [placeName, setPlaceName] = useState<string | null>(null);
+   const [selected, setSelected] = useState<string | null>(null);
+   /*
+    * Reading it again. `attempt` moves for the button under the hours and
+    * for a tab that has been away longer than the answer keeps for; `forced`
+    * carries the nonce past the browser's copy, and `quiet` holds the
+    * skeleton back when nobody asked, so a phone picked up again fills in
+    * under the reader rather than blanking on them.
+    */
+   const [attempt, setAttempt] = useState(0);
+   const forced = useRef(false);
+   const quiet = useRef(false);
+   const readAt = useRef(0);
+   const reread = (options?: { quiet?: boolean }) => {
+      forced.current = true;
+      quiet.current = options?.quiet ?? false;
+      setAttempt((n) => n + 1);
+   };
+
    useEffect(() => {
       if (!isSignedIn || !target) return;
       const controller = new AbortController();
@@ -87,10 +112,37 @@ export function ForecastPage() {
          })
          .catch(() => undefined);
       return () => controller.abort();
-   }, [isSignedIn, target?.latitude, target?.longitude]); // eslint-disable-line react-hooks/exhaustive-deps
-   const [placeName, setPlaceName] = useState<string | null>(null);
-   const [selected, setSelected] = useState<string | null>(null);
-   const [attempt, setAttempt] = useState(0);
+   }, [isSignedIn, target?.latitude, target?.longitude, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+   /*
+    * The clock, ticking. Everything on this page that says now is worked out
+    * while it draws: the hour banded in teal, which day counts as today, and
+    * the time under the hours. Nothing was moving them, so a page left open
+    * on a phone kept whatever hour it was opened on.
+    */
+   const [nowMs, setNowMs] = useState(() => Date.now());
+   useEffect(() => {
+      let timer = 0;
+      const beat = () => {
+         setNowMs(Date.now());
+         timer = window.setTimeout(beat, 60000 - (Date.now() % 60000) + 50);
+      };
+      timer = window.setTimeout(beat, 60000 - (Date.now() % 60000) + 50);
+      /* Back from somewhere else: the hour first, and the reading again if
+         the one on screen is older than the answer is kept for. */
+      const woke = () => {
+         if (document.visibilityState !== 'visible') return;
+         setNowMs(Date.now());
+         if (readAt.current && Date.now() - readAt.current > 5 * 60 * 1000) {
+            reread({ quiet: true });
+         }
+      };
+      document.addEventListener('visibilitychange', woke);
+      return () => {
+         window.clearTimeout(timer);
+         document.removeEventListener('visibilitychange', woke);
+      };
+   }, []);
 
    /* The forecast for wherever the page is pointed. */
    useEffect(() => {
@@ -99,13 +151,18 @@ export function ForecastPage() {
          return;
       }
       const controller = new AbortController();
-      setStatus('loading');
-      fetchForecast(target.latitude, target.longitude, controller.signal)
+      const fresh = forced.current;
+      const under = quiet.current;
+      forced.current = false;
+      quiet.current = false;
+      if (!under) setStatus('loading');
+      fetchForecast(target.latitude, target.longitude, controller.signal, fresh)
          .then((found) => {
             if (!found) {
                setStatus('error');
                return;
             }
+            readAt.current = Date.now();
             setForecast(found);
             setSelected((was) =>
                was && found.days.some((d) => d.date === was)
@@ -113,6 +170,16 @@ export function ForecastPage() {
                   : (found.days[0]?.date ?? null)
             );
             setStatus('ready');
+            /*
+             * That may have come off the browser's own five minute copy.
+             * Draw it, since a drawn week beats a spinner, then ask the
+             * server for a newer one behind it. Once only: the second ask
+             * carries the nonce, so whatever it brings back stands.
+             */
+            const age = Date.now() - new Date(found.issuedAt).getTime();
+            if (!fresh && Number.isFinite(age) && age > 5 * 60 * 1000) {
+               reread({ quiet: true });
+            }
          })
          .catch((error) => {
             if (!axios.isCancel(error)) setStatus('error');
@@ -165,7 +232,13 @@ export function ForecastPage() {
       [forecast]
    );
 
-   const nowLocal = forecast ? localHourNow(forecast.utcOffsetSeconds) : null;
+   const nowLocal = forecast
+      ? localHourNow(forecast.utcOffsetSeconds, nowMs)
+      : null;
+   /* When the app last asked, on the clock at the place. */
+   const checkedAt = forecast
+      ? clockAtPlace(forecast.issuedAt, forecast.utcOffsetSeconds)
+      : null;
    const today = nowLocal ? nowLocal.slice(0, 10) : '';
    const day = forecast?.days.find((d) => d.date === selected) ?? null;
    /* The day after, because a moon that rises today sets tomorrow morning. */
@@ -219,11 +292,7 @@ export function ForecastPage() {
                <p className="max-w-[46ch] text-[17px] text-ink-2">
                   Could not read the forecast here. Try again.
                </p>
-               <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setAttempt((n) => n + 1)}
-               >
+               <Button type="button" variant="outline" onClick={() => reread()}>
                   Try again
                </Button>
             </div>
@@ -233,7 +302,11 @@ export function ForecastPage() {
             <>
                {now ? (
                   <div className="mt-5">
-                     <NowFacts snapshot={now} system={system} />
+                     <NowFacts
+                        snapshot={now}
+                        system={system}
+                        utcOffsetSeconds={forecast.utcOffsetSeconds}
+                     />
                   </div>
                ) : null}
                <div className="mt-5">
@@ -272,7 +345,10 @@ export function ForecastPage() {
 
                <p className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[14px] text-ink-3">
                   <span>
-                     Read {formatClock(forecast.issuedAt)}
+                     {/* Checked, not read: this is when the app last asked
+                         Open-Meteo, on the clock at the place, so a page sent
+                         to a friend across a border still makes sense. */}
+                     {checkedAt ? `Checked ${checkedAt}` : 'Checked'}
                      {forecast.timezone
                         ? `, hours in ${forecast.timezone.replace('_', ' ')}`
                         : ''}
@@ -283,7 +359,7 @@ export function ForecastPage() {
                   </span>
                   <button
                      type="button"
-                     onClick={() => setAttempt((n) => n + 1)}
+                     onClick={() => reread()}
                      className="g-tracked -my-3 inline-flex min-h-11 items-center text-[16px] text-ink underline-offset-4 hover:underline"
                   >
                      Read again
@@ -440,10 +516,14 @@ function ForecastSkeleton() {
 function NowFacts({
    snapshot,
    system,
+   utcOffsetSeconds,
 }: {
    snapshot: WeatherSnapshot;
    system: ReturnType<typeof readUnitSystem>;
+   /* The reading is stamped on the place's clock, not the reader's. */
+   utcOffsetSeconds: number;
 }) {
+   const readAt = clockAtPlace(snapshot.observedAt, utcOffsetSeconds);
    const t = (c: number | null | undefined) =>
       typeof c === 'number'
          ? `${Math.round(tempIn(c, system) ?? c)}${unitOf('temp', system)}`
@@ -486,9 +566,7 @@ function NowFacts({
          <div className="flex items-baseline justify-between gap-4">
             <h2 className="lab text-teal-text">Right now</h2>
             <p className="lab text-ink-3">
-               {snapshot.observedAt
-                  ? `Read ${formatClock(snapshot.observedAt)}`
-                  : 'The reading of the moment'}
+               {readAt ? `Read ${readAt}` : 'The reading of the moment'}
             </p>
          </div>
          <dl className="mt-1.5 grid grid-cols-4 gap-x-4">

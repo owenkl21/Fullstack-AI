@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import {
    ConnectionsDialog,
    type ConnectionsKind,
@@ -8,8 +8,16 @@ import { ProfileSettingsPanel } from '@/components/profile/ProfileSettingsPanel'
 import { ProfileStatsPanel } from '@/components/social/ProfileStats';
 import { RankCard } from '@/components/profile/RankCard';
 import { ProfileView } from '@/components/profile/ProfileView';
+import {
+   fetchMyProfile,
+   settleMyAvatar,
+} from '@/components/profile/avatar-api';
+import {
+   fetchMyCatches,
+   type CatchSummary,
+} from '@/components/fishing/record/api';
 import type {
-   ProfileResponse,
+   GalleryImage,
    ProfileTallies,
    UserProfile,
 } from '@/components/profile/types';
@@ -25,14 +33,38 @@ import { useDocumentTitle } from '@/lib/title';
 
 type Status = 'loading' | 'ready' | 'error';
 
-type CatchSummary = {
+/*
+ * The catches endpoint signs a card and a thumb beside every photograph, which
+ * the shared CatchImage type does not list yet. Read them here rather than
+ * loading a four megabyte original into a gallery tile.
+ */
+type SignedImage = {
    id: string;
-   title: string;
-   length: number | null;
-   site: { id: string; name: string } | null;
+   url: string;
+   cardUrl?: string | null;
+   thumbUrl?: string | null;
 };
 
 const LOAD_FAILED = 'Could not load your profile.';
+
+/* Newest fish first, and one entry per photograph on it. */
+const photographsFrom = (catches: CatchSummary[]): GalleryImage[] =>
+   [...catches]
+      .sort((a, b) => b.caughtAt.localeCompare(a.caughtAt))
+      .flatMap((entry) =>
+         (entry.images ?? []).map((held) => {
+            const image = held.image as SignedImage;
+            return {
+               id: image.id,
+               url: image.url,
+               cardUrl: image.cardUrl ?? null,
+               thumbUrl: image.thumbUrl ?? null,
+               sourceType: 'CATCH' as const,
+               sourceId: entry.id,
+               sourceTitle: entry.title,
+            };
+         })
+      );
 
 export function ProfilePage() {
    useDocumentTitle('My profile');
@@ -49,25 +81,34 @@ function ProfileScreen() {
 
    const [profile, setProfile] = useState<UserProfile | null>(null);
    const [tallies, setTallies] = useState<ProfileTallies | null>(null);
+   const [photographs, setPhotographs] = useState<GalleryImage[] | null>(null);
    const [status, setStatus] = useState<Status>('loading');
-   const [isReachable, setIsReachable] = useState(true);
    const [attempt, setAttempt] = useState(0);
    const [connections, setConnections] = useState<ConnectionsKind>('followers');
    const [connectionsOpen, setConnectionsOpen] = useState(false);
    const [settingsOpen, setSettingsOpen] = useState(false);
 
+   /* Shared with the header's circle, so a cold load of this page reads the
+    * angler once rather than twice. */
    useEffect(() => {
-      const controller = new AbortController();
+      let cancelled = false;
 
-      axios
-         .get<ProfileResponse>('/api/users/me', { signal: controller.signal })
-         .then(({ data }) => {
-            setProfile(data.profile);
-            setIsReachable(data.storage !== 'clerk_fallback');
+      fetchMyProfile()
+         .then((loaded) => {
+            if (cancelled) {
+               return;
+            }
+
+            if (!loaded) {
+               setStatus('error');
+               return;
+            }
+
+            setProfile(loaded);
             setStatus('ready');
          })
          .catch((error: unknown) => {
-            if (axios.isCancel(error)) {
+            if (cancelled || axios.isCancel(error)) {
                return;
             }
 
@@ -75,22 +116,22 @@ function ProfileScreen() {
             setStatus('error');
          });
 
-      return () => controller.abort();
+      return () => {
+         cancelled = true;
+      };
    }, [attempt]);
 
-   /* The figures are counted from the catches themselves; the profile endpoint
-    * does not carry a total yet.
-    * TODO(api): totals on the profile payload so this second call can go
-    * (appendix E, the profile figures item). */
+   /* The figures, the first fish and the photographs are counted from the
+    * catches themselves. The profile endpoint carries no total, and its gallery
+    * is drawn from the eight newest catches only, so a photograph on an older
+    * fish never reaches it.
+    * TODO(api): totals and a photographed-only gallery on the profile payload
+    * so this second call can go (appendix E, the profile figures item). */
    useEffect(() => {
       const controller = new AbortController();
 
-      axios
-         .get<{ catches: CatchSummary[] }>('/api/catches/me', {
-            signal: controller.signal,
-         })
-         .then(({ data }) => {
-            const list = data.catches ?? [];
+      fetchMyCatches(controller.signal)
+         .then((list) => {
             const spots = new Set(
                list
                   .map((entry) => entry.site?.id)
@@ -104,6 +145,13 @@ function ProfileScreen() {
                      : longest,
                null
             );
+            const first = list.reduce<string | null>(
+               (earliest, entry) =>
+                  !earliest || entry.caughtAt < earliest
+                     ? entry.caughtAt
+                     : earliest,
+               null
+            );
 
             setTallies({
                catches: list.length,
@@ -111,7 +159,9 @@ function ProfileScreen() {
                bestLengthCm: best?.length ?? null,
                bestCatchId: best?.id ?? null,
                bestCatchTitle: best?.title ?? null,
+               firstCaughtAt: first,
             });
+            setPhotographs(photographsFrom(list));
          })
          .catch((error: unknown) => {
             if (axios.isCancel(error)) {
@@ -121,10 +171,23 @@ function ProfileScreen() {
             /* The figures are a nicety; the profile still reads without them. */
             console.error(error);
             setTallies(null);
+            setPhotographs(null);
          });
 
       return () => controller.abort();
    }, [attempt]);
+
+   /* The angler's own photographs first, then anything the server found on a
+    * spot, and never the same picture twice. */
+   const gallery = useMemo(() => {
+      const fromCatches = photographs ?? [];
+      const held = new Set(fromCatches.map((entry) => entry.id));
+      const fromProfile = (profile?.galleryImages ?? []).filter(
+         (entry) => !held.has(entry.id)
+      );
+
+      return [...fromCatches, ...fromProfile].slice(0, 12);
+   }, [photographs, profile]);
 
    const retry = useCallback(() => {
       setStatus('loading');
@@ -138,9 +201,10 @@ function ProfileScreen() {
       setConnectionsOpen(true);
    }, []);
 
+   /* The header's circle is the same photograph, so a save moves both. */
    const onSaved = useCallback((saved: UserProfile) => {
       setProfile(saved);
-      setIsReachable(true);
+      settleMyAvatar(saved.avatarThumbUrl ?? saved.avatarUrl ?? null);
    }, []);
 
    return (
@@ -167,20 +231,10 @@ function ProfileScreen() {
             </div>
          ) : (
             <>
-               {isReachable ? null : (
-                  <p
-                     role="status"
-                     className="mb-8 border-l-[3px] border-teal bg-bg-2 px-4 py-3 text-[15px] text-ink-2"
-                  >
-                     Your catches, spots and followers are out of reach right
-                     now, so only your name and photograph are shown. Your
-                     changes are kept and will catch up.
-                  </p>
-               )}
-
                <ProfileView
                   profile={profile}
                   tallies={tallies}
+                  gallery={gallery}
                   figures={
                      <>
                         <RankCard own className="mt-8" />

@@ -58,8 +58,17 @@ export function AppHeader() {
                </nav>
             </SignedIn>
             <div className="ml-auto flex items-center gap-3">
-               <ThemeToggle />
+               {/*
+                * A 390 header was carrying the wordmark, the sun, the bell and
+                * the avatar. Signed in, the sun now lives in the account
+                * panel's footer on a phone and keeps its place here from md
+                * up. Signed out there is no panel, so it stays in the bar.
+                */}
+               <SignedIn>
+                  <ThemeToggle className="hidden md:inline-flex" />
+               </SignedIn>
                <SignedOut>
+                  <ThemeToggle />
                   <Link
                      to="/sign-in"
                      className="g-tracked hidden min-h-11 items-center text-[19px] text-paper-2 hover:text-paper sm:inline-flex"

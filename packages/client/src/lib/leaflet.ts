@@ -50,21 +50,38 @@ const SEAMARK_ATTRIBUTION =
  * Satellite is the default here on purpose. From the air you can see the
  * gullies, the reef and the ledges, which is how anyone picks a mark.
  *
- * All three are keyless and free to use with attribution, which is a licence
+ * All four are keyless and free to use with attribution, which is a licence
  * condition rather than a courtesy, so it is always on.
  */
 export type BaseLayer = 'satellite' | 'terrain' | 'plain' | 'streets';
 
 const BASES: Record<
    BaseLayer,
-   { url: string; attribution: string; maxZoom: number; label: string }
+   {
+      url: string;
+      attribution: string;
+      maxZoom: number;
+      /*
+       * The last zoom the server has pictures for. Past it Leaflet stretches
+       * that tile rather than asking for one that comes back grey.
+       */
+      maxNativeZoom: number;
+      label: string;
+   }
 > = {
    satellite: {
       label: 'Satellite',
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       attribution:
          'Imagery &copy; <a href="https://www.esri.com">Esri</a>, Maxar, Earthstar Geographics',
+      /*
+       * Esri photographs the Cape Peninsula to z19 and nearly everywhere else
+       * in the country to z18: Struisbaai, Langebaan, the Vaal, Gariep and
+       * Theewaterskloof all came back as the grey "not yet available" tile at
+       * z19. Stretching z18 one step is better than a blank last step.
+       */
       maxZoom: 19,
+      maxNativeZoom: 18,
    },
    terrain: {
       label: 'Terrain',
@@ -77,20 +94,29 @@ const BASES: Record<
       attribution:
          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Style &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
       maxZoom: 17,
+      maxNativeZoom: 17,
    },
    plain: {
       label: 'Plain',
-      /* CARTO Positron: no road clutter, so the pins are the loudest thing. */
-      url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      /*
+       * Esri's light grey canvas: no road clutter, so the pins are the loudest
+       * thing. This was CARTO Positron until CARTO began burning "API KEY
+       * REQUIRED" across every keyless tile (seen live, 19 Sep 2026). The grey
+       * canvas is keyless under the same terms as the satellite above and is
+       * drawn to z16, which is as close as a plain base needs to go.
+       */
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
       attribution:
-         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      maxZoom: 20,
+         '&copy; <a href="https://www.esri.com">Esri</a>, HERE, Garmin, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+      maxNativeZoom: 16,
    },
    streets: {
       label: 'Streets',
       url: OSM_TILES,
       attribution: OSM_ATTRIBUTION,
       maxZoom: 19,
+      maxNativeZoom: 19,
    },
 };
 
@@ -344,6 +370,66 @@ export const dropPin = (): L.DivIcon => {
    return icon;
 };
 
+/*
+ * The pin a search puts down, carrying the name that was asked for.
+ *
+ * The same teardrop the mark flow drops, because a pin is a pin, with a paper
+ * plate above it holding the place's name: a result you can see from across
+ * the screen rather than a map that quietly moved. The plate is drawn in the
+ * product's own tokens rather than fixed colours, so night flips it with
+ * everything else.
+ */
+export const FOUND_PIN_CLASS = 'map-pin-found';
+
+const escapeHtml = (text: string) =>
+   text.replace(
+      /[&<>"']/g,
+      (character) =>
+         ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+         })[character] ?? character
+   );
+
+export const foundPin = (name: string): L.DivIcon => {
+   const icon = dropPin();
+   const label = name.length > 24 ? `${name.slice(0, 23).trimEnd()}…` : name;
+   const plate =
+      `<span style="position:absolute;bottom:48px;left:50%;transform:translateX(-50%);` +
+      `white-space:nowrap;background:var(--bg);color:var(--ink);border:1px solid var(--line);` +
+      `padding:2px 7px;font-family:var(--font-display),sans-serif;font-size:15px;` +
+      `letter-spacing:0.06em;text-transform:uppercase;line-height:1.3">${escapeHtml(label)}</span>`;
+   icon.options.html = `<span style="position:relative;display:block;width:44px">${plate}${String(icon.options.html)}</span>`;
+   icon.options.className = `${icon.options.className ?? ''} ${FOUND_PIN_CLASS}`;
+   return icon;
+};
+
+/**
+ * A control drawn over the map, kept out of the map's hands.
+ *
+ * Leaflet listens on its own container, so a control that stands inside it
+ * would pan, zoom or drop a mark on the water underneath as well as doing its
+ * own job. Saying this about the element stops that.
+ *
+ * It does nothing for a control that is a sibling of the container rather than
+ * a child of it, which is how every control in this product is drawn, and that
+ * is deliberate rather than lazy: Leaflet never sees those events, so there is
+ * nothing to stop, and stopping them does real harm. React listens at the root
+ * of the document, so a mousedown halted on the way up never reaches the
+ * button's own handler and the control goes quietly dead. That is exactly what
+ * happened to the map's search field when this was applied to everything.
+ */
+export const stopMapEvents = (element: HTMLElement | null) => {
+   if (!element || element.dataset.mapGuard === 'on') return;
+   if (!element.closest('.leaflet-container')) return;
+   element.dataset.mapGuard = 'on';
+   L.DomEvent.disableClickPropagation(element);
+   L.DomEvent.disableScrollPropagation(element);
+};
+
 export type CreateMapOptions = {
    centre: MapPosition;
    zoom: number;
@@ -399,6 +485,7 @@ export const createMap = (
    const baseLayer = L.tileLayer(base.url, {
       attribution: base.attribution,
       maxZoom: base.maxZoom,
+      maxNativeZoom: base.maxNativeZoom,
    }).addTo(map);
 
    /* Kept on the map object so the caller can change base without rebuilding
@@ -427,6 +514,7 @@ export const setBaseLayer = (map: L.Map, base: BaseLayer) => {
    holder.__base = L.tileLayer(next.url, {
       attribution: next.attribution,
       maxZoom: next.maxZoom,
+      maxNativeZoom: next.maxNativeZoom,
    }).addTo(map);
    /* Under everything else, so pins and the seamark overlay stay on top. */
    holder.__base.bringToBack();

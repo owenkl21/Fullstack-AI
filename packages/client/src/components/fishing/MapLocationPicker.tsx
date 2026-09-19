@@ -12,11 +12,13 @@ import {
    dropPin,
    refreshSize,
    setBaseLayer,
+   stopMapEvents,
    type BaseLayer,
 } from '@/lib/leaflet';
 import {
    formatCoordinate,
    parseGoogleMapsCoordinates,
+   readPair,
    readPosition,
    type MapPosition,
 } from '@/lib/maps';
@@ -102,13 +104,15 @@ const searchPlaces = async (
    }));
 };
 
-/* A typed pair, "-34.1275, 18.4487", in either order of care. */
-const readPair = (text: string): MapPosition | null => {
-   const m = text
-      .trim()
-      .match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
-   return m ? readPosition(m[1] ?? '', m[2] ?? '') : null;
-};
+/*
+ * A link, rather than anything with two numbers in it. The link parser's last
+ * pattern matches any "5, 6" inside a string, so "Shop 5, 6th Avenue" would
+ * otherwise become a position in the Gulf of Guinea.
+ */
+const LINK = /^(https?:\/\/|www\.)|maps\.app|goo\.gl|google\.[a-z.]+\/maps/i;
+
+const readLink = (text: string) =>
+   LINK.test(text.trim()) ? parseGoogleMapsCoordinates(text) : null;
 
 const samePlace = (a: MapPosition | null, b: MapPosition) =>
    Boolean(
@@ -379,16 +383,21 @@ export function MapLocationPicker({
       setFound(null);
       if (!q) return;
 
-      const link = parseGoogleMapsCoordinates(q);
-      if (link) {
-         put({ lat: link.parsedLatitude, lng: link.parsedLongitude });
-         setNote('The pin is on the position from the link.');
-         setQuery('');
-         return;
-      }
+      /*
+       * A typed pair is read before a link is looked for. The link parser's
+       * last pattern matches a bare pair too, so "-34.1275, 18.4487" landed on
+       * the right position and told the reader it had come from a link.
+       */
       const pair = readPair(q);
       if (pair) {
          put(pair);
+         setQuery('');
+         return;
+      }
+      const link = readLink(q);
+      if (link) {
+         put({ lat: link.parsedLatitude, lng: link.parsedLongitude });
+         setNote('The pin is on the position from the link.');
          setQuery('');
          return;
       }
@@ -463,6 +472,10 @@ export function MapLocationPicker({
    const control =
       'grid h-11 place-items-center border border-line bg-background text-ink transition-[transform,background-color] duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2 active:scale-[0.96] disabled:opacity-50';
 
+   const guard = useCallback((element: HTMLElement | null) => {
+      stopMapEvents(element);
+   }, []);
+
    /* Said only while there is nothing on the map; a pin explains itself. */
    const hint = hasPin ? null : 'Tap the map to drop the pin.';
 
@@ -470,16 +483,21 @@ export function MapLocationPicker({
     * The search sits on top of the map and shares its edge, so the two read as
     * one instrument rather than a field that happens to be near a picture.
     * Enter asks; a link or a typed pair goes straight there.
+    *
+    * It is a div and not a form on purpose. This picker is dropped inside the
+    * page's own form on Add a spot and on the full Log a catch, and a form
+    * inside a form is not a thing HTML has: the browser hands the field to
+    * the outer form, so Enter reloaded the page with an empty query string
+    * and the search never ran. Enter is read off the field instead, which
+    * works the same wherever the picker is put.
     */
+   const ask = () => {
+      if (searching || !query.trim()) return;
+      void runSearch(query);
+   };
+
    const form = (
-      <form
-         role="search"
-         className="relative z-[400]"
-         onSubmit={(event) => {
-            event.preventDefault();
-            void runSearch(query);
-         }}
-      >
+      <div role="search" className="relative z-[400]">
          <div className="flex h-11 items-center border border-line bg-background focus-within:border-ink">
             <MagnifyingGlassIcon
                aria-hidden="true"
@@ -495,13 +513,16 @@ export function MapLocationPicker({
                }}
                onPaste={(event) => {
                   const pasted = event.clipboardData.getData('text');
-                  if (
-                     pasted &&
-                     (parseGoogleMapsCoordinates(pasted) || readPair(pasted))
-                  ) {
+                  if (pasted && (readPair(pasted) || readLink(pasted))) {
                      event.preventDefault();
                      void runSearch(pasted);
                   }
+               }}
+               onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  /* Never let it reach the page's own form. */
+                  event.preventDefault();
+                  ask();
                }}
                autoComplete="off"
                aria-label="Search a place, or paste a link from Maps"
@@ -509,7 +530,8 @@ export function MapLocationPicker({
                className="h-full min-w-0 flex-1 bg-transparent px-3 text-[16px] text-ink outline-none placeholder:text-ink-3"
             />
             <button
-               type="submit"
+               type="button"
+               onClick={ask}
                disabled={searching || !query.trim()}
                className="g-tracked h-full shrink-0 px-3 text-[16px] text-ink-2 hover:text-ink disabled:opacity-40"
             >
@@ -541,7 +563,7 @@ export function MapLocationPicker({
                ))}
             </ul>
          ) : null}
-      </form>
+      </div>
    );
 
    const BASE_SHORT: Record<BaseLayer, string> = {
@@ -552,7 +574,16 @@ export function MapLocationPicker({
    };
    /* On the map, top right, for the compact form: search, where I am, base. */
    const overlay = (
-      <div className="absolute top-2 right-2 z-[500] flex flex-col gap-2">
+      /*
+       * A row along the top edge, not a column down the side. Stacked, the
+       * third control ran past the foot of a 200px map and the fixed NEXT bar
+       * on the log cut it in half; across, the overlay is 40 pixels tall
+       * whatever height the map is given.
+       */
+      <div
+         ref={guard}
+         className="absolute top-2 right-2 z-[500] flex flex-row-reverse gap-2"
+      >
          <button
             type="button"
             onClick={() => {

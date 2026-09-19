@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useEffect, useId, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
    Dialog,
    DialogContent,
@@ -62,7 +63,12 @@ export function ConnectionsDialog({
          }}
       >
          <DialogContent>
-            <Connections key={kind} kind={kind} count={count} />
+            <Connections
+               key={kind}
+               kind={kind}
+               count={count}
+               onClose={onClose}
+            />
          </DialogContent>
       </Dialog>
    );
@@ -71,9 +77,11 @@ export function ConnectionsDialog({
 function Connections({
    kind,
    count,
+   onClose,
 }: {
    kind: ConnectionsKind;
    count: number;
+   onClose: () => void;
 }) {
    const searchId = useId();
    const [search, setSearch] = useState('');
@@ -171,33 +179,41 @@ function Connections({
                   {people.map((person) => (
                      <li
                         key={person.id}
-                        className="flex min-h-11 items-center gap-3 border-t border-paper/15 py-2 first:border-t-0"
+                        className="border-t border-paper/15 first:border-t-0"
                      >
-                        {person.avatarUrl ? (
-                           <img
-                              src={person.avatarUrl}
-                              alt=""
-                              width={40}
-                              height={40}
-                              loading="lazy"
-                              className="size-10 shrink-0 rounded-full object-cover"
-                           />
-                        ) : (
-                           <span
-                              aria-hidden="true"
-                              className="g flex size-10 shrink-0 items-center justify-center rounded-full bg-paper/15 text-[20px] text-paper"
-                           >
-                              {initialOf(person.displayName)}
+                        {/* The whole row opens the angler, and the sheet
+                            steps out of the way on the way there. */}
+                        <Link
+                           to={`/anglers/${person.id}`}
+                           onClick={onClose}
+                           className="flex min-h-11 items-center gap-3 py-2 transition-colors duration-150 [transition-timing-function:var(--ease)] hover:bg-paper/10"
+                        >
+                           {person.avatarUrl ? (
+                              <img
+                                 src={person.avatarUrl}
+                                 alt=""
+                                 width={40}
+                                 height={40}
+                                 loading="lazy"
+                                 className="size-10 shrink-0 rounded-full object-cover"
+                              />
+                           ) : (
+                              <span
+                                 aria-hidden="true"
+                                 className="g flex size-10 shrink-0 items-center justify-center rounded-full bg-paper/15 text-[20px] text-paper"
+                              >
+                                 {initialOf(person.displayName)}
+                              </span>
+                           )}
+                           <span className="min-w-0">
+                              <span className="block truncate text-[15px] text-paper">
+                                 {person.displayName}
+                              </span>
+                              <span className="block truncate text-sm text-paper-2">
+                                 {person.username ? `@${person.username}` : ''}
+                              </span>
                            </span>
-                        )}
-                        <span className="min-w-0">
-                           <span className="block truncate text-[15px] text-paper">
-                              {person.displayName}
-                           </span>
-                           <span className="block truncate text-sm text-paper-2">
-                              {person.username ? `@${person.username}` : ''}
-                           </span>
-                        </span>
+                        </Link>
                      </li>
                   ))}
                </ul>

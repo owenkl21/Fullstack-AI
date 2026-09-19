@@ -64,6 +64,53 @@ const give = async (p, file) => {
       .setInputFiles(file);
 };
 
+/*
+ * Name the fish, walk the phone's three steps, save, and read back what the
+ * API kept. Returns the record and takes the catch out again.
+ */
+const fileCatch = async (p, vp) => {
+   const speciesBox = p.locator('input[role=combobox]').first();
+   await speciesBox.fill('Galjoen');
+   await p.waitForTimeout(600);
+   await p
+      .getByRole('option', { name: /^Galjoen/ })
+      .first()
+      .click()
+      .catch(() => undefined);
+   if (vp === 'phone') {
+      for (let i = 0; i < 2; i++) {
+         await p
+            .getByRole('button', { name: /^Next$/ })
+            .first()
+            .click();
+         await p.waitForTimeout(600);
+      }
+   }
+   const before = await p.request
+      .get(HOST + '/api/catches/me')
+      .then((r) => r.json())
+      .catch(() => ({ catches: [] }));
+   await p
+      .getByRole('button', { name: /^Save catch$/ })
+      .first()
+      .click();
+   await p.waitForTimeout(5000);
+   const after = await p.request
+      .get(HOST + '/api/catches/me')
+      .then((r) => r.json());
+   const fresh = (after.catches || []).find(
+      (c) => !(before.catches || []).some((o) => o.id === c.id)
+   );
+   if (!fresh) return null;
+   const record = await p.request
+      .get(HOST + `/api/catches/${fresh.id}`)
+      .then((r) => r.json())
+      .then((d) => d.catch ?? d)
+      .catch(() => null);
+   await p.request.delete(HOST + `/api/catches/${fresh.id}`);
+   return record;
+};
+
 const passUploads = async (p) =>
    p.route(/cloudflarestorage\.com/, async (route) => {
       const request = route.request();
@@ -301,6 +348,113 @@ for (const [vp, size] of [
    );
    await p.waitForTimeout(1500);
    await shot(p, `pos-new-photo-${vp}`);
+
+   /* ---- opened from the map's Log here ---- */
+   await open(p, '/log?lat=-34.13000&lng=18.33000', 6000);
+   check(
+      `${vp} from the map: the line names the map`,
+      (await source()) === 'map',
+      await source()
+   );
+   check(
+      `${vp} from the map: pin on the point the map was looking at`,
+      near(await pin(), { lat: -34.13, lng: 18.33 }),
+      await pin()
+   );
+   await give(p, PHOTO);
+   await p
+      .waitForFunction(
+         () =>
+            document
+               .querySelector('[data-where-source]')
+               ?.getAttribute('data-where-source') === 'photo',
+         null,
+         { timeout: 15000 }
+      )
+      .catch(() => undefined);
+   check(
+      `${vp} from the map: the photograph beats the map's point`,
+      near(await pin(), VAAL) && (await source()) === 'photo',
+      await pin()
+   );
+   if (vp === 'phone') {
+      /* The answer has to be readable where the picture was added, without
+         scrolling: the map is a screen and a half further down. */
+      const note = p.getByText(/Pin moved to where the photograph was taken/);
+      const box = (await note.count()) ? await note.boundingBox() : null;
+      const scrolled = await p.evaluate(() => window.scrollY);
+      check(
+         `${vp} from the map: the photograph is answered on the first screen`,
+         Boolean(box) && box.y + box.height < PHONE.height && scrolled === 0,
+         box ? `y ${Math.round(box.y)}, scrollY ${scrolled}` : 'no note'
+      );
+   }
+   await shot(p, `fix-mapentry-${vp}`);
+   const mapEntry = await fileCatch(p, vp);
+   check(
+      `${vp} from the map: the saved catch carries the photograph's place`,
+      typeof mapEntry?.latitude === 'number' &&
+         Math.abs(mapEntry.latitude - VAAL.lat) < 0.002 &&
+         Math.abs(mapEntry.longitude - VAAL.lng) < 0.002,
+      mapEntry ? `${mapEntry.latitude},${mapEntry.longitude}` : 'no new catch'
+   );
+
+   /* ---- a photograph added through the strip beside the cover ---- */
+   if (vp === 'desk') {
+      await open(p, '/log', 6000);
+      await give(p, PLAIN);
+      await p.waitForTimeout(3000);
+      uploading = PHOTO;
+      await p
+         .locator('input[aria-label="Add another photograph"]')
+         .first()
+         .setInputFiles(PHOTO);
+      await p
+         .waitForFunction(
+            () =>
+               document
+                  .querySelector('[data-where-source]')
+                  ?.getAttribute('data-where-source') === 'photo',
+            null,
+            { timeout: 15000 }
+         )
+         .catch(() => undefined);
+      check(
+         `${vp} strip: a second photograph's place moves the pin`,
+         near(await pin(), VAAL) && (await source()) === 'photo',
+         await pin()
+      );
+      await shot(p, `fix-strip-${vp}`);
+   }
+
+   /* ---- filed under a saved spot, which must not cost the pin ---- */
+   const sites = await p.request
+      .get(HOST + '/api/sites')
+      .then((r) => r.json())
+      .then((d) => d.sites || [])
+      .catch(() => []);
+   const spot = sites.find(
+      (site) =>
+         typeof site.latitude === 'number' && typeof site.longitude === 'number'
+   );
+   if (spot) {
+      await ctx.setGeolocation({
+         latitude: spot.latitude,
+         longitude: spot.longitude,
+      });
+      await open(p, '/log', 6000);
+      const filed = await fileCatch(p, vp);
+      check(
+         `${vp} spot: a catch filed under a spot keeps its own position`,
+         Boolean(filed?.siteId) &&
+            typeof filed?.latitude === 'number' &&
+            Math.abs(filed.latitude - spot.latitude) < 0.01,
+         filed
+            ? `siteId ${filed.siteId || 'none'}, ${filed.latitude},${filed.longitude}`
+            : 'no new catch'
+      );
+      await ctx.setGeolocation({ latitude: -34.13, longitude: 18.33 });
+   }
 
    console.log(vp, 'page errors:', errs.length ? errs : 'none');
    await ctx.close();

@@ -1,13 +1,15 @@
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
    SpotsMap,
+   type FoundPlace,
    type MapFocus,
    type SpotPin,
 } from '@/components/map/SpotsMap';
 import { PlaceSearch } from '@/components/forecast/PlaceSearch';
-import { usePhone } from '@/lib/media';
+import { stopMapEvents } from '@/lib/leaflet';
+import { describePlace } from '@/lib/maps';
 import { usePosition } from '@/lib/position';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { useDocumentTitle } from '@/lib/title';
@@ -20,8 +22,14 @@ import { useDocumentTitle } from '@/lib/title';
  * nothing saved had no reason to go there at all. That is backwards: the map is
  * where you decide where to fish, and the list is a filing cabinet.
  *
+ * One shape on every screen: water corner to corner, the search floating on
+ * its top edge and the controls on its bottom one. The desktop used to be a
+ * heading, a paragraph describing the map you were looking at, and an
+ * orphaned search field, with the map itself squeezed into the bottom half.
+ *
  * Everything lands here: your spots, spots other anglers have made public, your
- * private marks, and the ramps and tackle shops around wherever you are looking.
+ * private marks, the ramps and tackle shops around wherever you are looking,
+ * and whatever the search has just found.
  */
 
 type SiteRow = {
@@ -45,8 +53,15 @@ function MapScreen() {
    const navigate = useNavigate();
    const [mine, setMine] = useState<SpotPin[]>([]);
    const [focus, setFocus] = useState<MapFocus | null>(null);
-   const { ask, state: positionState } = usePosition({ auto: false });
-   const phone = usePhone();
+   const [found, setFound] = useState<FoundPlace | null>(null);
+   /* Where the map is looking, so a search is ranked against the water in
+      front of the reader rather than the middle of the country. */
+   const [near, setNear] = useState<{
+      latitude: number;
+      longitude: number;
+   } | null>(null);
+   const { ask, fix, state: positionState } = usePosition({ auto: false });
+   const field = useRef<HTMLInputElement | null>(null);
 
    useEffect(() => {
       const controller = new AbortController();
@@ -76,123 +91,106 @@ function MapScreen() {
       return () => controller.abort();
    }, []);
 
-   const goTo = (latitude: number, longitude: number, zoom: number) =>
-      setFocus({ latitude, longitude, zoom, key: Date.now() });
+   /*
+    * The centre, rounded. The map reports every settle, and a fresh object on
+    * every pan would send the search field off to ask the same question again.
+    * Five hundredths of a degree is about five kilometres, which is finer than
+    * this ranking needs.
+    */
+   const onMove = useCallback(
+      (centre: { latitude: number; longitude: number }) => {
+         setNear((was) =>
+            was &&
+            Math.abs(was.latitude - centre.latitude) < 0.05 &&
+            Math.abs(was.longitude - centre.longitude) < 0.05
+               ? was
+               : centre
+         );
+      },
+      []
+   );
 
    const useMyPosition = () => {
-      void ask().then((fix) => {
-         if (fix) goTo(fix.latitude, fix.longitude, 13);
+      void ask().then((next) => {
+         if (next)
+            setFocus({
+               latitude: next.latitude,
+               longitude: next.longitude,
+               zoom: 13,
+               key: Date.now(),
+            });
       });
    };
 
-   /*
-    * On a phone the map is the screen.
-    *
-    * It used to be a 284 pixel window on the water under a heading, a
-    * paragraph and a search field, which is a picture of a map: too small to
-    * see where the next headland is, so too small to decide anything with.
-    * Here it runs from under the header to the top of the navigation bar, the
-    * search floats on its top edge and the controls on its bottom one, and the
-    * whole screen is the thing you came to look at.
-    */
-   if (phone) {
-      return (
-         /*
-          * The shell ends a page 88 pixels above the foot, so a control that
-          * lands there is clear of the raised Log key. This page has no such
-          * control: it ends in a floating bar that already gives the key its
-          * room, and the water should run to the navigation. So it takes the
-          * 24 pixels back and measures itself against the bar alone.
-          */
-         <section className="relative -mb-6 h-[calc(100dvh-60px-64px-env(safe-area-inset-bottom))] w-full overflow-hidden">
-            {/* The page still names itself, for a screen reader and for the
-                focus that moves here on every navigation. The map is the
-                heading a sighted reader gets. */}
-            <h1 className="sr-only">Map</h1>
-
-            <SpotsMap
-               full
-               spots={mine}
-               wheelZoom
-               focus={focus}
-               onOpen={(id) => navigate(`/sites/${id}`)}
-            />
-
-            <div className="absolute inset-x-0 top-0 z-[600] p-3">
-               <PlaceSearch
-                  className="w-full"
-                  /* The bar at the foot of the map already carries Locate,
-                     and one screen does not need two of it. */
-                  showMine={false}
-                  locating={positionState === 'asking'}
-                  onPick={(place) => goTo(place.latitude, place.longitude, 12)}
-                  onUseMine={useMyPosition}
-               />
-            </div>
-         </section>
-      );
-   }
+   const guard = useCallback((element: HTMLElement | null) => {
+      stopMapEvents(element);
+   }, []);
 
    return (
       /*
-       * The map page is one screen, not a page you scroll to a map on.
-       *
-       * It used to run the map at 62vh inside a scrolling column, so on a
-       * phone the controls under the map and the locate control inside it both
-       * landed in the band the fixed bar owns at the foot of the screen, and
-       * were cut in half by it. The column is now told to be exactly the room
-       * between the header and that bar, the map takes whatever the heading and
-       * the search leave, and the controls sit inside the screen by
-       * construction rather than by luck. It is a minimum rather than a fixed
-       * height, so a short phone still scrolls instead of crushing the map.
+       * The shell ends a page 88 pixels above the foot, so a control that
+       * lands there is clear of the raised Log key. This page has no such
+       * control: it ends in a floating bar that already gives the key its
+       * room, and the water should run to the navigation. So it takes the
+       * 24 pixels back and measures itself against the bar alone. On a
+       * desktop there is no bar at all and the map takes the rest of the
+       * window.
        */
-      <section className="mx-auto flex min-h-[calc(100dvh-60px-64px-env(safe-area-inset-bottom))] w-[min(1680px,100%-32px)] flex-col gap-5 py-6 md:min-h-[calc(100dvh-60px-96px)] md:gap-8 md:py-12">
-         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
-            <div>
-               <h1 className="g text-[44px] md:text-[56px]">Map</h1>
-               <p className="mt-3 max-w-[58ch] text-[17px] text-ink-2">
-                  Your spots, what other anglers have made public, your own
-                  private marks, and the slipways and tackle shops around them.
-                  {mine.length
-                     ? ` ${mine.length === 1 ? 'One' : mine.length} of the spots ${mine.length === 1 ? 'is' : 'are'} yours.`
-                     : ''}
-               </p>
-            </div>
-            {/* Somewhere else on the coast, by name, without dragging there. */}
+      <section className="relative -mb-6 h-[calc(100dvh-60px-64px-env(safe-area-inset-bottom))] w-full overflow-hidden md:mb-0 md:h-[calc(100dvh-60px)]">
+         {/* The page still names itself, for a screen reader and for the
+             focus that moves here on every navigation. The map is the
+             heading a sighted reader gets. */}
+         <h1 className="sr-only">Map</h1>
+
+         <SpotsMap
+            full
+            spots={mine}
+            wheelZoom
+            focus={focus}
+            found={found}
+            onClearFound={() => setFound(null)}
+            onMove={onMove}
+            onFindPlace={() => field.current?.focus()}
+            onSpotSaved={(spot) =>
+               setMine((current) =>
+                  current.some((row) => row.id === spot.id)
+                     ? current
+                     : [...current, spot]
+               )
+            }
+            onOpen={(id) => navigate(`/sites/${id}`)}
+         />
+
+         <div ref={guard} className="absolute inset-x-0 top-0 z-[600] p-3">
             <PlaceSearch
-               className="w-full md:w-auto"
+               className="w-full"
+               /* The bar at the foot of the map already carries Locate,
+                  and one screen does not need two of it. */
                showMine={false}
+               /* What was asked stays in the field: the pin on the water is
+                  the answer to it, and the question should still be there. */
+               keepQuery
+               near={
+                  near ??
+                  (fix
+                     ? { latitude: fix.latitude, longitude: fix.longitude }
+                     : null)
+               }
                locating={positionState === 'asking'}
+               inputRef={field}
                onPick={(place) =>
-                  setFocus({
+                  setFound({
+                     id: place.id,
+                     name: place.name,
                      latitude: place.latitude,
                      longitude: place.longitude,
-                     zoom: 12,
-                     key: Date.now(),
+                     /* What it is and where, in the same words the list
+                        under the field used. */
+                     region: describePlace(place),
+                     kind: null,
                   })
                }
-               onUseMine={() => {
-                  void ask().then((fix) => {
-                     if (fix) {
-                        setFocus({
-                           latitude: fix.latitude,
-                           longitude: fix.longitude,
-                           zoom: 13,
-                           key: Date.now(),
-                        });
-                     }
-                  });
-               }}
-            />
-         </div>
-
-         <div className="flex min-h-[380px] flex-1 flex-col">
-            <SpotsMap
-               fill
-               spots={mine}
-               wheelZoom
-               focus={focus}
-               onOpen={(id) => navigate(`/sites/${id}`)}
+               onUseMine={useMyPosition}
             />
          </div>
       </section>

@@ -23,7 +23,13 @@ export type TimeSource = 'clock' | 'photo' | 'typed';
 export type Where = {
    latitude: number;
    longitude: number;
-   source: 'phone' | 'photo' | 'pin';
+   /*
+    * Four answers, best last. The map's own point is where the map was
+    * looking when the log was opened from it: a guess at the water, not a
+    * fix, so a photograph's GPS overtakes it. Only a pin the angler put down
+    * by hand holds against the photograph.
+    */
+   source: 'phone' | 'photo' | 'pin' | 'map';
    accuracy?: number;
 };
 
@@ -74,7 +80,9 @@ export function Receipt({
          ? 'From the photograph'
          : where.source === 'pin'
            ? 'Pin dropped'
-           : `Phone fix${where.accuracy ? `, within ${Math.round(where.accuracy)} m` : ''}`
+           : where.source === 'map'
+             ? 'From the map'
+             : `Phone fix${where.accuracy ? `, within ${Math.round(where.accuracy)} m` : ''}`
       : fixStatus === 'denied'
         ? 'No position. Location is off for this site.'
         : fixStatus === 'unsupported'
@@ -86,7 +94,7 @@ export function Receipt({
    const WhereIcon =
       where?.source === 'photo'
          ? CameraIcon
-         : where?.source === 'pin'
+         : where?.source === 'pin' || where?.source === 'map'
            ? MapPinIcon
            : SignalIcon;
 

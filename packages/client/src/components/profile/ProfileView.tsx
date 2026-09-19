@@ -12,9 +12,11 @@ import {
    initialOf,
    monthAndYear,
    plural,
+   type GalleryImage,
    type ProfileTallies,
    type UserProfile,
 } from '@/components/profile/types';
+import { formatLength, readUnitSystem } from '@/lib/units';
 
 /*
  * The angler as other anglers would read them: a photograph, a name, a handle, a
@@ -26,11 +28,15 @@ import {
 export function ProfileView({
    profile,
    tallies,
+   gallery,
    figures,
    onOpenConnections,
 }: {
    profile: UserProfile;
    tallies: ProfileTallies | null;
+   /* The photographs to show, counted from the whole log rather than from the
+    * handful of catches the profile payload carries. */
+   gallery?: GalleryImage[];
    /* The counted figures, slotted in here so they land above the photographs
     * rather than after them. An empty shelf should not outrank real numbers. */
    figures?: ReactNode;
@@ -39,7 +45,14 @@ export function ProfileView({
    const root = useRef<HTMLDivElement>(null);
    useRevealIn(root);
 
-   const since = monthAndYear(profile.createdAt);
+   /*
+    * Since the first fish, not since the sign-up. An angler who wrote up last
+    * season on the day they joined was told they had been fishing since this
+    * month, four lines above a log that starts in December.
+    */
+   const firstFish = monthAndYear(tallies?.firstCaughtAt);
+   const joined = monthAndYear(profile.createdAt);
+   const photographs = gallery ?? profile.galleryImages;
    const bio = profile.bio?.trim();
    return (
       <div ref={root}>
@@ -82,8 +95,10 @@ export function ProfileView({
                {bio ? bio : 'No bio yet.'}
             </p>
 
-            {since ? (
-               <p className="lab num mt-4">Fishing since {since}</p>
+            {firstFish ? (
+               <p className="lab num mt-4">Fishing since {firstFish}</p>
+            ) : joined ? (
+               <p className="lab num mt-4">Joined {joined}</p>
             ) : null}
          </header>
 
@@ -112,8 +127,7 @@ export function ProfileView({
                   >
                      {tallies.bestCatchTitle ?? 'that catch'}
                   </Link>{' '}
-                  at {tallies.bestLengthCm} cm (
-                  {(tallies.bestLengthCm / 2.54).toFixed(1)} in).
+                  at {formatLength(tallies.bestLengthCm, readUnitSystem())}.
                </p>
             ) : null}
 
@@ -139,15 +153,20 @@ export function ProfileView({
              * say "nothing here yet" than four dashed frames.
              */}
             <Fold
+               /* The fold takes `open` as a starting state, and the
+                  photographs arrive a moment after the name does. The key
+                  flips once, when the first one lands, so the shelf opens
+                  itself rather than sitting shut over a count. */
+               key={photographs.length > 0 ? 'photographs' : 'empty'}
                title="Photographs"
-               open={profile.galleryImages.length > 0}
+               open={photographs.length > 0}
                aside={
-                  profile.galleryImages.length > 0
-                     ? plural(profile.galleryImages.length, 'photo')
+                  photographs.length > 0
+                     ? plural(photographs.length, 'photo')
                      : null
                }
             >
-               {profile.galleryImages.length === 0 ? (
+               {photographs.length === 0 ? (
                   /*
                    * An empty shelf, drawn rather than described. The frames show
                    * what will sit here, so the gap reads as room for photographs
@@ -184,7 +203,7 @@ export function ProfileView({
                   </div>
                ) : (
                   <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-                     {profile.galleryImages.map((entry) => (
+                     {photographs.map((entry) => (
                         <li
                            key={`${entry.sourceType}-${entry.sourceId}-${entry.id}`}
                         >

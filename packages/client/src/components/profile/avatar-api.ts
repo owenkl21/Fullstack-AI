@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
+import type { ProfileResponse, UserProfile } from '@/components/profile/types';
 
 /*
  * Your own photograph, signed, for the header.
@@ -15,7 +16,7 @@ import { useEffect, useState } from 'react';
  * thumb yet, which is only true of an avatar uploaded before the variants.
  */
 let cached: string | null | undefined;
-let loading: Promise<void> | null = null;
+let loading: Promise<UserProfile | null> | null = null;
 const listeners = new Set<() => void>();
 
 export function settleMyAvatar(url: string | null) {
@@ -25,7 +26,32 @@ export function settleMyAvatar(url: string | null) {
 
 export function forgetMyAvatar() {
    cached = undefined;
+   loading = null;
    listeners.forEach((fn) => fn());
+}
+
+/*
+ * One read of the signed-in angler per load, shared.
+ *
+ * The header circle and the profile screen want the same person, and on a cold
+ * /profile they both asked for it in the same second: two calls to
+ * /api/users/me on one page, which is how the rate limiter started answering
+ * 429. Whoever asks first makes the call and everyone else waits on it. The
+ * promise is dropped once it settles, so a retry is a fresh read.
+ */
+export function fetchMyProfile(): Promise<UserProfile | null> {
+   loading ??= axios
+      .get<ProfileResponse>('/api/users/me')
+      .then(({ data }) => {
+         const profile = data.profile ?? null;
+         settleMyAvatar(profile?.avatarThumbUrl ?? profile?.avatarUrl ?? null);
+         return profile;
+      })
+      .finally(() => {
+         loading = null;
+      });
+
+   return loading;
 }
 
 export function useMyAvatar(enabled = true) {
@@ -38,23 +64,8 @@ export function useMyAvatar(enabled = true) {
       };
    }, []);
    useEffect(() => {
-      if (!enabled || cached !== undefined || loading) return;
-      loading = axios
-         .get<{
-            profile?: {
-               avatarUrl?: string | null;
-               avatarThumbUrl?: string | null;
-            };
-         }>('/api/users/me')
-         .then(({ data }) =>
-            settleMyAvatar(
-               data.profile?.avatarThumbUrl ?? data.profile?.avatarUrl ?? null
-            )
-         )
-         .catch(() => settleMyAvatar(null))
-         .finally(() => {
-            loading = null;
-         });
+      if (!enabled || cached !== undefined) return;
+      void fetchMyProfile().catch(() => settleMyAvatar(null));
    }, [enabled]);
    return cached ?? null;
 }

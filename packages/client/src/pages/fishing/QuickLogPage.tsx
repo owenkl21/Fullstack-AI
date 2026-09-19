@@ -45,7 +45,7 @@ import { usePhone } from '@/lib/media';
 import { Segment } from '@/components/fishing/quicklog/Segment';
 import { CaughtAt } from '@/components/fishing/quicklog/CaughtAt';
 import { dayStamp } from '@/components/fishing/quicklog/stamp';
-import { readPhotoMeta } from '@/lib/exif';
+import { readPhotoMeta, type PhotoMeta } from '@/lib/exif';
 import { distanceM, nearestSpot, type SpotLike } from '@/lib/geo';
 import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
 import {
@@ -126,11 +126,15 @@ function QuickLog() {
     */
    const [params] = useSearchParams();
    const [where, setWhere] = useState<Where | null>(() => {
-      /* Arriving from the map: the pin is where the map was looking. */
+      /*
+       * Arriving from the map: the point the map was looking at. It is a
+       * guess at the water, not a pin the angler put down, so a photograph
+       * that knows where it was taken overtakes it.
+       */
       const lat = Number(params.get('lat'));
       const lng = Number(params.get('lng'));
       return params.has('lat') && Number.isFinite(lat) && Number.isFinite(lng)
-         ? { latitude: lat, longitude: lng, source: 'pin' }
+         ? { latitude: lat, longitude: lng, source: 'map' }
          : null;
    });
 
@@ -210,40 +214,66 @@ function QuickLog() {
     * where that usually happens.
     */
    const [photoWithoutPosition, setPhotoWithoutPosition] = useState(false);
+   /* A photograph's place taken as the pin, worth saying on a phone where
+      the map is below the fold when the picture goes in. */
+   const [photoMoved, setPhotoMoved] = useState(false);
 
-   const onPhotoFile = (file: File) => {
-      void readPhotoMeta(file).then((meta) => {
-         photoTakenAt.current = meta.takenAt;
-         if (meta.takenAt && timeSource !== 'typed') {
-            setStampedAt(meta.takenAt);
+   /*
+    * What a chosen photograph tells the log, whether it went in the frame or
+    * the strip beside it. The first picture that carries a position speaks
+    * for the lot: they are one catch, photographed from one place.
+    */
+   const takePhotoMeta = (metas: PhotoMeta[], cover: boolean) => {
+      if (cover) {
+         const takenAt = metas.find((meta) => meta.takenAt)?.takenAt ?? null;
+         photoTakenAt.current = takenAt;
+         if (takenAt && timeSource !== 'typed') {
+            setStampedAt(takenAt);
             setTimeSource('photo');
          }
-         if (meta.latitude !== null && meta.longitude !== null) {
-            const place = {
-               latitude: meta.latitude,
-               longitude: meta.longitude,
-            };
-            setPhotoWithoutPosition(false);
-            /*
-             * The photograph knows where it was taken. It beats the phone's
-             * fix, which only says where the phone is now, and the map is
-             * always on screen so the pin is seen to move. A pin the angler
-             * put down by hand is their answer: the photograph's place is
-             * offered next to it, one tap to take it.
-             */
-            if (whereRef.current?.source === 'pin') {
-               setPhotoPlace(place);
-            } else {
-               setWhere({ ...place, source: 'photo' });
-               setPhotoPlace(null);
-            }
+      }
+      const placed = metas.find(
+         (meta): meta is PhotoMeta & { latitude: number; longitude: number } =>
+            meta.latitude !== null && meta.longitude !== null
+      );
+      if (placed) {
+         const place = {
+            latitude: placed.latitude,
+            longitude: placed.longitude,
+         };
+         setPhotoWithoutPosition(false);
+         /*
+          * The photograph knows where it was taken. It beats the phone's
+          * fix, which only says where the phone is now, and the point the
+          * map was looking at, which is a guess. A pin the angler put down
+          * by hand is their answer: the photograph's place is offered next
+          * to it, one tap to take it.
+          */
+         if (whereRef.current?.source === 'pin') {
+            setPhotoPlace(place);
+            setPhotoMoved(false);
          } else {
-            /* Said every time, not only when the camera wrote a time: a
-             * screenshot or a shared picture carries neither, and the angler
-             * still expected the pin to move. */
-            setPhotoWithoutPosition(true);
+            setWhere({ ...place, source: 'photo' });
+            setPhotoPlace(null);
+            setPhotoMoved(true);
          }
-      });
+      } else if (cover || whereRef.current?.source !== 'photo') {
+         /* Said every time, not only when the camera wrote a time: a
+          * screenshot or a shared picture carries neither, and the angler
+          * still expected the pin to move. */
+         setPhotoWithoutPosition(true);
+         setPhotoMoved(false);
+      }
+   };
+
+   const onPhotoFile = (file: File) => {
+      void readPhotoMeta(file).then((meta) => takePhotoMeta([meta], true));
+   };
+
+   const onStripFiles = (files: File[]) => {
+      void Promise.all(files.map(readPhotoMeta)).then((metas) =>
+         takePhotoMeta(metas, false)
+      );
    };
 
    const [entered, setEntered] = useState(false);
@@ -793,7 +823,9 @@ function QuickLog() {
          ? 'From the photograph'
          : where.source === 'pin'
            ? 'Pinned by you'
-           : `Phone fix${where.accuracy ? `, within ${Math.round(where.accuracy)} m` : ''}`
+           : where.source === 'map'
+             ? 'From the map'
+             : `Phone fix${where.accuracy ? `, within ${Math.round(where.accuracy)} m` : ''}`
       : null;
    const fromPhone =
       where?.source === 'photo' && fix
@@ -806,6 +838,19 @@ function QuickLog() {
         : fixStatus === 'unsupported'
           ? 'No position from this browser.'
           : 'Getting a fix.';
+   /*
+    * What the photograph just did to the pin, said under the photograph.
+    * On a phone the map is a screen and a half below the picker, so the
+    * angler adds a picture at the top of the form and nothing they can see
+    * answers them. One line, only while there is something to answer.
+    */
+   const photoNote = photoWithoutPosition
+      ? 'This photograph carries no position.'
+      : photoPlace
+        ? `The photograph was taken ${where ? away(distanceM(where, photoPlace)) : ''} from your pin.`
+        : photoMoved
+          ? 'Pin moved to where the photograph was taken.'
+          : null;
    const privacyLine =
       visibility === 'PRIVATE'
          ? 'Only you see this catch.'
@@ -952,6 +997,7 @@ function QuickLog() {
                   setWhere({ latitude, longitude, source: 'pin' });
                   setPhotoPlace(null);
                   setPhotoWithoutPosition(false);
+                  setPhotoMoved(false);
                }}
             />
          </div>
@@ -984,6 +1030,7 @@ function QuickLog() {
                   onClick={() => {
                      setWhere({ ...photoPlace, source: 'photo' });
                      setPhotoPlace(null);
+                     setPhotoMoved(false);
                   }}
                   className="g-tracked text-[15px] text-teal-text hover:opacity-80"
                >
@@ -1402,6 +1449,11 @@ function QuickLog() {
                      ) : null}
                      {heading('The catch')}
                      {photoBlock}
+                     {photoNote ? (
+                        <p className="-mt-3 text-[14px] text-ink-3">
+                           {photoNote}
+                        </p>
+                     ) : null}
                      {tapeBlock}
                      {speciesBlock}
                      {caughtAtBlock}
@@ -1479,6 +1531,7 @@ function QuickLog() {
                      photos={photos}
                      onChange={setPhotos}
                      onBusyChange={setStripBusy}
+                     onFiles={onStripFiles}
                      coverPreview={photoPreview}
                   />
                ) : null}

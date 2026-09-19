@@ -1,0 +1,20 @@
+import { launch, context, open, signIn, shot, PHONE } from './lib.mjs';
+const run = async () => {
+  const browser = await launch();
+  const page = await (await context(browser, PHONE, { hasTouch:true, isMobile:true })).newPage();
+  await signIn(page);
+  await open(page, '/map', 6000);
+  const count = async () => ({ mine: await page.locator('.map-pin-spot').count(), other: await page.locator('.map-pin-other').count(), cl: await page.locator('.map-pin-cluster-spot').count(), clo: await page.locator('.map-pin-cluster-other').count() });
+  console.log('before', JSON.stringify(await count()));
+  await page.locator('.grid-cols-5 > *').nth(1).click();
+  await page.waitForTimeout(900);
+  await page.locator('.sheet button', { hasText: 'Galjoen' }).first().click();
+  await page.waitForTimeout(600);
+  await page.locator('.sheet').getByRole('button', { name:'Done' }).click();
+  await page.waitForTimeout(2000);
+  console.log('after galjoen', JSON.stringify(await count()));
+  console.log('fish cell reads:', await page.locator('.grid-cols-5 > *').nth(1).innerText());
+  await shot(page, 'mi10-galjoen', {x:0,y:0,...PHONE});
+  await browser.close();
+};
+run().catch(e=>{console.error(e);process.exit(1);});

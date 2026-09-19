@@ -16,12 +16,16 @@ export function PhotoStrip({
    photos,
    onChange,
    onBusyChange,
+   onFiles,
    coverPreview,
    className,
 }: {
    photos: UploadedPhoto[];
    onChange: (next: UploadedPhoto[]) => void;
    onBusyChange: (busy: boolean) => void;
+   /* The chosen files themselves, before the bucket has them, so the form
+      can read what the camera wrote into each one. */
+   onFiles?: (files: File[]) => void;
    /* The cover as the browser already holds it, while the bucket is still
       making its own copy of it. */
    coverPreview?: string | null;
@@ -41,6 +45,7 @@ export function PhotoStrip({
          return;
       }
       setError(null);
+      onFiles?.(chosen);
       setBusy(true);
       onBusyChange(true);
       try {

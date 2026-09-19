@@ -6,6 +6,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useEffect, useState } from 'react';
 import { CountIn } from '@/components/fishing/record/CountIn';
+import { formatDay, plural } from '@/components/fishing/record/format';
 import { Link } from 'react-router-dom';
 import { fetchMyStats, type PersonalBest, type ProfileStats } from './api';
 
@@ -67,37 +68,39 @@ export function ProfileStatsPanel() {
          counted: true,
       },
       { label: 'Released', value: String(stats.releasedCount), counted: true },
-      { label: 'Points', value: String(stats.points), counted: true },
+      /*
+       * The board points, which are kilograms scored against the published
+       * figures for a species. The rank card above counts a different currency
+       * and both were labelled Points, three lines apart.
+       */
+      { label: 'Board points', value: String(stats.points), counted: true },
    ];
 
-   const dayName = (iso: string) => {
-      const at = new Date(`${iso}T12:00:00Z`);
-      return Number.isNaN(at.getTime())
-         ? iso
-         : at.toLocaleDateString(undefined, {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-           });
-   };
+   /* Midday, so the day cannot slip either way across the date line. */
+   const dayName = (iso: string) => formatDay(`${iso}T12:00:00`) ?? iso;
 
+   /*
+    * Logs, not fish. The server counts these three by record, so a single log
+    * of five elf counts once here; saying fish would be wrong the first time
+    * Owen logs more than one at a go.
+    */
    const highlights = [
       stats.favouriteSpecies && {
          key: 'species',
          Icon: SparklesIcon,
          value: stats.favouriteSpecies.name,
-         tail: `is your most caught fish, ${stats.favouriteSpecies.count} of them.`,
+         tail: `is your most caught fish, in ${plural(stats.favouriteSpecies.count, 'log', 'logs')}.`,
       },
       stats.favouriteSpot && {
          key: 'spot',
          Icon: MapPinIcon,
          value: stats.favouriteSpot.name,
-         tail: `is where you land most, ${stats.favouriteSpot.count} fish.`,
+         tail: `is where you land most, ${plural(stats.favouriteSpot.count, 'log', 'logs')}.`,
       },
       stats.bestDay && {
          key: 'day',
          Icon: TrophyIcon,
-         value: `${stats.bestDay.count} fish`,
+         value: plural(stats.bestDay.count, 'log', 'logs'),
          tail: `was your best day, on ${dayName(stats.bestDay.date)}.`,
       },
    ].filter(Boolean) as {

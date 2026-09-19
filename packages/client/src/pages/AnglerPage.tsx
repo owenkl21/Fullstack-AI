@@ -154,7 +154,12 @@ function AnglerScreen() {
       );
    }
 
-   const since = monthAndYear(profile.createdAt);
+   /*
+    * Joined, not "fishing since": the public payload carries no catch dates, so
+    * the only date here is the day the account was made. Saying that plainly
+    * beats printing a sign-up month under the words "fishing since".
+    */
+   const joined = monthAndYear(profile.createdAt);
 
    return (
       <section className="mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14">
@@ -212,9 +217,7 @@ function AnglerScreen() {
                {profile.bio?.trim() || 'No bio yet.'}
             </p>
 
-            {since ? (
-               <p className="lab num mt-4">Fishing since {since}</p>
-            ) : null}
+            {joined ? <p className="lab num mt-4">Joined {joined}</p> : null}
 
             <FollowCounts
                className="mt-4"

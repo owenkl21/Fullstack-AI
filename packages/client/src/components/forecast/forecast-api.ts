@@ -104,13 +104,32 @@ export type PlaceName = { name: string; region: string | null };
 export async function fetchForecast(
    latitude: number,
    longitude: number,
-   signal?: AbortSignal
+   signal?: AbortSignal,
+   /*
+    * Read past the browser's own copy. The answer is served with
+    * `max-age=300`, so asking again for the same place inside five minutes
+    * never leaves the tab and the page is asked to prove it is current with
+    * the very answer that is out of date. A nonce makes it a new address,
+    * which is the only lever a browser gives us here; the server keeps its
+    * own answer for ten minutes, so this can still come back with the
+    * timestamp it had before, and the line under the hours says so.
+    */
+   fresh?: boolean
 ): Promise<Forecast | null> {
    /* The server first; the browser itself when the server is throttled. */
    try {
       const { data } = await axios.get<{ forecast: Forecast | null }>(
          '/api/forecast',
-         { params: { latitude, longitude, days: 7 }, signal }
+         {
+            params: {
+               latitude,
+               longitude,
+               days: 7,
+               ...(fresh ? { t: Date.now() } : {}),
+            },
+            headers: fresh ? { 'Cache-Control': 'no-cache' } : undefined,
+            signal,
+         }
       );
       if (data.forecast) return data.forecast;
    } catch (error) {
@@ -173,11 +192,40 @@ export function thunderRisk(
    return null;
 }
 
-/* The place's clock right now, in the same form as an hour's `local`. */
-export function localHourNow(utcOffsetSeconds: number) {
-   const shifted = new Date(Date.now() + utcOffsetSeconds * 1000);
-   const pad = (n: number) => String(n).padStart(2, '0');
-   return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/* The place's clock right now, in the same form as an hour's `local`. The
+   moment is a parameter so the page can tick it rather than reading it once
+   and keeping that hour until someone reloads. */
+export function localHourNow(
+   utcOffsetSeconds: number,
+   at: number = Date.now()
+) {
+   const shifted = new Date(at + utcOffsetSeconds * 1000);
+   return `${shifted.getUTCFullYear()}-${pad2(shifted.getUTCMonth() + 1)}-${pad2(
       shifted.getUTCDate()
-   )}T${pad(shifted.getUTCHours())}:00`;
+   )}T${pad2(shifted.getUTCHours())}:00`;
+}
+
+/* Open-Meteo writes its hours with no zone on them and means UTC, e.g.
+   `2026-09-19T17:00`. A browser reads a stamp like that as its own clock, so
+   printing one straight off the wire says 17:00 in a country where it is
+   19:00. Anything that carries a Z or an offset is a real instant already. */
+const ZONED = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+/** The clock at the place, e.g. `19:00`, whatever zone the reader is in. */
+export function clockAtPlace(
+   value: string | number | Date | null | undefined,
+   utcOffsetSeconds: number
+): string | null {
+   if (value === null || value === undefined) return null;
+   const asUtc =
+      typeof value === 'string' && DATE_TIME.test(value) && !ZONED.test(value)
+         ? `${value}Z`
+         : value;
+   const date = asUtc instanceof Date ? asUtc : new Date(asUtc);
+   if (Number.isNaN(date.getTime())) return null;
+   const shifted = new Date(date.getTime() + utcOffsetSeconds * 1000);
+   return `${pad2(shifted.getUTCHours())}:${pad2(shifted.getUTCMinutes())}`;
 }

@@ -1,20 +1,51 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import { signOut, useSession } from '@/lib/auth-client';
 import { initialOf } from '@/components/profile/types';
 import { useMyAvatar } from '@/components/profile/avatar-api';
+import { useUnreadCount } from '@/components/social/notifications-api';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { Sheet } from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 
 /*
  * What <UserButton /> used to be, in the product's own language rather than a
- * vendor's. A round avatar that opens a short menu: the profile, the account
- * settings, and a way out.
+ * vendor's. A round avatar that opens everything that is yours.
+ *
+ * It used to be a 224px box hanging off the avatar with 33px rows, which on a
+ * phone covered half the feed and still read as cramped, and which was a div
+ * with role="menu": no escape key, no focus held inside it, and the page
+ * scrolling away behind it. It is now a panel from the right edge, full
+ * height, on the app's own Sheet. Radix Dialog brings the overlay, the escape
+ * key, the tap outside, the scroll lock and the focus.
  *
  * Round is the one exception the design rules allow to radius 0, alongside
  * avatars and round icon controls.
  */
+
+/* Everything that is yours, in one list. Two of these had no way in from a
+ * phone at all before: /sites/me was linked only from the desktop nav and a
+ * spot page, and /competitions only from Boards. */
+const rows = [
+   { to: '/profile', label: 'Your profile' },
+   { to: '/insights', label: 'Your insights' },
+   { to: '/notifications', label: 'Notifications' },
+   { to: '/saved', label: 'Kept posts, spots and gear' },
+   { to: '/sites/me', label: 'Your spots' },
+   { to: '/gear/me', label: 'Your gear' },
+   { to: '/forecast', label: 'Forecast' },
+   { to: '/competitions', label: 'Competitions' },
+   { to: '/account', label: 'Account' },
+];
+
 export function AccountMenu() {
    const { data } = useSession();
    const signedAvatar = useMyAvatar(Boolean(data?.user));
+   /* The count only, not a second poller: the bell stands beside this button
+    * in the header and is already asking every forty five seconds, and the
+    * hook hands every subscriber the same shared number. */
+   const unread = useUnreadCount(false);
    const navigate = useNavigate();
    const [open, setOpen] = useState(false);
 
@@ -30,6 +61,8 @@ export function AccountMenu() {
    const avatar =
       signedAvatar ??
       (user.image && /^https?:\/\//.test(user.image) ? user.image : null);
+   /* The session carries the handle, so the panel head costs no request. */
+   const handle = user.username ? `@${user.username}` : user.email;
 
    const leave = async () => {
       setOpen(false);
@@ -37,114 +70,115 @@ export function AccountMenu() {
       navigate('/');
    };
 
+   const face = (size: string) =>
+      avatar ? (
+         <img
+            src={avatar}
+            alt=""
+            className={cn('block rounded-full object-cover', size)}
+         />
+      ) : (
+         initial
+      );
+
    return (
-      <div className="relative">
+      <>
          <button
             type="button"
-            aria-haspopup="menu"
+            aria-haspopup="dialog"
             aria-expanded={open}
             aria-label="Your account"
-            onClick={() => setOpen((was) => !was)}
+            onClick={() => setOpen(true)}
             className="grid size-11 place-items-center overflow-hidden rounded-full border border-paper-2 text-[15px] text-paper"
          >
-            {avatar ? (
-               <img
-                  src={avatar}
-                  alt=""
-                  className="block size-11 rounded-full object-cover"
-               />
-            ) : (
-               initial
-            )}
+            {face('size-11')}
          </button>
 
-         {open ? (
-            <>
-               {/* A click anywhere else closes it, which is what a menu should do. */}
-               <button
-                  type="button"
-                  aria-hidden="true"
-                  tabIndex={-1}
-                  onClick={() => setOpen(false)}
-                  className="fixed inset-0 z-40 cursor-default"
-               />
-               <div
-                  role="menu"
-                  className="blk absolute right-0 z-50 mt-2 w-56 border border-line p-2"
-               >
-                  <p className="px-2 pt-1 pb-2 text-[14px] text-ink-2">
-                     {user.email}
-                  </p>
-                  <Link
-                     role="menuitem"
-                     to="/profile"
-                     onClick={() => setOpen(false)}
-                     className="g-tracked block px-2 py-2 text-[17px] hover:bg-bg-2"
-                  >
-                     Your profile
-                  </Link>
-                  {/* The phone bar has four slots and the forecast is not one
-                      of them; the home page links to it too. */}
-                  <Link
-                     role="menuitem"
-                     to="/forecast"
-                     onClick={() => setOpen(false)}
-                     className="g-tracked block px-2 py-2 text-[17px] hover:bg-bg-2 md:hidden"
-                  >
-                     Forecast
-                  </Link>
-                  <Link
-                     role="menuitem"
-                     to="/notifications"
-                     onClick={() => setOpen(false)}
-                     className="g-tracked block px-2 py-2 text-[17px] hover:bg-bg-2"
-                  >
-                     Notifications
-                  </Link>
-                  <Link
-                     role="menuitem"
-                     to="/insights"
-                     onClick={() => setOpen(false)}
-                     className="g-tracked block px-2 py-2 text-[17px] hover:bg-bg-2"
-                  >
-                     Your insights
-                  </Link>
-                  <Link
-                     role="menuitem"
-                     to="/saved"
-                     onClick={() => setOpen(false)}
-                     className="g-tracked block px-2 py-2 text-[17px] hover:bg-bg-2"
-                  >
-                     Kept posts, spots and gear
-                  </Link>
-                  {/* Gear lost its phone tab slot to Boards, so it lives here. */}
-                  <Link
-                     role="menuitem"
-                     to="/gear/me"
-                     onClick={() => setOpen(false)}
-                     className="g-tracked block px-2 py-2 text-[17px] hover:bg-bg-2 md:hidden"
-                  >
-                     Your gear
-                  </Link>
-                  <Link
-                     role="menuitem"
-                     to="/account"
-                     onClick={() => setOpen(false)}
-                     className="g-tracked block px-2 py-2 text-[17px] hover:bg-bg-2"
-                  >
-                     Account
-                  </Link>
+         <Sheet
+            open={open}
+            onOpenChange={setOpen}
+            side="right"
+            title="Your account"
+         >
+            {/* The black plate, edge to edge, so the panel reads as one of the
+                app's blocks. The insets are padding on the plate, which keeps
+                the ground full bleed and moves only what is written on it. */}
+            <div className="blk blk-plain flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)]">
+               <div className="flex items-center gap-3 border-b border-line px-4 py-4">
+                  <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full border border-paper-2 text-[15px] text-paper">
+                     {face('size-11')}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                     <span className="g-tracked truncate text-[21px] text-ink">
+                        {user.name || user.email}
+                     </span>
+                     <span className="truncate text-[13px] text-ink-3">
+                        {handle}
+                     </span>
+                  </span>
                   <button
-                     role="menuitem"
+                     type="button"
+                     onClick={() => setOpen(false)}
+                     aria-label="Close"
+                     className="grid size-11 shrink-0 place-items-center rounded-full border border-line-2 text-ink transition-colors hover:border-ink"
+                  >
+                     <XMarkIcon
+                        aria-hidden="true"
+                        className="size-5"
+                        strokeWidth={1.5}
+                     />
+                  </button>
+               </div>
+
+               <nav
+                  aria-label="Your account"
+                  className="thread-scroll min-h-0 flex-1 overflow-y-auto py-1"
+               >
+                  {rows.map((row) => (
+                     <NavLink
+                        key={row.to}
+                        to={row.to}
+                        onClick={() => setOpen(false)}
+                        className={({ isActive }) =>
+                           cn(
+                              'flex min-h-[52px] items-center gap-3 border-l-[3px] px-4 transition-colors duration-100',
+                              isActive
+                                 ? 'border-teal bg-teal/10 text-ink'
+                                 : 'border-transparent hover:bg-bg-2'
+                           )
+                        }
+                     >
+                        <span className="g-tracked flex-1 truncate text-[19px]">
+                           {row.label}
+                        </span>
+                        {row.to === '/notifications' && unread > 0 ? (
+                           <span
+                              aria-hidden="true"
+                              className="num grid min-w-[22px] shrink-0 place-items-center bg-teal px-1 text-[12px] leading-[20px] text-teal-ink"
+                           >
+                              {unread > 99 ? '99+' : unread}
+                           </span>
+                        ) : null}
+                     </NavLink>
+                  ))}
+               </nav>
+
+               {/* Sign out sits away from the list, so a thumb running down the
+                   rows cannot land on it. The sun and moon comes off a 390
+                   header that was carrying four things and keeps its place on
+                   a desktop, where there is room for it. */}
+               <div className="flex items-center gap-3 border-t border-line px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                  <button
                      type="button"
                      onClick={leave}
-                     className="g-tracked block w-full px-2 py-2 text-left text-[17px] hover:bg-bg-2"
+                     className="g-tracked inline-flex min-h-11 flex-1 items-center border border-line-2 px-3 text-[17px] text-ink transition-colors hover:border-ink"
                   >
                      Sign out
                   </button>
+                  <ThemeToggle className="shrink-0 md:hidden" />
                </div>
-            </>
-         ) : null}
-      </div>
+            </div>
+         </Sheet>
+      </>
    );
 }
