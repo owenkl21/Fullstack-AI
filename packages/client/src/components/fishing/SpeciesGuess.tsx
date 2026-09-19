@@ -166,8 +166,9 @@ function Guess({
    };
 
    /*
-    * One row: what it looks like, the two names to tap, and a cross to say
-    * neither. The names are the whole message, so there is no sentence.
+    * The label and the cross on one line; the names beneath as rows that
+    * take the full width on a phone and two equal columns from a tablet up.
+    * Nothing wraps and nothing is cut, whatever the fish is called.
     */
    return (
       <div
@@ -176,27 +177,8 @@ function Guess({
          aria-label="The fish namer's guess"
          data-namer="named"
       >
-         <div className="flex items-start gap-2">
-            <div className="flex flex-1 flex-wrap items-center gap-2">
-               <span className="text-[14px] text-ink-3">Looks like</span>
-               {names.map((c) => (
-                  <button
-                     key={c.guess}
-                     type="button"
-                     disabled={adding !== null}
-                     onClick={() => void take(c)}
-                     className="inline-flex h-9 items-center gap-1.5 border border-ink px-2.5 text-ink transition-colors duration-150 hover:bg-ink hover:text-background disabled:opacity-60"
-                  >
-                     <span className="g-tracked text-[15px]">
-                        {adding === c.guess ? 'Adding' : c.commonName}
-                     </span>
-                     <span className="num text-[11px] opacity-60">
-                        {Math.round(c.confidence * 100)}%
-                     </span>
-                  </button>
-               ))}
-            </div>
-            {/* Neither: stays on the first line while the names wrap beside it. */}
+         <div className="flex items-center justify-between gap-3">
+            <span className="text-[14px] text-ink-3">Looks like</span>
             <button
                type="button"
                disabled={adding !== null}
@@ -206,10 +188,28 @@ function Guess({
                }}
                aria-label="Neither. I will type the name"
                title="Neither"
-               className="grid size-9 shrink-0 place-items-center text-ink-3 hover:text-ink"
+               className="-mr-2 grid size-9 place-items-center text-ink-3 hover:text-ink"
             >
                <XMarkIcon aria-hidden="true" className="size-5" />
             </button>
+         </div>
+         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {names.map((c) => (
+               <button
+                  key={c.guess}
+                  type="button"
+                  disabled={adding !== null}
+                  onClick={() => void take(c)}
+                  className="flex h-11 items-center justify-between gap-3 border border-ink px-3 text-left text-ink transition-colors duration-150 hover:bg-ink hover:text-background disabled:opacity-60"
+               >
+                  <span className="g-tracked text-[17px]">
+                     {adding === c.guess ? 'Adding' : c.commonName}
+                  </span>
+                  <span className="num shrink-0 text-[12px] opacity-60">
+                     {Math.round(c.confidence * 100)}%
+                  </span>
+               </button>
+            ))}
          </div>
          {problem ? (
             <p className="text-[14px] text-destructive">{problem}</p>
