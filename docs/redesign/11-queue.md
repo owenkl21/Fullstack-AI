@@ -372,6 +372,16 @@ band, tides and the sun and moon; then the name and the mark arrived.
       competition page, and the quick log in competition mode with two photos.
       Plan and state in [14-competitions.md](14-competitions.md). Needs
       `ANTHROPIC_API_KEY` on Railway for the figure check.
+- [x] **Where a catch is placed, seen and honoured.** The quick log's map
+      is always on screen (small) with the pin on whatever is known, and the
+      line above it says which: phone fix, the photograph's place, or the
+      angler's own pin. A photograph's GPS beats the phone fix; a hand-placed
+      pin stands and the photograph's place is offered beside it. The full
+      form asks for the position on open and lets a photograph's place beat
+      the fix too, with a line saying how far the phone is from it; a photo
+      with no position says so on both forms. `audit/position.mjs` drives
+      both forms on a phone and a desktop with a GPS-tagged photograph
+      (Vaal Dam) and one without: 26 checks.
 
 ## Next, in order
 

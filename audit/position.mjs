@@ -1,4 +1,4 @@
-import { launch, context, open, signIn, shot, DESK, PHONE } from './lib.mjs';
+import { launch, context, open, signIn, shot, DESK, PHONE, HOST } from './lib.mjs';
 
 /*
  * Where a catch is placed, on both log forms, phone and desktop:
@@ -54,14 +54,21 @@ for (const [vp, size] of [['phone', PHONE], ['desk', DESK]]) {
    await shot(p, `pos-quick-photo-${vp}`);
 
    /* the angler drags the pin by hand */
+   await p.locator('#quicklog-pin .leaflet-container').first().scrollIntoViewIfNeeded();
+   await p.waitForTimeout(600);
    const marker = p.locator('#quicklog-pin .leaflet-marker-icon').first();
    const box = await marker.boundingBox();
    if (box) {
-      await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height - 6;
+      await p.mouse.move(x, y);
       await p.mouse.down();
-      await p.mouse.move(box.x + box.width / 2 + 90, box.y + box.height / 2 + 40, { steps: 12 });
+      for (let i = 1; i <= 15; i++) {
+         await p.mouse.move(x + i * 6, y + i * 3);
+         await p.waitForTimeout(20);
+      }
       await p.mouse.up();
-      await p.waitForTimeout(800);
+      await p.waitForTimeout(1000);
    }
    check(`${vp} quick: a dragged pin says pinned by you`, (await source()) === 'pin', await source());
    const pinnedAt = await pin();
@@ -93,13 +100,17 @@ for (const [vp, size] of [['phone', PHONE], ['desk', DESK]]) {
    if (vp === 'phone') {
       for (let i = 0; i < 2; i++) { await p.getByRole('button', { name: /^Next$/ }).first().click(); await p.waitForTimeout(600); }
    }
-   const before = await p.request.get('/api/catches/me').then((r) => r.json()).catch(() => ({ catches: [] }));
+   const before = await p.request.get(HOST + '/api/catches/me').then((r) => r.json()).catch(() => ({ catches: [] }));
    await p.getByRole('button', { name: /^Save catch$/ }).first().click();
    await p.waitForTimeout(5000);
-   const after = await p.request.get('/api/catches/me').then((r) => r.json());
+   const after = await p.request.get(HOST + '/api/catches/me').then((r) => r.json());
    const fresh = (after.catches || []).find((c) => !(before.catches || []).some((o) => o.id === c.id));
-   check(`${vp} quick: the saved catch carries the photograph's place`, Boolean(fresh) && Math.abs(fresh.latitude - VAAL.lat) < 0.002 && Math.abs(fresh.longitude - VAAL.lng) < 0.002, fresh ? `${fresh.latitude},${fresh.longitude}` : 'no new catch');
-   if (fresh) await p.request.delete(`/api/catches/${fresh.id}`);
+   /* The list leaves the position out; the record itself carries it. */
+   const record = fresh ? await p.request.get(HOST + `/api/catches/${fresh.id}`).then((r) => r.json()).then((d) => d.catch ?? d).catch(() => null) : null;
+   const lat = record?.latitude ?? record?.location?.latitude;
+   const lng = record?.longitude ?? record?.location?.longitude;
+   check(`${vp} quick: the saved catch carries the photograph's place`, typeof lat === 'number' && Math.abs(lat - VAAL.lat) < 0.002 && Math.abs(lng - VAAL.lng) < 0.002, fresh ? `${lat},${lng}` : 'no new catch');
+   if (fresh) await p.request.delete(HOST + `/api/catches/${fresh.id}`);
 
    /* ---- the full form ---- */
    await open(p, '/catches/new', 6000);
