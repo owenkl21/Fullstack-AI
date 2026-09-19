@@ -317,7 +317,8 @@ router.get(
    fishingController.getFishingSiteById
 );
 
-router.get('/api/feed', feedController.listFeed);
+/* Public, but a signed-in reader gets their own likes, keeps and follows back. */
+router.get('/api/feed', attachApiAuth, feedController.listFeed);
 router.post('/api/feed', requireApiAuth, feedController.createFeedPost);
 router.put('/api/feed/:postId', requireApiAuth, feedController.updateFeedPost);
 router.delete(
@@ -330,7 +331,11 @@ router.post(
    requireApiAuth,
    feedController.toggleLike
 );
-router.get('/api/feed/:postId/comments', feedController.listComments);
+router.get(
+   '/api/feed/:postId/comments',
+   attachApiAuth,
+   feedController.listComments
+);
 router.post(
    '/api/feed/:postId/comments',
    requireApiAuth,
