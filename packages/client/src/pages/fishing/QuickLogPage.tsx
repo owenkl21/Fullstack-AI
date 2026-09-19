@@ -195,7 +195,10 @@ function QuickLog() {
                setWhere({ ...place, source: 'photo' });
                setPhotoPlace(null);
             }
-         } else if (meta.takenAt) {
+         } else {
+            /* Said every time, not only when the camera wrote a time: a
+             * screenshot or a shared picture carries neither, and the angler
+             * still expected the pin to move. */
             setPhotoWithoutPosition(true);
          }
       });

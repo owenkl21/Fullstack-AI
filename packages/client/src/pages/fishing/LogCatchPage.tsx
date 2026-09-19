@@ -376,7 +376,15 @@ export function CatchForm({
             const placed = found.find(
                (meta) => meta.latitude !== null && meta.longitude !== null
             );
-            if (!placed || spotChosen.current) return;
+            if (spotChosen.current) return;
+            if (!placed) {
+               if (files.length && spotMode !== 'saved') {
+                  setPhotoNote(
+                     'The photograph carries no position, so the pin stays where it is. Phones often strip it from a shared or edited picture.'
+                  );
+               }
+               return;
+            }
             const photoAt = {
                latitude: placed.latitude!,
                longitude: placed.longitude!,
@@ -1424,14 +1432,23 @@ export function CatchForm({
                         <p className="text-ink-2">Getting a fix.</p>
                      ) : null}
                      {hereState === 'ready' && herePosition ? (
-                        <MapLocationPicker
-                           latitude={String(herePosition.latitude)}
-                           longitude={String(herePosition.longitude)}
-                           onChange={(latitude, longitude) => {
-                              spotChosen.current = true;
-                              setHerePosition({ latitude, longitude });
-                           }}
-                        />
+                        <>
+                           <MapLocationPicker
+                              latitude={String(herePosition.latitude)}
+                              longitude={String(herePosition.longitude)}
+                              source="Phone fix"
+                              onChange={(latitude, longitude) => {
+                                 spotChosen.current = true;
+                                 setPhotoNote(null);
+                                 setHerePosition({ latitude, longitude });
+                              }}
+                           />
+                           {photoNote ? (
+                              <p className="mt-2 text-[14px] text-ink-3">
+                                 {photoNote}
+                              </p>
+                           ) : null}
+                        </>
                      ) : null}
                      {hereState === 'refused' ? (
                         <div className="flex flex-col items-start gap-3">
