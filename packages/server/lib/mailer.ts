@@ -183,3 +183,5 @@ export async function sendWelcome({ user }: { user: Recipient }) {
       ...mail,
    });
 }
+
+/* Touched to redeploy: FISHIAL_URL changed when the hub restarted. */
