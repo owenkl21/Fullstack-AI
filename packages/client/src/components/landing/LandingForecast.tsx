@@ -217,7 +217,10 @@ export function LandingForecast() {
    return (
       <section
          id="forecast"
-         className={cn('relative bg-background py-14 md:py-[88px]', ANCHOR)}
+         className={cn(
+            'relative bg-background pt-[calc(var(--hang)+var(--trough)+1.25rem)] pb-14 md:pt-[calc(var(--hang)+var(--trough)+2rem)] md:pb-[88px]',
+            ANCHOR
+         )}
       >
          <div className={WRAP}>
             <div className="grid items-end gap-7 lg:grid-cols-2 lg:gap-14">

@@ -33,7 +33,7 @@ export function LandingRecord() {
       <section
          id="record"
          className={cn(
-            'relative overflow-hidden bg-bg-2 py-14 md:py-[88px]',
+            'relative overflow-hidden bg-background pt-[calc(var(--hang)+var(--trough)+1.25rem)] pb-14 md:pt-[calc(var(--hang)+var(--trough)+2rem)] md:pb-[88px]',
             ANCHOR
          )}
       >

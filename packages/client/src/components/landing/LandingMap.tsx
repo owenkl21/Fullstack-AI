@@ -197,22 +197,25 @@ export function LandingMap() {
       <section
          id="map"
          className={cn(
-            'relative overflow-hidden bg-black-block py-[84px] text-paper md:py-[112px]',
+            'relative bg-black-block pt-[84px] pb-11 text-paper md:pt-[112px] md:pb-14',
             ANCHOR
          )}
       >
          <TornEdge fill="bg" flip seed={22} />
-         <div
-            ref={band}
-            className="parallax-band absolute inset-x-0 top-[-14%] bottom-0"
-         >
-            <img
-               src={photos.rockOcean}
-               alt=""
-               loading="lazy"
-               className="h-full w-full object-cover"
-            />
-            <div className="absolute inset-0 bg-black-block/88" />
+         {/* Its own clipping box, so the waterline at the foot can hang. */}
+         <div className="absolute inset-0 overflow-hidden">
+            <div
+               ref={band}
+               className="parallax-band absolute inset-x-0 top-[-14%] bottom-0"
+            >
+               <img
+                  src={photos.rockOcean}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+               />
+               <div className="absolute inset-0 bg-black-block/88" />
+            </div>
          </div>
 
          <div className={cn(WRAP, 'relative')}>
@@ -462,7 +465,7 @@ export function LandingMap() {
             </div>
          </div>
 
-         <TornEdge fill="bg-2" seed={31} />
+         <TornEdge fill="black" cut />
       </section>
    );
 }

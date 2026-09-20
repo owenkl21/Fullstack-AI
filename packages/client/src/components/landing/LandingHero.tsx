@@ -62,21 +62,25 @@ export function LandingHero() {
       <section
          id="top"
          className={cn(
-            'relative overflow-hidden bg-black-block pt-9 pb-[84px] text-paper md:pt-16 md:pb-[104px]',
+            'relative bg-black-block pt-9 pb-11 text-paper md:pt-16 md:pb-14',
             ANCHOR
          )}
       >
-         <div
-            ref={band}
-            className="parallax-hero absolute inset-x-0 top-[-10%] bottom-0"
-         >
-            <img
-               src={photos.heroSpot}
-               alt=""
-               fetchPriority="high"
-               className="h-full w-full object-cover object-[62%_40%]"
-            />
-            <div className="absolute inset-0 bg-black-block/60" />
+         {/* Its own clipping box: the section cannot clip, or the waterline
+             that hangs below it is cut off. */}
+         <div className="absolute inset-0 overflow-hidden">
+            <div
+               ref={band}
+               className="parallax-hero absolute inset-x-0 top-[-10%] bottom-0"
+            >
+               <img
+                  src={photos.heroSpot}
+                  alt=""
+                  fetchPriority="high"
+                  className="h-full w-full object-cover object-[62%_40%]"
+               />
+               <div className="absolute inset-0 bg-black-block/60" />
+            </div>
          </div>
 
          <div className={cn(WRAP, 'relative')}>
@@ -214,7 +218,7 @@ export function LandingHero() {
             </p>
          </div>
 
-         <TornEdge fill="bg" seed={5} />
+         <TornEdge fill="black" cut />
       </section>
    );
 }
