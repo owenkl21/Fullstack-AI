@@ -1,7 +1,7 @@
-import { useRef, useState, type CSSProperties } from 'react';
+import { useRef, useState } from 'react';
 import { TornEdge } from '@/components/brand/TornEdge';
-import { Contours } from '@/components/brand/Contours';
 import { cn } from '@/lib/utils';
+import { LandingSpotsMap } from './LandingSpotsMap';
 import { ANCHOR, WRAP, stagger } from './layout';
 import { photos } from './photos';
 import { useParallaxFallback } from './useParallaxFallback';
@@ -153,41 +153,6 @@ const disclosures = [
 
 type Disclosure = (typeof disclosures)[number]['value'];
 
-/*
- * The coast, drawn well outside the box so the sheet's own edge is never
- * stroked: only the waterline between the two fills is a line.
- */
-const COAST = [
-   'M-6 -6 L18 -6 C22 6 14 14 16 24 C18 34 26 34 24 42 C22 50 28 52 27 60 C26 68 33 72 31 80 C29 88 36 94 34 106 L-6 106 Z',
-   'M106 48 C96 54 90 60 88 66 C86 72 92 76 90 82 C88 88 80 90 82 106 L106 106 Z',
-];
-
-/* The graticule: four meridians and three parallels, barely there. */
-const MERIDIANS = [20, 40, 60, 80];
-const PARALLELS = [25, 50, 75];
-
-/*
- * Where the pins stand, as a share of the plate. `mine` is a spot of your own,
- * which is the only thing the disclosure control moves.
- */
-const marks: {
-   key: string;
-   kind: PinKind;
-   count?: number;
-   x: number;
-   y: number;
-   mine?: boolean;
-}[] = [
-   { key: 'tackle', kind: 'tackle', x: 9, y: 38 },
-   { key: 'ramp', kind: 'ramp', x: 25, y: 57 },
-   { key: 'marina', kind: 'marina', x: 34, y: 82 },
-   { key: 'mine-a', kind: 'spot', count: 12, x: 34, y: 24, mine: true },
-   { key: 'mine-b', kind: 'spot', count: 4, x: 48, y: 62, mine: true },
-   { key: 'waypoint', kind: 'waypoint', x: 54, y: 14 },
-   { key: 'other-a', kind: 'other', x: 63, y: 33 },
-   { key: 'other-b', kind: 'other', x: 72, y: 88 },
-];
-
 export function LandingMap() {
    const band = useRef<HTMLDivElement>(null);
    useParallaxFallback(band, 0.18);
@@ -320,127 +285,7 @@ export function LandingMap() {
                className="blk blk-flat blk-plain rv mt-10 border border-paper/20 md:mt-14"
                style={stagger(2)}
             >
-               <div
-                  aria-hidden="true"
-                  className="relative aspect-[5/6] w-full overflow-hidden bg-black-block sm:aspect-[2/1] lg:aspect-[21/9]"
-                  style={
-                     {
-                        /* The contour art is drawn for paper grounds; on the
-                           plate it has to come back the other way up. */
-                        '--contour':
-                           'color-mix(in srgb, var(--paper) 15%, transparent)',
-                     } as CSSProperties
-                  }
-               >
-                  <svg
-                     viewBox="0 0 100 100"
-                     preserveAspectRatio="none"
-                     className="absolute inset-0 h-full w-full"
-                  >
-                     <rect
-                        x="0"
-                        y="0"
-                        width="100"
-                        height="100"
-                        fill="var(--teal)"
-                        fillOpacity="0.08"
-                     />
-                     {COAST.map((d) => (
-                        <path
-                           key={d}
-                           d={d}
-                           fill="color-mix(in srgb, var(--paper) 6%, var(--black-2))"
-                           stroke="var(--paper)"
-                           strokeOpacity="0.3"
-                           strokeWidth="1"
-                           vectorEffect="non-scaling-stroke"
-                        />
-                     ))}
-                     {MERIDIANS.map((x) => (
-                        <line
-                           key={`m${x}`}
-                           x1={x}
-                           y1="0"
-                           x2={x}
-                           y2="100"
-                           stroke="var(--paper)"
-                           strokeOpacity="0.08"
-                           strokeWidth="1"
-                           vectorEffect="non-scaling-stroke"
-                        />
-                     ))}
-                     {PARALLELS.map((y) => (
-                        <line
-                           key={`p${y}`}
-                           x1="0"
-                           y1={y}
-                           x2="100"
-                           y2={y}
-                           stroke="var(--paper)"
-                           strokeOpacity="0.08"
-                           strokeWidth="1"
-                           vectorEffect="non-scaling-stroke"
-                        />
-                     ))}
-                  </svg>
-
-                  <Contours seed={9} className="inset-0 h-full w-full" />
-
-                  {marks.map((mark) => (
-                     <span key={mark.key}>
-                        {mark.mine ? (
-                           <svg
-                              viewBox="0 0 100 100"
-                              className={cn(
-                                 'absolute h-[72px] w-[72px] -translate-x-1/2 -translate-y-1/2 transition-opacity duration-300 lg:h-[104px] lg:w-[104px]',
-                                 shown === 'km' ? 'opacity-100' : 'opacity-0'
-                              )}
-                              style={{ left: `${mark.x}%`, top: `${mark.y}%` }}
-                           >
-                              <circle
-                                 cx="50"
-                                 cy="50"
-                                 r="47"
-                                 fill="var(--teal)"
-                                 fillOpacity="0.12"
-                                 stroke="var(--teal)"
-                                 strokeOpacity="0.55"
-                                 strokeWidth="1.5"
-                                 strokeDasharray="4 3"
-                              />
-                           </svg>
-                        ) : null}
-                        <span
-                           className={cn(
-                              'absolute -translate-x-1/2 -translate-y-full transition-opacity duration-300',
-                              mark.mine && shown === 'off' && 'opacity-0'
-                           )}
-                           style={{ left: `${mark.x}%`, top: `${mark.y}%` }}
-                        >
-                           <Pin
-                              kind={mark.kind}
-                              count={mark.count}
-                              className="w-[30px] lg:w-9"
-                           />
-                        </span>
-                     </span>
-                  ))}
-
-                  <span
-                     className="absolute -translate-x-1/2 -translate-y-1/2"
-                     style={{ left: '82%', top: '46%' }}
-                  >
-                     <ClusterPin className="w-8 lg:w-10" />
-                  </span>
-
-                  <span className="absolute bottom-3 left-3 flex items-end gap-2">
-                     <span className="block h-2 w-14 border-x border-b border-paper/40" />
-                     <span className="lab text-paper-2">1 km</span>
-                  </span>
-                  <span className="num lab absolute right-3 bottom-3 hidden text-paper-2 sm:block">
-                     -34.12770, 18.44860
-                  </span>
-               </div>
+               <LandingSpotsMap shown={shown} />
 
                <div className="flex flex-wrap gap-2 border-t border-paper/20 px-[18px] py-4 md:px-[22px]">
                   <span className="g-tracked inline-flex h-11 items-center border border-paper/20 bg-black-block-2 px-3.5 text-[15px]">
