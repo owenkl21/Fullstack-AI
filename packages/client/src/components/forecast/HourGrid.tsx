@@ -14,6 +14,7 @@ import {
    PressureIcon,
    SwellIcon,
    ThermometerIcon,
+   RatingIcon,
    TideIcon,
    UvIcon,
    DaylightIcon,
@@ -35,10 +36,19 @@ import {
    thunderRisk,
    type ForecastDay,
    type ForecastHour,
+   type RatedHour,
 } from './forecast-api';
 import { SkyBand } from './SkyArcs';
 import { TideBand } from './TideBand';
-import { rainTint, skyTone, tempTint, uvTint, windColour } from './tones';
+import {
+   BAND_WORD,
+   bandFill,
+   rainTint,
+   skyTone,
+   tempTint,
+   uvTint,
+   windColour,
+} from './tones';
 
 /*
  * The day, hour by hour, as one instrument.
@@ -111,6 +121,7 @@ export function HourGrid({
    next,
    nowLocal,
    system,
+   rated,
 }: {
    hours: ForecastHour[];
    /* The day these hours belong to, for the readings that are per day. */
@@ -120,6 +131,12 @@ export function HourGrid({
    /* The place's current hour, in the same form as an hour's `local`. */
    nowLocal: string | null;
    system: UnitSystem;
+   /*
+    * The band for each hour, keyed by its local stamp. Absent when nobody is
+    * signed in, and then the row simply is not there: a reading with nothing
+    * behind it is worse than no row at all.
+    */
+   rated?: Map<string, RatedHour>;
 }) {
    const [more, setMore] = useState(false);
    const scroller = useRef<HTMLDivElement>(null);
@@ -168,6 +185,55 @@ export function HourGrid({
    };
 
    const all: Row[] = [
+      {
+         /*
+          * The rating, hour by hour. One block per hour, as tall as the score
+          * and coloured by its band, so the shape of the day reads before any
+          * figure does: the block that stands up in the morning is the morning
+          * worth driving out for.
+          *
+          * No number printed. A score out of a hundred against a single hour
+          * is more precision than the thing deserves, and the panel above the
+          * instrument prints the day's word and its figure. The band is on the
+          * cell for a screen reader and the line that moved the hour most is
+          * on the title for a pointer.
+          */
+         key: 'rating',
+         label: 'Rating',
+         icon: RatingIcon,
+         height: 44,
+         mdHeight: 38,
+         has: (h) => rated?.has(h.local) ?? false,
+         cell: (h) => {
+            const mark = rated?.get(h.local);
+            if (!mark) return null;
+            return (
+               <span
+                  role="img"
+                  aria-label={`${BAND_WORD[mark.band]}, ${mark.score} out of 100`}
+                  title={mark.why ?? undefined}
+                  className="flex h-7 w-full items-end px-0.5 md:h-6"
+               >
+                  <span
+                     className="bar-grow block w-full"
+                     style={{
+                        /*
+                         * Drawn against the range the scores actually live in
+                         * rather than against nought. A week of hours runs
+                         * from the high twenties to the middle eighties, and
+                         * at full scale that is four pixels of difference
+                         * between a bad hour and the best one, which is a row
+                         * of identical blocks. Stretched across the real range
+                         * the shape of the day comes back.
+                         */
+                        height: `${Math.min(100, Math.max(14, ((mark.score - 28) / 57) * 100))}%`,
+                        background: bandFill(mark.band),
+                     }}
+                  />
+               </span>
+            );
+         },
+      },
       {
          key: 'wind',
          label: 'Wind',

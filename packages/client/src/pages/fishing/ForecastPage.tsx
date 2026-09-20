@@ -11,6 +11,7 @@ import { useSearchParams } from 'react-router-dom';
 import { DayStrip } from '@/components/forecast/DayStrip';
 import { HourGrid } from '@/components/forecast/HourGrid';
 import { PlaceSearch } from '@/components/forecast/PlaceSearch';
+import { RatingPanel } from '@/components/forecast/RatingPanel';
 import {
    clockAtPlace,
    fetchForecast,
@@ -18,7 +19,9 @@ import {
    namePlace,
    type Forecast,
    type ForecastDay,
+   type ForecastRating,
    type PlaceHit,
+   type RatedHour,
 } from '@/components/forecast/forecast-api';
 import { Button } from '@/components/ui/button';
 import { usePosition } from '@/lib/position';
@@ -76,6 +79,13 @@ export function ForecastPage() {
 
    const [status, setStatus] = useState<Status>(target ? 'loading' : 'idle');
    const [forecast, setForecast] = useState<Forecast | null>(null);
+   /*
+    * Whether the week is worth driving out for, read off this angler's own
+    * log on the server. Null for anyone signed out, and null when the page
+    * had to go to Open-Meteo itself because the server was throttled: in
+    * both cases the week draws exactly as it always did.
+    */
+   const [rating, setRating] = useState<ForecastRating | null>(null);
 
    /*
     * The reading of the moment at the place, beside the week ahead. This is
@@ -156,14 +166,22 @@ export function ForecastPage() {
       forced.current = false;
       quiet.current = false;
       if (!under) setStatus('loading');
-      fetchForecast(target.latitude, target.longitude, controller.signal, fresh)
-         .then((found) => {
-            if (!found) {
+      fetchForecast(
+         target.latitude,
+         target.longitude,
+         controller.signal,
+         fresh,
+         system
+      )
+         .then((answer) => {
+            if (!answer) {
                setStatus('error');
                return;
             }
+            const found = answer.forecast;
             readAt.current = Date.now();
             setForecast(found);
+            setRating(answer.rating);
             setSelected((was) =>
                was && found.days.some((d) => d.date === was)
                   ? was
@@ -185,7 +203,7 @@ export function ForecastPage() {
             if (!axios.isCancel(error)) setStatus('error');
          });
       return () => controller.abort();
-   }, [target?.latitude, target?.longitude, attempt]);
+   }, [target?.latitude, target?.longitude, attempt, system]);
 
    /* Its name, when the address did not carry one. */
    useEffect(() => {
@@ -253,6 +271,17 @@ export function ForecastPage() {
             : [],
       [forecast, selected]
    );
+   /* The band per hour, by its local stamp, for the row in the instrument. */
+   const ratedHours = useMemo(
+      () =>
+         rating
+            ? new Map<string, RatedHour>(
+                 rating.hours.map((h) => [h.local, h] as const)
+              )
+            : undefined,
+      [rating]
+   );
+   const ratedDay = rating?.days.find((d) => d.date === selected) ?? null;
 
    return (
       <section className="relative mx-auto w-[min(1680px,100%-32px)] pb-8 md:pb-12">
@@ -329,6 +358,17 @@ export function ForecastPage() {
                   aria-labelledby={`day-${day.date}`}
                   className="mt-5 md:mt-3"
                >
+                  {rating && ratedDay ? (
+                     <div className="mb-5 md:mb-4">
+                        <RatingPanel
+                           key={ratedDay.date}
+                           day={ratedDay}
+                           rating={rating}
+                           today={today}
+                        />
+                     </div>
+                  ) : null}
+
                   <DayFacts key={day.date} day={day} system={system} />
 
                   <div className="mt-5 md:mt-4">
@@ -339,6 +379,7 @@ export function ForecastPage() {
                         next={nextDay}
                         nowLocal={day.date === today ? nowLocal : null}
                         system={system}
+                        rated={ratedHours}
                      />
                   </div>
                </div>

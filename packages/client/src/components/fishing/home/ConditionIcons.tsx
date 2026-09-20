@@ -28,6 +28,29 @@ const stroke = {
    strokeLinejoin: 'round' as const,
 };
 
+/**
+ * The mark for the rating row.
+ *
+ * Three readings climbing, which is the shape the row itself draws. Every
+ * other mark in the rail stands for a thing in the weather; this row is the
+ * only one whose figure is a judgement rather than a measurement, so its mark
+ * is the judgement and not a wave or a cloud borrowed to stand in for one.
+ */
+export function RatingIcon({ className, ...rest }: IconProps) {
+   return (
+      <svg
+         viewBox="0 0 24 24"
+         className={cn('size-5', className)}
+         {...stroke}
+         {...rest}
+      >
+         <path d="M4.5 20.5v-5" />
+         <path d="M11 20.5v-9" />
+         <path d="M17.5 20.5v-13" />
+      </svg>
+   );
+}
+
 /** A wave, for sea state. */
 export function WaveIcon({ className, ...rest }: IconProps) {
    return (

@@ -1,3 +1,4 @@
+import type { Band } from './forecast-api';
 import type { CSSProperties } from 'react';
 
 /*
@@ -150,3 +151,30 @@ export const windBar = (kph: number | null) =>
           : kph < 48
             ? 'bg-wind-2'
             : 'bg-wind-3';
+
+/*
+ * The four bands of the rating, in the ramp the instrument already owns.
+ *
+ * No new hues. The wind ramp runs teal, green, amber, orange, red from the
+ * wind you can fish to the wind that ends a session, so the rating reads it
+ * backwards: red for an hour not worth the drive, amber for an ordinary one,
+ * green for a good one and teal, the product's own accent, for the rare hour
+ * that earns the word. The height of the bar says the same thing again, and
+ * the panel above the hours prints the word, so the colour is never carrying
+ * it alone.
+ */
+const BAND_TOKEN: Record<Band, string> = {
+   bad: '--wind-3',
+   good: '--sun',
+   great: '--green',
+   exceptional: '--teal',
+};
+
+export const bandFill = (band: Band) => `var(${BAND_TOKEN[band]})`;
+
+export const BAND_WORD: Record<Band, string> = {
+   bad: 'Bad',
+   good: 'Good',
+   great: 'Great',
+   exceptional: 'Exceptional',
+};
