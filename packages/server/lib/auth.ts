@@ -1,7 +1,12 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { prisma } from './prisma';
-import { sendResetPassword, sendVerificationEmail } from './mailer';
+import {
+   sendPasswordChanged,
+   sendResetPassword,
+   sendVerificationEmail,
+   sendWelcome,
+} from './mailer';
 
 /*
  * Self-hosted auth, replacing Clerk. Sessions are httpOnly cookies in the same
@@ -59,6 +64,17 @@ export const auth = betterAuth({
       enabled: true,
       requireEmailVerification,
       sendResetPassword,
+      /*
+       * A password that changed is the one account event worth telling somebody
+       * about unprompted: if they did not do it, this is how they find out.
+       * It fires after the new password is saved, so it is a record of a thing
+       * that happened rather than a request for anything.
+       */
+      onPasswordReset: async ({ user }) => {
+         await sendPasswordChanged({
+            user: { email: user.email, name: user.name },
+         });
+      },
    },
 
    emailVerification: {
@@ -70,6 +86,13 @@ export const auth = betterAuth({
        * all until a mail provider exists, which is the opposite of the point.
        */
       sendOnSignUp: true,
+      /*
+       * The address is confirmed and the log is really open, so this is the
+       * moment the welcome is true rather than presumptuous.
+       */
+      afterEmailVerification: async (user) => {
+         await sendWelcome({ user: { email: user.email, name: user.name } });
+      },
    },
 
    /*

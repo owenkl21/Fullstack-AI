@@ -1,29 +1,38 @@
+import { Resend } from 'resend';
+import {
+   passwordChangedEmail,
+   resetPasswordEmail,
+   verifyEmail,
+   welcomeEmail,
+   type MailPerson,
+} from './mail/templates';
+
 /*
- * Email, with no email provider yet.
+ * Email, through Resend.
  *
- * Resend needs a verified sending domain, which takes up to 72 hours and is the
- * owner's to arrange. Until it exists this writes the link to the log and keeps
- * the last few in memory, so verification and password reset can be walked
- * through end to end rather than sitting untestable behind a DNS record.
+ * This was a stub that printed the link to the log because there was no
+ * verified sending domain. The domain exists now, so the two functions the auth
+ * config already imports send real mail, and the printing stays as the fallback
+ * for a developer with no key in their .env: sign-up still completes locally
+ * without anybody needing a Resend account.
  *
- * Swapping in Resend later is this one file: keep the two exported functions,
- * send the mail, drop the recorder.
+ * Nothing in here ever throws. A mail that fails to send must not take a
+ * sign-up or a password reset down with it; it is logged loudly instead, and
+ * the caller carries on.
  */
 
-type Recipient = { email: string; name?: string | null };
+type Recipient = MailPerson;
 
 export type SentMail = {
-   kind: 'verify' | 'reset';
+   kind: 'verify' | 'reset' | 'password-changed' | 'welcome';
    to: string;
-   url: string;
-   /* When the link stops working, so a stale one in the log is obvious. */
+   /* Only the two mails that carry a link have one. */
+   url?: string;
    sentAt: string;
+   /* What became of it: sent by Resend, printed to the log, or refused. */
+   state: 'sent' | 'logged' | 'failed';
 };
 
-/*
- * The last few links, newest first. In memory on purpose: they are short lived
- * secrets and have no business outliving the process or reaching the database.
- */
 const KEEP = 20;
 const recent: SentMail[] = [];
 
@@ -34,18 +43,90 @@ const record = (mail: SentMail) => {
    recent.length = Math.min(recent.length, KEEP);
 };
 
+const apiKey = process.env.RESEND_API_KEY?.trim();
+
 /*
- * Loud on purpose. This is the only way to complete a sign-up right now, so it
- * should be impossible to miss when scrolling `railway logs`.
+ * The address the mail comes from. It has to be on the domain verified in
+ * Resend, and it should be one a reply can actually reach: a product this size
+ * is better off reading the replies than bouncing them.
  */
-const announce = (label: string, to: string, url: string) => {
+const from =
+   process.env.MAIL_FROM?.trim() || 'Fisherfeed <hello@fisherfeed.com>';
+const replyTo = process.env.MAIL_REPLY_TO?.trim() || undefined;
+
+const resend = apiKey ? new Resend(apiKey) : null;
+
+/** True while there is no key, so callers can say so rather than lie. */
+export const mailIsMocked = !resend;
+
+if (!resend) {
+   console.warn(
+      '[mail] RESEND_API_KEY is not set. Links will be printed to this log instead of sent.'
+   );
+}
+
+/*
+ * Loud on purpose: with no provider this is the only way to finish a sign-up,
+ * so it should be impossible to miss when scrolling the log.
+ */
+const announce = (label: string, to: string, url?: string) => {
    console.log('');
    console.log(`  ${label}`);
    console.log(`  to:   ${to}`);
-   console.log(`  open: ${url}`);
-   console.log('  No mail was sent. There is no provider configured yet.');
+   if (url) console.log(`  open: ${url}`);
+   console.log('  No mail was sent. RESEND_API_KEY is not set.');
    console.log('');
 };
+
+async function deliver({
+   kind,
+   label,
+   to,
+   subject,
+   html,
+   text,
+   url,
+}: {
+   kind: SentMail['kind'];
+   label: string;
+   to: string;
+   subject: string;
+   html: string;
+   text: string;
+   url?: string;
+}) {
+   const sentAt = new Date().toISOString();
+
+   if (!resend) {
+      announce(label, to, url);
+      record({ kind, to, url, sentAt, state: 'logged' });
+      return;
+   }
+
+   try {
+      const { data, error } = await resend.emails.send({
+         from,
+         to,
+         subject,
+         html,
+         text,
+         replyTo,
+      });
+
+      if (error) {
+         console.error(`[mail] ${kind} to ${to} refused:`, error.message);
+         record({ kind, to, url, sentAt, state: 'failed' });
+         return;
+      }
+
+      console.log(`[mail] ${kind} sent to ${to} (${data?.id ?? 'no id'})`);
+      record({ kind, to, url, sentAt, state: 'sent' });
+   } catch (cause) {
+      /* A network blip, a dead key, Resend having a bad morning. Never fatal. */
+      console.error(`[mail] ${kind} to ${to} failed:`, cause);
+      record({ kind, to, url, sentAt, state: 'failed' });
+   }
+}
 
 export async function sendVerificationEmail({
    user,
@@ -54,12 +135,13 @@ export async function sendVerificationEmail({
    user: Recipient;
    url: string;
 }) {
-   announce('VERIFY EMAIL', user.email, url);
-   record({
+   const mail = verifyEmail({ user, url });
+   await deliver({
       kind: 'verify',
+      label: 'VERIFY EMAIL',
       to: user.email,
       url,
-      sentAt: new Date().toISOString(),
+      ...mail,
    });
 }
 
@@ -70,14 +152,34 @@ export async function sendResetPassword({
    user: Recipient;
    url: string;
 }) {
-   announce('RESET PASSWORD', user.email, url);
-   record({
+   const mail = resetPasswordEmail({ user, url });
+   await deliver({
       kind: 'reset',
+      label: 'RESET PASSWORD',
       to: user.email,
       url,
-      sentAt: new Date().toISOString(),
+      ...mail,
    });
 }
 
-/** True once a real provider is wired up, so callers can stop apologising. */
-export const mailIsMocked = true;
+/* After a reset completes. A notice, not a link to act on. */
+export async function sendPasswordChanged({ user }: { user: Recipient }) {
+   const mail = passwordChangedEmail({ user });
+   await deliver({
+      kind: 'password-changed',
+      label: 'PASSWORD CHANGED',
+      to: user.email,
+      ...mail,
+   });
+}
+
+/* Once the address is verified and the account is really open. */
+export async function sendWelcome({ user }: { user: Recipient }) {
+   const mail = welcomeEmail({ user });
+   await deliver({
+      kind: 'welcome',
+      label: 'WELCOME',
+      to: user.email,
+      ...mail,
+   });
+}
