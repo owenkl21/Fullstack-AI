@@ -78,6 +78,51 @@ export type ForecastDay = {
    moon: MoonPhase;
 };
 
+/*
+ * The rating that rides with a forecast, worked out on the server from the
+ * reader's own log, the conditions already fetched and the moon. Null when
+ * nobody is signed in, and null when the page had to read Open-Meteo itself
+ * because the server was throttled.
+ */
+export type Band = 'bad' | 'good' | 'great' | 'exceptional';
+
+export type Reason = {
+   text: string;
+   from: 'log' | 'weather' | 'moon';
+   lift: number;
+   topic: string;
+};
+
+export type RatedHour = {
+   /* The place's own clock, matching an hour's `local`. */
+   local: string;
+   score: number;
+   band: Band;
+   why: string | null;
+};
+
+export type RatedDay = {
+   date: string;
+   score: number;
+   band: Band;
+   /* The best three hours of that day, e.g. `05:00` to `07:00`. */
+   bestFrom: string | null;
+   bestTo: string | null;
+   reasons: Reason[];
+};
+
+export type ForecastRating = {
+   hours: RatedHour[];
+   days: RatedDay[];
+   basis: {
+      catches: number;
+      used: number;
+      confidence: 'thin' | 'building' | 'solid';
+      note: string;
+   };
+   best: { date: string; from: string | null; to: string | null } | null;
+};
+
 export type Forecast = {
    latitude: number;
    longitude: number;
@@ -101,6 +146,11 @@ export type PlaceHit = {
 
 export type PlaceName = { name: string; region: string | null };
 
+export type ForecastAnswer = {
+   forecast: Forecast;
+   rating: ForecastRating | null;
+};
+
 export async function fetchForecast(
    latitude: number,
    longitude: number,
@@ -114,29 +164,36 @@ export async function fetchForecast(
     * own answer for ten minutes, so this can still come back with the
     * timestamp it had before, and the line under the hours says so.
     */
-   fresh?: boolean
-): Promise<Forecast | null> {
+   fresh?: boolean,
+   /* The reasons come back as sentences, so they are written in these. */
+   units?: 'METRIC' | 'IMPERIAL'
+): Promise<ForecastAnswer | null> {
    /* The server first; the browser itself when the server is throttled. */
    try {
-      const { data } = await axios.get<{ forecast: Forecast | null }>(
-         '/api/forecast',
-         {
-            params: {
-               latitude,
-               longitude,
-               days: 7,
-               ...(fresh ? { t: Date.now() } : {}),
-            },
-            headers: fresh ? { 'Cache-Control': 'no-cache' } : undefined,
-            signal,
-         }
-      );
-      if (data.forecast) return data.forecast;
+      const { data } = await axios.get<{
+         forecast: Forecast | null;
+         rating?: ForecastRating | null;
+      }>('/api/forecast', {
+         params: {
+            latitude,
+            longitude,
+            days: 7,
+            ...(units ? { units } : {}),
+            ...(fresh ? { t: Date.now() } : {}),
+         },
+         headers: fresh ? { 'Cache-Control': 'no-cache' } : undefined,
+         signal,
+      });
+      if (data.forecast) {
+         return { forecast: data.forecast, rating: data.rating ?? null };
+      }
    } catch (error) {
       if (axios.isCancel(error)) throw error;
    }
+   /* Read straight off Open-Meteo. No log here, so no rating with it. */
    const { readForecast } = await import('@/lib/open-meteo');
-   return readForecast(latitude, longitude, 7, signal);
+   const forecast = await readForecast(latitude, longitude, 7, signal);
+   return forecast ? { forecast, rating: null } : null;
 }
 
 export async function searchPlaces(

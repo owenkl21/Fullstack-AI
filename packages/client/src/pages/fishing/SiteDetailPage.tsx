@@ -28,6 +28,8 @@ import { NotFoundPage } from '@/pages/NotFoundPage';
 import { StaticMap } from '@/components/map/StaticMap';
 import { useIsSignedIn } from '@/lib/auth-client';
 import { NoPhoto } from '@/components/brand/FishMark';
+import { SpotRatings } from '@/components/fishing/reviews/SpotRatings';
+import { useSpotRatings } from '@/components/fishing/reviews/reviews-api';
 
 /*
  * A spot: the photograph and the name first, then what the place is and how to get
@@ -218,6 +220,7 @@ function SiteRecord({
    const { isSignedIn } = useIsSignedIn();
    const isOwner = useIsOwner(data?.createdBy?.id);
    const kept = useKept(isSignedIn && !isOwner);
+   const ratings = useSpotRatings(siteId);
    const navigate = useNavigate();
 
    const [page, setPage] = useState(1);
@@ -301,7 +304,14 @@ function SiteRecord({
 
    const water = data.waterType ? WATER_WORDS[data.waterType] : null;
    const caughtLine = plural(catches.length, 'catch', 'catches');
-   const facts = [water, `${caughtLine} logged here`]
+   /* An average only once there is one. A spot nobody has rated says nothing
+      here rather than printing a nought that reads as a verdict. */
+   const average = ratings.data?.summary.average ?? null;
+   const facts = [
+      water,
+      `${caughtLine} logged here`,
+      average === null ? null : `rated ${average.toFixed(1)} out of 5`,
+   ]
       .filter(Boolean)
       .join(' · ');
    const position =
@@ -433,6 +443,12 @@ function SiteRecord({
                   </>
                )}
             </section>
+
+            <SpotRatings
+               siteId={data.id}
+               siteName={data.name}
+               store={ratings}
+            />
 
             <section className="rv mt-12 border-t border-line pt-8">
                <h2 className="sr-only">What you can do with this spot</h2>

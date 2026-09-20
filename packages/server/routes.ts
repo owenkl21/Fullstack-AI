@@ -4,6 +4,7 @@ import { chatController } from './controllers/chat.controller';
 import { groupsController } from './controllers/groups.controller';
 import { statsController } from './controllers/stats.controller';
 import { fishingController } from './controllers/fishing.controller';
+import { siteMergeController } from './controllers/site-merge.controller';
 import { userController } from './controllers/user.controller';
 import { uploadsController } from './controllers/uploads.controller';
 import { competitionsController } from './controllers/competitions.controller';
@@ -15,6 +16,7 @@ import { notificationsController } from './controllers/notifications.controller'
 import { waypointsController } from './controllers/waypoints.controller';
 import { gearController } from './controllers/gear.controller';
 import { feedController } from './controllers/feed.controller';
+import { reviewsController } from './controllers/reviews.controller';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from './lib/auth';
 import { setAuthContext } from './lib/auth-context';
@@ -120,6 +122,15 @@ router.get(
 );
 router.get('/api/sites', fishingController.listFishingSites);
 
+/* Two pins on the same water, made one. Reading suggestions changes nothing;
+   the merge itself moves catches and cannot undo itself, so it is a POST. */
+router.get(
+   '/api/sites/merge-suggestions',
+   requireApiAuth,
+   siteMergeController.suggestions
+);
+router.post('/api/sites/merge', requireApiAuth, siteMergeController.merge);
+
 /* A reference table, not anyone's data, so no sign-in needed to name a fish. */
 router.get('/api/species', fishingController.searchSpecies);
 /* A name the table does not have yet. Deduped against what it has, however
@@ -148,7 +159,12 @@ router.post('/api/vision/read', requireApiAuth, visionController.readMeasure);
 router.post('/api/vision/identify', requireApiAuth, visionController.identify);
 
 /* The week ahead at a place. Public, like the places. */
-router.get('/api/forecast', forecastController.get);
+/*
+ * Signed out this is the week and nothing more. Signed in the same answer
+ * carries a rating read off the reader's own log, so the session is attached
+ * rather than required.
+ */
+router.get('/api/forecast', attachApiAuth, forecastController.get);
 
 /* Keeping somebody else's spot or gear. A reference, never a copy, so what the
  * owner does with it afterwards still applies. */
@@ -315,6 +331,27 @@ router.get(
    '/api/sites/:siteId',
    attachApiAuth,
    fishingController.getFishingSiteById
+);
+
+/*
+ * What anglers make of a spot. One rating per person per spot, so the write is
+ * a PUT on your own one rather than a POST of another row: a second rating
+ * edits the first.
+ *
+ * The read is public and still needs attachApiAuth. Without it the reader is a
+ * stranger to their own rating, the page offers to rate a spot they have
+ * already rated, and the owner of a private spot cannot read its ratings.
+ */
+router.get('/api/sites/:siteId/reviews', attachApiAuth, reviewsController.list);
+router.put(
+   '/api/sites/:siteId/reviews/me',
+   requireApiAuth,
+   reviewsController.leave
+);
+router.delete(
+   '/api/sites/:siteId/reviews/me',
+   requireApiAuth,
+   reviewsController.remove
 );
 
 /* Public, but a signed-in reader gets their own likes, keeps and follows back. */
