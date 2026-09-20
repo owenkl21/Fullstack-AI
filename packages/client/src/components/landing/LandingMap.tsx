@@ -158,8 +158,8 @@ type Disclosure = (typeof disclosures)[number]['value'];
  * stroked: only the waterline between the two fills is a line.
  */
 const COAST = [
-   'M-6 -6 L17 -6 L21 11 L15 23 L24 33 L19 47 L29 57 L25 70 L35 80 L31 92 L39 106 L-6 106 Z',
-   'M106 50 L87 63 L92 76 L79 85 L85 106 L106 106 Z',
+   'M-6 -6 L18 -6 C22 6 14 14 16 24 C18 34 26 34 24 42 C22 50 28 52 27 60 C26 68 33 72 31 80 C29 88 36 94 34 106 L-6 106 Z',
+   'M106 48 C96 54 90 60 88 66 C86 72 92 76 90 82 C88 88 80 90 82 106 L106 106 Z',
 ];
 
 /* The graticule: four meridians and three parallels, barely there. */
@@ -212,7 +212,7 @@ export function LandingMap() {
                loading="lazy"
                className="h-full w-full object-cover"
             />
-            <div className="absolute inset-0 bg-black-block/75" />
+            <div className="absolute inset-0 bg-black-block/88" />
          </div>
 
          <div className={cn(WRAP, 'relative')}>
