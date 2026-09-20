@@ -7,7 +7,19 @@ import { demoMoment } from './data';
  * measured, and reduced motion collapses all of them to nothing.
  */
 
-export type DemoScreen = 'home' | 'record';
+/*
+ * The screens the phone can be showing. `home` and `record` are the two the
+ * log sequence uses; the other four are the bar's own, and the bar marks
+ * whichever of them is up exactly as the app's bar does.
+ */
+export type DemoScreen =
+   | 'home'
+   | 'record'
+   | 'feed'
+   | 'catches'
+   | 'map'
+   | 'boards';
+export type DemoTab = 'feed' | 'catches' | 'map' | 'boards';
 export type LengthUnit = 'cm' | 'in';
 export type WeightUnit = 'kg' | 'lb';
 export type DemoToast = { lead: string; rest: string };
@@ -173,6 +185,16 @@ export function useDemo() {
       setScreen('home');
    }
 
+   /*
+    * A tap on the bar. It closes the log sheet if it is open, because the app's
+    * bar is not reachable from behind the sheet either, and puts the screen up.
+    */
+   function goTab(tab: DemoTab) {
+      setSheetOpen(false);
+      setStep(0);
+      setScreen(tab);
+   }
+
    function openRecord() {
       setRecordBuilt(true);
       recordBuiltRef.current = true;
@@ -273,6 +295,7 @@ export function useDemo() {
       setWeightWeighed,
       save,
       goHome,
+      goTab,
       openRecord,
       seeThoseThree,
       play,

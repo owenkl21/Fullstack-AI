@@ -1,13 +1,33 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { cn } from '@/lib/utils';
+import { BoardsScreen } from './BoardsScreen';
+import { CatchesScreen } from './CatchesScreen';
+import { FeedScreen } from './FeedScreen';
 import { HomeScreen } from './HomeScreen';
 import { LogSheet } from './LogSheet';
+import { MapScreen } from './MapScreen';
 import { RecordScreen } from './RecordScreen';
-import type { Demo } from './useDemo';
+import type { Demo, DemoTab } from './useDemo';
 
 /* The app's own bar, in the app's own order: Log sits in the middle. */
-const BAR_LEFT = ['Feed', 'Catches'];
-const BAR_RIGHT = ['Map', 'Boards'];
+const BAR_LEFT: { tab: DemoTab; label: string }[] = [
+   { tab: 'feed', label: 'Feed' },
+   { tab: 'catches', label: 'Catches' },
+];
+const BAR_RIGHT: { tab: DemoTab; label: string }[] = [
+   { tab: 'map', label: 'Map' },
+   { tab: 'boards', label: 'Boards' },
+];
+
+/*
+ * A slot in the bar, and the mark on the one you are looking at: a 3px teal
+ * rule drawn across the top of the cell, which is what the app's own bar does
+ * and the only thing in the product that says "you are here".
+ */
+const SLOT =
+   'g-tracked relative flex items-center justify-center text-[15px] text-paper-2 transition-colors duration-150 [transition-timing-function:var(--ease)] hover:text-paper motion-reduce:transition-none md:text-[17px]';
+const SLOT_ON =
+   'text-paper before:absolute before:inset-x-0 before:top-0 before:h-[3px] before:bg-teal';
 
 function Screen({
    on,
@@ -37,6 +57,27 @@ function Screen({
       >
          {children}
       </section>
+   );
+}
+
+/* One cell of the bar: a word, and the screen it puts up. */
+function Slot({
+   demo,
+   slot,
+}: {
+   demo: Demo;
+   slot: { tab: DemoTab; label: string };
+}) {
+   const on = demo.screen === slot.tab;
+   return (
+      <button
+         type="button"
+         onClick={() => demo.goTab(slot.tab)}
+         aria-current={on ? 'page' : undefined}
+         className={cn(SLOT, on && SLOT_ON)}
+      >
+         {slot.label}
+      </button>
    );
 }
 
@@ -80,6 +121,22 @@ export function DeviceDemo({
                <RecordScreen demo={demo} />
             </Screen>
 
+            <Screen on={demo.screen === 'feed'} label="Feed">
+               <FeedScreen on={demo.screen === 'feed'} />
+            </Screen>
+
+            <Screen on={demo.screen === 'catches'} label="My catches">
+               <CatchesScreen on={demo.screen === 'catches'} />
+            </Screen>
+
+            <Screen on={demo.screen === 'map'} label="Map">
+               <MapScreen on={demo.screen === 'map'} />
+            </Screen>
+
+            <Screen on={demo.screen === 'boards'} label="Boards">
+               <BoardsScreen on={demo.screen === 'boards'} />
+            </Screen>
+
             <LogSheet demo={demo} />
 
             <div
@@ -107,39 +164,24 @@ export function DeviceDemo({
                </button>
             </div>
 
-            <div className="absolute inset-x-0 bottom-0 z-[5] grid h-16 grid-cols-[1fr_1fr_84px_1fr_1fr] bg-black-block text-paper md:grid-cols-[1fr_1fr_96px_1fr_1fr]">
-               <div aria-hidden="true" className="contents">
-                  {BAR_LEFT.map((word) => (
-                     <span
-                        key={word}
-                        className={cn(
-                           'g-tracked flex items-center justify-center text-[15px] text-paper-2 md:text-[17px]',
-                           word === 'Feed' &&
-                              'text-paper shadow-[inset_0_3px_0_var(--teal)]'
-                        )}
-                     >
-                        {word}
-                     </span>
-                  ))}
-               </div>
+            <nav
+               aria-label="App"
+               className="absolute inset-x-0 bottom-0 z-[5] grid h-16 grid-cols-[1fr_1fr_84px_1fr_1fr] bg-black-block text-paper md:grid-cols-[1fr_1fr_96px_1fr_1fr]"
+            >
+               {BAR_LEFT.map((slot) => (
+                  <Slot key={slot.tab} demo={demo} slot={slot} />
+               ))}
                <button
                   type="button"
                   onClick={demo.openSheet}
-                  className="g-tracked flex items-center justify-center bg-teal text-[20px] text-teal-ink transition-[filter] duration-150 active:brightness-95 md:text-[22px]"
+                  className="g-tracked flex items-center justify-center bg-teal text-[20px] text-teal-ink transition-[filter] duration-150 active:brightness-95 motion-reduce:transition-none md:text-[22px]"
                >
                   Log
                </button>
-               <div aria-hidden="true" className="contents">
-                  {BAR_RIGHT.map((word) => (
-                     <span
-                        key={word}
-                        className="g-tracked flex items-center justify-center text-[15px] text-paper-2 md:text-[17px]"
-                     >
-                        {word}
-                     </span>
-                  ))}
-               </div>
-            </div>
+               {BAR_RIGHT.map((slot) => (
+                  <Slot key={slot.tab} demo={demo} slot={slot} />
+               ))}
+            </nav>
          </div>
       </div>
    );

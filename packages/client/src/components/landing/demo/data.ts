@@ -220,3 +220,126 @@ export const steps = [
       body: 'The record assembles around the photo: the numbers settle into place and the row lands at the top of your log.',
    },
 ] as const;
+
+/*
+ * The feed, the log, the map and a board, as the four screens the phone's bar
+ * switches between. Same morning at Kalk Bay, same sample angler, and the copy
+ * is the copy the page was designed from.
+ */
+
+export const feedHead = { kicker: 'Newest first', title: 'Feed' };
+
+export const feedPost = {
+   author: 'Riaan Adams',
+   handle: 'riaanadams',
+   initial: 'R',
+   photo: photos.catchOcean,
+   photoAlt: 'A bass held over the water at Kalk Bay',
+   frame: '1 / 3',
+   species: 'Bass',
+   measure: '44 cm · 1.9 kg',
+   source: 'by eye',
+   context: 'Caught at Kalk Bay, Tue 15 Sep, 06:14 · 4 h ago',
+   note: 'Falling glass after the south-west blow. Second cast, off the ledge.',
+   likes: 18,
+   comments: 4,
+   action: 'See the catch',
+};
+
+export const catchesHead = {
+   kicker: 'Your log',
+   title: 'My catches',
+   heading: 'Recent',
+   count: 'All 184 catches',
+   /* The line the log closes on once a list is longer than the page. */
+   more: 'Showing 4 of 184 catches',
+};
+
+export type CatchesRow = {
+   id: string;
+   photo: string;
+   species: string;
+   when: string;
+   spot: string;
+   length: string;
+};
+
+export const catchesRows: CatchesRow[] = [
+   {
+      id: 'bass-15-sep',
+      photo: photos.catchOcean,
+      species: 'Bass',
+      when: 'Tue 15 Sep, 06:14',
+      spot: 'Kalk Bay',
+      length: '44 cm',
+   },
+   {
+      id: 'bass-14-sep',
+      photo: photos.catchDepth,
+      species: 'Bass',
+      when: 'Sun 14 Sep, 06:40',
+      spot: 'Theewaterskloof',
+      length: '52 cm',
+   },
+   {
+      id: 'steenbras-12-sep',
+      photo: photos.catchLine,
+      species: 'Steenbras',
+      when: 'Sat 12 Sep, 07:05',
+      spot: 'Kalk Bay',
+      length: '27 cm',
+   },
+   {
+      id: 'galjoen-11-sep',
+      photo: photos.catchOcean,
+      species: 'Galjoen',
+      when: 'Fri 11 Sep, 17:20',
+      spot: 'Rooi-Els',
+      length: '38 cm',
+   },
+];
+
+/* The water the phone opens on, closer in than the page's own map. */
+export const mapCentre = { lat: -34.1295, lng: 18.4477 };
+export const mapZoom = 14;
+
+export type MapMark = {
+   key: string;
+   kind: 'spot' | 'other' | 'waypoint' | 'ramp' | 'tackle';
+   lat: number;
+   lng: number;
+   count?: number;
+};
+
+/*
+ * Where each mark stands is checked against the imagery underneath it. The
+ * coast runs down about 18.449 here, so a spot or a private mark west of that
+ * would be pinned up the mountain behind Kalk Bay; the slipway belongs in the
+ * harbour and the tackle shop in the village, which is where they are.
+ */
+export const mapMarks: MapMark[] = [
+   { key: 'kalk', kind: 'spot', lat: -34.129, lng: 18.452, count: 12 },
+   { key: 'ledge', kind: 'spot', lat: -34.1352, lng: 18.4548, count: 3 },
+   { key: 'theirs', kind: 'other', lat: -34.1215, lng: 18.4585 },
+   { key: 'mark', kind: 'waypoint', lat: -34.131, lng: 18.4585 },
+   { key: 'ramp', kind: 'ramp', lat: -34.1262, lng: 18.449 },
+   { key: 'tackle', kind: 'tackle', lat: -34.1301, lng: 18.4405 },
+];
+
+export const boardsHead = {
+   kicker: 'Boards',
+   title: 'Who is catching what',
+   /* The way through to competitions on a phone, as the board carries it. */
+   competitions: 'Competitions anglers are running',
+};
+
+export const board = {
+   species: 'Galjoen',
+   order: 'By length',
+   head: 'Longest',
+   rows: [
+      { pos: '1', name: 'R. Adams', spot: 'Cape Point', value: '61 cm' },
+      { pos: '2', name: 'T. Naidoo', spot: 'Rooi-Els', value: '58 cm' },
+      { pos: '3', name: 'You', spot: 'Kalk Bay', value: '54 cm', you: true },
+   ],
+} as const;
