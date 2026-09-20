@@ -5,7 +5,9 @@ import { LogSheet } from './LogSheet';
 import { RecordScreen } from './RecordScreen';
 import type { Demo } from './useDemo';
 
-const BAR_WORDS = ['Feed', 'Catches', 'Spots', 'Gear'];
+/* The app's own bar, in the app's own order: Log sits in the middle. */
+const BAR_LEFT = ['Feed', 'Catches'];
+const BAR_RIGHT = ['Map', 'Boards'];
 
 function Screen({
    on,
@@ -105,14 +107,14 @@ export function DeviceDemo({
                </button>
             </div>
 
-            <div className="absolute inset-x-0 bottom-0 z-[5] grid h-16 grid-cols-[repeat(4,minmax(0,1fr))_104px] bg-black-block text-paper md:grid-cols-[repeat(4,minmax(0,1fr))_124px]">
+            <div className="absolute inset-x-0 bottom-0 z-[5] grid h-16 grid-cols-[1fr_1fr_84px_1fr_1fr] bg-black-block text-paper md:grid-cols-[1fr_1fr_96px_1fr_1fr]">
                <div aria-hidden="true" className="contents">
-                  {BAR_WORDS.map((word) => (
+                  {BAR_LEFT.map((word) => (
                      <span
                         key={word}
                         className={cn(
-                           'g-tracked flex items-center justify-center text-[16px] text-paper-2 md:text-[18px]',
-                           word === 'Catches' &&
+                           'g-tracked flex items-center justify-center text-[15px] text-paper-2 md:text-[17px]',
+                           word === 'Feed' &&
                               'text-paper shadow-[inset_0_3px_0_var(--teal)]'
                         )}
                      >
@@ -127,6 +129,16 @@ export function DeviceDemo({
                >
                   Log
                </button>
+               <div aria-hidden="true" className="contents">
+                  {BAR_RIGHT.map((word) => (
+                     <span
+                        key={word}
+                        className="g-tracked flex items-center justify-center text-[15px] text-paper-2 md:text-[17px]"
+                     >
+                        {word}
+                     </span>
+                  ))}
+               </div>
             </div>
          </div>
       </div>

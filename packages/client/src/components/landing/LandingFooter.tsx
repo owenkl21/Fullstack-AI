@@ -6,12 +6,13 @@ import { FishMark } from '@/components/brand/FishMark';
 const columns = [
    [
       { href: '#how', label: 'How it logs' },
-      { href: '#keeps', label: 'What it keeps' },
+      { href: '#forecast', label: 'The forecast' },
+      { href: '#map', label: 'The map' },
    ],
    [
       { href: '#record', label: 'The record' },
-      { href: '#questions', label: 'Questions' },
-      { href: '#join', label: 'Join' },
+      { href: '#insights', label: 'Insights' },
+      { href: '#boards', label: 'Boards' },
    ],
 ];
 

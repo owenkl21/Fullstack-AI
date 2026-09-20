@@ -82,6 +82,15 @@ export function LandingHero() {
          <div className={cn(WRAP, 'relative')}>
             <div className="grid items-center gap-9 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] lg:gap-14">
                <div className="flex flex-col items-start gap-4 md:gap-5">
+                  <span
+                     className={cn(
+                        headline.className,
+                        'lab lab-rule text-paper-2'
+                     )}
+                     style={headline.style}
+                  >
+                     A fishing log for the South African coast
+                  </span>
                   <h1
                      className={cn(
                         headline.className,
@@ -99,8 +108,9 @@ export function LandingHero() {
                      style={line.style}
                   >
                      One tap stamps where you are, the minute and the weather.
-                     The photograph names the fish. What is beside this is the
-                     app, running.
+                     Photograph the fish and it names itself. I built it so you
+                     can put the phone away and get back to casting. What is
+                     beside this is the app itself, running on last September.
                   </p>
                   <div
                      className={cn(action.className, 'flex flex-wrap gap-3')}
@@ -122,6 +132,15 @@ export function LandingHero() {
                         Watch it log
                      </Button>
                   </div>
+                  <p
+                     className={cn(
+                        action.className,
+                        'text-[14px] text-paper-2'
+                     )}
+                     style={action.style}
+                  >
+                     Free. No setup, no tour, and no plan to sell your catches.
+                  </p>
                </div>
 
                <div
@@ -190,7 +209,8 @@ export function LandingHero() {
             </ol>
 
             <p className="mt-5 text-[13px] text-paper-2">
-               A sample log. Your own photographs take these places.
+               A sample log, one morning at Kalk Bay. Your own photographs take
+               these places.
             </p>
          </div>
 

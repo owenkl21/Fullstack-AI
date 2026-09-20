@@ -53,6 +53,16 @@ export const readouts = [
    },
 ] as const;
 
+/*
+ * The second row the app's home screen carries under the three big readings:
+ * sky, sea and swell, stated rather than counted up.
+ */
+export const readoutsRow2 = [
+   { key: 'Sky', value: 'Clear' },
+   { key: 'Water', value: '16.4 \u00b0C' },
+   { key: 'Swell', value: '2.4 m at 11 s' },
+] as const;
+
 export const logSays = {
    label: 'What your log says',
    body: 'Three of your five kob here came on a falling glass after a south-west blow, between 05:50 and 07:10.',

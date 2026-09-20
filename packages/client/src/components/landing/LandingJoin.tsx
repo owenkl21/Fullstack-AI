@@ -6,8 +6,11 @@ import { photos } from './photos';
 import { Link } from 'react-router-dom';
 
 /*
- * The one full-bleed teal moment on the page, carrying the black signup box. The
- * address typed here is handed to the sign-up as its starting value.
+ * The one full-bleed teal moment on the page, carrying the black signup box.
+ *
+ * It speaks as the person who built it rather than as a product, because that
+ * is what it is: one angler's log for one coast. The address typed here is
+ * handed to the sign-up as its starting value.
  */
 export function LandingJoin() {
    const emailId = useId();
@@ -22,20 +25,30 @@ export function LandingJoin() {
                      src={photos.dawnBoats}
                      alt="Anglers in a boat at dusk"
                      loading="lazy"
-                     className="hidden h-full w-full object-cover md:block md:min-h-[280px]"
+                     className="hidden h-full w-full object-cover md:block md:min-h-[320px]"
                   />
                   <form
                      onSubmit={(event) => event.preventDefault()}
-                     className="flex flex-col gap-[22px] px-[22px] py-7 md:px-11 md:py-10"
+                     className="flex flex-col gap-[18px] px-[22px] py-7 md:px-11 md:py-10"
                   >
+                     <span className="lab lab-rule text-paper-2">
+                        From the builder
+                     </span>
                      <h2 className="g text-[clamp(40px,5vw,64px)]">
                         Stay on the water
                      </h2>
-                     <p className="text-paper-2">
-                        No setup and no tour. Log one fish and you have seen the
-                        whole of it.
+                     <p className="max-w-[52ch] text-paper-2 text-pretty">
+                        I fish this coast, and I kept losing the details: which
+                        tide, which wind, how big, exactly where. So I built the
+                        log I wanted. One tap on the rocks, and the rest of it
+                        filled in by the time the fish went back.
                      </p>
-                     <div className="flex flex-col gap-1.5">
+                     <p className="max-w-[52ch] text-paper-2 text-pretty">
+                        It is free. There is no plan to sell it or your catches,
+                        and there is no setup and no tour. Log one fish and you
+                        have seen the whole of it.
+                     </p>
+                     <div className="mt-1 flex flex-col gap-1.5">
                         <label htmlFor={emailId} className="lab text-paper-2">
                            Email
                         </label>

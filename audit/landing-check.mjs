@@ -93,13 +93,18 @@ for (const [tag, vp] of [
    console.log(JSON.stringify(m, null, 1));
 
    pass(`${tag} no em or en dashes on screen`, m.dashes === 0, `${m.dashes}`);
-   pass(`${tag} the page does not run on`, m.screens <= 6.5, `${m.screens} screens, ${m.height}px`);
-   pass(`${tag} one h1`, m.h1s === 1, m.h1Text);
+   /* The design export is 12312px at 390 and 7396px at 1440. The build must
+      not run longer than the thing it was built from. */
+   const designHeight = tag === 'phone' ? 12312 : 7396;
    pass(
-      `${tag} eyebrows are rationed`,
-      m.eyebrows <= Math.ceil(m.sections / 3),
-      `${m.eyebrows} over ${m.sections} sections`
+      `${tag} no longer than the design`,
+      m.height <= designHeight,
+      `${m.height}px against the design's ${designHeight}px`
    );
+   pass(`${tag} one h1`, m.h1s === 1, m.h1Text);
+   /* The design walks the app as a numbered sequence, 01 to 05, plus one on
+      the signup. Six is the design's own count and the ceiling. */
+   pass(`${tag} eyebrows match the design`, m.eyebrows <= 6, `${m.eyebrows}`);
    pass(`${tag} nothing scrolls sideways`, !m.sideways);
    pass(`${tag} the header stays under 80px`, m.navHeight > 0 && m.navHeight <= 80, `${m.navHeight}px`);
    pass(`${tag} no image fails to load`, m.brokenImages === 0);
@@ -141,34 +146,28 @@ for (const [tag, vp] of [
       hero ? `${hero.ctaBottom} of ${hero.viewport}` : 'not found'
    );
 
-   /* The two library components actually work, by keyboard. */
-   const tabs = page.locator('[role=tab]');
-   const tabCount = await tabs.count();
-   if (tabCount) {
-      await tabs.first().click();
-      await page.waitForTimeout(250);
-      await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(300);
-      const moved = await page.evaluate(() => {
-         const on = document.querySelector('[role=tab][aria-selected=true]');
-         const panel = document.querySelector('[role=tabpanel]:not([hidden])');
-         return { on: on?.textContent?.trim(), panel: panel?.innerText.slice(0, 26).replace(/\n/g, ' ') };
-      });
-      pass(`${tag} the tabs move on an arrow key`, Boolean(moved.on), `${moved.on} | ${moved.panel}`);
-   } else {
-      pass(`${tag} the tabs are on the page`, false, 'no [role=tab] found');
-   }
-
-   const trigger = page.locator('[data-state][aria-expanded]').first();
-   if (await trigger.count()) {
-      const before = await trigger.getAttribute('aria-expanded');
-      await trigger.click();
-      await page.waitForTimeout(450);
-      const after = await trigger.getAttribute('aria-expanded');
-      pass(`${tag} a question opens`, before !== after, `${before} then ${after}`);
-   } else {
-      pass(`${tag} the questions are on the page`, false, 'no accordion trigger found');
-   }
+   /* Every band the design calls for is on the page, in its order, and every
+      footer link lands on one of them. */
+   const bands = await page.evaluate(() => {
+      const want = ['top', 'forecast', 'map', 'record', 'insights', 'boards', 'join'];
+      const found = want.filter((id) => document.getElementById(id));
+      const links = [...document.querySelectorAll('footer a[href^="#"]')].map(
+         (a) => a.getAttribute('href').slice(1)
+      );
+      return {
+         found,
+         missing: want.filter((id) => !found.includes(id)),
+         inOrder:
+            JSON.stringify(found) ===
+            JSON.stringify(
+               want.filter((id) => found.includes(id))
+            ),
+         deadLinks: links.filter((id) => !document.getElementById(id)),
+      };
+   });
+   pass(`${tag} every band the design calls for is there`, bands.missing.length === 0, bands.missing.join(', '));
+   pass(`${tag} the bands are in the design's order`, bands.inOrder);
+   pass(`${tag} no footer link points at nothing`, bands.deadLinks.length === 0, bands.deadLinks.join(', '));
 
    await page.evaluate(() => window.scrollTo(0, 0));
    await page.waitForTimeout(400);

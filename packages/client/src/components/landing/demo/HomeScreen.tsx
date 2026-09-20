@@ -13,6 +13,7 @@ import {
    recentHeading,
    season,
    seasonHeading,
+   readoutsRow2,
 } from './data';
 import type { Demo } from './useDemo';
 
@@ -97,6 +98,24 @@ export function HomeScreen({
                      )}
                   >
                      {r.note}
+                  </span>
+               </div>
+            ))}
+         </div>
+
+         {/* Sky, sea and swell: stated, not counted, the way the app states them. */}
+         <div className="grid grid-cols-3 border-t border-line px-4 py-2.5 md:px-[18px]">
+            {readoutsRow2.map((r, i) => (
+               <div
+                  key={r.key}
+                  className={cn(
+                     'flex flex-col pr-2',
+                     i > 0 && 'rule-dashed-v pl-2.5 md:pl-3'
+                  )}
+               >
+                  <span className="lab text-[11px]">{r.key}</span>
+                  <span className="num mt-0.5 text-[14px] text-ink">
+                     {r.value}
                   </span>
                </div>
             ))}

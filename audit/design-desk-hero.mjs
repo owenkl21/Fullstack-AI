@@ -1,0 +1,11 @@
+import { chromium } from 'playwright';
+const file = 'file:///private/tmp/claude-501/-Users-owenkleinhans/5cdb79aa-e9b0-4da5-89d1-31a54b7058ac/scratchpad/landing-rework/Landing%20Page.dc.html';
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
+const p = await ctx.newPage();
+await p.goto(file, { waitUntil: 'load', timeout: 60000 });
+await p.waitForTimeout(1500);
+const h = await p.evaluate(() => Math.round(document.querySelector('#top').getBoundingClientRect().height));
+await p.screenshot({ path: 'shots/design-desk-hero.png', fullPage: true, clip: { x: 0, y: 0, width: 1440, height: Math.min(h, 1400) } });
+console.log('hero height at 1440:', h);
+await b.close();
