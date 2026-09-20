@@ -64,7 +64,7 @@ export function HomeScreen({
             <TornEdge fill="bg" className="bottom-[-1px] z-[3] h-10" />
          </div>
 
-         <div className="relative grid grid-cols-3 px-4 pt-4 pb-1.5 md:px-[18px] md:pt-[18px]">
+         <div className="relative grid grid-cols-3 overflow-hidden px-4 pt-4 pb-1.5 md:px-[18px] md:pt-[18px]">
             <Contours
                seed={3}
                width={460}

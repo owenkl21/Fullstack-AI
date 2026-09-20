@@ -48,7 +48,7 @@ function Screen({
          aria-label={label}
          inert={!on}
          className={cn(
-            'absolute inset-x-0 top-0 bottom-16 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+            'absolute inset-x-0 top-0 bottom-16 overflow-x-hidden overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
             on ? 'translate-x-0 opacity-100' : 'translate-x-6 opacity-0'
          )}
          style={{
