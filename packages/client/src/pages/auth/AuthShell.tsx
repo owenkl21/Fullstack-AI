@@ -112,7 +112,13 @@ export function AuthForm({
                {error}
             </p>
          ) : null}
-         {note ? <p className="text-[15px] text-ink-2">{note}</p> : null}
+         {/*
+          * Always in the page, so a note that arrives after a submit is read
+          * out. Empty, it is not displayed, and takes no row of the grid.
+          */}
+         <p aria-live="polite" className="text-[15px] text-ink-2 empty:hidden">
+            {note}
+         </p>
       </form>
    );
 }

@@ -67,6 +67,12 @@ export function ResetPasswordPage() {
          return;
       }
 
+      /*
+       * The server has signed out every session on the account, this one
+       * included. Signing out here as well clears the page's own idea of who
+       * is in, so the new password is the only way back.
+       */
+      await authClient.signOut().catch(() => undefined);
       navigate('/sign-in');
    };
 

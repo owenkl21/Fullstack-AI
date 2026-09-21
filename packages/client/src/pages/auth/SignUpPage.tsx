@@ -27,18 +27,41 @@ export function SignUpPage() {
       }
 
       setBusy(true);
-      const { error: failed } = await signUp.email({ email, password, name });
-      setBusy(false);
 
-      if (failed) {
+      /*
+       * A request that never gets there throws rather than answering, and
+       * without the finally the button would stay on its busy label.
+       */
+      try {
+         const { error: failed } = await signUp.email({
+            email,
+            password,
+            name,
+            /*
+             * Where the link in the mail lands once it is opened. Left out,
+             * better-auth sends the reader to the home page, and a dead link to
+             * /?error=, which nothing reads, so an expired link looked like
+             * nothing at all. A relative path passes its origin check as it is.
+             */
+            callbackURL: '/verify-email',
+         });
+
+         if (failed) {
+            setError(
+               failed.message ||
+                  'That did not go through. Check the address and try again.'
+            );
+            return;
+         }
+
+         navigate('/verify-email?sent=1');
+      } catch {
          setError(
-            failed.message ||
-               'That did not go through. Check the address and try again.'
+            'That did not go through. Check your connection and try again.'
          );
-         return;
+      } finally {
+         setBusy(false);
       }
-
-      navigate('/verify-email?sent=1');
    };
 
    return (
