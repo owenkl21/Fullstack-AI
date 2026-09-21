@@ -26,9 +26,15 @@ import { cn } from '@/lib/utils';
 
 /* Everything that is yours, in one list. Two of these had no way in from a
  * phone at all before: /sites/me was linked only from the desktop nav and a
- * spot page, and /competitions only from Boards. */
-const rows = [
+ * spot page, and /competitions only from Boards.
+ *
+ * Find anglers sits under the profile because following people is part of
+ * who you are here, and this panel is the one place that is the same on a
+ * phone and a desktop. It is marked only on the search itself, not on every
+ * angler it leads to. */
+const rows: { to: string; label: string; end?: boolean }[] = [
    { to: '/profile', label: 'Your profile' },
+   { to: '/anglers', label: 'Find anglers', end: true },
    { to: '/insights', label: 'Your insights' },
    { to: '/notifications', label: 'Notifications' },
    { to: '/saved', label: 'Kept posts, spots and gear' },
@@ -138,6 +144,7 @@ export function AccountMenu() {
                      <NavLink
                         key={row.to}
                         to={row.to}
+                        end={row.end}
                         onClick={() => setOpen(false)}
                         className={({ isActive }) =>
                            cn(
@@ -177,6 +184,25 @@ export function AccountMenu() {
                   </button>
                   <ThemeToggle className="shrink-0 md:hidden" />
                </div>
+
+               {/* The signed-in app has no footer, so the small print lives
+                   here, where an account's other housekeeping already is. */}
+               <p className="flex gap-4 px-4 pb-3 text-[13px] text-ink-3">
+                  <NavLink
+                     to="/privacy"
+                     onClick={() => setOpen(false)}
+                     className="inline-flex min-h-11 items-center hover:text-ink"
+                  >
+                     Privacy
+                  </NavLink>
+                  <NavLink
+                     to="/terms"
+                     onClick={() => setOpen(false)}
+                     className="inline-flex min-h-11 items-center hover:text-ink"
+                  >
+                     Terms
+                  </NavLink>
+               </p>
             </div>
          </Sheet>
       </>

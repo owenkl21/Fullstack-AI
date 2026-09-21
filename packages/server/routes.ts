@@ -409,6 +409,18 @@ router.delete(
 router.post('/api/gear', requireApiAuth, gearController.createGear);
 router.get('/api/gear', requireApiAuth, gearController.listGear);
 router.get('/api/gear/me', requireApiAuth, gearController.listMyGear);
+/*
+ * Finding people, and whether a handle is free while one is being typed.
+ * Both sit above /:userId for the same reason /me does. No limiter of their
+ * own, as nothing outside /api/auth has one: each is a small bounded read
+ * behind a session, and the client waits for the typing to stop first.
+ */
+router.get(
+   '/api/users/handle-available',
+   requireApiAuth,
+   userController.checkHandle
+);
+router.get('/api/users/search', requireApiAuth, userController.searchAnglers);
 router.put('/api/gear/:gearId', requireApiAuth, gearController.updateGear);
 router.delete('/api/gear/:gearId', requireApiAuth, gearController.deleteGear);
 

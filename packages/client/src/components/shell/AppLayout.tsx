@@ -4,6 +4,7 @@ import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
 import { RouteBoundary, clearChunkReloadMark } from '@/lib/lazy-route';
 import { cn } from '@/lib/utils';
 import { AppHeader } from './AppHeader';
+import { HandleGate } from './HandleGate';
 import { isTaskRoute } from './routes';
 import { BottomBar } from './BottomBar';
 
@@ -102,7 +103,9 @@ export function AppLayout() {
                      </div>
                   }
                >
-                  <Outlet />
+                  <HandleGate>
+                     <Outlet />
+                  </HandleGate>
                </Suspense>
             </RouteBoundary>
          </main>

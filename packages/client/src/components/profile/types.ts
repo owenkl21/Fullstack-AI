@@ -39,10 +39,17 @@ export type ProfileResponse = {
 
 export type ConnectionUser = {
    id: string;
-   username: string;
+   /* Null for an angler who has not picked a handle yet. */
+   username: string | null;
    displayName: string;
    avatarUrl: string | null;
    avatarThumbUrl?: string | null;
+};
+
+/** One row of the angler search: a person, how followed they are, and by you. */
+export type AnglerResult = ConnectionUser & {
+   followersCount: number;
+   followedByMe: boolean;
 };
 
 /** What the angler's own log adds up to, counted from the catches endpoint. */

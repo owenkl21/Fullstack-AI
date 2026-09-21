@@ -1,4 +1,11 @@
+import type { Prisma } from '@prisma/client';
+import { requireEmailVerification } from '../lib/auth';
 import { prisma } from '../lib/prisma';
+import {
+   handleProblemOf,
+   normaliseHandle,
+   type HandleProblem,
+} from '../schemas/user.schema';
 import { notificationsService } from './notifications.service';
 import { uploadsService } from './uploads.service';
 
@@ -51,11 +58,32 @@ type ProfileResult = {
 
 type ConnectionUser = {
    id: string;
-   username: string;
+   /* Null for an angler who signed up and has not picked one yet. */
+   username: string | null;
    displayName: string;
    avatarUrl: string | null;
    avatarThumbUrl: string | null;
 };
+
+/* One row of the angler search. No email: this is a list of other people. */
+type AnglerResult = ConnectionUser & {
+   followersCount: number;
+   followedByMe: boolean;
+};
+
+export type HandleCheck =
+   | { handle: string; available: true }
+   | { handle: string; available: false; reason: HandleProblem | 'taken' };
+
+type UpdateProfileResult =
+   | ProfileResult
+   | { code: 'username_taken' | 'username_reserved' };
+
+const SEARCH_PAGE = 20;
+/* Far enough to page through any real search, short of letting one request
+ * walk the whole table twenty rows at a time. */
+const SEARCH_MAX_OFFSET = 400;
+const SEARCH_MAX_TERM = 60;
 
 type ReadUrls = {
    url: string | null;
@@ -173,29 +201,113 @@ const isDuplicateConstraintError = (error: unknown) => {
    );
 };
 
-const findAvailableUsername = async (
-   preferredUsername: string,
+/*
+ * Whether a handle can be had by this angler.
+ *
+ * Their own handle is always theirs, reserved or not: an angler who held one
+ * before the list existed can still save the rest of their profile, and a
+ * handle stored before handles were lowercased still counts as their own.
+ *
+ * There used to be no refusal here at all. A taken handle was quietly renamed
+ * to owen_1, owen_2 and on, so somebody who asked for @owen was saved as a
+ * name they never chose and only found out from the toast.
+ *
+ * The lookup is plain equality and still ignores case, because the table is
+ * created utf8mb4_unicode_ci and so is its unique index. A legacy @Owen stops
+ * a new @owen here, and the index would stop it anyway.
+ */
+const checkHandleFor = async (
+   raw: string,
    userId: string
-) => {
-   const base = preferredUsername.trim();
-   let suffix = 0;
+): Promise<HandleCheck> => {
+   const handle = normaliseHandle(raw);
 
-   while (suffix < 100) {
-      const candidate = suffix === 0 ? base : `${base}_${suffix}`;
-      const existingUser = await prisma.user.findUnique({
-         where: { username: candidate },
-         select: { id: true },
-      });
+   const current = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true },
+   });
 
-      if (!existingUser || existingUser.id === userId) {
-         return candidate;
-      }
-
-      suffix += 1;
+   if (current?.username && current.username.toLowerCase() === handle) {
+      return { handle, available: true };
    }
 
-   throw new Error('Unable to allocate unique username.');
+   const problem = handleProblemOf(handle);
+   if (problem) {
+      return { handle, available: false, reason: problem };
+   }
+
+   /* A closed account keeps its row, and the unique index with it, so its
+    * handle is still taken. */
+   const holder = await prisma.user.findFirst({
+      where: { username: handle, id: { not: userId } },
+      select: { id: true },
+   });
+
+   return holder
+      ? { handle, available: false, reason: 'taken' }
+      : { handle, available: true };
 };
+
+/*
+ * Who the search may show. Never the reader, never a closed account, and an
+ * unconfirmed one only while confirming is not required to sign in.
+ */
+const findableBy = (viewerId: string): Prisma.UserWhereInput => ({
+   id: { not: viewerId },
+   deletedAt: null,
+   ...(requireEmailVerification ? { emailVerified: true } : {}),
+});
+
+const anglerSelect = {
+   id: true,
+   username: true,
+   displayName: true,
+   avatarUrl: true,
+   _count: { select: { followers: true } },
+} satisfies Prisma.UserSelect;
+
+/* The best known first, then by name, then by id so a page boundary never
+ * lands between two rows that sort the same. */
+const anglerOrder: Prisma.UserOrderByWithRelationInput[] = [
+   { followers: { _count: 'desc' } },
+   { displayName: 'asc' },
+   { id: 'asc' },
+];
+
+/*
+ * The ranks a search is answered in, best first.
+ *
+ * A name that starts with what was typed is almost always the one meant, so
+ * it outranks a name that only contains it: "tom" should find Tom before it
+ * finds Bottom. A word inside the name counts as a start, so "kle" finds Owen
+ * Kleinhans. A leading @ says the reader is typing a handle, so handles go
+ * first and names come after them.
+ */
+const searchTiers = (
+   term: string,
+   byHandle: boolean
+): Prisma.UserWhereInput[] =>
+   byHandle
+      ? [
+           { username: { startsWith: term } },
+           { username: { contains: term } },
+           { displayName: { contains: term } },
+        ]
+      : [
+           {
+              OR: [
+                 { username: { startsWith: term } },
+                 { displayName: { startsWith: term } },
+                 { displayName: { contains: ` ${term}` } },
+              ],
+           },
+           {
+              OR: [
+                 { username: { contains: term } },
+                 { displayName: { contains: term } },
+              ],
+           },
+        ];
 
 const buildProfileView = async (userId: string) => {
    const profile = await prisma.user.findUnique({
@@ -468,27 +580,63 @@ export const userService = {
       });
    },
 
-   async updateProfile(userId: string, input: UserProfileInput) {
-      const requestedUsername = input.username
-         ? await findAvailableUsername(input.username, userId)
-         : undefined;
+   /** Whether a handle is free for this angler, without taking it. */
+   checkHandle(raw: string, userId: string) {
+      return checkHandleFor(raw, userId);
+   },
+
+   async updateProfile(
+      userId: string,
+      input: UserProfileInput
+   ): Promise<UpdateProfileResult> {
+      let username: string | undefined;
+
+      if (input.username !== undefined) {
+         const check = await checkHandleFor(input.username, userId);
+
+         if (!check.available) {
+            /* The schema has already refused anything malformed, so the only
+             * refusals left to say are these two. */
+            return {
+               code:
+                  check.reason === 'reserved'
+                     ? 'username_reserved'
+                     : 'username_taken',
+            };
+         }
+
+         username = check.handle;
+      }
 
       /*
        * Update, not upsert. The row exists: better-auth created it at sign-up,
        * so a missing one means the session points at a user that is gone, and
        * inventing a placeholder would hide that.
        */
-      await prisma.user.update({
-         where: { id: userId },
-         data: {
-            displayName: input.displayName,
-            bio: input.bio,
-            username: requestedUsername,
-            avatarUrl: input.avatarUrl,
-            bannerUrl: input.bannerUrl,
-         },
-         select: { id: true },
-      });
+      try {
+         await prisma.user.update({
+            where: { id: userId },
+            data: {
+               displayName: input.displayName,
+               bio: input.bio,
+               username,
+               avatarUrl: input.avatarUrl,
+               bannerUrl: input.bannerUrl,
+            },
+            select: { id: true },
+         });
+      } catch (error) {
+         /*
+          * Two anglers asking for the same free handle in the same moment
+          * both pass the check above, and the unique index is what stops the
+          * second. The handle is the only unique column this writes.
+          */
+         if (username !== undefined && isDuplicateConstraintError(error)) {
+            return { code: 'username_taken' };
+         }
+
+         throw error;
+      }
 
       const profile = await buildProfileView(userId);
 
@@ -550,57 +698,32 @@ export const userService = {
          where: { id: userId },
          select: { id: true },
       });
-      const normalizedSearch = search?.trim();
+      /* "@owen" is how a handle gets typed, and no stored handle has the @. */
+      const normalizedSearch = search?.trim().replace(/^@/, '');
+
+      /*
+       * No mode: 'insensitive'. Prisma only has it on Postgres and Mongo, and
+       * on MySQL it made every search with a term in it fail. The columns are
+       * utf8mb4_unicode_ci, so a plain contains already ignores case.
+       */
+      const matching = normalizedSearch
+         ? {
+              OR: [
+                 { username: { contains: normalizedSearch } },
+                 { displayName: { contains: normalizedSearch } },
+              ],
+           }
+         : {};
 
       const whereClause =
          type === 'followers'
             ? {
                  followingId: actor.id,
-                 follower: {
-                    deletedAt: null,
-                    ...(normalizedSearch
-                       ? {
-                            OR: [
-                               {
-                                  username: {
-                                     contains: normalizedSearch,
-                                     mode: 'insensitive' as const,
-                                  },
-                               },
-                               {
-                                  displayName: {
-                                     contains: normalizedSearch,
-                                     mode: 'insensitive' as const,
-                                  },
-                               },
-                            ],
-                         }
-                       : {}),
-                 },
+                 follower: { deletedAt: null, ...matching },
               }
             : {
                  followerId: actor.id,
-                 following: {
-                    deletedAt: null,
-                    ...(normalizedSearch
-                       ? {
-                            OR: [
-                               {
-                                  username: {
-                                     contains: normalizedSearch,
-                                     mode: 'insensitive' as const,
-                                  },
-                               },
-                               {
-                                  displayName: {
-                                     contains: normalizedSearch,
-                                     mode: 'insensitive' as const,
-                                  },
-                               },
-                            ],
-                         }
-                       : {}),
-                 },
+                 following: { deletedAt: null, ...matching },
               };
 
       const rows = await prisma.follow.findMany({
@@ -652,6 +775,111 @@ export const userService = {
 
       return users;
    },
+
+   /*
+    * Other anglers by name or handle, twenty at a time.
+    *
+    * Nothing typed is a short list of the most followed anglers the reader
+    * does not follow yet, so the page opens on somebody worth following
+    * rather than on an empty box. That list is one page and has no next.
+    *
+    * The cursor is an offset. The ranks below are several queries stitched
+    * together, and an id cursor cannot say which rank it stopped in. Each
+    * rank is read only as far as the page needs, and none past the offset
+    * cap, so a deep page costs a bounded read rather than the whole table.
+    *
+    * startsWith and contains are LIKE underneath, and the columns are
+    * utf8mb4_unicode_ci, so both ignore case without asking.
+    */
+   async searchAnglers(viewerId: string, rawQuery: string, cursor?: string) {
+      const trimmed = rawQuery.trim().slice(0, SEARCH_MAX_TERM);
+      const byHandle = trimmed.startsWith('@');
+      const term = trimmed.replace(/^@/, '').trim();
+      const visible = findableBy(viewerId);
+
+      let rows: Prisma.UserGetPayload<{ select: typeof anglerSelect }>[];
+      let nextCursor: string | null = null;
+
+      if (!term) {
+         rows = await prisma.user.findMany({
+            where: {
+               ...visible,
+               followers: { none: { followerId: viewerId } },
+            },
+            orderBy: [
+               { followers: { _count: 'desc' } },
+               { createdAt: 'desc' },
+               { id: 'asc' },
+            ],
+            take: SEARCH_PAGE,
+            select: anglerSelect,
+         });
+      } else {
+         const parsed = Number.parseInt(cursor ?? '', 10);
+         const offset = Number.isFinite(parsed)
+            ? Math.min(Math.max(parsed, 0), SEARCH_MAX_OFFSET)
+            : 0;
+         /* One past the page, which is how we know there is a next one. */
+         const wanted = offset + SEARCH_PAGE + 1;
+         const tiers = searchTiers(term, byHandle);
+         const found: typeof rows = [];
+
+         for (const [index, tier] of tiers.entries()) {
+            if (found.length >= wanted) break;
+
+            found.push(
+               ...(await prisma.user.findMany({
+                  /* Each rank leaves out everyone an earlier rank took, so
+                   * nobody is listed twice. */
+                  where: {
+                     AND: [visible, tier],
+                     ...(index > 0 ? { NOT: tiers.slice(0, index) } : {}),
+                  },
+                  orderBy: anglerOrder,
+                  take: wanted - found.length,
+                  select: anglerSelect,
+               }))
+            );
+         }
+
+         rows = found.slice(offset, offset + SEARCH_PAGE);
+         nextCursor =
+            found.length > offset + SEARCH_PAGE &&
+            offset + SEARCH_PAGE <= SEARCH_MAX_OFFSET
+               ? String(offset + SEARCH_PAGE)
+               : null;
+      }
+
+      const ids = rows.map((row) => row.id);
+      const follows = ids.length
+         ? await prisma.follow.findMany({
+              where: { followerId: viewerId, followingId: { in: ids } },
+              select: { followingId: true },
+           })
+         : [];
+      const followed = new Set(follows.map((row) => row.followingId));
+
+      const users: AnglerResult[] = await Promise.all(
+         rows.map(async (row) => {
+            /* A 44px circle in a list, so the thumb, the same way the
+             * followers sheet reads it. */
+            const avatar = await resolveAvatarReadUrls(row.avatarUrl);
+
+            return {
+               id: row.id,
+               username: row.username,
+               displayName: row.displayName,
+               avatarUrl: avatar.url,
+               avatarThumbUrl: avatar.thumbUrl,
+               followersCount: row._count.followers,
+               followedByMe: followed.has(row.id),
+            };
+         })
+      );
+
+      return { users, nextCursor, suggested: !term };
+   },
+
    async unfollow(userId: string, targetUserId: string) {
       const actor = await prisma.user.findUniqueOrThrow({
          where: { id: userId },

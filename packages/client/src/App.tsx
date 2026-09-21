@@ -104,6 +104,9 @@ const VerifyEmailPage = lazyRoute(() =>
 const AnglerPage = lazyRoute(() =>
    import('@/pages/AnglerPage').then((m) => ({ default: m.AnglerPage }))
 );
+const AnglersPage = lazyRoute(() =>
+   import('@/pages/AnglersPage').then((m) => ({ default: m.AnglersPage }))
+);
 const MapPage = lazyRoute(() =>
    import('@/pages/fishing/MapPage').then((m) => ({ default: m.MapPage }))
 );
@@ -135,6 +138,12 @@ const CompetitionPage = lazyRoute(() =>
 );
 const BoardsPage = lazyRoute(() =>
    import('@/pages/social/BoardsPage').then((m) => ({ default: m.BoardsPage }))
+);
+const PrivacyPage = lazyRoute(() =>
+   import('@/pages/legal/LegalPage').then((m) => ({ default: m.PrivacyPage }))
+);
+const TermsPage = lazyRoute(() =>
+   import('@/pages/legal/LegalPage').then((m) => ({ default: m.TermsPage }))
 );
 const AccountPage = lazyRoute(() =>
    import('@/pages/auth/AccountPage').then((m) => ({ default: m.AccountPage }))
@@ -172,6 +181,9 @@ function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/account" element={<AccountPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/anglers" element={<AnglersPage />} />
             <Route path="/anglers/:userId" element={<AnglerPage />} />
             <Route path="/map" element={<MapPage />} />
             <Route path="/forecast" element={<ForecastPage />} />

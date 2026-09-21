@@ -4,6 +4,14 @@ import { R2ImagePicker } from '@/components/r2-image-picker';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import type { ProfileResponse, UserProfile } from '@/components/profile/types';
+import { HandleField } from '@/components/profile/HandleField';
+import {
+   blocksSave,
+   handleSaveProblem,
+   normaliseHandle,
+   useHandleCheck,
+} from '@/components/profile/handle';
+import { useSession } from '@/lib/auth-client';
 import { Link } from 'react-router-dom';
 import {
    FieldRow,
@@ -20,7 +28,6 @@ import {
  */
 
 const NAME_MAX = 80;
-const HANDLE_MAX = 40;
 const BIO_MAX = 280;
 
 const extractStorageKey = (value: string | null | undefined) => {
@@ -83,24 +90,6 @@ const nameProblem = (value: string) => {
    return '';
 };
 
-const handleProblem = (value: string) => {
-   const trimmed = value.trim();
-
-   if (trimmed.length < 3) {
-      return 'A handle needs at least 3 characters.';
-   }
-
-   if (trimmed.length > HANDLE_MAX) {
-      return `A handle can be ${HANDLE_MAX} characters at most.`;
-   }
-
-   if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
-      return 'A handle can use letters, numbers and underscores only.';
-   }
-
-   return '';
-};
-
 const bioProblem = (value: string) =>
    value.trim().length > BIO_MAX
       ? `Your bio can be ${BIO_MAX} characters at most.`
@@ -117,24 +106,35 @@ export function ProfileSettingsPanel({
    const handleRef = useRef<HTMLInputElement>(null);
    const bioRef = useRef<HTMLTextAreaElement>(null);
 
+   /* The session's copy of the handle is what the header shows, so a save
+    * refreshes it rather than leaving the old handle in the account panel. */
+   const { refetch: refetchSession } = useSession();
+
    const [displayName, setDisplayName] = useState(profile.displayName ?? '');
-   const [username, setUsername] = useState(profile.username ?? '');
+   /* Normalised from the start, so a handle stored before handles were
+    * lowercased shows as what it will be saved as, not as a fault. */
+   const [username, setUsername] = useState(
+      normaliseHandle(profile.username ?? '')
+   );
    const [bio, setBio] = useState(profile.bio ?? '');
    const [avatarImages, setAvatarImages] = useState(avatarValueOf(profile));
    const [bannerImages, setBannerImages] = useState(bannerValueOf(profile));
 
    const [nameError, setNameError] = useState('');
-   const [handleError, setHandleError] = useState('');
+   const [handleLeft, setHandleLeft] = useState(false);
+   const [handleServerError, setHandleServerError] = useState('');
    const [bioError, setBioError] = useState('');
    const [saveError, setSaveError] = useState('');
 
    const [isSaving, setIsSaving] = useState(false);
    const [isUploading, setIsUploading] = useState(false);
 
+   const handleCheck = useHandleCheck(username, profile.username);
+
    /* A save elsewhere on the page rewrites the person, so the fields follow it. */
    useEffect(() => {
       setDisplayName(profile.displayName ?? '');
-      setUsername(profile.username ?? '');
+      setUsername(normaliseHandle(profile.username ?? ''));
       setBio(profile.bio ?? '');
       setAvatarImages(avatarValueOf(profile));
       setBannerImages(bannerValueOf(profile));
@@ -145,12 +145,12 @@ export function ProfileSettingsPanel({
 
       const problems = {
          name: nameProblem(displayName),
-         handle: handleProblem(username),
+         handle: blocksSave(handleCheck),
          bio: bioProblem(bio),
       };
 
       setNameError(problems.name);
-      setHandleError(problems.handle);
+      setHandleLeft(true);
       setBioError(problems.bio);
       setSaveError('');
 
@@ -175,13 +175,14 @@ export function ProfileSettingsPanel({
          const trimmedBio = bio.trim();
          const { data } = await axios.patch<ProfileResponse>('/api/users/me', {
             displayName: displayName.trim(),
-            username: username.trim(),
+            username,
             bio: trimmedBio ? trimmedBio : null,
             avatarUrl: avatarImages[0]?.storageKey ?? null,
             bannerUrl: bannerImages[0]?.storageKey ?? null,
          });
 
          onSaved(data.profile);
+         void refetchSession();
 
          toast({
             title: 'Profile saved.',
@@ -191,8 +192,11 @@ export function ProfileSettingsPanel({
       } catch (error) {
          console.error(error);
 
-         if (axios.isAxiosError(error) && error.response?.status === 409) {
-            setHandleError('That handle is already taken. Try another one.');
+         /* Taken since the field last checked, or refused outright. Said
+          * beside the handle, never swapped for another one. */
+         const handleRefusal = handleSaveProblem(error);
+         if (handleRefusal) {
+            setHandleServerError(handleRefusal);
             handleRef.current?.focus();
             return;
          }
@@ -230,14 +234,17 @@ export function ProfileSettingsPanel({
                 * to be a separate bordered row, which put the two controls on
                 * different baselines and at different heights.
                 */}
-               <TextField
-                  label="Handle"
+               <HandleField
                   ref={handleRef}
                   value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                  onBlur={() => setHandleError(handleProblem(username))}
-                  error={handleError}
-                  hint={`Letters, numbers and underscores, 3 to ${HANDLE_MAX} characters, and nobody else can have it.`}
+                  onChange={(next) => {
+                     setUsername(next);
+                     setHandleServerError('');
+                  }}
+                  onBlur={() => setHandleLeft(true)}
+                  check={handleCheck}
+                  finished={handleLeft}
+                  serverError={handleServerError}
                />
             </FieldRow>
 

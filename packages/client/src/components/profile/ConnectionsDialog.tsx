@@ -169,11 +169,26 @@ function Connections({
                   </Button>
                </div>
             ) : people.length === 0 ? (
-               <p className="py-8 text-[15px] text-paper-2">
-                  {query
-                     ? 'Nobody here matches that search.'
-                     : emptyLineOf(kind)}
-               </p>
+               <div className="py-8">
+                  <p className="text-[15px] text-paper-2">
+                     {query
+                        ? 'Nobody here matches that search.'
+                        : emptyLineOf(kind)}
+                  </p>
+                  {/* Following nobody is the one empty list with an obvious
+                      next step, so it is offered rather than left implied. */}
+                  {kind === 'following' && !query ? (
+                     <Button
+                        asChild
+                        variant="outline"
+                        className="mt-4 border-paper text-paper hover:bg-paper/10"
+                     >
+                        <Link to="/anglers" onClick={onClose}>
+                           Find anglers to follow
+                        </Link>
+                     </Button>
+                  ) : null}
+               </div>
             ) : (
                <ul>
                   {people.map((person) => (

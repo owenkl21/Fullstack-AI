@@ -1,6 +1,5 @@
 import type { Request, Response } from 'express';
 import { getAuth } from '../lib/auth-context';
-import { Prisma } from '@prisma/client';
 import { updateProfileSchema } from '../schemas/user.schema';
 import { userService } from '../services/user.service';
 
@@ -97,24 +96,24 @@ export const userController = {
             parsed.data
          );
 
+         /* The race on the unique index lands here too: the service turns
+          * the duplicate key into the same answer as a handle seen taken. */
+         if ('code' in result) {
+            return result.code === 'username_taken'
+               ? res.status(409).json({
+                    code: 'username_already_exists',
+                    message: 'That username is already in use.',
+                 })
+               : res.status(400).json({
+                    code: 'username_reserved',
+                    message: 'That username is reserved.',
+                 });
+         }
+
          return res.json({
             profile: result.profile,
          });
       } catch (error) {
-         const prismaErrorCode =
-            error instanceof Prisma.PrismaClientKnownRequestError
-               ? error.code
-               : typeof error === 'object' && error !== null && 'code' in error
-                 ? String((error as { code?: unknown }).code)
-                 : null;
-
-         if (prismaErrorCode === 'P2002') {
-            return res.status(409).json({
-               code: 'username_already_exists',
-               message: 'That username is already in use.',
-            });
-         }
-
          console.error('[user:updateCurrentProfile] failed to update profile', {
             userId: auth.userId,
             error,
@@ -125,6 +124,59 @@ export const userController = {
             message: 'Unexpected server error',
          });
       }
+   },
+
+   /*
+    * Whether a handle is free, asked while it is being typed. Answers what
+    * the handle becomes once normalised, so the page can show @owen for
+    * "@Owen" and the reader is never surprised by what gets saved.
+    */
+   checkHandle: async (req: Request, res: Response) => {
+      const auth = getAuth(req);
+
+      if (!auth.userId) {
+         return res.status(401).json({
+            code: 'unauthorized',
+            message: 'Authentication required.',
+         });
+      }
+
+      const raw = typeof req.query.handle === 'string' ? req.query.handle : '';
+      const check = await userService.checkHandle(raw, auth.userId);
+
+      return res.json(
+         check.available
+            ? { available: true, normalised: check.handle }
+            : {
+                 available: false,
+                 reason: check.reason,
+                 normalised: check.handle,
+              }
+      );
+   },
+
+   /*
+    * Other anglers by name or handle. Behind auth like the profiles it links
+    * to, and the answer depends on who asks: the reader is left out, and each
+    * row says whether the reader already follows that angler.
+    */
+   searchAnglers: async (req: Request, res: Response) => {
+      const auth = getAuth(req);
+
+      if (!auth.userId) {
+         return res.status(401).json({
+            code: 'unauthorized',
+            message: 'Authentication required.',
+         });
+      }
+
+      const q = typeof req.query.q === 'string' ? req.query.q : '';
+      const cursor =
+         typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+
+      const result = await userService.searchAnglers(auth.userId, q, cursor);
+
+      return res.json(result);
    },
 
    followUser: async (req: Request, res: Response) => {

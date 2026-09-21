@@ -131,12 +131,21 @@ export function ProfileView({
                </p>
             ) : null}
 
-            <FollowCounts
-               className="mt-4"
-               followers={profile.followersCount}
-               following={profile.followingCount}
-               onOpen={onOpenConnections}
-            />
+            {/* The way to more people, beside the counts of the people you
+                already have, which is where anyone looks for it. */}
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
+               <FollowCounts
+                  followers={profile.followersCount}
+                  following={profile.followingCount}
+                  onOpen={onOpenConnections}
+               />
+               <Link
+                  to="/anglers"
+                  className="g-tracked inline-flex min-h-11 items-center text-[19px] text-teal-text underline-offset-4 hover:underline"
+               >
+                  Find anglers
+               </Link>
+            </div>
          </section>
 
          {figures}
