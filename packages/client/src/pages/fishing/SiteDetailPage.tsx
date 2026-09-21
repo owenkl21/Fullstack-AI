@@ -28,7 +28,10 @@ import { NotFoundPage } from '@/pages/NotFoundPage';
 import { StaticMap } from '@/components/map/StaticMap';
 import { useIsSignedIn } from '@/lib/auth-client';
 import { NoPhoto } from '@/components/brand/FishMark';
-import { SpotRatings } from '@/components/fishing/reviews/SpotRatings';
+import {
+   HeaderRating,
+   SpotRatings,
+} from '@/components/fishing/reviews/SpotRatings';
 import { useSpotRatings } from '@/components/fishing/reviews/reviews-api';
 
 /*
@@ -304,14 +307,8 @@ function SiteRecord({
 
    const water = data.waterType ? WATER_WORDS[data.waterType] : null;
    const caughtLine = plural(catches.length, 'catch', 'catches');
-   /* An average only once there is one. A spot nobody has rated says nothing
-      here rather than printing a nought that reads as a verdict. */
-   const average = ratings.data?.summary.average ?? null;
-   const facts = [
-      water,
-      `${caughtLine} logged here`,
-      average === null ? null : `rated ${average.toFixed(1)} out of 5`,
-   ]
+   /* The rating is not repeated here: the header carries it beside the name. */
+   const facts = [water, `${caughtLine} logged here`]
       .filter(Boolean)
       .join(' · ');
    const position =
@@ -329,6 +326,7 @@ function SiteRecord({
          <SiteHeader
             name={data.name}
             photoUrl={data.images[0]?.image.url ?? null}
+            rating={<HeaderRating store={ratings} />}
          />
 
          <SiteBody>
@@ -562,9 +560,13 @@ function SiteBody({ children }: { children: ReactNode }) {
 function SiteHeader({
    name,
    photoUrl,
+   rating,
 }: {
    name: string;
    photoUrl: string | null;
+   /* What anglers rate it, under the name on a phone and at its right on a
+      desktop, sitting on the name's last line. */
+   rating: ReactNode;
 }) {
    const [settled, setSettled] = useState(false);
 
@@ -607,10 +609,11 @@ function SiteHeader({
          </div>
 
          <div className="relative z-[4] pt-5 pb-11 md:pt-7 md:pb-16">
-            <div className="mx-auto w-[min(1320px,100%-32px)]">
+            <div className="mx-auto flex w-[min(1320px,100%-32px)] flex-col md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-x-10 md:gap-y-4">
                <h1 className="g text-[44px] text-paper md:text-[72px]">
                   {name}
                </h1>
+               {rating}
             </div>
          </div>
 

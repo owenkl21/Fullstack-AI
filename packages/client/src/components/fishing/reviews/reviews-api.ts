@@ -30,6 +30,9 @@ export type RatingSummary = {
    spread: { rating: number; count: number }[];
 };
 
+/* A spot's rating as a list carries it: the figure and how many, no spread. */
+export type SpotRating = Pick<RatingSummary, 'average' | 'count'>;
+
 export type SpotRatings = {
    summary: RatingSummary;
    /* Everybody else. Your own arrives once, as `yours`. */
@@ -95,9 +98,9 @@ export async function removeRating(siteId: string) {
 /*
  * A spot's ratings, read once per spot.
  *
- * Held at the page rather than inside the section, because the line of facts
- * under the name prints the average as well, and the two must not be two
- * requests that can disagree with one another.
+ * Held at the page rather than inside the section, because the header prints
+ * the average beside the name as well, and the two must not be two requests
+ * that can disagree with one another.
  *
  * A failure here is quiet. The ratings not loading is not a reason for the
  * spot, its position and everything caught there to disappear.
