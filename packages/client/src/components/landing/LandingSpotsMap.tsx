@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { createMap, kindPin, refreshSize } from '@/lib/leaflet';
+import { createMap, kindPin } from '@/lib/leaflet';
 import { cn } from '@/lib/utils';
 
 /*
@@ -16,7 +16,29 @@ import { cn } from '@/lib/utils';
  * The pins are `kindPin` from the app, so the teardrops, the colours and the
  * catch counts are the product's own vocabulary rather than a copy of it.
  */
-const CENTRE = { lat: -34.1512, lng: 18.4436 };
+
+/*
+ * Where the satellite picture is one clean photograph, and so where the frame
+ * is allowed to be.
+ *
+ * Esri's imagery is stitched from sources, and two of the seams sit right
+ * here. West of about 18.28 the ocean tiles come from an older, softer source,
+ * with a hard vertical edge and a pale ghost of a coastline in the sea; it is
+ * the same at every zoom. Out in False Bay, Seal Island sits in a black disc
+ * near 18.58. The old frame, wide at zoom 12, had both in it. The frame now
+ * never leaves this box: on a wide screen that means one zoom closer, which
+ * is also the zoom a shore angler actually reads the coast at.
+ */
+const CLEAN = L.latLngBounds([-34.23, 18.29], [-33.96, 18.555]);
+
+/*
+ * A pin stands on its tip, so its head is above the position. The frame is
+ * fitted with this much room round the marks, in pixels, then moved north so
+ * the room splits 50 over the top pin, enough for its head, and 22 under the
+ * bottom one, enough to keep it clear of the attribution line.
+ */
+const PIN_ROOM = L.point(56, 72);
+const HEAD_LIFT = 14;
 
 type Mark = {
    key: string;
@@ -28,30 +50,61 @@ type Mark = {
    mine?: boolean;
 };
 
+/*
+ * Real places on the stretch from Muizenberg to Fish Hoek, so the harbour is
+ * on the harbour and the slipway is on the water. They used to be placed by
+ * eye on a wider frame, and a marina and a slipway ended up on the mountain.
+ * The slipway is the one OpenStreetMap records at the mouth of Zandvlei; the
+ * tackle shop stands in for any shop on Fish Hoek's main road; the private
+ * mark is a boat mark out in the bay, which is what a private mark usually is.
+ */
 const MARKS: Mark[] = [
    {
-      key: 'kalk',
+      key: 'st-james',
       kind: 'spot',
-      lat: -34.1277,
-      lng: 18.4468,
+      lat: -34.1187,
+      lng: 18.4596,
       count: 12,
       mine: true,
    },
    {
-      key: 'fish',
+      key: 'jagers-walk',
       kind: 'spot',
-      lat: -34.1806,
-      lng: 18.4325,
+      lat: -34.1412,
+      lng: 18.4372,
       count: 4,
       mine: true,
    },
-   { key: 'other-1', kind: 'other', lat: -34.1041, lng: 18.4712 },
-   { key: 'other-2', kind: 'other', lat: -34.1963, lng: 18.4661 },
-   { key: 'mark', kind: 'waypoint', lat: -34.1394, lng: 18.4077, mine: true },
-   { key: 'ramp', kind: 'ramp', lat: -34.1187, lng: 18.4331 },
-   { key: 'marina', kind: 'marina', lat: -34.1648, lng: 18.4172 },
-   { key: 'tackle', kind: 'tackle', lat: -34.1108, lng: 18.4556 },
+   { key: 'surfers-corner', kind: 'other', lat: -34.1082, lng: 18.4712 },
+   { key: 'fish-hoek-beach', kind: 'other', lat: -34.1328, lng: 18.4388 },
+   {
+      key: 'bay-mark',
+      kind: 'waypoint',
+      lat: -34.1335,
+      lng: 18.4665,
+      mine: true,
+   },
+   { key: 'zandvlei', kind: 'ramp', lat: -34.0935, lng: 18.4741 },
+   { key: 'kalk-bay', kind: 'marina', lat: -34.1282, lng: 18.4497 },
+   { key: 'main-road', kind: 'tackle', lat: -34.133, lng: 18.4252 },
 ];
+
+/*
+ * The closest whole zoom that shows every mark, or the closest the clean box
+ * allows if that is closer, centred on the marks and then held inside the box.
+ * Run again whenever the frame changes shape, since a phone and a desktop
+ * want different zooms.
+ */
+function frame(map: L.Map) {
+   const marks = L.latLngBounds(MARKS.map((m) => [m.lat, m.lng]));
+   const zoom = Math.max(
+      map.getBoundsZoom(marks, false, PIN_ROOM),
+      map.getBoundsZoom(CLEAN, true)
+   );
+   map.setView(marks.getCenter(), zoom, { animate: false });
+   map.panBy([0, -HEAD_LIFT], { animate: false });
+   map.panInsideBounds(CLEAN, { animate: false });
+}
 
 export function LandingSpotsMap({
    shown,
@@ -71,12 +124,14 @@ export function LandingSpotsMap({
       if (!node) return;
 
       const created = createMap(node, {
-         centre: CENTRE,
+         centre: CLEAN.getCenter(),
          zoom: 12,
          interactive: false,
          base: 'satellite',
+         seamarks: false,
       });
       map.current = created;
+      frame(created);
 
       for (const mark of MARKS) {
          const marker = L.marker([mark.lat, mark.lng], {
@@ -101,7 +156,14 @@ export function LandingSpotsMap({
          }
       }
 
-      const observer = new ResizeObserver(() => refreshSize(created));
+      /* Leaflet measures once; a new shape needs a new measure and a new frame. */
+      const observer = new ResizeObserver(() =>
+         window.requestAnimationFrame(() => {
+            if (!created.getPane('mapPane')) return;
+            created.invalidateSize();
+            frame(created);
+         })
+      );
       observer.observe(node);
 
       return () => {
@@ -132,11 +194,11 @@ export function LandingSpotsMap({
       <div
          ref={holder}
          role="img"
-         aria-label="A map of False Bay with spots, marks, a slipway, a marina and a tackle shop"
+         aria-label="A map of the coast from Muizenberg to Fish Hoek with spots, a private mark, a slipway, a harbour and a tackle shop"
          data-base="satellite"
          className={cn(
             'map-surface w-full',
-            'aspect-[5/6] sm:aspect-[2/1] lg:aspect-[21/9]',
+            'aspect-[5/6] sm:aspect-[3/2] lg:aspect-[21/9]',
             className
          )}
       />

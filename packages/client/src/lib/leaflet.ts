@@ -439,6 +439,12 @@ export type CreateMapOptions = {
    wheelZoom?: boolean;
    /** False for the read-only embeds, which should not be panned or zoomed. */
    interactive?: boolean;
+   /**
+    * The OpenSeaMap beacons and buoys. On by default; off for a picture of
+    * the map, where a lit sector flare means nothing to someone who cannot
+    * tap it.
+    */
+   seamarks?: boolean;
 };
 
 /*
@@ -453,7 +459,13 @@ export const createMap = (
    container: HTMLElement,
    options: CreateMapOptions
 ): L.Map => {
-   const { centre, zoom, interactive = true, wheelZoom = false } = options;
+   const {
+      centre,
+      zoom,
+      interactive = true,
+      wheelZoom = false,
+      seamarks = true,
+   } = options;
 
    const map = L.map(container, {
       center: [centre.lat, centre.lng],
@@ -492,16 +504,18 @@ export const createMap = (
     * everything that has been added to it. */
    (map as L.Map & { __base?: L.TileLayer }).__base = baseLayer;
 
-   L.tileLayer(SEAMARK_TILES, {
-      attribution: SEAMARK_ATTRIBUTION,
-      /*
-       * Seamarks only exist close in. Below this the server returns 404 for
-       * every tile, which fills the console with errors and paints nothing.
-       */
-      minZoom: 9,
-      maxZoom: 18,
-      opacity: 0.9,
-   }).addTo(map);
+   if (seamarks) {
+      L.tileLayer(SEAMARK_TILES, {
+         attribution: SEAMARK_ATTRIBUTION,
+         /*
+          * Seamarks only exist close in. Below this the server returns 404 for
+          * every tile, which fills the console with errors and paints nothing.
+          */
+         minZoom: 9,
+         maxZoom: 18,
+         opacity: 0.9,
+      }).addTo(map);
+   }
 
    return map;
 };
