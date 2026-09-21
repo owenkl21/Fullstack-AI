@@ -1,5 +1,7 @@
-import { BoltIcon } from '@heroicons/react/24/outline';
+import { BoltIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 import {
+   useEffect,
+   useId,
    useLayoutEffect,
    useRef,
    useState,
@@ -72,7 +74,10 @@ import {
  * - The rail. Under md a reading's name is a mark, forty four pixels wide,
  *   with the word behind it for anyone listening rather than looking. That is
  *   the one place this product allows an icon in place of a word: at 390px a
- *   hundred and ten pixels of label is two and a half hours of forecast.
+ *   hundred and ten pixels of label is two and a half hours of forecast. The
+ *   word is one tap away rather than gone: each mark opens a note with the
+ *   row's name, its unit and what the row draws, and the mark in the corner
+ *   says so.
  * - Readings that answer one question share a row. Sky sits over air because
  *   nobody reads the weather without the temperature; the sun and the moon
  *   share a horizon because a night session is planned on both at once; the
@@ -111,6 +116,22 @@ type Row = {
    style?: (hour: ForecastHour) => CSSProperties | undefined;
    /* Behind "More readings" on a phone; shown outright from md. */
    later?: boolean;
+   /*
+    * What the mark's note says under the name: the unit as the note puts it,
+    * where that is not the rail's own, and one sentence on what the row draws.
+    */
+   noteUnit?: string;
+   note?: string;
+};
+
+/* A note from the rail, which is a row's or the corner mark's own. */
+type Note = Pick<Row, 'key' | 'label' | 'unit' | 'noteUnit' | 'note'>;
+
+/* The corner mark's note, which says what the others are for. */
+const HELP: Note = {
+   key: 'help',
+   label: 'The marks',
+   note: 'Tap any mark down this rail for its name and unit.',
 };
 
 const num = (n: number | null) => (n === null ? '' : String(n));
@@ -132,14 +153,26 @@ export function HourGrid({
    nowLocal: string | null;
    system: UnitSystem;
    /*
-    * The band for each hour, keyed by its local stamp. Absent when nobody is
-    * signed in, and then the row simply is not there: a reading with nothing
-    * behind it is worse than no row at all.
+    * The band for each hour, keyed by its local stamp. Absent only when the
+    * week has no rating, and then the row simply is not there: a reading with
+    * nothing behind it is worse than no row at all.
     */
    rated?: Map<string, RatedHour>;
 }) {
    const [more, setMore] = useState(false);
    const scroller = useRef<HTMLDivElement>(null);
+
+   /*
+    * The note a mark opens, one at a time, by the key of its row. Where it
+    * sits is measured off the mark when it is tapped rather than tracked: a
+    * phone's rows are fixed heights, and the later rows only ever open below
+    * the ones already drawn.
+    */
+   const [tip, setTip] = useState<string | null>(null);
+   const [tipTop, setTipTop] = useState(0);
+   const wrap = useRef<HTMLDivElement>(null);
+   const tipBox = useRef<HTMLDivElement>(null);
+   const tipId = useId();
 
    const nowIndex = nowLocal
       ? hours.findIndex((h) => h.local === nowLocal)
@@ -200,6 +233,8 @@ export function HourGrid({
           */
          key: 'rating',
          label: 'Rating',
+         noteUnit: 'out of 100',
+         note: 'How good the hour looks for fishing, as a bar. Taller is better; the colour is the band.',
          icon: RatingIcon,
          height: 44,
          mdHeight: 38,
@@ -238,6 +273,7 @@ export function HourGrid({
          key: 'wind',
          label: 'Wind',
          unit: unitOf('speed', system),
+         note: 'The arrow is where it blows to, the bar how hard. Speed, then the gust under it.',
          icon: WindIcon,
          height: 140,
          mdHeight: 132,
@@ -290,6 +326,8 @@ export function HourGrid({
       {
          key: 'tide',
          label: 'Tide',
+         noteUnit: 'rise and fall',
+         note: 'The water rising and falling through the day. High and low are marked with their times.',
          icon: TideIcon,
          height: 84,
          /* Four samples make a curve; fewer would be a labelled empty row. */
@@ -306,6 +344,7 @@ export function HourGrid({
          key: 'air',
          label: 'Air',
          unit: unitOf('temp', system),
+         note: 'The sky that hour and the air temperature under it. Cold and hot hours are tinted.',
          icon: ThermometerIcon,
          height: 48,
          mdHeight: 46,
@@ -349,6 +388,7 @@ export function HourGrid({
       {
          key: 'sky',
          label: 'Sun and moon',
+         note: 'First light to last, and where the moon is. A night session is planned on both.',
          icon: DaylightIcon,
          height: 96,
          has: () =>
@@ -361,6 +401,8 @@ export function HourGrid({
          key: 'rain',
          label: 'Rain',
          unit: '%',
+         noteUnit: '% chance',
+         note: 'The chance of rain, and how much in millimetres when there is any.',
          icon: CloudRainIcon,
          height: 44,
          style: (h) => rainTint(h.precipitationProbability),
@@ -383,6 +425,9 @@ export function HourGrid({
          key: 'swell',
          label: 'Swell',
          unit: unitOf('height', system),
+         /* Runs rather than comes from: the arrow is turned to where the
+            swell goes, the same way the wind's is. */
+         note: 'Swell height, which way it runs, and its period in seconds.',
          icon: SwellIcon,
          height: 62,
          mdHeight: 60,
@@ -463,6 +508,58 @@ export function HourGrid({
    const rows = all.filter((row) => hours.some(row.has));
    const hasLater = rows.some((row) => row.later);
 
+   /*
+    * The note that is open, if its row is still drawn. A later row folded
+    * away by "Fewer readings" stays mounted, so its note has to go with it
+    * here. The later four have no sentence of their own yet; their note is
+    * the name and unit the corner mark promises.
+    */
+   const tipRow: Note | null =
+      tip === 'help'
+         ? HELP
+         : (rows.find((row) => row.key === tip && (!row.later || more)) ??
+           null);
+   const open = tipRow !== null;
+   const tipUnit = tipRow ? (tipRow.noteUnit ?? tipRow.unit ?? '') : '';
+
+   const toggle = (key: string, mark: HTMLElement) => {
+      if (tip === key) {
+         setTip(null);
+         return;
+      }
+      const box = wrap.current;
+      if (!box) return;
+      const b = mark.getBoundingClientRect();
+      const w = box.getBoundingClientRect();
+      setTipTop(b.top + b.height / 2 - w.top);
+      setTip(key);
+   };
+
+   /*
+    * A tap anywhere else, or Escape, puts the note away. The marks toggle
+    * themselves, so a tap on one is left to it, and a swipe along the hours
+    * starts with a tap like any other. Focus never leaves the mark, so there
+    * is nothing to hand back.
+    */
+   useEffect(() => {
+      if (!open) return;
+      const away = (event: PointerEvent) => {
+         const target = event.target;
+         if (target instanceof Node && tipBox.current?.contains(target)) return;
+         if (target instanceof Element && target.closest('[data-mark]')) return;
+         setTip(null);
+      };
+      const escape = (event: KeyboardEvent) => {
+         if (event.key === 'Escape') setTip(null);
+      };
+      document.addEventListener('pointerdown', away);
+      document.addEventListener('keydown', escape);
+      return () => {
+         document.removeEventListener('pointerdown', away);
+         document.removeEventListener('keydown', escape);
+      };
+   }, [open]);
+
    const rail =
       'fc-ground sticky left-0 z-10 w-11 min-w-11 px-0 text-left align-middle md:w-[132px] md:min-w-[132px] md:px-3';
 
@@ -471,7 +568,7 @@ export function HourGrid({
          {/* The rail's edge is drawn down the block rather than as a border
              on a sticky cell, which a collapsed table drops, and it sits
              outside the scroller so it stays where the rail is. */}
-         <div className="relative">
+         <div ref={wrap} className="relative">
             <span
                aria-hidden="true"
                className="pointer-events-none absolute top-0 bottom-0 left-11 z-20 w-px bg-line md:left-[132px]"
@@ -487,7 +584,34 @@ export function HourGrid({
                <table className="w-full border-collapse text-[14px] md:text-[16px]">
                   <thead>
                      <tr className="border-b border-line">
-                        <th scope="col" data-rail className={cn(rail, 'py-2')}>
+                        <th
+                           scope="col"
+                           data-rail
+                           className={cn(rail, 'py-0 md:py-2')}
+                        >
+                           {/* As tall as the hour heads beside it, so the
+                               head row stays the height it was. */}
+                           <button
+                              type="button"
+                              data-mark
+                              aria-label="What the marks mean"
+                              aria-expanded={tipRow === HELP}
+                              aria-describedby={
+                                 tipRow === HELP ? tipId : undefined
+                              }
+                              onClick={(event) =>
+                                 toggle('help', event.currentTarget)
+                              }
+                              className={cn(
+                                 'flex h-[34px] w-11 cursor-pointer items-center justify-center focus-visible:-outline-offset-2 md:hidden',
+                                 tipRow === HELP ? 'text-teal' : 'text-ink-3'
+                              )}
+                           >
+                              <QuestionMarkCircleIcon
+                                 aria-hidden="true"
+                                 className="size-5"
+                              />
+                           </button>
                            <span className="lab hidden text-ink-2 md:block">
                               Hour
                            </span>
@@ -530,6 +654,7 @@ export function HourGrid({
                   <tbody>
                      {rows.map((row) => {
                         const Mark = row.icon;
+                        const shown = tipRow?.key === row.key;
                         return (
                            <tr
                               key={row.key}
@@ -545,19 +670,36 @@ export function HourGrid({
                               )}
                            >
                               <th scope="row" className={cn(rail, 'py-0')}>
-                                 <span
-                                    className="flex items-center justify-center text-ink-2 md:hidden"
-                                    title={row.label}
+                                 {/* The later rows are drawn forty pixels
+                                     tall and their marks a pixel shorter,
+                                     because a collapsed border adds that
+                                     pixel to a row its content fills. The
+                                     inset ring keeps the focus inside the
+                                     scroller's clip. */}
+                                 <button
+                                    type="button"
+                                    data-mark
+                                    aria-label={
+                                       row.unit
+                                          ? `${row.label}, ${row.unit}`
+                                          : row.label
+                                    }
+                                    aria-expanded={shown}
+                                    aria-describedby={shown ? tipId : undefined}
+                                    onClick={(event) =>
+                                       toggle(row.key, event.currentTarget)
+                                    }
+                                    className={cn(
+                                       'flex cursor-pointer items-center justify-center focus-visible:-outline-offset-2 md:hidden',
+                                       row.later ? 'h-[39px] w-11' : 'size-11',
+                                       shown ? 'text-teal' : 'text-ink-2'
+                                    )}
                                  >
                                     <Mark
                                        aria-hidden="true"
                                        className="size-5"
                                     />
-                                    <span className="sr-only">
-                                       {row.label}
-                                       {row.unit ? `, ${row.unit}` : ''}
-                                    </span>
-                                 </span>
+                                 </button>
                                  <span className="hidden md:block">
                                     <span className="lab text-ink-2">
                                        {row.label}
@@ -607,6 +749,48 @@ export function HourGrid({
                   </tbody>
                </table>
             </div>
+
+            {/*
+             * The note sits out here rather than in the rail's cell, because
+             * the scroller clips up and down as well as across. It sits under
+             * the sticky header and the bar at the foot, as the page does.
+             */}
+            {tipRow ? (
+               <div
+                  id={tipId}
+                  ref={tipBox}
+                  role="tooltip"
+                  style={{ top: tipTop }}
+                  className="fc-tip absolute left-14 z-[25] max-w-[281px] -translate-y-1/2 border-l-[3px] border-teal pt-2.5 pr-3.5 pb-[11px] pl-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.45)] md:hidden"
+               >
+                  <span
+                     aria-hidden="true"
+                     className="absolute top-1/2 -left-[9px] size-3 -translate-y-1/2 rotate-45 bg-teal"
+                  />
+                  <p className="flex items-baseline gap-2">
+                     <span className="g-tracked text-[20px]">
+                        {tipRow.label}
+                     </span>
+                     {tipUnit ? (
+                        <span className="num text-[13px] text-ink-2">
+                           {tipUnit}
+                        </span>
+                     ) : null}
+                  </p>
+                  {tipRow.note ? (
+                     <p className="mt-1 text-[14px] leading-[1.4] text-ink-2">
+                        {tipRow.note}
+                     </p>
+                  ) : null}
+               </div>
+            ) : null}
+            {/* A described-by is read when focus arrives, and the note opens
+                after it has, so the note is said here as well. */}
+            <span className="sr-only" aria-live="polite">
+               {tipRow
+                  ? `${tipRow.label}${tipUnit ? `, ${tipUnit}` : ''}.${tipRow.note ? ` ${tipRow.note}` : ''}`
+                  : ''}
+            </span>
          </div>
 
          {/*

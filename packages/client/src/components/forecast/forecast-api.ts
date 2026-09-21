@@ -80,9 +80,10 @@ export type ForecastDay = {
 
 /*
  * The rating that rides with a forecast, worked out on the server from the
- * reader's own log, the conditions already fetched and the moon. Null when
- * nobody is signed in, and null when the page had to read Open-Meteo itself
- * because the server was throttled.
+ * reader's own log, the conditions already fetched and the moon. A reader who
+ * is signed out is rated on the weather and the moon alone. Null only when the
+ * rating failed, or when the page had to read Open-Meteo itself because the
+ * server was throttled.
  */
 export type Band = 'bad' | 'good' | 'great' | 'exceptional';
 
@@ -108,6 +109,12 @@ export type RatedDay = {
    /* The best three hours of that day, e.g. `05:00` to `07:00`. */
    bestFrom: string | null;
    bestTo: string | null;
+   /*
+    * Those three hours read on the hours' own scale, so the word beside the
+    * lit bars agrees with their colours. Optional because the browser can
+    * still be holding an answer of the older shape for a few minutes.
+    */
+   bestBand?: Band | null;
    reasons: Reason[];
 };
 

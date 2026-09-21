@@ -1140,6 +1140,16 @@ article.blk[aria-labelledby] > div:last-of-type > .rule-dashed {
 .fc-now {
    background: color-mix(in srgb, var(--teal) 14%, transparent);
 }
+/*
+ * A note from the rail: paper in both themes, inside a block whose ink is
+ * remapped for black, so it takes the day ink pair back.
+ */
+.fc-tip {
+   --ink: var(--black);
+   --ink-2: #4e4a46;
+   background: var(--paper);
+   color: var(--ink);
+}
 
 /* ---- Bars and curves in the hour grid -------------------------------------- */
 /*
@@ -1171,6 +1181,18 @@ article.blk[aria-labelledby] > div:last-of-type > .rule-dashed {
       stroke-dashoffset: 0;
    }
 }
+/*
+ * The verdict's ring draws round to its score, the same ease and length as a
+ * curve drawing on.
+ */
+.ring-fill {
+   animation: ring-fill 900ms var(--ease) both;
+}
+@keyframes ring-fill {
+   from {
+      stroke-dasharray: 0 100;
+   }
+}
 @media (prefers-reduced-motion: reduce) {
    .bar-grow {
       animation: none;
@@ -1178,6 +1200,9 @@ article.blk[aria-labelledby] > div:last-of-type > .rule-dashed {
    .draw-on {
       animation: none;
       stroke-dashoffset: 0;
+   }
+   .ring-fill {
+      animation: none;
    }
 }
 

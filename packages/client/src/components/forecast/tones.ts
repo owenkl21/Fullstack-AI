@@ -1,4 +1,4 @@
-import type { Band } from './forecast-api';
+import type { Band, Reason } from './forecast-api';
 import type { CSSProperties } from 'react';
 
 /*
@@ -178,3 +178,37 @@ export const BAND_WORD: Record<Band, string> = {
    great: 'Great',
    exceptional: 'Exceptional',
 };
+
+/* The bands worst to best, the order the verdict's scale reads in. */
+export const BANDS: Band[] = ['bad', 'good', 'great', 'exceptional'];
+
+/*
+ * The word in front of a reason, by what it is about rather than where it
+ * came from. A reason from the weather is about the wind or the light, and
+ * that is the word a reader scans the list for. Two topics can share a word,
+ * the wind's speed and its direction, and each still says its own sentence.
+ */
+const REASON_WORD: Partial<Record<string, string>> = {
+   'moon-period': 'Moon',
+   light: 'Light',
+   wind: 'Wind',
+   'wind-direction': 'Wind',
+   gust: 'Gust',
+   pressure: 'Pressure',
+   swell: 'Swell',
+   'swell-period': 'Swell',
+   sky: 'Sky',
+   water: 'Water',
+   'time-of-day': 'Time',
+   veto: 'No go',
+};
+
+/* A topic the map has not met yet still gets a word, its source. */
+const SOURCE_WORD: Record<Reason['from'], string> = {
+   log: 'Log',
+   weather: 'Weather',
+   moon: 'Moon',
+};
+
+export const reasonWord = (reason: Reason) =>
+   REASON_WORD[reason.topic] ?? SOURCE_WORD[reason.from];

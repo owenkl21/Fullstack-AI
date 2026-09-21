@@ -81,9 +81,10 @@ export function ForecastPage() {
    const [forecast, setForecast] = useState<Forecast | null>(null);
    /*
     * Whether the week is worth driving out for, read off this angler's own
-    * log on the server. Null for anyone signed out, and null when the page
-    * had to go to Open-Meteo itself because the server was throttled: in
-    * both cases the week draws exactly as it always did.
+    * log on the server, or off the weather and the moon alone for a reader
+    * who is signed out. Null only when the rating failed, or when the page
+    * had to go to Open-Meteo itself because the server was throttled: then
+    * the week draws exactly as it always did.
     */
    const [rating, setRating] = useState<ForecastRating | null>(null);
 
@@ -282,6 +283,17 @@ export function ForecastPage() {
       [rating]
    );
    const ratedDay = rating?.days.find((d) => d.date === selected) ?? null;
+   /*
+    * The verdict's pointer to a better day. The panel is keyed on the day, so
+    * it remounts under the reader and the button they pressed goes with it;
+    * focus goes to that day's tab rather than falling back to the page.
+    */
+   const pickDay = (date: string) => {
+      setSelected(date);
+      requestAnimationFrame(() =>
+         document.getElementById(`day-${date}`)?.focus()
+      );
+   };
 
    return (
       <section className="relative mx-auto w-[min(1680px,100%-32px)] pb-8 md:pb-12">
@@ -365,6 +377,8 @@ export function ForecastPage() {
                            day={ratedDay}
                            rating={rating}
                            today={today}
+                           nowLocal={day.date === today ? nowLocal : null}
+                           onPick={pickDay}
                         />
                      </div>
                   ) : null}

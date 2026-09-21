@@ -70,6 +70,12 @@ export type RatedDay = {
    /** The best three hours of the day, on the place's clock, e.g. `05:00`. */
    bestFrom: string | null;
    bestTo: string | null;
+   /**
+    * The best three hours read on the hours' own scale, so the word agrees
+    * with the colours of the bars beside it. The day is read six points
+    * harder, so a Good day can hold a Great window, never the reverse.
+    */
+   bestBand: Band | null;
    reasons: Reason[];
 };
 
@@ -1238,6 +1244,7 @@ export function rateForecast(input: RatingInput): ForecastRating {
             band: 'bad',
             bestFrom: null,
             bestTo: null,
+            bestBand: null,
             reasons: [],
          };
       }
@@ -1278,6 +1285,10 @@ export function rateForecast(input: RatingInput): ForecastRating {
          band,
          bestFrom: clock((window[0] as Worked).hour.local),
          bestTo: clock((window[window.length - 1] as Worked).hour.local),
+         /* A day made exceptional by its peak can average 80 or 81, which
+            the hour scale reads as Great, so the window keeps the day's word
+            then rather than reading below it. */
+         bestBand: band === 'exceptional' ? 'exceptional' : bandFor(score),
          reasons: pickReasons(peak.reasons, 4),
       };
    });
