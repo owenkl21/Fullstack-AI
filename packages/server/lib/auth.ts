@@ -5,6 +5,7 @@ import {
    createAuthMiddleware,
    getSessionFromCtx,
 } from 'better-auth/api';
+import { LEGAL_VERSION } from './legal';
 import { prisma } from './prisma';
 import {
    sendChangeEmailConfirmation,
@@ -50,8 +51,12 @@ const trustedOrigins = (process.env.APP_ORIGIN?.trim() || baseURL)
  * Move every account whose address cannot take mail first. Once this is on, an
  * unconfirmed account cannot sign in, so it cannot reach Change email, and
  * every link that would rescue it goes to the dead address.
+ *
+ * Exported because the angler search follows the same rule: while this is off
+ * an unconfirmed account is a real angler using the app, and once it is on
+ * that account cannot sign in, so it is nobody to find.
  */
-const requireEmailVerification =
+export const requireEmailVerification =
    process.env.MAIL_PROVIDER_READY?.trim() === 'true';
 
 /*
@@ -139,6 +144,24 @@ export const auth = betterAuth({
 
    hooks: {
       before: createAuthMiddleware(async (ctx) => {
+         /*
+          * No account without agreeing to the Terms and the Privacy Policy,
+          * which is where the use of photographs for training is set out.
+          * The box on the sign-up page sends the version it showed; checked
+          * here so the endpoint cannot be called without it, and so a page
+          * left open across a change of words has to be reloaded first.
+          */
+         if (ctx.path === '/sign-up/email') {
+            const body = ctx.body as { acceptTerms?: unknown } | undefined;
+            if (body?.acceptTerms !== LEGAL_VERSION) {
+               throw new APIError('BAD_REQUEST', {
+                  code: 'TERMS_NOT_ACCEPTED',
+                  message:
+                     'Agree to the Terms and the Privacy Policy to start a log. If you did, reload the page and try again.',
+               });
+            }
+         }
+
          /*
           * A change of address asks for the current password, as a change of
           * password already does. Without it, anybody at a device the owner
@@ -288,6 +311,9 @@ export const auth = betterAuth({
          username: { type: 'string', required: false, input: false },
          bio: { type: 'string', required: false, input: false },
          storagePrefixId: { type: 'string', required: false, input: false },
+         /* Which words the account agreed to, and when. Set on create only. */
+         termsVersion: { type: 'string', required: false, input: false },
+         termsAcceptedAt: { type: 'date', required: false, input: false },
       },
    },
 
@@ -326,6 +352,13 @@ export const auth = betterAuth({
                   storagePrefixId:
                      (user as { id?: string }).id ??
                      `u_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`,
+                  /*
+                   * Email sign-up is the only way a user is made, and the
+                   * before hook above has already refused one that did not
+                   * agree, so every row made here agreed to this version now.
+                   */
+                  termsVersion: LEGAL_VERSION,
+                  termsAcceptedAt: new Date(),
                },
             }),
          },

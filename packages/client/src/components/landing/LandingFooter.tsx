@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Contours } from '@/components/brand/Contours';
 import { cn } from '@/lib/utils';
 import { WRAP } from './layout';
@@ -60,6 +61,36 @@ export function LandingFooter() {
                   </div>
                ))}
             </nav>
+         </div>
+
+         {/* The small print, under a hairline, and the address to write to. */}
+         <div
+            className={cn(
+               WRAP,
+               'relative mt-10 flex flex-col gap-3 border-t border-paper/15 pt-5 text-[13px] sm:flex-row sm:items-center sm:justify-between'
+            )}
+         >
+            <nav aria-label="Legal" className="flex flex-wrap gap-x-6">
+               <Link
+                  to="/privacy"
+                  className="inline-flex min-h-11 items-center text-paper transition-colors hover:text-teal"
+               >
+                  Privacy Policy
+               </Link>
+               <Link
+                  to="/terms"
+                  className="inline-flex min-h-11 items-center text-paper transition-colors hover:text-teal"
+               >
+                  Terms and Conditions
+               </Link>
+               <a
+                  href="mailto:info@fisherfeed.com"
+                  className="inline-flex min-h-11 items-center transition-colors hover:text-teal"
+               >
+                  info@fisherfeed.com
+               </a>
+            </nav>
+            <span>&copy; {new Date().getFullYear()} Fisherfeed</span>
          </div>
       </footer>
    );

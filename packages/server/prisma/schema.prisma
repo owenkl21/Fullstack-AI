@@ -171,6 +171,12 @@ model User {
    * the avatar: one is who you are, the other is where you fish.
    */
   bannerUrl                  String?
+  /**
+   * Which Terms and Privacy Policy the account agreed to at sign-up, by their
+   * date, and when. Null on accounts made before the box existed.
+   */
+  termsVersion               String?
+  termsAcceptedAt            DateTime?
   catches                    Catch[]
   sites                      FishingSite[]
   reviews                    Review[]

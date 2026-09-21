@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { signUp } from '@/lib/auth-client';
 import { useDocumentTitle } from '@/lib/title';
+import { LEGAL_VERSION } from '@/pages/legal/legal-content';
 import { AuthForm, AuthShell, Field } from './AuthShell';
 
 /* better-auth's own floor. Saying it up front beats failing on submit. */
@@ -14,6 +15,7 @@ export function SignUpPage() {
    const [name, setName] = useState('');
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
+   const [agreed, setAgreed] = useState(false);
    const [error, setError] = useState<string | null>(null);
    const [busy, setBusy] = useState(false);
 
@@ -26,6 +28,11 @@ export function SignUpPage() {
          return;
       }
 
+      if (!agreed) {
+         setError('Tick the box to agree to the Terms and the Privacy Policy.');
+         return;
+      }
+
       setBusy(true);
 
       /*
@@ -33,7 +40,7 @@ export function SignUpPage() {
        * without the finally the button would stay on its busy label.
        */
       try {
-         const { error: failed } = await signUp.email({
+         const payload = {
             email,
             password,
             name,
@@ -44,7 +51,14 @@ export function SignUpPage() {
              * nothing at all. A relative path passes its origin check as it is.
              */
             callbackURL: '/verify-email',
-         });
+            /*
+             * Which words were agreed to. The server refuses a sign-up
+             * without it, so the box cannot be skipped by calling the API
+             * directly, and it is not a column better-auth stores.
+             */
+            acceptTerms: LEGAL_VERSION,
+         };
+         const { error: failed } = await signUp.email(payload);
 
          if (failed) {
             setError(
@@ -102,6 +116,39 @@ export function SignUpPage() {
                autoComplete="new-password"
                hint={`At least ${MIN_PASSWORD} characters.`}
             />
+            {/*
+             * Named in the box itself: agreeing to the training use should not
+             * be something found later in the policy.
+             */}
+            <label className="flex min-h-11 cursor-pointer items-start gap-3 text-[15px] leading-snug text-ink-2">
+               <input
+                  type="checkbox"
+                  required
+                  checked={agreed}
+                  onChange={(event) => setAgreed(event.target.checked)}
+                  className="mt-0.5 size-5 shrink-0 accent-teal"
+               />
+               <span>
+                  I agree to the{' '}
+                  <Link
+                     to="/terms"
+                     target="_blank"
+                     className="text-teal-text underline underline-offset-4"
+                  >
+                     Terms and Conditions
+                  </Link>{' '}
+                  and the{' '}
+                  <Link
+                     to="/privacy"
+                     target="_blank"
+                     className="text-teal-text underline underline-offset-4"
+                  >
+                     Privacy Policy
+                  </Link>
+                  , including Fisherfeed using my photographs and catches to
+                  train its models.
+               </span>
+            </label>
             <Button
                type="submit"
                size="lg"
