@@ -38,12 +38,74 @@ export function verifyEmail({ user, url }: { user: MailPerson; url: string }) {
          kicker: 'Confirm your address',
          heading: 'Verify your email',
          body: [
-            `${greeting(user.name)}this confirms that ${user.email} is yours, which is what lets you get back into your log if you ever lose the password.`,
+            `${greeting(user.name)}this confirms that ${user.email} is yours. It is also where a reset link goes if you ever lose the password.`,
             'The link works once and expires in an hour.',
          ],
          button: { label: 'Verify my email', url },
          footnote: [
             'If you did not sign up for Fisherfeed, ignore this. Nothing happens until the link is used, and it expires on its own.',
+         ],
+      }),
+   };
+}
+
+/*
+ * The last step of a change of address, sent to the NEW one. Not the sign-up
+ * mail: that one tells the reader to ignore it if they never signed up, which
+ * is wrong for somebody who has had an account for a year.
+ */
+export function verifyNewAddressEmail({
+   user,
+   url,
+}: {
+   user: MailPerson;
+   url: string;
+}) {
+   return {
+      subject: 'Confirm your new address for Fisherfeed',
+      ...renderEmail({
+         preheader: 'One tap and your log moves to this address.',
+         kicker: 'Change of address',
+         heading: 'Use this address',
+         body: [
+            `${greeting(user.name)}this makes ${user.email} the address for your Fisherfeed log. Sign-in and reset links will come here from now on.`,
+            'The link works once and expires in an hour.',
+         ],
+         button: { label: 'Use this address', url },
+         footnote: [
+            'If you did not ask for this, ignore it. Nothing changes until the link is used, and it expires on its own.',
+         ],
+      }),
+   };
+}
+
+/*
+ * The first step of a change of address, sent to the CURRENT one, and only
+ * for an account whose address is confirmed. It is what stops somebody with a
+ * borrowed session moving the account to an address the owner cannot follow.
+ */
+export function changeEmailConfirmationEmail({
+   user,
+   newEmail,
+   url,
+}: {
+   user: MailPerson;
+   newEmail: string;
+   url: string;
+}) {
+   return {
+      subject: 'Approve the new address for your Fisherfeed log',
+      ...renderEmail({
+         preheader: `Somebody asked to move your log to ${newEmail}.`,
+         kicker: 'Change of address',
+         heading: 'Approve the change',
+         body: [
+            `${greeting(user.name)}somebody signed in to your log asked to move it from ${user.email} to ${newEmail}.`,
+            `Open this to approve it. A second link then goes to ${newEmail}, and the change happens when that one is opened. Both expire in an hour.`,
+         ],
+         button: { label: 'Approve the change', url },
+         footnote: [
+            'If that was not you, do not open the link, and change your password: somebody has been in your account.',
          ],
       }),
    };

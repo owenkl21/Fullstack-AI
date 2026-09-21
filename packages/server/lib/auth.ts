@@ -1,7 +1,9 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
+import { createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
 import { prisma } from './prisma';
 import {
+   sendChangeEmailConfirmation,
    sendPasswordChanged,
    sendResetPassword,
    sendVerificationEmail,
@@ -36,13 +38,76 @@ const trustedOrigins = (process.env.APP_ORIGIN?.trim() || baseURL)
    .filter(Boolean);
 
 /*
- * There is no mail provider yet, so requiring a verified address would lock
- * every new account out of the app. The verification mail is still sent, and
- * still logged, so the flow can be exercised; it just is not a gate until a
- * provider exists. Flip this with MAIL_PROVIDER_READY=true.
+ * Requiring a verified address before mail is seen to arrive would lock every
+ * new account out of the app. The verification mail is still sent, so the
+ * flow can be exercised; it just is not a gate until then. Flip this with
+ * MAIL_PROVIDER_READY=true once a real inbox has received one.
+ *
+ * Move every account whose address cannot take mail first. Once this is on, an
+ * unconfirmed account cannot sign in, so it cannot reach Change email, and
+ * every link that would rescue it goes to the dead address.
  */
 const requireEmailVerification =
    process.env.MAIL_PROVIDER_READY?.trim() === 'true';
+
+/*
+ * The claims inside one of better-auth's email tokens, read without checking
+ * the signature. Only used where better-auth has already checked it, or to
+ * pick a mail's wording, never to decide who may do what. A change of address
+ * is the one that carries updateTo.
+ */
+const tokenClaims = (
+   token?: string | null
+): { updateTo?: string; requestType?: string } => {
+   try {
+      const payload = token?.split('.')[1];
+      return payload
+         ? JSON.parse(Buffer.from(payload, 'base64url').toString())
+         : {};
+   } catch {
+      return {};
+   }
+};
+
+const tokenInRequest = (request?: Request) => {
+   try {
+      return request ? new URL(request.url).searchParams.get('token') : null;
+   } catch {
+      return null;
+   }
+};
+
+/*
+ * A verification mail that did not go out reaches the page only when a real
+ * session asked for it. Signed out, better-auth sends only for an account that
+ * exists and is unconfirmed, so a failure there would be the one answer that
+ * differs, and anybody could ask about any address. The mailer has already
+ * logged it either way. Checked by session, not by cookie, because a cookie is
+ * trivially invented.
+ */
+async function sendVerification(
+   data: {
+      user: { email: string; name?: string | null };
+      url: string;
+      token: string;
+   },
+   request?: Request
+): Promise<void> {
+   try {
+      await sendVerificationEmail({
+         user: { email: data.user.email, name: data.user.name },
+         url: data.url,
+         newAddress: Boolean(tokenClaims(data.token).updateTo),
+      });
+   } catch (cause) {
+      const session = request
+         ? await auth.api
+              .getSession({ headers: request.headers })
+              .catch(() => null)
+         : null;
+      if (session) throw cause;
+   }
+}
 
 if (!process.env.BETTER_AUTH_SECRET?.trim()) {
    /*
@@ -60,9 +125,47 @@ export const auth = betterAuth({
    secret: process.env.BETTER_AUTH_SECRET,
    trustedOrigins,
 
+   /*
+    * Warn is better-auth's default. Named so nobody lowers it: at info it
+    * prints the full address of every sign-up that meets an existing account.
+    * A refused request is recorded, with its status, by the request log in
+    * index.ts.
+    */
+   logger: { level: 'warn' },
+
+   /*
+    * No link in a mail ever opens a session. Only a password does.
+    *
+    * better-auth's change-of-address link signs in whoever opens it when
+    * nobody is signed in, and there is no option to stop it, so the link is
+    * refused here unless the account is already signed in on that browser.
+    * The approval step, which only sends the next mail, needs no session.
+    * The redirect is fixed rather than the link's own callbackURL: this runs
+    * before better-auth has checked the token, and a forged one must not
+    * turn this into an open redirect.
+    */
+   hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+         if (ctx.path !== '/verify-email') return;
+         const token = ctx.query?.token;
+         const claims = tokenClaims(typeof token === 'string' ? token : null);
+         if (!claims.updateTo) return;
+         if (claims.requestType === 'change-email-confirmation') return;
+         if (await getSessionFromCtx(ctx)) return;
+         throw ctx.redirect('/verify-email?change=1&error=SIGN_IN_REQUIRED');
+      }),
+   },
+
    emailAndPassword: {
       enabled: true,
       requireEmailVerification,
+      /*
+       * A reset signs out every session, this browser's included. Otherwise
+       * whoever was already in, the owner or somebody who should not be,
+       * stays in on the old password, and the reset lands the owner straight
+       * back in the account without typing the new one.
+       */
+      revokeSessionsOnPasswordReset: true,
       sendResetPassword,
       /*
        * A password that changed is the one account event worth telling somebody
@@ -78,8 +181,13 @@ export const auth = betterAuth({
    },
 
    emailVerification: {
-      sendVerificationEmail,
-      autoSignInAfterVerification: true,
+      sendVerificationEmail: sendVerification,
+      /*
+       * Off. On, opening the link signs in whoever opened it, with no
+       * password, which makes a forwarded or intercepted mail a key to the
+       * account. Confirming an address confirms it and nothing more.
+       */
+      autoSignInAfterVerification: false,
       /*
        * Send it even though it is not a gate yet. Otherwise nothing is written
        * to the log at sign-up and the verification flow cannot be exercised at
@@ -88,9 +196,12 @@ export const auth = betterAuth({
       sendOnSignUp: true,
       /*
        * The address is confirmed and the log is really open, so this is the
-       * moment the welcome is true rather than presumptuous.
+       * moment the welcome is true rather than presumptuous. A change of
+       * address lands here too, and an angler with a year of catches does not
+       * need telling to log the first one.
        */
-      afterEmailVerification: async (user) => {
+      afterEmailVerification: async (user, request) => {
+         if (tokenClaims(tokenInRequest(request)).updateTo) return;
          await sendWelcome({ user: { email: user.email, name: user.name } });
       },
    },
@@ -107,6 +218,26 @@ export const auth = betterAuth({
        * come into it.
        */
       modelName: 'user',
+      /*
+       * An account made with an address that cannot take mail could never
+       * reset its password, so it needs a way to move.
+       *
+       * A confirmed account must approve from its current address first,
+       * which is what stops a borrowed session moving it somewhere the owner
+       * cannot follow. An unconfirmed one has no working address to ask, so
+       * its link goes straight to the new address, and the change lands only
+       * when that is opened.
+       */
+      changeEmail: {
+         enabled: true,
+         sendChangeEmailConfirmation: async ({ user, newEmail, url }) => {
+            await sendChangeEmailConfirmation({
+               user: { email: user.email, name: user.name },
+               newEmail,
+               url,
+            });
+         },
+      },
       fields: {
          name: 'displayName',
          image: 'avatarUrl',
@@ -121,13 +252,21 @@ export const auth = betterAuth({
    /*
     * In memory, which resets on every deploy. Fine for one instance; it would
     * need database storage behind more than one.
+    *
+    * Reset and verification mail fall under better-auth's own rule, three a
+    * minute. There was a '/forget-password' rule here, but that path is the
+    * email-otp plugin's, which this app does not use, so it matched nothing.
+    *
+    * A change of address mails any address it is given, so it gets the same
+    * ceiling as sign-up. better-auth's default, three every ten seconds, would
+    * let one account spray the sending domain's reputation away.
     */
    rateLimit: {
       enabled: true,
       customRules: {
          '/sign-in/email': { window: 60, max: 5 },
          '/sign-up/email': { window: 3600, max: 5 },
-         '/forget-password': { window: 3600, max: 5 },
+         '/change-email': { window: 3600, max: 5 },
       },
    },
 

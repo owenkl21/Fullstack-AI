@@ -20,6 +20,7 @@ import { reviewsController } from './controllers/reviews.controller';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from './lib/auth';
 import { setAuthContext } from './lib/auth-context';
+import { mailStatus } from './lib/mailer';
 import { userService } from './services/user.service';
 
 const router = express.Router();
@@ -78,6 +79,18 @@ router.get('/', (_req: Request, res: Response) => {
 
 router.get('/api/hello', (_req: Request, res: Response) => {
    res.json({ message: 'Hello from the API!' });
+});
+
+/*
+ * Which build is answering, and whether it can send mail, without anybody
+ * reading Railway's logs. No address, no key and no error text: only what a
+ * stranger could learn from trying to sign up anyway.
+ */
+router.get('/api/health', (_req: Request, res: Response) => {
+   res.json({
+      deployment: process.env.RAILWAY_DEPLOYMENT_ID ?? null,
+      mail: mailStatus,
+   });
 });
 
 router.post('/api/chat', requireApiAuth, chatController.sendMessage);

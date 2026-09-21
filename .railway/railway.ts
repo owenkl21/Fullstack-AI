@@ -75,6 +75,12 @@ export default defineRailway(() => {
          BETTER_AUTH_URL: preserve(),
          APP_ORIGIN: preserve(),
          MAIL_PROVIDER_READY: preserve(),
+         /*
+          * The account mail. Undeclared, an apply would delete the key and
+          * every verification and reset would quietly go to the log instead.
+          */
+         RESEND_API_KEY: preserve(),
+         MAIL_FROM: preserve(),
          SEED_ALLOW_REMOTE_HOST: preserve(),
          SEED_CONFIRM: preserve(),
          SEED_ALLOW_PRODUCTION: preserve(),
