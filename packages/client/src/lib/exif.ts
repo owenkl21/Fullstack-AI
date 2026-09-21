@@ -4,8 +4,15 @@
  * A phone writes the moment of the shutter into the JPEG as EXIF
  * DateTimeOriginal, in the camera's own local time. For a log of several
  * fish that is the honest record of when each one came out, and it is
- * already in the picker's hands before anything is uploaded. Only the first
- * 128 KB is read: the EXIF block sits at the front of the file.
+ * already in the picker's hands before anything is uploaded. Only the head of
+ * the file is read: a phone puts the EXIF block at the front. The head is
+ * half a megabyte rather than the 64 KB a phone needs, because a photo that
+ * has been through a desktop editor can carry a large colour profile or XMP
+ * block ahead of it, and reading a little more costs nothing.
+ *
+ * It never throws. A file cut short or written oddly gives no time and no
+ * place, which is the same answer as a photo that never had them, so one bad
+ * file in a batch cannot take the others' times and places down with it.
  *
  * Hand rolled rather than a dependency because the picker only takes JPEG,
  * PNG and WebP, and only JPEG carries this, so the whole parser is one
@@ -18,7 +25,7 @@
  * both, so a form cannot ask for half of what the file is holding.
  */
 
-const HEAD_BYTES = 128 * 1024;
+const HEAD_BYTES = 512 * 1024;
 const TAG_EXIF_IFD = 0x8769;
 const TAG_DATE_TIME_ORIGINAL = 0x9003;
 const TAG_DATE_TIME = 0x0132;
@@ -52,14 +59,26 @@ export async function readPhotoMeta(file: File): Promise<PhotoMeta> {
    if (!/jpe?g$/i.test(file.type) && !/\.jpe?g$/i.test(file.name)) {
       return NO_META;
    }
-   const buffer = await file.slice(0, HEAD_BYTES).arrayBuffer();
-   const view = new DataView(buffer);
+   try {
+      const buffer = await file.slice(0, HEAD_BYTES).arrayBuffer();
+      return readJpegMeta(new DataView(buffer));
+   } catch {
+      return NO_META;
+   }
+}
+
+function readJpegMeta(view: DataView): PhotoMeta {
    if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) return NO_META;
 
    let offset = 2;
    while (offset + 4 <= view.byteLength) {
       if (view.getUint8(offset) !== 0xff) return NO_META;
       const marker = view.getUint8(offset + 1);
+      /* The format allows any number of 0xFF fill bytes before a marker. */
+      if (marker === 0xff) {
+         offset += 1;
+         continue;
+      }
       const size = view.getUint16(offset + 2);
       if (marker === 0xe1) {
          const start = offset + 4;
@@ -105,7 +124,9 @@ function readTiffMeta(view: DataView, tiff: number): PhotoMeta {
       return out;
    };
 
+   /* Null when the values run past what was read, rather than a throw. */
    const rationals = (at: number, count: number) => {
+      if (at + count * 8 > view.byteLength) return null;
       const out: number[] = [];
       for (let i = 0; i < count; i++) {
          const n = u32(at + i * 8);
@@ -171,6 +192,8 @@ function readTiffMeta(view: DataView, tiff: number): PhotoMeta {
          if (
             Number.isFinite(la) &&
             Number.isFinite(ln) &&
+            Math.abs(la) <= 90 &&
+            Math.abs(ln) <= 180 &&
             (la !== 0 || ln !== 0)
          ) {
             latitude = la;
