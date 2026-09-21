@@ -17,6 +17,13 @@ import {
    type BaseLayer,
 } from '@/lib/leaflet';
 import { MapLegend, MapToolbar } from '@/components/map/MapToolbar';
+import {
+   formatCoords,
+   formatDay,
+   plural,
+} from '@/components/fishing/record/format';
+import type { SpotRating } from '@/components/fishing/reviews/reviews-api';
+import { waterTypeWord } from '@/components/fishing/rows/format';
 import { popupCard } from '@/components/map/popup';
 import { PinCard, type CardAction } from '@/components/map/PinCard';
 import { Sheet } from '@/components/ui/sheet';
@@ -44,6 +51,11 @@ export type SpotPin = {
    latitude: number;
    longitude: number;
    catchCount: number;
+   waterType?: string | null;
+   lastCatchAt?: string | null;
+   rating?: SpotRating | null;
+   /* The fish most caught there, most first. */
+   species?: { id: string; name: string; count: number }[];
 };
 
 /* A place a search found: a pin you can act on, not a pan. */
@@ -555,29 +567,38 @@ export function SpotsMap({
                kicker: 'Your spot',
                title: spot.name,
                accent: 'var(--teal)',
+               rating: spot.rating,
                facts: [
-                  { mark: 'fish', value: catchLine(spot.catchCount) },
                   {
-                     mark: 'pin',
-                     value: `${spot.latitude.toFixed(4)}, ${spot.longitude.toFixed(4)}`,
+                     mark: 'fish',
+                     value:
+                        spot.catchCount === 0
+                           ? 'No catches logged here yet'
+                           : plural(spot.catchCount, 'catch', 'catches'),
+                  },
+                  {
+                     mark: 'calendar',
+                     value: spot.lastCatchAt
+                        ? `Last fished ${formatDay(spot.lastCatchAt)}`
+                        : '',
                      quiet: true,
                   },
+                  {
+                     mark: 'pin',
+                     value: formatCoords(spot.latitude, spot.longitude) ?? '',
+                     quiet: true,
+                     figures: true,
+                  },
                ],
+               tags: spotTags(spot),
                actions: [
                   {
-                     label: 'Open the spot',
+                     label: 'Open',
                      tone: 'primary',
                      onClick: () => onOpenRef.current(spot.id),
                   },
                   {
-                     label: 'Log here',
-                     onClick: () =>
-                        navigateRef.current(
-                           `/log?lat=${spot.latitude.toFixed(5)}&lng=${spot.longitude.toFixed(5)}`
-                        ),
-                  },
-                  {
-                     label: 'Forecast',
+                     label: 'Forecast here',
                      onClick: () =>
                         navigateRef.current(
                            `/forecast?lat=${spot.latitude.toFixed(4)}&lng=${spot.longitude.toFixed(4)}&name=${encodeURIComponent(spot.name)}`
@@ -585,7 +606,9 @@ export function SpotsMap({
                   },
                ],
             }),
-            POPUP
+            /* The card is drawn 290 wide. With two short actions its content
+               alone would come out narrower. */
+            { ...POPUP, minWidth: 290 }
          );
       }
    }, [key, passesFilter, phone, mapReady]);
@@ -1000,6 +1023,10 @@ export function SpotsMap({
                latitude: found.latitude,
                longitude: found.longitude,
                catchCount: 0,
+               waterType: null,
+               lastCatchAt: null,
+               rating: null,
+               species: [],
             });
          setTapped(null);
          setNaming(false);
@@ -1030,17 +1057,21 @@ export function SpotsMap({
             <PinCard
                kicker="Your spot"
                title={spot.name}
+               rating={spot.rating}
                facts={[
                   { value: catchLine(spot.catchCount) },
                   {
-                     value: `${spot.latitude.toFixed(4)}, ${spot.longitude.toFixed(4)}`,
+                     value: formatCoords(spot.latitude, spot.longitude) ?? '',
                      quiet: true,
                      figures: true,
                   },
                ]}
+               tags={spotTags(spot)}
+               /* Two actions in one row. The sheet still closes on a tap
+                  outside it or on Escape. */
                actions={[
                   {
-                     label: 'Open the spot',
+                     label: 'Open',
                      tone: 'primary',
                      onClick: () => {
                         closeCard();
@@ -1048,20 +1079,12 @@ export function SpotsMap({
                      },
                   },
                   {
-                     label: 'Log here',
-                     onClick: () =>
-                        navigate(
-                           `/log?lat=${spot.latitude.toFixed(5)}&lng=${spot.longitude.toFixed(5)}`
-                        ),
-                  },
-                  {
-                     label: 'Forecast',
+                     label: 'Forecast here',
                      onClick: () =>
                         navigate(
                            `/forecast?lat=${spot.latitude.toFixed(4)}&lng=${spot.longitude.toFixed(4)}&name=${encodeURIComponent(spot.name)}`
                         ),
                   },
-                  { label: 'Close', onClick: closeCard },
                ]}
             />
          );
@@ -1545,14 +1568,24 @@ export function SpotsMap({
                   </div>
                </Sheet>
 
+               {/*
+                * Every card sits on the black plate, whatever the pin, so one
+                * sheet has one ground. The sheet goes black as well, so the
+                * strip over the home bar is not a white band under the plate.
+                */}
                <Sheet
                   open={Boolean(tapped)}
                   onOpenChange={(open) => {
                      if (!open) closeCard();
                   }}
                   title="What is here"
+                  className="on-black"
                >
-                  <div className="thread-scroll min-h-0 overflow-y-auto">
+                  <div className="thread-scroll blk blk-plain relative min-h-0 overflow-y-auto pt-3">
+                     <span
+                        aria-hidden="true"
+                        className="absolute top-2 left-1/2 h-1 w-9 -translate-x-1/2 bg-paper/30"
+                     />
                      {card}
                   </div>
                </Sheet>
@@ -1568,6 +1601,17 @@ const catchLine = (count: number) =>
       : count === 1
         ? '1 catch logged here'
         : `${count} catches logged here`;
+
+/* What your own spot is known for: the water, then the fish most caught
+   there. A tag is its own key, so a repeat is dropped. */
+const spotTags = (spot: SpotPin) => [
+   ...new Set(
+      [
+         waterTypeWord(spot.waterType),
+         ...(spot.species ?? []).slice(0, 3).map((species) => species.name),
+      ].filter((tag): tag is string => Boolean(tag))
+   ),
+];
 
 const poiWord = (poi: Poi) =>
    poi.kind === 'ramp'

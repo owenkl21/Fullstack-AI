@@ -3,7 +3,7 @@ import type { ComponentType, SVGProps } from 'react';
 import {
    ArrowDownRightIcon,
    BuildingStorefrontIcon,
-   CalendarDaysIcon,
+   CalendarIcon,
    CameraIcon,
    FlagIcon,
    LifebuoyIcon,
@@ -13,6 +13,10 @@ import {
    UserIcon,
 } from '@heroicons/react/24/outline';
 import { FishMark } from '@/components/brand/FishMark';
+import { plural } from '@/components/fishing/record/format';
+import type { SpotRating } from '@/components/fishing/reviews/reviews-api';
+import { Stars } from '@/components/fishing/reviews/Stars';
+import { cn } from '@/lib/utils';
 
 /*
  * The card that opens on a pin.
@@ -38,7 +42,7 @@ export type PopupMark =
 
 const MARKS: Record<PopupMark, ComponentType<SVGProps<SVGSVGElement>>> = {
    fish: FishMark,
-   calendar: CalendarDaysIcon,
+   calendar: CalendarIcon,
    user: UserIcon,
    pin: MapPinIcon,
    note: PencilSquareIcon,
@@ -50,7 +54,13 @@ const MARKS: Record<PopupMark, ComponentType<SVGProps<SVGSVGElement>>> = {
    camera: CameraIcon,
 };
 
-export type PopupFact = { mark: PopupMark; value: string; quiet?: boolean };
+export type PopupFact = {
+   mark: PopupMark;
+   value: string;
+   quiet?: boolean;
+   /* Tabular figures, for coordinates that should not shift as they change. */
+   figures?: boolean;
+};
 
 export type PopupAction = {
    label: string;
@@ -61,6 +71,9 @@ export type PopupAction = {
 export type PopupInput = {
    kicker: string;
    title: string;
+   /* What anglers make of it, as the first line. Left out until someone has
+      rated it, since the other facts are dropped when empty too. */
+   rating?: SpotRating | null;
    facts: PopupFact[];
    /* Small words under the facts: what the spot is known for. */
    tags?: string[];
@@ -70,6 +83,9 @@ export type PopupInput = {
 };
 
 function Card({ input }: { input: PopupInput }) {
+   const rating = input.rating;
+   const average = rating && rating.count > 0 ? rating.average : null;
+
    return (
       <div
          className="map-card"
@@ -82,6 +98,18 @@ function Card({ input }: { input: PopupInput }) {
          <p className="map-card-kicker">{input.kicker}</p>
          <p className="map-card-title">{input.title}</p>
          <ul className="map-card-facts">
+            {rating && average !== null ? (
+               <li className="map-card-fact">
+                  <Stars value={average} className="gap-px [--star:16px]" />
+                  <span className="num">
+                     <span className="font-medium">{average.toFixed(1)}</span>
+                     <span className="sr-only"> out of 5</span>{' '}
+                     <span className="text-ink-2">
+                        · {plural(rating.count, 'rating', 'ratings')}
+                     </span>
+                  </span>
+               </li>
+            ) : null}
             {input.facts
                .filter((fact) => fact.value)
                .map((fact, i) => {
@@ -89,9 +117,11 @@ function Card({ input }: { input: PopupInput }) {
                   return (
                      <li
                         key={`${fact.mark}-${i}`}
-                        className={
-                           fact.quiet ? 'map-card-fact quiet' : 'map-card-fact'
-                        }
+                        className={cn(
+                           'map-card-fact',
+                           fact.quiet && 'quiet',
+                           fact.figures && 'num'
+                        )}
                      >
                         <Mark aria-hidden="true" className="map-card-mark" />
                         <span>{fact.value}</span>

@@ -23,7 +23,9 @@ export type RowPhoto = {
 export type RowProps = {
    to: string;
    title: string;
-   subline: string;
+   /** The line under the name. A node, so a spot can draw it one way on a phone
+    * and another on a desktop. */
+   subline: ReactNode;
    /** What the link is called to a screen reader. Defaults to the title. */
    label?: string;
    photoUrl?: string | null;

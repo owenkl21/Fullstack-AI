@@ -8,6 +8,7 @@ import {
    type SpotPin,
 } from '@/components/map/SpotsMap';
 import { PlaceSearch } from '@/components/forecast/PlaceSearch';
+import type { SpotRating } from '@/components/fishing/reviews/reviews-api';
 import { stopMapEvents } from '@/lib/leaflet';
 import { describePlace } from '@/lib/maps';
 import { usePosition } from '@/lib/position';
@@ -38,6 +39,10 @@ type SiteRow = {
    latitude: number | null;
    longitude: number | null;
    catchCount?: number;
+   waterType?: string | null;
+   lastCatchAt?: string | null;
+   rating?: SpotRating | null;
+   species?: { id: string; name: string; count: number }[];
 };
 
 export function MapPage() {
@@ -83,6 +88,10 @@ function MapScreen() {
                      latitude: row.latitude as number,
                      longitude: row.longitude as number,
                      catchCount: row.catchCount ?? 0,
+                     waterType: row.waterType ?? null,
+                     lastCatchAt: row.lastCatchAt ?? null,
+                     rating: row.rating ?? null,
+                     species: row.species ?? [],
                   }))
             );
          })

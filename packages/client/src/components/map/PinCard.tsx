@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react';
+import { plural } from '@/components/fishing/record/format';
+import type { SpotRating } from '@/components/fishing/reviews/reviews-api';
+import { Stars } from '@/components/fishing/reviews/Stars';
 import { cn } from '@/lib/utils';
 
 /*
@@ -20,6 +23,7 @@ export type CardAction = {
 export function PinCard({
    kicker,
    title,
+   rating,
    facts,
    tags,
    children,
@@ -27,6 +31,9 @@ export function PinCard({
 }: {
    kicker: string;
    title: string;
+   /* What anglers make of it, under the name. Nothing until someone has
+      rated it, as an empty fact is dropped too. */
+   rating?: SpotRating | null;
    /* A line each: what has come out of here, who saved it, where it is. */
    facts: { value: string; quiet?: boolean; figures?: boolean }[];
    tags?: string[];
@@ -34,10 +41,29 @@ export function PinCard({
    children?: ReactNode;
    actions: CardAction[];
 }) {
+   const average = rating && rating.count > 0 ? rating.average : null;
+
    return (
       <div className="p-4">
          <p className="lab">{kicker}</p>
          <h2 className="g mt-1.5 text-[28px] break-words">{title}</h2>
+
+         {rating && average !== null ? (
+            <div className="mt-2.5 flex items-center gap-2.5">
+               <Stars
+                  value={average}
+                  emptyClassName="text-paper/28"
+                  className="gap-0.5 [--star:20px]"
+               />
+               <span className="g num text-[26px] leading-none">
+                  {average.toFixed(1)}
+                  <span className="sr-only"> out of 5</span>
+               </span>
+               <span className="lab num">
+                  {plural(rating.count, 'rating', 'ratings')}
+               </span>
+            </div>
+         ) : null}
 
          {facts.length ? (
             <ul className="mt-2.5 flex flex-col gap-1">
@@ -86,7 +112,7 @@ export function PinCard({
                         ? 'bg-ink text-background'
                         : action.tone === 'danger'
                           ? 'border border-line text-destructive hover:border-destructive'
-                          : 'border border-line text-ink hover:border-ink'
+                          : 'border border-line-2 text-ink hover:border-ink'
                   )}
                >
                   {action.label}

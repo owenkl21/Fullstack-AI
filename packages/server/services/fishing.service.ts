@@ -10,6 +10,7 @@ import {
    toWeatherSnapshot,
    type Conditions,
 } from '../clients/open-meteo.client';
+import { ratingsBySite } from './reviews.service';
 import { uploadsService } from './uploads.service';
 import { userService } from './user.service';
 
@@ -1320,6 +1321,7 @@ export const fishingService = {
             // coarsening rule in appendix E is about publishing someone else's.
             latitude: true,
             longitude: true,
+            waterType: true,
             images: {
                take: 1,
                orderBy: { position: 'asc' },
@@ -1338,7 +1340,85 @@ export const fishingService = {
          },
       });
 
-      return Promise.all(sites.map((entry) => withResolvedImageUrls(entry)));
+      /*
+       * The rating, when it was last fished and what comes out of it, grouped
+       * over every spot at once so the query count does not grow with the list.
+       *
+       * Only public catches and the owner's own are read. Anyone can log a
+       * catch at any spot, so without the filter another angler's private
+       * catch here would give away its date and its species. The public map
+       * list filters the same way.
+       */
+      const ids = sites.map((site) => site.id);
+      const [ratings, groups] = await Promise.all([
+         ratingsBySite(ids),
+         ids.length
+            ? prisma.catch.groupBy({
+                 by: ['siteId', 'speciesId'],
+                 where: {
+                    siteId: { in: ids },
+                    deletedAt: null,
+                    OR: [{ visibility: 'PUBLIC' }, { createdById: user.id }],
+                 },
+                 _count: { _all: true },
+                 _max: { caughtAt: true },
+              })
+            : Promise.resolve([]),
+      ]);
+
+      const speciesIds = [
+         ...new Set(
+            groups.flatMap((group) =>
+               group.speciesId ? [group.speciesId] : []
+            )
+         ),
+      ];
+      const names = new Map(
+         speciesIds.length
+            ? (
+                 await prisma.species.findMany({
+                    where: { id: { in: speciesIds } },
+                    select: { id: true, commonName: true },
+                 })
+              ).map((species) => [species.id, species.commonName])
+            : []
+      );
+
+      /* A catch with no species still counts as the spot being fished. */
+      const lastCatchAt = new Map<string, Date>();
+      const species = new Map<
+         string,
+         { id: string; name: string; count: number }[]
+      >();
+
+      for (const group of groups) {
+         if (!group.siteId) continue;
+
+         const caught = group._max.caughtAt;
+         const latest = lastCatchAt.get(group.siteId);
+         if (caught && (!latest || caught > latest)) {
+            lastCatchAt.set(group.siteId, caught);
+         }
+
+         const name = group.speciesId ? names.get(group.speciesId) : undefined;
+         if (group.speciesId && name) {
+            const known = species.get(group.siteId) ?? [];
+            known.push({ id: group.speciesId, name, count: group._count._all });
+            species.set(group.siteId, known);
+         }
+      }
+
+      return Promise.all(
+         sites.map(async (entry) => ({
+            ...(await withResolvedImageUrls(entry)),
+            lastCatchAt: lastCatchAt.get(entry.id) ?? null,
+            rating: ratings.get(entry.id) ?? { average: null, count: 0 },
+            /* Most caught first, the three a tag row has room for. */
+            species: (species.get(entry.id) ?? [])
+               .sort((a, b) => b.count - a.count)
+               .slice(0, 3),
+         }))
+      );
    },
 
    async updateFishingSite(

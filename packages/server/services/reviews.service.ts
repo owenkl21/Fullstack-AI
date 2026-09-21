@@ -76,6 +76,42 @@ async function summaryOf(siteId: string): Promise<ReviewSummary> {
 }
 
 /*
+ * Every spot in a list at once, counted from the rows with summaryOf's range
+ * and rounding, so a list and the spot page cannot print different figures.
+ * A spot missing from the table has no ratings: average null, count 0.
+ */
+export async function ratingsBySite(siteIds: string[]) {
+   const table = new Map<string, { average: number | null; count: number }>();
+
+   if (!siteIds.length) {
+      return table;
+   }
+
+   const groups = await prisma.review.groupBy({
+      by: ['siteId'],
+      where: {
+         siteId: { in: siteIds },
+         deletedAt: null,
+         rating: { gte: RATING_MIN, lte: RATING_MAX },
+      },
+      _count: { _all: true },
+      _avg: { rating: true },
+   });
+
+   for (const group of groups) {
+      table.set(group.siteId, {
+         count: group._count._all,
+         average:
+            group._avg.rating === null
+               ? null
+               : Math.round(group._avg.rating * 10) / 10,
+      });
+   }
+
+   return table;
+}
+
+/*
  * The spot, if this viewer is allowed to see it at all. Deliberately the same
  * rule getFishingSiteById applies, so a spot that is not found on the page is
  * not found here either.

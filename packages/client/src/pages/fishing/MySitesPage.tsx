@@ -26,6 +26,8 @@ import { SearchField } from '@/components/fishing/rows/SearchField';
 
 type SiteSummary = SpotRowItem & {
    images: { image: { id: string; url: string } }[];
+   /* The fish most caught there, for the tags on the map card. */
+   species?: { id: string; name: string; count: number }[];
 };
 
 type LoadStatus = 'loading' | 'ready' | 'error';
@@ -112,8 +114,8 @@ function MySitesList() {
    const filtered = useMemo(() => {
       const needle = query.trim().toLowerCase();
 
-      /* TODO(api): sorted by the last catch where the endpoint sends one, and by the
-       * day the spot was saved where it does not (appendix E, B3). */
+      /* Most recently fished first. A spot with no catch yet sorts by the day
+       * it was saved. */
       return items
          .filter((entry) =>
             needle ? entry.name.toLowerCase().includes(needle) : true
@@ -144,6 +146,10 @@ function MySitesList() {
                        latitude: entry.latitude,
                        longitude: entry.longitude,
                        catchCount: entry.catchCount,
+                       waterType: entry.waterType,
+                       lastCatchAt: entry.lastCatchAt,
+                       rating: entry.rating,
+                       species: entry.species,
                     },
                  ]
                : []
