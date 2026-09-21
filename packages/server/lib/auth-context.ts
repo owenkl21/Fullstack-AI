@@ -1,4 +1,5 @@
-import type { Request } from 'express';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import type { NextFunction, Request, Response } from 'express';
 
 /*
  * The authenticated user, carried on the request.
@@ -24,11 +25,39 @@ const CONTEXT = Symbol.for('fishlogger.auth');
 
 type WithContext = Request & { [CONTEXT]?: AuthContext };
 
+/*
+ * Who is looking, for code that has no request to ask.
+ *
+ * A photograph's original carries the camera's EXIF, and on a phone that
+ * includes where it was taken to a few metres. Only its owner may be handed
+ * a link to it; everyone else gets the resized copy, which the browser drew
+ * on a canvas and so carries no tags at all. The decision is made where every
+ * link is signed, deep in the upload service, which is called from a dozen
+ * places that were never given the viewer. Threading it through all of them
+ * would leave the next new caller to forget; this lets the signer ask.
+ *
+ * Every request runs inside a scope with an empty viewer, and reading the
+ * session fills it in. Nothing read outside a request finds a viewer, so the
+ * answer there is the safe one: not the owner.
+ */
+type Viewer = { storagePrefixId: string | null };
+const viewerScope = new AsyncLocalStorage<Viewer>();
+
+export const requestScope = (
+   _req: Request,
+   _res: Response,
+   next: NextFunction
+) => viewerScope.run({ storagePrefixId: null }, next);
+
+/* The R2 prefix of whoever this request is for, or null for a stranger. */
+export const currentViewerPrefix = () =>
+   viewerScope.getStore()?.storagePrefixId ?? null;
+
 export const setAuthContext = (
    req: Request,
    user: { id: string; storagePrefixId?: string | null }
 ) => {
-   (req as WithContext)[CONTEXT] = {
+   const context = {
       userId: user.id,
       /*
        * Falls back to the id. A row written before storagePrefixId existed has
@@ -36,6 +65,9 @@ export const setAuthContext = (
        */
       storagePrefixId: user.storagePrefixId ?? user.id,
    };
+   (req as WithContext)[CONTEXT] = context;
+   const viewer = viewerScope.getStore();
+   if (viewer) viewer.storagePrefixId = context.storagePrefixId;
 };
 
 export const getAuth = (req: Request): AuthContext =>

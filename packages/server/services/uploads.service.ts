@@ -5,6 +5,7 @@ import {
    PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { currentViewerPrefix } from '../lib/auth-context';
 
 type UploadScope = 'catch' | 'site' | 'avatar' | 'banner' | 'gear';
 
@@ -368,9 +369,22 @@ export const uploadsService = {
 
       const urls = await resolveReadUrls(storageKey);
 
+      /*
+       * The original is the camera's file, EXIF and all, and a phone writes
+       * where the photograph was taken into it. So a catch with its position
+       * hidden still gave the spot away to anyone who opened the picture.
+       * Only the owner is handed the original now. Everyone else gets the
+       * card, 1200 across, which the browser drew on a canvas and which
+       * carries no tags. The key says whose it is: every upload lives under
+       * users/<storagePrefixId>/, and the viewer comes from the request.
+       */
+      const viewer = currentViewerPrefix();
+      const ownsIt =
+         viewer !== null && storageKey.startsWith(`users/${viewer}/`);
+
       return {
          storageKey,
-         readUrl: urls.url,
+         readUrl: ownsIt ? urls.url : urls.cardUrl,
          cardReadUrl: urls.cardUrl,
          thumbReadUrl: urls.thumbUrl,
       };

@@ -170,6 +170,18 @@ export const uploadsController = {
          return res.status(400).json(parsed.error.format());
       }
 
+      /* Not found rather than forbidden: a stranger learns nothing about the key. */
+      const { storagePrefixId } = getAuth(req);
+      if (
+         !storagePrefixId ||
+         !parsed.data.storageKey.startsWith(`users/${storagePrefixId}/`)
+      ) {
+         return res.status(404).json({
+            code: 'not_found',
+            message: 'No such image.',
+         });
+      }
+
       try {
          const signed = await uploadsService.getReadUrl(parsed.data.storageKey);
          return res.json(signed);

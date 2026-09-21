@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import { toNodeHandler } from 'better-auth/node';
 import router from './routes';
 import { auth } from './lib/auth';
+import { requestScope } from './lib/auth-context';
 import { prisma } from './lib/prisma';
 
 //reads variables from .env file and adds them to process.env
@@ -68,6 +69,9 @@ app.use(
 );
 
 app.use(express.json());
+
+/* Each request gets its own viewer, filled in once the session is read. */
+app.use(requestScope);
 
 app.use(router);
 

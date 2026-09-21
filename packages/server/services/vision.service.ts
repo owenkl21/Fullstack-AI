@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import axios from 'axios';
 import { prisma } from '../lib/prisma';
+import { stripLocation } from '../lib/strip-location';
 import { uploadsService } from './uploads.service';
 
 /*
@@ -53,6 +54,11 @@ const mediaTypeOf = (contentType: string | undefined): MediaType =>
           ? 'image/gif'
           : 'image/jpeg';
 
+/*
+ * Every photograph this file sends anywhere comes through here, so this is
+ * where its location is taken out. The namer and the reader need the fish,
+ * not the spot.
+ */
 async function fetchImage(url: string) {
    const response = await axios.get<ArrayBuffer>(url, {
       responseType: 'arraybuffer',
@@ -60,7 +66,7 @@ async function fetchImage(url: string) {
       maxContentLength: 12 * 1024 * 1024,
    });
    return {
-      data: Buffer.from(response.data).toString('base64'),
+      data: stripLocation(Buffer.from(response.data)).toString('base64'),
       mediaType: mediaTypeOf(response.headers['content-type']),
    };
 }

@@ -122,7 +122,16 @@ router.delete(
 );
 router.post('/api/uploads/sign', requireApiAuth, uploadsController.signUpload);
 router.put('/api/uploads/proxy', requireApiAuth, uploadsController.proxyUpload);
-router.post('/api/uploads/read-url', uploadsController.getReadUrl);
+/*
+ * Signed in, and only for the caller's own photographs. It used to sign any
+ * key for anybody, and a key is written plainly in every card link, so a
+ * stranger could trade a card for the original and its location with it.
+ */
+router.post(
+   '/api/uploads/read-url',
+   requireApiAuth,
+   uploadsController.getReadUrl
+);
 router.get(
    '/api/uploads/direct',
    requireApiAuth,
