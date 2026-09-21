@@ -129,11 +129,15 @@ export function LandingRecord() {
                </div>
 
                <article className="blk rv" style={stagger(3)}>
+                  {/* A real catch, off a dam at sunset. Four by three is the
+                      file's own shape, so the face and the tail both stay. */}
                   <img
-                     src={photos.catchOcean}
-                     alt="A bass held against the sea"
+                     src={photos.catchDam}
+                     alt="A largemouth bass held up on a dam shore at sunset"
                      loading="lazy"
-                     className="aspect-[3/2] w-full object-cover"
+                     width={960}
+                     height={720}
+                     className="aspect-[4/3] w-full object-cover"
                   />
                   <div className="flex flex-col gap-4 px-[22px] pt-5 pb-6 md:px-7 md:pt-6 md:pb-7">
                      <div className="flex items-baseline justify-between gap-4">

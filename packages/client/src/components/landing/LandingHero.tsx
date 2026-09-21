@@ -1,14 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { TornEdge } from '@/components/brand/TornEdge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DeviceDemo } from './demo/DeviceDemo';
 import { steps } from './demo/data';
 import { useDemo } from './demo/useDemo';
-import { ANCHOR, WRAP } from './layout';
+import { ANCHOR, WRAP, stagger } from './layout';
 import { photos } from './photos';
 import { useParallaxFallback } from './useParallaxFallback';
 import { Link } from 'react-router-dom';
+
+/*
+ * How long each step stays on the phone when Watch it log runs, read off the
+ * waits in `play` in useDemo: the sheet rising to the conditions, the
+ * conditions to the photo, the photo to Save, and Save back to home. The rule
+ * over a step fills across that long, so the row reads as the phone's
+ * progress. A second run skips the fix and so skips step two; its rule goes
+ * straight to full, the way a step that is done looks.
+ */
+const RUN_MS = [1000, 2400, 2800, 4200];
 
 /*
  * The opening: the promise and the app itself, on one ground.
@@ -173,37 +183,70 @@ export function LandingHero() {
             >
                {steps.map((s, i) => {
                   const n = i + 1;
-                  const on = demo.step === n;
-                  const done = demo.step > n;
+                  const state =
+                     demo.step === n ? 'on' : demo.step > n ? 'done' : 'idle';
                   return (
-                     <li key={s.n}>
+                     <li
+                        key={s.n}
+                        className="rv border-t border-paper/20 first:border-t-0 md:[&:nth-child(2)]:border-t-0 lg:border-t-0"
+                        style={stagger(i)}
+                     >
+                        {/*
+                         * Padded out and pulled back by the same amount, so the
+                         * words stay on the column and the focus ring has room
+                         * round them rather than sitting on the first letter.
+                         */}
                         <button
                            type="button"
                            onClick={demo.play}
                            aria-label={`${s.title}. Watch it log.`}
+                           data-state={state}
+                           data-playing={demo.playing || undefined}
+                           style={
+                              { '--run': `${RUN_MS[i]}ms` } as CSSProperties
+                           }
                            className={cn(
-                              'group flex h-full w-full flex-col items-start gap-1.5 border-t border-paper/20 py-4 pr-4 text-left transition-[opacity,background-color] duration-[400ms] [transition-timing-function:var(--ease)] first:border-t-0 hover:bg-paper/10 focus-visible:bg-paper/10 md:py-5 lg:border-t-0',
-                              on
+                              'step group relative -mx-3 flex h-full w-[calc(100%+24px)] flex-col items-start gap-1.5 px-3 py-4 text-left transition-opacity duration-[400ms] [transition-timing-function:var(--ease)] md:py-5',
+                              state === 'on'
                                  ? 'opacity-100'
-                                 : done
+                                 : state === 'done'
                                    ? 'opacity-85'
-                                   : 'opacity-55 hover:opacity-100'
+                                   : 'opacity-60 hover:opacity-100 focus-visible:opacity-100'
                            )}
                         >
-                           <span
-                              className={cn(
-                                 'g num text-[38px] leading-[0.9] transition-colors duration-300 md:text-[44px]',
-                                 on || done
-                                    ? 'text-teal'
-                                    : 'text-paper-2 group-hover:text-paper'
-                              )}
-                           >
-                              {s.n}
+                           <span aria-hidden="true" className="step-rule" />
+                           <span className="flex items-end gap-3">
+                              <span
+                                 aria-hidden="true"
+                                 className="step-num g num text-[38px] leading-[0.9] text-paper-2 md:text-[44px]"
+                              >
+                                 {[...s.n].map((digit, k) => (
+                                    <span
+                                       key={k}
+                                       className="step-digit"
+                                       style={{ '--k': k } as CSSProperties}
+                                    >
+                                       <span>{digit}</span>
+                                       <span className="text-teal">
+                                          {digit}
+                                       </span>
+                                    </span>
+                                 ))}
+                              </span>
+                              <span
+                                 aria-hidden="true"
+                                 className="step-cue lab mb-[3px] flex items-center gap-1.5 text-teal"
+                              >
+                                 <span className="step-cue-mark" />
+                                 {state === 'on' && demo.playing
+                                    ? 'On the phone'
+                                    : 'Watch it log'}
+                              </span>
                            </span>
-                           <b className="g block text-[24px] leading-none font-normal tracking-[0.04em] md:text-[26px]">
+                           <b className="step-title g block text-[24px] leading-none font-normal tracking-[0.04em] md:text-[26px]">
                               {s.title}
                            </b>
-                           <p className="max-w-[34ch] text-[14px] leading-[1.5] text-paper-2">
+                           <p className="max-w-[34ch] text-[14px] leading-[1.5] text-paper-2 transition-colors duration-300 group-hover:text-paper group-focus-visible:text-paper">
                               {s.body}
                            </p>
                         </button>

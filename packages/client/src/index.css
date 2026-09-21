@@ -1206,6 +1206,202 @@ article.blk[aria-labelledby] > div:last-of-type > .rule-dashed {
    }
 }
 
+/* ---- The four steps under the hero ------------------------------------------ */
+/*
+ * Each step is a button that runs the phone, and the teal rule over it is the
+ * phone's progress: it fills across a step for as long as that step is on the
+ * phone, stays full once it is done, and drains away when the phone is home.
+ *
+ * A pointer gets a taste of that before it presses. The rule wipes across,
+ * the number rolls over to teal a digit at a time the way the counters in the
+ * phone settle, and the title opens its tracking out towards the buttons'.
+ * The rule leaves the way it came in, off the far end, so a hand run along
+ * the row reads as one line passing through.
+ *
+ * Hover sits behind (hover: hover) so a tap on a phone does not leave a card
+ * lit after the finger has gone.
+ */
+.step-rule {
+   position: absolute;
+   inset-inline: 0.75rem;
+   top: -1px;
+   height: 2px;
+   background: var(--teal);
+   transform: scaleX(0);
+   transform-origin: right;
+   transition: transform 560ms var(--ease);
+}
+.step[data-state='done'] .step-rule,
+.step[data-state='on']:not([data-playing]) .step-rule,
+.step:focus-visible .step-rule {
+   transform: scaleX(1);
+   transform-origin: left;
+}
+.step[data-state='on'][data-playing] .step-rule {
+   transform-origin: left;
+   animation: step-run var(--run, 1s) linear both;
+}
+@keyframes step-run {
+   from {
+      transform: scaleX(0);
+   }
+   to {
+      transform: scaleX(1);
+   }
+}
+
+.step-num {
+   display: inline-flex;
+}
+.step-digit {
+   display: inline-grid;
+   overflow: hidden;
+}
+.step-digit > span {
+   grid-area: 1 / 1;
+   transition: transform 520ms cubic-bezier(0.7, 0, 0.2, 1);
+   transition-delay: calc(var(--k, 0) * 70ms);
+}
+.step-digit > span + span {
+   transform: translateY(105%);
+}
+.step[data-state='on'] .step-digit > span:first-child,
+.step[data-state='done'] .step-digit > span:first-child,
+.step:focus-visible .step-digit > span:first-child {
+   transform: translateY(-105%);
+}
+.step[data-state='on'] .step-digit > span + span,
+.step[data-state='done'] .step-digit > span + span,
+.step:focus-visible .step-digit > span + span {
+   transform: none;
+}
+
+.step-title {
+   transition: letter-spacing 420ms var(--ease);
+}
+.step:focus-visible .step-title {
+   letter-spacing: 0.07em;
+}
+
+/* "Watch it log" before a press, "On the phone" while its step runs. */
+.step-cue {
+   opacity: 0;
+   transform: translateX(-10px);
+   transition:
+      opacity 260ms var(--ease),
+      transform 420ms var(--ease);
+}
+.step[data-state='on'][data-playing] .step-cue,
+.step:not([data-playing]):focus-visible .step-cue {
+   opacity: 1;
+   transform: none;
+}
+/* A play mark, which turns into a live dot while the phone is on this step. */
+.step-cue-mark {
+   width: 7px;
+   height: 8px;
+   background: currentColor;
+   clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.step[data-state='on'][data-playing] .step-cue-mark {
+   height: 7px;
+   clip-path: circle(50%);
+   animation: step-live 1.1s ease-in-out infinite;
+}
+@keyframes step-live {
+   50% {
+      opacity: 0.25;
+   }
+}
+
+@media (hover: hover) {
+   .step:hover .step-rule {
+      transform: scaleX(1);
+      transform-origin: left;
+   }
+   .step:hover .step-digit > span:first-child {
+      transform: translateY(-105%);
+   }
+   .step:hover .step-digit > span + span {
+      transform: none;
+   }
+   .step:hover .step-title {
+      letter-spacing: 0.07em;
+   }
+   .step:not([data-playing]):hover .step-cue {
+      opacity: 1;
+      transform: none;
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .step[data-state='on'][data-playing] .step-rule {
+      animation: none;
+      transform: scaleX(1);
+   }
+   .step[data-state='on'][data-playing] .step-cue-mark {
+      animation: none;
+   }
+}
+
+/* ---- Page one, at the foot of the landing page ------------------------------ */
+/*
+ * A black page on a paper one, like the top of a stack. The paper page sits
+ * rotated off the corner; a pointer near the book fans it a little further
+ * and lifts the top page, which is the only invitation it needs to make.
+ */
+.join-under {
+   position: absolute;
+   inset: 0;
+   background: var(--paper);
+   transform: translate(10px, 12px) rotate(2.2deg);
+   transform-origin: 20% 100%;
+   transition: transform 560ms var(--ease);
+}
+.join-card {
+   box-shadow: 0 18px 40px -20px rgba(6, 42, 47, 0.6);
+   transition:
+      transform 560ms var(--ease),
+      box-shadow 560ms var(--ease);
+}
+.join-colon {
+   animation: join-blink 1s steps(1) infinite;
+}
+.join-caret {
+   display: inline-block;
+   width: 3px;
+   height: 22px;
+   background: var(--teal);
+   animation: join-blink 1.05s steps(1) infinite;
+}
+@keyframes join-blink {
+   50% {
+      opacity: 0.2;
+   }
+}
+.join-go-arrow {
+   display: inline-block;
+   margin-left: 0.45em;
+   transition: transform 360ms var(--ease);
+}
+@media (hover: hover) {
+   .join-page:hover .join-card {
+      transform: translateY(-6px) rotate(-0.6deg);
+      box-shadow: 0 30px 50px -22px rgba(6, 42, 47, 0.65);
+   }
+   .join-page:hover .join-under {
+      transform: translate(20px, 16px) rotate(4.5deg);
+   }
+   .join-go:hover .join-go-arrow {
+      transform: translateX(6px);
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .join-colon,
+   .join-caret {
+      animation: none;
+   }
+}
+
 /* ---- A shimmer for anything still loading ---------------------------------- */
 .shimmer {
    position: relative;

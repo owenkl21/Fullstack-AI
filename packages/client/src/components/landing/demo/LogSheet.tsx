@@ -124,7 +124,13 @@ export function LogSheet({ demo }: { demo: Demo }) {
                   ))}
                </div>
 
-               <div className="relative flex h-[200px] items-center justify-center overflow-hidden bg-black-block">
+               {/*
+                * flex-none: this column scrolls, and a flex child shrinks
+                * before its parent scrolls. The photo has nothing in flow but
+                * the button, so it gave way first and the fish came out as a
+                * strip the height of that button.
+                */}
+               <div className="relative flex h-[200px] flex-none items-center justify-center overflow-hidden bg-black-block">
                   <img
                      src={demoMoment.photo}
                      alt="A bass held against the sea"

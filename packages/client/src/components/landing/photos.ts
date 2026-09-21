@@ -6,6 +6,7 @@ export const photos = {
    heroSpot: '/photos/spot-sunset-rock.jpg',
    rockOcean: '/photos/spot-rock-ocean.jpg',
    catchOcean: '/photos/catch-ocean.jpg',
+   catchDam: '/photos/catch-dam-bass.jpg',
    catchLine: '/photos/catch-line.jpg',
    catchDepth: '/photos/catch-depth.jpg',
    dawnBoats: '/photos/dawn-boats.jpg',
