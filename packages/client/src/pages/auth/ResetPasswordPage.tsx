@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { authClient } from '@/lib/auth-client';
+import { authClient, signOut, useSession } from '@/lib/auth-client';
 import { useDocumentTitle } from '@/lib/title';
 import { AuthForm, AuthShell, Field } from './AuthShell';
 
@@ -16,6 +16,22 @@ export function ResetPasswordPage() {
    const [again, setAgain] = useState('');
    const [error, setError] = useState<string | null>(null);
    const [busy, setBusy] = useState(false);
+   const { data: session, isPending, isRefetching } = useSession();
+   const signedIn = Boolean(session?.user);
+
+   /*
+    * A reset link opened in a browser that is signed in signs it out first.
+    * Setting a new password is never something done from inside the account:
+    * the reset ends every session anyway, and the form should not sit under
+    * a header that says somebody is in.
+    */
+   useEffect(() => {
+      if (token && signedIn) void signOut().catch(() => undefined);
+   }, [token, signedIn]);
+
+   /* The first answer only, and nothing while the sign-out goes through. */
+   if (isPending && !isRefetching) return null;
+   if (token && signedIn) return null;
 
    /* No token means the link was cut short, or has already been used. */
    if (!token) {

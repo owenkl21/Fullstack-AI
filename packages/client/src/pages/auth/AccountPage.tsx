@@ -34,6 +34,10 @@ function changeProblem(failed: {
       return 'Too many tries. Wait a while and try again.';
    }
 
+   if (failed.code === 'INVALID_PASSWORD') {
+      return 'That password is not right.';
+   }
+
    /* better-auth gives this one a message and no code. */
    if (failed.message === 'Email is the same') {
       return 'That is already your address.';
@@ -90,6 +94,7 @@ function YourEmail({
    onConfirmed: () => void;
 }) {
    const [newEmail, setNewEmail] = useState('');
+   const [password, setPassword] = useState('');
    const [error, setError] = useState<string | null>(null);
    const [note, setNote] = useState<string | null>(null);
    const [busy, setBusy] = useState(false);
@@ -111,16 +116,30 @@ function YourEmail({
          return;
       }
 
+      if (!password) {
+         setError('Give your current password to change the address.');
+         return;
+      }
+
       setBusy(true);
 
       try {
-         const { error: failed } = await authClient.changeEmail({
-            newEmail: wanted,
-            /*
-             * Marked, so the verify page knows a failed link is part of a
-             * change and does not offer to send one to the old address.
-             */
-            callbackURL: '/verify-email?change=1',
+         /*
+          * Through $fetch because the password is ours, not better-auth's:
+          * the server checks it before the change-of-address endpoint runs,
+          * so a device left signed in is not enough to move the account.
+          */
+         const { error: failed } = await authClient.$fetch('/change-email', {
+            method: 'POST',
+            body: {
+               newEmail: wanted,
+               password,
+               /*
+                * Marked, so the verify page knows a failed link is part of a
+                * change and does not offer to send one to the old address.
+                */
+               callbackURL: '/verify-email?change=1',
+            },
          });
 
          if (failed) {
@@ -129,6 +148,7 @@ function YourEmail({
          }
 
          setNewEmail('');
+         setPassword('');
          /*
           * A confirmed address has to agree to the change first, so its link
           * goes there and the one to the new address follows from it. An
@@ -179,6 +199,13 @@ function YourEmail({
                   onChange={setNewEmail}
                   autoComplete="email"
                   hint="Nothing changes until the new address is confirmed."
+               />
+               <Field
+                  label="Current password"
+                  type="password"
+                  value={password}
+                  onChange={setPassword}
+                  autoComplete="current-password"
                />
                <Button
                   type="submit"

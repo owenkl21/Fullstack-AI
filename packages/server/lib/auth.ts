@@ -1,6 +1,10 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import { createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
+import {
+   APIError,
+   createAuthMiddleware,
+   getSessionFromCtx,
+} from 'better-auth/api';
 import { prisma } from './prisma';
 import {
    sendChangeEmailConfirmation,
@@ -133,26 +137,64 @@ export const auth = betterAuth({
     */
    logger: { level: 'warn' },
 
-   /*
-    * No link in a mail ever opens a session. Only a password does.
-    *
-    * better-auth's change-of-address link signs in whoever opens it when
-    * nobody is signed in, and there is no option to stop it, so the link is
-    * refused here unless the account is already signed in on that browser.
-    * The approval step, which only sends the next mail, needs no session.
-    * The redirect is fixed rather than the link's own callbackURL: this runs
-    * before better-auth has checked the token, and a forged one must not
-    * turn this into an open redirect.
-    */
    hooks: {
       before: createAuthMiddleware(async (ctx) => {
-         if (ctx.path !== '/verify-email') return;
-         const token = ctx.query?.token;
-         const claims = tokenClaims(typeof token === 'string' ? token : null);
-         if (!claims.updateTo) return;
-         if (claims.requestType === 'change-email-confirmation') return;
-         if (await getSessionFromCtx(ctx)) return;
-         throw ctx.redirect('/verify-email?change=1&error=SIGN_IN_REQUIRED');
+         /*
+          * A change of address asks for the current password, as a change of
+          * password already does. Without it, anybody at a device the owner
+          * left signed in could move the account to their own address, reset
+          * the password there, and keep it. better-auth's endpoint takes no
+          * password, so it is checked here, against the same hash sign-in
+          * uses, before the endpoint runs at all.
+          */
+         if (ctx.path === '/change-email') {
+            const session = await getSessionFromCtx(ctx);
+            /* Signed out, the endpoint answers 401 on its own. */
+            if (!session) return;
+            const body = ctx.body as { password?: unknown } | undefined;
+            const password =
+               typeof body?.password === 'string' ? body.password : '';
+            const account =
+               await ctx.context.internalAdapter.findCredentialAccount(
+                  session.user.id
+               );
+            const right =
+               password.length > 0 &&
+               !!account?.password &&
+               (await ctx.context.password.verify({
+                  hash: account.password,
+                  password,
+               }));
+            if (!right) {
+               throw new APIError('BAD_REQUEST', {
+                  code: 'INVALID_PASSWORD',
+                  message: 'Invalid password',
+               });
+            }
+            return;
+         }
+
+         /*
+          * No link in a mail ever opens a session. Only a password does.
+          *
+          * better-auth's change-of-address link signs in whoever opens it
+          * when nobody is signed in, and there is no option to stop it, so
+          * the link is refused here unless the account is already signed in
+          * on that browser. The approval step, which only sends the next mail,
+          * needs no session. The redirect is fixed rather than the link's own
+          * callbackURL: this runs before better-auth has checked the token,
+          * and a forged one must not turn this into an open redirect.
+          */
+         if (ctx.path === '/verify-email') {
+            const token = ctx.query?.token;
+            const claims = tokenClaims(
+               typeof token === 'string' ? token : null
+            );
+            if (!claims.updateTo) return;
+            if (claims.requestType === 'change-email-confirmation') return;
+            if (await getSessionFromCtx(ctx)) return;
+            throw ctx.redirect('/verify-email?change=1&error=SIGN_IN_REQUIRED');
+         }
       }),
    },
 

@@ -1,12 +1,70 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { authClient } from '@/lib/auth-client';
+import { authClient, signOut, useSession } from '@/lib/auth-client';
 import { useDocumentTitle } from '@/lib/title';
 import { AuthForm, AuthShell, Field } from './AuthShell';
 
 export function ForgotPasswordPage() {
    useDocumentTitle('Reset your password');
+   const { data: session, isPending, isRefetching } = useSession();
+
+   /* The first answer only, so a refetch on focus does not blank the page. */
+   if (isPending && !isRefetching) return null;
+
+   /*
+    * Signed in, this is not the way to a new password. The account page is,
+    * and it asks for the current one, so somebody at a device left signed in
+    * cannot use it. Resetting is for a password that is forgotten, which
+    * starts signed out, and the link goes to the owner's inbox either way.
+    */
+   if (session?.user) return <SignedInAlready email={session.user.email} />;
+
+   return <AskForLink />;
+}
+
+function SignedInAlready({ email }: { email: string }) {
+   const [busy, setBusy] = useState(false);
+
+   return (
+      <AuthShell
+         title="You are signed in"
+         lead={`As ${email}. To change your password, go to your account. It asks for the current one.`}
+         footer={
+            <p className="inline-flex min-h-11 items-center text-[17px] text-ink-2">
+               <Link
+                  to="/account"
+                  className="inline-flex min-h-11 items-center text-teal-text"
+               >
+                  Go to your account
+               </Link>
+            </p>
+         }
+      >
+         <div className="grid gap-4">
+            <p className="max-w-[52ch] text-[17px] text-ink-2">
+               Forgotten it? Sign out first, then ask for a link. It goes to the
+               address on the account, never to whoever asks.
+            </p>
+            <Button
+               type="button"
+               variant="outline"
+               disabled={busy}
+               className="justify-self-start"
+               onClick={async () => {
+                  setBusy(true);
+                  await signOut().catch(() => undefined);
+                  setBusy(false);
+               }}
+            >
+               {busy ? 'Signing out' : 'Sign out'}
+            </Button>
+         </div>
+      </AuthShell>
+   );
+}
+
+function AskForLink() {
    const [email, setEmail] = useState('');
    const [sent, setSent] = useState(false);
    const [error, setError] = useState<string | null>(null);
