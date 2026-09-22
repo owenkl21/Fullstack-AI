@@ -19,6 +19,25 @@ type FeedScope = 'GLOBAL' | 'NEARBY';
  */
 type FeedType = 'CATCH';
 
+/* Who wrote a comment, as the thread prints it. Never an email address. */
+const commentAuthor = {
+   select: { id: true, username: true, displayName: true },
+};
+
+/*
+ * A card carries its five newest comments so the thread opens without a round
+ * trip, and each of those carries the two replies the thread shows before
+ * "View more". Anything past that is read with the whole thread.
+ */
+const EMBEDDED_COMMENTS = 5;
+const EMBEDDED_REPLIES = 2;
+/*
+ * The most rows one thread read returns. Oldest first, so the cut can only
+ * ever lose the newest: a reply is younger than the comment it answers, which
+ * means a reply inside the window always has its parent inside it too.
+ */
+const THREAD_CAP = 1000;
+
 const feedInclude = {
    author: {
       select: { id: true, username: true, displayName: true, avatarUrl: true },
@@ -47,6 +66,7 @@ const feedInclude = {
                      storageKey: true,
                      focusX: true,
                      focusY: true,
+                     zoom: true,
                   },
                },
             },
@@ -68,14 +88,112 @@ const feedInclude = {
          ...siteGateSelect,
       },
    },
+   /*
+    * Top-level comments only. A reply used to be impossible; now that it is
+    * not, five newest rows of either kind could be five replies to comments
+    * the card does not hold, with nothing to hang them from.
+    */
    comments: {
-      where: { deletedAt: null },
+      where: { deletedAt: null, parentId: null },
       orderBy: { createdAt: 'desc' as const },
-      take: 5,
+      take: EMBEDDED_COMMENTS,
       include: {
-         user: { select: { id: true, username: true, displayName: true } },
+         user: commentAuthor,
+         replies: {
+            where: { deletedAt: null },
+            orderBy: { createdAt: 'asc' as const },
+            take: EMBEDDED_REPLIES,
+            include: { user: commentAuthor },
+         },
+         _count: { select: { replies: { where: { deletedAt: null } } } },
       },
    },
+   /*
+    * How many top-level comments there are, which commentCount cannot say:
+    * that one counts replies as well, because it is the figure beside the
+    * bubble and a reply is a comment on the post. The thread needs this one
+    * to know how many it has not shown yet.
+    */
+   _count: {
+      select: { comments: { where: { deletedAt: null, parentId: null } } },
+   },
+};
+
+type CommentRow = {
+   id: string;
+   postId: string;
+   parentId: string | null;
+   body: string;
+   likeCount: number;
+   editedAt: Date | null;
+   createdAt: Date;
+   user: { id: string; username: string | null; displayName: string };
+   replies?: CommentRow[];
+   _count?: { replies: number };
+};
+
+/*
+ * A comment as the thread reads it. Named field by field rather than spread,
+ * so a column added to the table later (deletedAt and userId are already
+ * there) does not start travelling to every reader by accident.
+ */
+const shapeComment = (row: CommentRow, likedByViewer: Set<string>) => ({
+   id: row.id,
+   postId: row.postId,
+   parentId: row.parentId,
+   body: row.body,
+   createdAt: row.createdAt,
+   editedAt: row.editedAt,
+   likeCount: Math.max(0, row.likeCount),
+   likedByMe: likedByViewer.has(row.id),
+   user: row.user,
+});
+
+/** A top-level comment: itself, the replies in hand, and how many there are. */
+const shapeThread = (row: CommentRow, likedByViewer: Set<string>) => {
+   const replies = (row.replies ?? []).map((reply) =>
+      shapeComment(reply, likedByViewer)
+   );
+   return {
+      ...shapeComment(row, likedByViewer),
+      replies,
+      replyCount: Math.max(row._count?.replies ?? 0, replies.length),
+   };
+};
+
+/** Which of these comments the viewer has liked. Nobody signed in, none. */
+async function likedAmong(viewerId: string | undefined, commentIds: string[]) {
+   if (!viewerId || commentIds.length === 0) return new Set<string>();
+   const rows = await prisma.feedCommentLike.findMany({
+      where: { userId: viewerId, commentId: { in: commentIds } },
+      select: { commentId: true },
+   });
+   return new Set(rows.map((row) => row.commentId));
+}
+
+const idsInThreads = (threads: CommentRow[]) =>
+   threads.flatMap((row) => [
+      row.id,
+      ...(row.replies ?? []).map((reply) => reply.id),
+   ]);
+
+/*
+ * The embedded comments of a post, in the shape the thread route returns, and
+ * the count of top-level ones lifted off Prisma's `_count` under a name that
+ * says what it is.
+ */
+const withShapedThread = <
+   T extends { comments: CommentRow[]; _count?: { comments: number } },
+>(
+   post: T,
+   likedByViewer: Set<string>
+) => {
+   const { _count, ...rest } = post;
+   return {
+      ...rest,
+      comments: post.comments.map((row) => shapeThread(row, likedByViewer)),
+      threadCount: _count?.comments ?? post.comments.length,
+   };
 };
 
 /*
@@ -109,6 +227,19 @@ const withSpotShownTo = <
       site: shown.site ? { id: shown.site.id, name: shown.site.name } : null,
    };
 };
+
+/*
+ * The post a comment route is acting under. Gone, or private, and the thread
+ * is not there for anybody: the same two rules the feed itself reads by.
+ */
+const readablePost = (postId: string) =>
+   prisma.feedPost.findFirst({
+      where: { id: postId, deletedAt: null, visibility: { not: 'PRIVATE' } },
+      select: { id: true, authorId: true },
+   });
+
+/* Thrown inside the reply transaction to roll it back; never leaves the file. */
+class ParentGone extends Error {}
 
 const withResolvedFeedImageUrls = async <
    T extends {
@@ -209,6 +340,13 @@ export const feedService = {
       longitude?: number;
       limit: number;
       offset: number;
+      /*
+       * One post, by id: where a notification about a comment lands, since a
+       * post has no page of its own. It is read through the same rules as the
+       * rest (live, not private, a catch) and leaves the scope out, because
+       * the reader asked for that post and not for a place.
+       */
+      postId?: string;
    }) {
       /*
        * Only a position this reader may be told can put a post in the box.
@@ -254,8 +392,9 @@ export const feedService = {
              * deleted; they simply stop being read.
              */
             type: 'CATCH' satisfies FeedType,
-            ...scopeWhere,
-            ...nearbyWhere,
+            ...(input.postId
+               ? { id: input.postId }
+               : { ...scopeWhere, ...nearbyWhere }),
          },
          include: feedInclude,
          orderBy: { createdAt: 'desc' },
@@ -291,8 +430,9 @@ export const feedService = {
       );
 
       if (!input.userId) {
+         const nobody = new Set<string>();
          return postsWithResolvedImageUrls.map((post: any) => ({
-            ...post,
+            ...withShapedThread(post, nobody),
             likedByMe: false,
             savedByMe: false,
             authorFollowedByMe: false,
@@ -335,8 +475,16 @@ export const feedService = {
          follows.map((entry: any) => entry.followingId)
       );
 
+      /* One read for every comment on the page, not one per card. */
+      const likedComments = await likedAmong(
+         viewerUserId,
+         postsWithResolvedImageUrls.flatMap((post: any) =>
+            idsInThreads(post.comments)
+         )
+      );
+
       return postsWithResolvedImageUrls.map((post: any) => ({
-         ...post,
+         ...withShapedThread(post, likedComments),
          likedByMe: likedSet.has(post.id),
          savedByMe: savedSet.has(post.id),
          authorFollowedByMe: followingSet.has(post.author.id),
@@ -387,7 +535,8 @@ export const feedService = {
          },
          include: feedInclude,
       });
-      return withSpotShownTo(post, userId);
+      /* New, so nobody has commented, let alone liked one. */
+      return withShapedThread(withSpotShownTo(post, userId), new Set<string>());
    },
 
    async updateFeedPost(
@@ -412,7 +561,10 @@ export const feedService = {
       });
       /* Their own post, but the spot under it may be somebody else's and
          kept private since: asked here like everywhere else. */
-      return withSpotShownTo(post, userId);
+      return withShapedThread(
+         withSpotShownTo(post, userId),
+         await likedAmong(userId, idsInThreads(post.comments))
+      );
    },
 
    async deleteFeedPost(userId: string, postId: string) {
@@ -445,29 +597,59 @@ export const feedService = {
          return null;
       }
 
-      const result = await prisma.$transaction(async (tx: any) => {
-         const existing = await tx.feedLike.findUnique({
-            where: { postId_userId: { postId, userId } },
-            select: { id: true },
-         });
-
-         if (existing) {
-            await tx.feedLike.delete({ where: { id: existing.id } });
+      const result: { liked: boolean } = await prisma
+         .$transaction(async (tx: any) => {
+            /*
+             * The post's row is taken before the like table is touched, the
+             * way a comment's heart takes its comment (toggleCommentLike), so
+             * every heart pressed on one post waits its turn. Without it, a
+             * like's insert only read the post for its key: two people liking
+             * at once each held that read and then waited on the other to
+             * raise the figure, and MySQL threw one of them out as a 500.
+             * Two unlikes at once both found the row and both lowered the
+             * figure, so it drifted below the likes actually held. Nothing
+             * changes here; the figure moves below.
+             */
             await tx.feedPost.update({
                where: { id: postId },
-               data: { likeCount: { decrement: 1 } },
+               data: { likeCount: { increment: 0 } },
+               select: { id: true },
             });
-            return { liked: false };
-         }
 
-         await tx.feedLike.create({ data: { postId, userId } });
-         await tx.feedPost.update({
-            where: { id: postId },
-            data: { likeCount: { increment: 1 } },
+            const existing = await tx.feedLike.findUnique({
+               where: { postId_userId: { postId, userId } },
+               select: { id: true },
+            });
+
+            if (existing) {
+               /* deleteMany, so the figure only drops by a row that went. */
+               const gone = await tx.feedLike.deleteMany({
+                  where: { id: existing.id },
+               });
+               await tx.feedPost.update({
+                  where: { id: postId },
+                  data: { likeCount: { decrement: gone.count } },
+               });
+               return { liked: false };
+            }
+
+            await tx.feedLike.create({ data: { postId, userId } });
+            await tx.feedPost.update({
+               where: { id: postId },
+               data: { likeCount: { increment: 1 } },
+            });
+
+            return { liked: true };
+         })
+         .catch((error: unknown) => {
+            /*
+             * The unique key on (postId, userId) still stands behind this: a
+             * like that trips it is a like already held, which is what was
+             * asked for, so it is answered as liked rather than as a failure.
+             */
+            if ((error as { code?: string })?.code !== 'P2002') throw error;
+            return { liked: true };
          });
-
-         return { liked: true };
-      });
 
       if (result.liked) {
          await notificationsService.notify({
@@ -480,82 +662,408 @@ export const feedService = {
       return result;
    },
 
-   async listComments(postId: string) {
-      return prisma.feedComment.findMany({
+   /*
+    * The whole thread, oldest first: every top-level comment with its replies
+    * under it. Anyone may read it; `viewerId` only decides which hearts come
+    * back filled. Null when the post is not there to be read.
+    */
+   async listComments(postId: string, viewerId?: string) {
+      const post = await readablePost(postId);
+      if (!post) return null;
+
+      const rows: CommentRow[] = await prisma.feedComment.findMany({
          where: { postId, deletedAt: null },
-         include: {
-            user: { select: { id: true, username: true, displayName: true } },
-         },
+         include: { user: commentAuthor },
          orderBy: { createdAt: 'asc' },
-      });
-   },
-
-   async createComment(userId: string, postId: string, body: string) {
-      await getUserId(userId); // throws if the user is gone
-      const post = await prisma.feedPost.findFirst({
-         where: { id: postId, deletedAt: null },
-         select: { id: true, authorId: true },
+         take: THREAD_CAP,
       });
 
-      if (!post) {
-         return null;
+      /*
+       * Nested here rather than in the query, so the thread is one read and
+       * the order inside each group is the order of the list. A reply whose
+       * parent is not among the live rows has nothing to hang from and is
+       * left out: a removal takes its replies with it, so that is only ever
+       * a reply that slipped in while its parent was being removed.
+       */
+      const threads = new Map<string, CommentRow>();
+      for (const row of rows) {
+         if (!row.parentId) threads.set(row.id, { ...row, replies: [] });
+      }
+      for (const row of rows) {
+         if (row.parentId) threads.get(row.parentId)?.replies?.push(row);
       }
 
-      const comment = await prisma.$transaction(async (tx: any) => {
-         const comment = await tx.feedComment.create({
-            data: {
-               postId,
-               userId,
-               body,
-            },
-            include: {
-               user: {
-                  select: { id: true, username: true, displayName: true },
-               },
-            },
-         });
-
-         await tx.feedPost.update({
-            where: { id: postId },
-            data: { commentCount: { increment: 1 } },
-         });
-
-         return comment;
-      });
-
-      await notificationsService.notify({
-         userId: post.authorId,
-         actorId: userId,
-         kind: 'COMMENT',
-         postId,
-         body,
-      });
-      return comment;
+      const ordered = [...threads.values()];
+      const liked = await likedAmong(viewerId, idsInThreads(ordered));
+      return ordered.map((row) => shapeThread(row, liked));
    },
 
-   async deleteComment(userId: string, commentId: string) {
+   /*
+    * A comment, or a reply when `parentId` names the comment being answered.
+    *
+    * The thread is one level deep. Answering a reply is allowed, and lands
+    * under the same top-level comment as the reply it answers; the person
+    * told about it is whoever wrote the comment that was actually answered,
+    * not whoever started the group.
+    */
+   async createComment(
+      userId: string,
+      postId: string,
+      body: string,
+      parentId?: string | null
+   ) {
+      await getUserId(userId); // throws if the user is gone
+      const post = await readablePost(postId);
+
+      if (!post) {
+         return { error: 'post_not_found' as const };
+      }
+
+      let answered: { id: string; userId: string } | null = null;
+      let topLevelId: string | null = null;
+      if (parentId) {
+         const target = await prisma.feedComment.findFirst({
+            where: { id: parentId, deletedAt: null },
+            select: {
+               id: true,
+               postId: true,
+               userId: true,
+               parentId: true,
+               parent: { select: { deletedAt: true } },
+            },
+         });
+
+         /* Removed, or never there. Nothing is said to a comment that is gone. */
+         if (!target || (target.parentId && target.parent?.deletedAt)) {
+            return { error: 'parent_not_found' as const };
+         }
+         /* A real comment, under some other post: not this thread's to answer. */
+         if (target.postId !== postId) {
+            return { error: 'parent_not_in_post' as const };
+         }
+
+         answered = { id: target.id, userId: target.userId };
+         topLevelId = target.parentId ?? target.id;
+      }
+
+      let comment: CommentRow;
+      try {
+         comment = await prisma.$transaction(async (tx: any) => {
+            /*
+             * A reply is a comment on the post, so it is counted as one. The
+             * figure is raised first, before the row is written, which takes
+             * the post's row for this transaction alone. The other way round,
+             * each insert took a shared hold on the post (its key is checked)
+             * and then waited to raise the figure, so two people writing at
+             * the same moment waited on each other and MySQL threw one of
+             * them out: the second of two comments sent at once failed.
+             */
+            await tx.feedPost.update({
+               where: { id: postId },
+               data: { commentCount: { increment: 1 } },
+            });
+
+            const created = await tx.feedComment.create({
+               data: {
+                  postId,
+                  userId,
+                  body,
+                  parentId: topLevelId,
+               },
+               include: { user: commentAuthor },
+            });
+
+            if (topLevelId) {
+               /*
+                * Looked at again now that the reply exists. A removal that
+                * ran between the check above and this write has already
+                * swept the parent's replies and would have missed this one,
+                * leaving it counted and never shown. Rolled back instead.
+                */
+               const parent = await tx.feedComment.findUnique({
+                  where: { id: topLevelId },
+                  select: { deletedAt: true },
+               });
+               if (!parent || parent.deletedAt) throw new ParentGone();
+            }
+
+            return created;
+         });
+      } catch (error) {
+         if (error instanceof ParentGone) {
+            return { error: 'parent_not_found' as const };
+         }
+         throw error;
+      }
+
+      /*
+       * Who hears about it. The person answered is told they were answered.
+       * The post's author is told of every comment under their post, unless
+       * they are the person answered, who has just been told once already.
+       * `notify` drops anything addressed to the person who wrote it. Both
+       * rows carry the new comment's id, so removing it removes them.
+       */
+      if (answered) {
+         await notificationsService.notify({
+            userId: answered.userId,
+            actorId: userId,
+            kind: 'COMMENT_REPLY',
+            postId,
+            commentId: comment.id,
+            body,
+         });
+      }
+      if (!answered || answered.userId !== post.authorId) {
+         await notificationsService.notify({
+            userId: post.authorId,
+            actorId: userId,
+            kind: 'COMMENT',
+            postId,
+            commentId: comment.id,
+            body,
+         });
+      }
+
+      const nobody = new Set<string>();
+      return {
+         comment: topLevelId
+            ? shapeComment(comment, nobody)
+            : shapeThread(comment, nobody),
+      };
+   },
+
+   /*
+    * The author changes the words. Only the author: the owner of the post may
+    * remove a comment under it, never rewrite one. Nobody is told again; the
+    * inbox rows that quote the comment are brought up to date in place.
+    */
+   async updateComment(userId: string, commentId: string, body: string) {
       await getUserId(userId); // throws if the user is gone
       const existing = await prisma.feedComment.findFirst({
-         where: { id: commentId, userId, deletedAt: null },
-         select: { id: true, postId: true },
+         where: {
+            id: commentId,
+            userId,
+            deletedAt: null,
+            post: { deletedAt: null },
+         },
+         select: { id: true, body: true },
       });
 
       if (!existing) {
          return null;
       }
 
-      await prisma.$transaction(async (tx: any) => {
-         await tx.feedComment.update({
-            where: { id: commentId },
+      const include = {
+         user: commentAuthor,
+         _count: { select: { replies: { where: { deletedAt: null } } } },
+      };
+      /* Saved as it stood: not an edit, so it is not marked as one. */
+      const changed = existing.body !== body;
+      const row: CommentRow = changed
+         ? await prisma.feedComment.update({
+              where: { id: commentId },
+              data: { body, editedAt: new Date() },
+              include,
+           })
+         : await prisma.feedComment.findUniqueOrThrow({
+              where: { id: commentId },
+              include,
+           });
+
+      if (changed) {
+         await notificationsService.rewordComment(commentId, body);
+      }
+
+      const liked = await likedAmong(userId, [commentId]);
+      /* The client keeps the replies it holds; only the comment comes back. */
+      return {
+         ...shapeComment(row, liked),
+         ...(row.parentId ? {} : { replyCount: row._count?.replies ?? 0 }),
+      };
+   },
+
+   /*
+    * Remove a comment, and with a top-level one every reply under it, which
+    * is what a reader expects from anywhere else they have commented: a reply
+    * left hanging under "Comment removed" answers nothing.
+    *
+    * Yours to remove if you wrote it, or if it sits under your post. One
+    * transaction: the rows are marked, the post's count drops by exactly the
+    * number marked, and the inbox rows about any of them go. Marked, not
+    * deleted, like everything else here; the likes stay in their table and
+    * stop counting because nothing reads a removed comment again.
+    */
+   async deleteComment(userId: string, commentId: string) {
+      await getUserId(userId); // throws if the user is gone
+      const existing = await prisma.feedComment.findFirst({
+         where: { id: commentId, deletedAt: null },
+         select: {
+            id: true,
+            postId: true,
+            userId: true,
+            post: { select: { authorId: true } },
+         },
+      });
+
+      /* Not found and not yours read the same from outside. */
+      if (
+         !existing ||
+         (existing.userId !== userId && existing.post.authorId !== userId)
+      ) {
+         return null;
+      }
+
+      return prisma.$transaction(async (tx: any) => {
+         /*
+          * The post's row is taken first, the way a new comment takes it
+          * first (createComment), so every write to a thread queues on the
+          * same row in the same order. A removal that marked the rows first
+          * and a reply to the comment being removed could otherwise each hold
+          * what the other was waiting for. Nothing changes here; the figure
+          * is lowered below once the number removed is known.
+          */
+         await tx.feedPost.update({
+            where: { id: existing.postId },
+            data: { commentCount: { increment: 0 } },
+            select: { id: true },
+         });
+
+         const replies: Array<{ id: string }> = await tx.feedComment.findMany({
+            where: { parentId: commentId, deletedAt: null },
+            select: { id: true },
+         });
+         const ids = [commentId, ...replies.map((reply) => reply.id)];
+
+         /*
+          * Counted by the write, not by the read above: two removals of the
+          * same comment at once both get here, and only the rows this one
+          * really marked may come off the post's figure.
+          */
+         const marked = await tx.feedComment.updateMany({
+            where: { id: { in: ids }, deletedAt: null },
             data: { deletedAt: new Date() },
          });
 
-         await tx.feedPost.update({
+         if (marked.count > 0) {
+            await tx.feedPost.update({
+               where: { id: existing.postId },
+               data: { commentCount: { decrement: marked.count } },
+            });
+            /* A figure that had already drifted low is not sent below zero. */
+            await tx.feedPost.updateMany({
+               where: { id: existing.postId, commentCount: { lt: 0 } },
+               data: { commentCount: 0 },
+            });
+         }
+
+         await notificationsService.forgetComments(tx, ids);
+
+         const post = await tx.feedPost.findUnique({
             where: { id: existing.postId },
-            data: { commentCount: { decrement: 1 } },
+            select: { commentCount: true },
          });
+
+         return {
+            id: commentId,
+            postId: existing.postId,
+            removedIds: ids,
+            removed: marked.count,
+            commentCount: post?.commentCount ?? 0,
+         };
+      });
+   },
+
+   /*
+    * Like a comment, or take the like back. The same toggle a post has, and
+    * it answers with the figure as well as the state, so a heart pressed on
+    * two devices settles on what the table says rather than on arithmetic.
+    */
+   async toggleCommentLike(userId: string, commentId: string) {
+      await getUserId(userId); // throws if the user is gone
+      const comment = await prisma.feedComment.findFirst({
+         where: {
+            id: commentId,
+            deletedAt: null,
+            post: { deletedAt: null, visibility: { not: 'PRIVATE' } },
+         },
+         select: { id: true, userId: true, postId: true, body: true },
       });
 
-      return { id: commentId };
+      if (!comment) {
+         return null;
+      }
+
+      const result: { liked: boolean; likeCount: number } = await prisma
+         .$transaction(async (tx: any) => {
+            /*
+             * The comment's row is taken before the like table is touched,
+             * so every heart pressed on one comment waits its turn. Without
+             * it, a like's insert only read the comment for its key: two
+             * people liking at once each held that read and then waited on
+             * the other to raise the figure, and a like and an unlike of the
+             * same heart waited on each other the same way. MySQL threw one
+             * of each pair out. Nothing changes here; the figure moves below.
+             */
+            await tx.feedComment.update({
+               where: { id: commentId },
+               data: { likeCount: { increment: 0 } },
+               select: { id: true },
+            });
+
+            const existing = await tx.feedCommentLike.findUnique({
+               where: { commentId_userId: { commentId, userId } },
+               select: { id: true },
+            });
+
+            if (existing) {
+               /* deleteMany, so a second unlike racing this one removes
+                  nothing and counts nothing, rather than throwing on a row
+                  that has already gone. */
+               const gone = await tx.feedCommentLike.deleteMany({
+                  where: { id: existing.id },
+               });
+               const row = await tx.feedComment.update({
+                  where: { id: commentId },
+                  data: { likeCount: { decrement: gone.count } },
+                  select: { likeCount: true },
+               });
+               return { liked: false, likeCount: Math.max(0, row.likeCount) };
+            }
+
+            await tx.feedCommentLike.create({ data: { commentId, userId } });
+            const row = await tx.feedComment.update({
+               where: { id: commentId },
+               data: { likeCount: { increment: 1 } },
+               select: { likeCount: true },
+            });
+
+            return { liked: true, likeCount: row.likeCount };
+         })
+         .catch(async (error: unknown) => {
+            /*
+             * Two likes at once: the second trips the unique key on
+             * (commentId, userId). The like is there, which is what was asked
+             * for, so it is answered as liked rather than as a failure.
+             */
+            if ((error as { code?: string })?.code !== 'P2002') throw error;
+            const row = await prisma.feedComment.findUnique({
+               where: { id: commentId },
+               select: { likeCount: true },
+            });
+            return { liked: true, likeCount: row?.likeCount ?? 1 };
+         });
+
+      if (result.liked) {
+         await notificationsService.notify({
+            userId: comment.userId,
+            actorId: userId,
+            kind: 'COMMENT_LIKE',
+            postId: comment.postId,
+            commentId,
+            /* Their own words back to them, so the line says which comment. */
+            body: comment.body,
+         });
+      }
+      return result;
    },
 };

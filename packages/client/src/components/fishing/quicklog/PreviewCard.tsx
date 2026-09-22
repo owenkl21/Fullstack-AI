@@ -1,4 +1,6 @@
 import { cn } from '@/lib/utils';
+import { FramedPhoto } from '@/components/FramedPhoto';
+import type { Framing } from '@/lib/framing';
 
 /*
  * What will be published.
@@ -13,8 +15,7 @@ export function PreviewCard({
    handle,
    avatarUrl,
    photoUrl,
-   focusX,
-   focusY,
+   framing,
    species,
    size,
    sizeSource,
@@ -25,8 +26,8 @@ export function PreviewCard({
    handle: string | null;
    avatarUrl: string | null;
    photoUrl: string | null;
-   focusX?: number | null;
-   focusY?: number | null;
+   /* The cover's framing, so this card crops it exactly as the feed will. */
+   framing?: Framing | null;
    species: string;
    /* The figure as it will read, "42 cm" or "3.4 kg", or null for neither. */
    size: string | null;
@@ -74,13 +75,11 @@ export function PreviewCard({
             </span>
          </div>
          {photoUrl ? (
-            <img
+            <FramedPhoto
                src={photoUrl}
                alt=""
-               style={{
-                  objectPosition: `${Math.round((focusX ?? 0.5) * 100)}% ${Math.round((focusY ?? 0.5) * 100)}%`,
-               }}
-               className="block aspect-[4/3] w-full object-cover"
+               framing={framing ?? null}
+               className="aspect-[4/3] w-full"
             />
          ) : null}
          <div className="flex flex-col gap-1.5 px-4 pt-4 pb-[18px]">

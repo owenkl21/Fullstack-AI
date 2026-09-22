@@ -2195,6 +2195,58 @@ h1[tabindex='-1']:focus:not(:focus-visible),
    }
 }
 
+/* ---- Comments: a like landing, and a comment a link pointed at ------------
+   One block for the thread (components/feed/CommentThread.tsx). A row's
+   arrival is still `.comment-in` above; these two are the only other motion
+   in it, and both stand still for a reader who asked for less. */
+.heart-pop {
+   animation: heart-pop 320ms var(--ease) both;
+   transform-origin: 50% 60%;
+}
+@keyframes heart-pop {
+   0% {
+      transform: scale(0.6);
+   }
+   55% {
+      transform: scale(1.22);
+   }
+   100% {
+      transform: scale(1);
+   }
+}
+/* Drawn outside the row with a shadow and a negative inset, so marking a
+   comment never moves it or the ones around it. */
+.comment-flash {
+   position: relative;
+}
+.comment-flash::before {
+   content: '';
+   position: absolute;
+   inset: -6px -8px;
+   pointer-events: none;
+   background: color-mix(in srgb, var(--teal) 16%, transparent);
+   box-shadow: inset 2px 0 0 var(--teal);
+   animation: comment-flash 2600ms var(--ease) 500ms both;
+}
+@keyframes comment-flash {
+   from {
+      opacity: 1;
+   }
+   to {
+      opacity: 0;
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .heart-pop {
+      animation: none;
+   }
+   /* No fade to watch: the mark is simply there, a quiet bar and no wash. */
+   .comment-flash::before {
+      animation: none;
+      background: none;
+   }
+}
+
 /* ---- The pin picker in a form (MapLocationPicker) --------------------------
    On the full picker, Add a spot and Log a catch, the plus and minus stay
    under a finger as well: choosing the point is the job there, the map has

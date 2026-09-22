@@ -14,6 +14,8 @@ export const listFeedSchema = z.object({
    longitude: z.coerce.number().min(-180).max(180).optional(),
    limit: z.coerce.number().int().min(1).max(100).optional().default(25),
    offset: z.coerce.number().int().min(0).optional().default(0),
+   /* One post by id, for a link that lands on a comment. Bounded like any id. */
+   postId: z.string().trim().min(1).max(64).optional(),
 });
 
 export const createFeedPostSchema = z.object({
@@ -33,6 +35,26 @@ export const updateFeedPostSchema = z.object({
    content: z.string().trim().min(1).max(2000).optional().nullable(),
 });
 
+/*
+ * One bound for the words, shared by writing a comment and editing one, so an
+ * edit can never make a comment longer than a new one was allowed to be.
+ */
+const feedCommentBody = z.string().trim().min(1).max(1000);
+
 export const createFeedCommentSchema = z.object({
-   body: z.string().trim().min(1).max(1000),
+   body: feedCommentBody,
+   /*
+    * The comment being answered, when this is a reply. It may itself be a
+    * reply: the service walks up to the top-level comment, so the client never
+    * has to know the thread is one level deep. A cuid is 25 characters; the
+    * bound only stops a megabyte of id reaching the database.
+    */
+   parentId: z.string().trim().min(1).max(64).optional().nullable(),
 });
+
+export const updateFeedCommentSchema = z.object({
+   body: feedCommentBody,
+});
+
+/* A comment id off the path, bounded for the same reason as parentId. */
+export const feedCommentIdSchema = z.string().trim().min(1).max(64);

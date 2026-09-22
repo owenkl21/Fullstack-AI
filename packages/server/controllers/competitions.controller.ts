@@ -187,6 +187,21 @@ export const competitionsController = {
                : (parsed.error.issues[0]?.message ?? 'Check the entry.'),
          });
       }
+      /*
+       * The measure photograph is not on the catch, so nothing else ties it
+       * to this angler: its key has to be one of their own uploads, or an
+       * entry could borrow somebody else's fish on the scale.
+       */
+      const own = `users/${auth.storagePrefixId ?? auth.userId}/`;
+      if (
+         parsed.data.measureImage &&
+         !parsed.data.measureImage.storageKey.startsWith(own)
+      ) {
+         return res.status(400).json({
+            code: 'bad_entry',
+            message: 'That measure photo is not one of yours.',
+         });
+      }
       try {
          const result = await entriesService.submit(auth.userId, id, {
             catchId: parsed.data.catchId,

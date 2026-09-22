@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { ViewfinderCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { ImageUploader, type RejectedFile } from '@/components/ImageUploader';
 import { Img } from '@/components/Img';
+import { FramedPhoto } from '@/components/FramedPhoto';
+import { FrameTool, type FramingResult } from '@/components/FrameTool';
 import {
    makeImageVariants,
    type ResizedVariant,
@@ -19,6 +21,12 @@ type UploadedImage = {
     * still passes straight through here. */
    cardUrl?: string | null;
    thumbUrl?: string | null;
+   /* How a catch photograph sits in its frame (lib/framing.ts). All three
+    * null, or absent, until the angler frames it. Only the catch scope writes
+    * them; the file itself is never touched. */
+   focusX?: number | null;
+   focusY?: number | null;
+   zoom?: number | null;
 };
 
 type Props = {
@@ -46,7 +54,12 @@ type QueueItem = {
    previewUrl: string;
    progress: number;
    status: 'uploading' | 'failed';
+   /* Framed while it was still going up. Carried onto the photograph the
+    * moment the upload settles, so a slow signal never holds the tool. */
+   framing?: FramingResult | null;
 };
+
+const UNFRAMED: FramingResult = { focusX: null, focusY: null, zoom: null };
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -158,6 +171,8 @@ export function R2ImagePicker({
    // Uploads finish out of order, so every completion reads the newest value.
    const valueRef = useRef(value);
    valueRef.current = value;
+   const queueRef = useRef(queue);
+   queueRef.current = queue;
    const onChangeRef = useRef(onChange);
    onChangeRef.current = onChange;
    const onFilesRef = useRef(onFiles);
@@ -167,6 +182,27 @@ export function R2ImagePicker({
    const limit = takesMany ? maxItems : 1;
    const isUploading = queue.some((item) => item.status === 'uploading');
 
+   /*
+    * A catch photograph is cropped to a frame wherever it is shown, so a catch
+    * gets Frame it on every tile. A spot's, gear's or the angler's own picture
+    * is drawn whole or centred as it always was, and the tool would be noise.
+    */
+   const frames = scope === 'catch';
+   /* Which tile the tool is open on: a photograph by its key, or one still
+    * going up by its place in the queue. */
+   const [framingTarget, setFramingTarget] = useState<
+      | { kind: 'uploaded'; storageKey: string }
+      | { kind: 'queued'; id: string }
+      | null
+   >(null);
+   /*
+    * The picked files as the browser holds them, kept by the key the bucket
+    * gave each once it is up. The tool draws from these rather than the
+    * bucket's copy, which is a round trip away and, on a thin signal, not
+    * there yet. Let go when the picker goes.
+    */
+   const localUrls = useRef(new Map<string, string>());
+
    useEffect(() => {
       onUploadingChange?.(isUploading);
    }, [isUploading, onUploadingChange]);
@@ -174,6 +210,8 @@ export function R2ImagePicker({
    useEffect(
       () => () => {
          queue.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+         localUrls.current.forEach((url) => URL.revokeObjectURL(url));
+         localUrls.current.clear();
       },
       // Only on unmount: individual previews are revoked as each tile leaves.
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -183,14 +221,33 @@ export function R2ImagePicker({
    const settle = useCallback(
       (item: QueueItem, uploaded: UploadedImage) => {
          const current = valueRef.current;
+         /* Whatever was framed while it went up, read off the queue at this
+          * moment rather than off the item the upload began with. */
+         const framed = frames
+            ? {
+                 ...uploaded,
+                 ...(queueRef.current.find((entry) => entry.id === item.id)
+                    ?.framing ?? UNFRAMED),
+              }
+            : uploaded;
          const next = takesMany
-            ? [...current, uploaded].slice(0, maxItems)
-            : [uploaded];
+            ? [...current, framed].slice(0, maxItems)
+            : [framed];
          onChangeRef.current(next);
          setQueue((entries) => entries.filter((entry) => entry.id !== item.id));
-         URL.revokeObjectURL(item.previewUrl);
+         if (frames) {
+            localUrls.current.set(uploaded.storageKey, item.previewUrl);
+         } else {
+            URL.revokeObjectURL(item.previewUrl);
+         }
+         /* The tool follows the tile it was opened on across the settle. */
+         setFramingTarget((was) =>
+            was?.kind === 'queued' && was.id === item.id
+               ? { kind: 'uploaded', storageKey: uploaded.storageKey }
+               : was
+         );
       },
-      [maxItems, takesMany]
+      [frames, maxItems, takesMany]
    );
 
    const run = useCallback(
@@ -299,8 +356,71 @@ export function R2ImagePicker({
    };
 
    const removeUploaded = (storageKey: string) => {
+      const local = localUrls.current.get(storageKey);
+      if (local) {
+         URL.revokeObjectURL(local);
+         localUrls.current.delete(storageKey);
+      }
       onChange(value.filter((entry) => entry.storageKey !== storageKey));
    };
+
+   /* The tool's picture and figures for whichever tile it is open on. */
+   const framingUploaded =
+      framingTarget?.kind === 'uploaded'
+         ? (value.find(
+              (entry) => entry.storageKey === framingTarget.storageKey
+           ) ?? null)
+         : null;
+   const framingQueued =
+      framingTarget?.kind === 'queued'
+         ? (queue.find((entry) => entry.id === framingTarget.id) ?? null)
+         : null;
+   const framingSrc = framingUploaded
+      ? (localUrls.current.get(framingUploaded.storageKey) ??
+        framingUploaded.cardUrl ??
+        framingUploaded.url)
+      : (framingQueued?.previewUrl ?? null);
+   const framingNow = framingUploaded ?? framingQueued?.framing ?? null;
+
+   const reframe = (next: FramingResult) => {
+      if (framingTarget?.kind === 'uploaded') {
+         const key = framingTarget.storageKey;
+         onChange(
+            valueRef.current.map((entry) =>
+               entry.storageKey === key ? { ...entry, ...next } : entry
+            )
+         );
+      } else if (framingTarget?.kind === 'queued') {
+         const id = framingTarget.id;
+         setQueue((entries) =>
+            entries.map((entry) =>
+               entry.id === id ? { ...entry, framing: next } : entry
+            )
+         );
+      }
+   };
+
+   /*
+    * Frame it, in the corner of a tile. A 44px reach around the mark; the
+    * word beside it once the tile is wide enough to hold the word and Make
+    * cover together.
+    */
+   const frameButton = (label: string, onClick: () => void) => (
+      <button
+         type="button"
+         aria-label={label}
+         disabled={disabled}
+         onClick={onClick}
+         className="g-tracked flex h-11 shrink-0 items-center gap-1.5 bg-black-block/70 px-3 text-[15px] text-paper transition-[background-color,color] duration-150 [transition-timing-function:var(--ease)] hover:bg-black-block hover:text-teal disabled:opacity-50"
+      >
+         <ViewfinderCircleIcon
+            className="size-5"
+            strokeWidth={1.5}
+            aria-hidden="true"
+         />
+         <span className="hidden sm:inline">Frame it</span>
+      </button>
+   );
 
    const makeCover = (storageKey: string) => {
       const picked = value.find((entry) => entry.storageKey === storageKey);
@@ -340,6 +460,9 @@ export function R2ImagePicker({
                         alt={`Photo ${index + 1}`}
                         fill
                         sizes="(min-width: 640px) 33vw, 50vw"
+                        /* The tile is the feed's own frame, so a catch is
+                           cropped here exactly as the feed will crop it. */
+                        framing={frames ? image : undefined}
                      />
                      {takesMany && index === 0 ? (
                         <span className="g-tracked absolute top-0 left-0 bg-teal px-2 py-1 text-[15px] text-teal-ink">
@@ -363,21 +486,55 @@ export function R2ImagePicker({
                         <button
                            type="button"
                            onClick={() => makeCover(image.storageKey)}
-                           className="g-tracked absolute right-0 bottom-0 left-0 bg-black-block/70 py-1.5 text-[15px] text-paper transition-[background-color] duration-150 [transition-timing-function:var(--ease)] hover:bg-black-block"
+                           className="g-tracked absolute bottom-0 left-0 flex h-11 items-center bg-black-block/70 px-3 text-[15px] text-paper transition-[background-color] duration-150 [transition-timing-function:var(--ease)] hover:bg-black-block"
                         >
                            Make cover
                         </button>
                      ) : null}
+                     {frames ? (
+                        <span className="absolute right-0 bottom-0 flex">
+                           {frameButton(`Frame photo ${index + 1}`, () =>
+                              setFramingTarget({
+                                 kind: 'uploaded',
+                                 storageKey: image.storageKey,
+                              })
+                           )}
+                        </span>
+                     ) : null}
                   </li>
                ))}
 
-               {queue.map((item) => (
+               {queue.map((item, at) => (
                   <li key={item.id} className="relative aspect-[4/3] bg-bg-2">
-                     <img
-                        src={item.previewUrl}
-                        alt=""
-                        className="h-full w-full object-cover opacity-60"
-                     />
+                     {frames ? (
+                        <FramedPhoto
+                           src={item.previewUrl}
+                           alt=""
+                           framing={item.framing}
+                           className="size-full"
+                           imgClassName="opacity-60"
+                        />
+                     ) : (
+                        <img
+                           src={item.previewUrl}
+                           alt=""
+                           className="h-full w-full object-cover opacity-60"
+                        />
+                     )}
+                     {frames && item.status === 'uploading' ? (
+                        /* Framing does not wait for the bytes: the tool works
+                           on the file the browser already holds. */
+                        <span className="absolute right-0 bottom-[2px] flex">
+                           {frameButton(
+                              `Frame photo ${value.length + at + 1}`,
+                              () =>
+                                 setFramingTarget({
+                                    kind: 'queued',
+                                    id: item.id,
+                                 })
+                           )}
+                        </span>
+                     ) : null}
                      <button
                         type="button"
                         aria-label={`Remove ${item.name}`}
@@ -437,6 +594,18 @@ export function R2ImagePicker({
                   </li>
                ))}
             </ul>
+         ) : null}
+
+         {frames ? (
+            <FrameTool
+               open={framingSrc !== null}
+               onOpenChange={(open) => {
+                  if (!open) setFramingTarget(null);
+               }}
+               src={framingSrc}
+               framing={framingNow}
+               onDone={reframe}
+            />
          ) : null}
       </div>
    );

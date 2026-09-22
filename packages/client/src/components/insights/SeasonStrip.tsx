@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { formatDayMonth, plural } from '@/components/fishing/record/format';
 import { seasonMonths, seasonYears } from '@/components/fishing/home/summary';
 import type { CatchSummary } from '@/components/fishing/record/api';
+import { framingStyle } from '@/lib/framing';
 import { cn } from '@/lib/utils';
 
 /*
@@ -105,6 +106,9 @@ export function SeasonStrip({ catches }: { catches: CatchSummary[] }) {
                                              src={photo}
                                              alt=""
                                              loading="lazy"
+                                             style={framingStyle(
+                                                day.entry.images[0]?.image
+                                             )}
                                              className="h-full w-full object-cover transition-transform duration-[600ms] [transition-timing-function:var(--ease)] hover:scale-[1.04]"
                                           />
                                        ) : (

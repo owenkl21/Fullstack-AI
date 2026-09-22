@@ -44,6 +44,9 @@ type SignedImage = {
    url: string;
    cardUrl?: string | null;
    thumbUrl?: string | null;
+   focusX?: number | null;
+   focusY?: number | null;
+   zoom?: number | null;
 };
 
 const LOAD_FAILED = 'Could not load your profile.';
@@ -60,6 +63,9 @@ const photographsFrom = (catches: CatchSummary[]): GalleryImage[] =>
                url: image.url,
                cardUrl: image.cardUrl ?? null,
                thumbUrl: image.thumbUrl ?? null,
+               focusX: image.focusX ?? null,
+               focusY: image.focusY ?? null,
+               zoom: image.zoom ?? null,
                sourceType: 'CATCH' as const,
                sourceId: entry.id,
                sourceTitle: entry.title,

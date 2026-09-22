@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { getAuth } from '../lib/auth-context';
+import { isOwnImageKey, notYourImage } from '../lib/image-owner';
 import { createGearSchema, updateGearSchema } from '../schemas/gear.schema';
 import { gearService } from '../services/gear.service';
 
@@ -21,6 +22,12 @@ export const gearController = {
       const parseResult = createGearSchema.safeParse(req.body);
       if (!parseResult.success) {
          return res.status(400).json(parseResult.error.format());
+      }
+      if (
+         parseResult.data.image &&
+         !isOwnImageKey(auth, parseResult.data.image.storageKey)
+      ) {
+         return res.status(400).json(notYourImage);
       }
 
       const gear = await gearService.createGear(auth.userId, parseResult.data);
@@ -63,6 +70,12 @@ export const gearController = {
       const parseResult = updateGearSchema.safeParse(req.body);
       if (!parseResult.success) {
          return res.status(400).json(parseResult.error.format());
+      }
+      if (
+         parseResult.data.image &&
+         !isOwnImageKey(auth, parseResult.data.image.storageKey)
+      ) {
+         return res.status(400).json(notYourImage);
       }
 
       const gear = await gearService.updateGear(

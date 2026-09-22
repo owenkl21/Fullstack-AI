@@ -194,6 +194,7 @@ model User {
   feedPosts                  FeedPost[]
   feedLikes                  FeedLike[]
   feedComments               FeedComment[]
+  feedCommentLikes           FeedCommentLike[]
   sessions                   Session[]
   accounts                   Account[]
   groupsCreated              Group[]              @relation("GroupsCreated")
@@ -485,6 +486,13 @@ model Image {
    */
   focusX       Float?
   focusY       Float?
+  /**
+   * How far the angler pushed in when framing it, 1 to 3. The file is never
+   * cropped: this and the focus are applied where the picture is drawn. Null
+   * means it was never framed with the tool and reads as 1, which is also how
+   * a centre the old log wrote on every photo is told from a chosen one.
+   */
+  zoom         Float?
   uploadedById String
   uploadedBy   User         @relation("UploadedImages", fields: [uploadedById], references: [id])
   catchLinks   CatchImage[]
@@ -556,17 +564,50 @@ model FeedLike {
 }
 
 model FeedComment {
-  id        String    @id @default(cuid())
+  id        String            @id @default(cuid())
   postId    String
-  post      FeedPost  @relation(fields: [postId], references: [id])
+  post      FeedPost          @relation(fields: [postId], references: [id])
   userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  body      String    @db.Text
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  user      User              @relation(fields: [userId], references: [id])
+  body      String            @db.Text
+  /**
+   * A reply hangs off a top-level comment and never off another reply: the
+   * thread is one level deep, so a reply to a reply takes the same parent and
+   * names who it answers in its first word. Null is a top-level comment.
+   */
+  parentId  String?
+  parent    FeedComment?      @relation("FeedCommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   FeedComment[]     @relation("FeedCommentReplies")
+  /**
+   * Kept beside the join rows the way FeedPost keeps its own, so a thread is
+   * read without counting. A removed comment keeps its rows and its figure;
+   * neither is read again, because every read filters on deletedAt.
+   */
+  likeCount Int               @default(0)
+  likes     FeedCommentLike[]
+  /**
+   * Set when the author changes the words, and never by anything else:
+   * updatedAt also moves when a like is counted, so it cannot say "edited".
+   */
+  editedAt  DateTime?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
   deletedAt DateTime?
 
   @@index([postId, createdAt(sort: Desc)])
+  @@index([parentId])
+}
+
+model FeedCommentLike {
+  id        String      @id @default(cuid())
+  commentId String
+  comment   FeedComment @relation(fields: [commentId], references: [id])
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  createdAt DateTime    @default(now())
+
+  @@unique([commentId, userId])
+  @@index([userId])
 }
 
 /**
@@ -782,12 +823,20 @@ model Notification {
   kind          NotificationKind
   postId        String?
   competitionId String?
+  /**
+   * The comment a COMMENT, COMMENT_REPLY or COMMENT_LIKE row is about. A plain
+   * id like postId, not a relation: it exists so the rows can be found and
+   * dropped in the same transaction that removes the comment, which keeps an
+   * inbox from quoting words their author took down.
+   */
+  commentId     String?
   body          String?          @db.VarChar(300)
   readAt        DateTime?
   createdAt     DateTime         @default(now())
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, readAt])
+  @@index([commentId])
   @@map("notifications")
 }
 

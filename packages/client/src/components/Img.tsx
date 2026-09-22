@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import { cn } from '@/lib/utils';
+import { framingStyle, type Framing } from '@/lib/framing';
 import { FishMark } from '@/components/brand/FishMark';
 
 /*
@@ -55,6 +56,15 @@ export type ImgProps = {
    fit?: 'cover' | 'contain';
    /** Where the crop is taken from, when the angler has moved it. */
    objectPosition?: string;
+   /**
+    * A catch photograph's framing: the point the angler held and how far they
+    * pushed in (lib/framing.ts). Pass the image itself, framed or not, and an
+    * unframed one gets the catch default rather than dead centre. Leave it
+    * out for anything that is not a catch photo (an avatar, a banner, gear, a
+    * spot) and the picture is centred as it always was. It only means
+    * something where the picture is cropped: a cover fit in a fixed box.
+    */
+   framing?: Framing | null;
    className?: string;
    imgClassName?: string;
 };
@@ -71,6 +81,7 @@ export function Img({
    full = false,
    fit = 'cover',
    objectPosition,
+   framing,
    className,
    imgClassName,
 }: ImgProps) {
@@ -214,7 +225,15 @@ export function Img({
                onError={(event) =>
                   onFailed(event.currentTarget.currentSrc || chosen)
                }
-               style={objectPosition ? { objectPosition } : undefined}
+               style={
+                  /* The box already hides what spills, so a pushed in
+                     photograph is clipped by it and needs no wrapper. */
+                  framing !== undefined && fit === 'cover' && (ratio || fill)
+                     ? framingStyle(framing)
+                     : objectPosition
+                       ? { objectPosition }
+                       : undefined
+               }
                className={cn(
                   ratio || fill
                      ? 'absolute inset-0 h-full w-full'

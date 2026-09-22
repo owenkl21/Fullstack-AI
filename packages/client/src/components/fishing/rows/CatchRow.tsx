@@ -81,6 +81,9 @@ export function CatchRow({
          photoUrl={photoUrl ?? photo?.url ?? null}
          photoCardUrl={photo?.cardUrl}
          photoThumbUrl={photo?.thumbUrl}
+         /* Null rather than nothing when the list carried no photograph of
+            its own: it is still a catch, so it still gets the catch default. */
+         photoFraming={photo ?? null}
          photoAlt={`Photo of ${item.title}`}
          marked={marked}
          right={

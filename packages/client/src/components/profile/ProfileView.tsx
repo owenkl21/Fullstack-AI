@@ -230,6 +230,13 @@ export function ProfileView({
                                  thumbSrc={entry.thumbUrl}
                                  alt={entry.sourceTitle}
                                  ratio="1 / 1"
+                                 /* A catch keeps its framing; a spot's
+                                    photograph is centred as it always was. */
+                                 framing={
+                                    entry.sourceType === 'CATCH'
+                                       ? entry
+                                       : undefined
+                                 }
                                  /* Two up on a phone, three on a tablet, four
                                     on the widest column the page draws. */
                                  sizes="(min-width: 1280px) 400px, (min-width: 640px) 33vw, 50vw"

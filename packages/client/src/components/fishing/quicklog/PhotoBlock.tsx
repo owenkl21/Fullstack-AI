@@ -5,6 +5,8 @@ import { putVariants } from './upload';
 import { CameraIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 import { usePhone } from '@/lib/media';
+import { framingStyle } from '@/lib/framing';
+import { FrameTool, type FramingResult } from '@/components/FrameTool';
 
 /*
  * The photo, taken and sent while the rest of the catch is being filled in. It uses
@@ -27,14 +29,23 @@ export type UploadedPhoto = {
       the browser could not make them. */
    cardUrl?: string | null;
    thumbUrl?: string | null;
-   /* Where the eye lands when the feed crops it to its frame: fractions
-      across and down. */
+   /* How it sits when it is cropped to a frame: the point that is held, as
+      fractions across and down, and how far it is pushed in. All three null
+      until the angler frames it (lib/framing.ts). */
    focusX?: number | null;
    focusY?: number | null;
+   zoom?: number | null;
 };
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_BYTES = 10 * 1024 * 1024;
+
+/* The framing a photograph carries, or the three nulls of one never framed. */
+const framingOf = (photo: UploadedPhoto): FramingResult => ({
+   focusX: photo.focusX ?? null,
+   focusY: photo.focusY ?? null,
+   zoom: photo.zoom ?? null,
+});
 
 export function PhotoBlock({
    onChange,
@@ -82,74 +93,58 @@ export function PhotoBlock({
    const [flash, setFlash] = useState(false);
    const [progress, setProgress] = useState(0);
    const [isUploading, setIsUploading] = useState(false);
+   const isUploadingRef = useRef(false);
    const [error, setError] = useState<string | null>(null);
    /*
     * The feed shows every photograph in a four by three frame. This is that
-    * frame, with the picture inside it, and dragging the picture moves what
-    * the frame keeps. The point is kept with the photo, as fractions.
+    * frame with the picture inside it, held where the angler framed it. The
+    * framing is three numbers kept with the photo; the file is sent exactly
+    * as it was picked. Frame it opens the tool, and it works on the picture
+    * the browser already holds, so it does not wait for the upload.
     */
-   const [focus, setFocus] = useState<{ x: number; y: number }>({
-      x: initial?.focusX ?? 0.5,
-      y: initial?.focusY ?? 0.5,
-   });
-   const [ratio, setRatio] = useState<number | null>(null);
+   const [framing, setFraming] = useState<FramingResult | null>(
+      initial ? framingOf(initial) : null
+   );
+   const framingRef = useRef(framing);
+   const [isFraming, setIsFraming] = useState(false);
    const uploadedRef = useRef<UploadedPhoto | null>(initial);
-   const frameRef = useRef<HTMLDivElement>(null);
-   const dragRef = useRef<{
-      x: number;
-      y: number;
-      fx: number;
-      fy: number;
-   } | null>(null);
-   const FRAME = 4 / 3;
    const cell = variant === 'cell';
 
-   const commitFocus = (next: { x: number; y: number }) => {
-      setFocus(next);
+   const commitFraming = (next: FramingResult) => {
+      framingRef.current = next;
+      setFraming(next);
       const photo = uploadedRef.current;
       if (photo) {
-         const stamped = { ...photo, focusX: next.x, focusY: next.y };
+         const stamped = { ...photo, ...next };
          uploadedRef.current = stamped;
          onChange(stamped);
       }
    };
 
-   const onFramePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-      dragRef.current = {
-         x: event.clientX,
-         y: event.clientY,
-         fx: focus.x,
-         fy: focus.y,
-      };
-      event.currentTarget.setPointerCapture(event.pointerId);
-   };
-   const onFramePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-      const drag = dragRef.current;
-      const frame = frameRef.current;
-      if (!drag || !frame || ratio === null) return;
-      const box = frame.getBoundingClientRect();
-      /* How much of the picture the frame cannot hold, on the axis that
-         overflows; a drag across the whole frame moves the focus by that. */
-      const wider = ratio > FRAME;
-      const spare = wider
-         ? box.width * (ratio / FRAME) - box.width
-         : box.height * (FRAME / ratio) - box.height;
-      if (spare <= 0) return;
-      const dx = event.clientX - drag.x;
-      const dy = event.clientY - drag.y;
-      const clamp = (v: number) => Math.min(1, Math.max(0, v));
-      setFocus(
-         wider
-            ? { x: clamp(drag.fx - dx / spare), y: 0.5 }
-            : { x: 0.5, y: clamp(drag.fy - dy / spare) }
-      );
-   };
-   const onFramePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-      if (!dragRef.current) return;
-      dragRef.current = null;
-      event.currentTarget.releasePointerCapture(event.pointerId);
-      commitFocus(focus);
-   };
+   /*
+    * The page can put a different photograph in this frame: another one made
+    * the cover, the cover removed with others behind it, a draft read back.
+    * The block then shows that one and frames that one. Without this, framing
+    * after a swap stamped the numbers on the photograph that used to be here
+    * and handed it back as the cover.
+    */
+   const initialKey = initial?.storageKey ?? null;
+   useEffect(() => {
+      if (!initial || isUploadingRef.current) return;
+      if (uploadedRef.current?.storageKey === initial.storageKey) return;
+      if (previewRef.current) {
+         URL.revokeObjectURL(previewRef.current);
+         previewRef.current = null;
+         onPreviewUrl?.(null);
+      }
+      uploadedRef.current = initial;
+      framingRef.current = framingOf(initial);
+      setFraming(framingRef.current);
+      setPreview(initial.url);
+      setSettled(true);
+      // Keyed on the photograph, not on the object the page rebuilds each render.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [initialKey]);
 
    /*
     * The object URL is let go when this block goes, unless the page took a
@@ -185,6 +180,7 @@ export function PhotoBlock({
       setError(null);
       setProgress(0);
       setIsUploading(true);
+      isUploadingRef.current = true;
       onBusyChange(true);
       try {
          /* The two smaller copies first, so a photograph the browser cannot
@@ -227,8 +223,12 @@ export function PhotoBlock({
             url: signed.readUrl,
             cardUrl: signed.cardReadUrl ?? null,
             thumbUrl: signed.thumbReadUrl ?? null,
-            focusX: focus.x,
-            focusY: focus.y,
+            /* Whatever the angler framed while it was going up. */
+            ...(framingRef.current ?? {
+               focusX: null,
+               focusY: null,
+               zoom: null,
+            }),
          };
          uploadedRef.current = uploaded;
          onChange(uploaded);
@@ -239,6 +239,7 @@ export function PhotoBlock({
          );
       } finally {
          setIsUploading(false);
+         isUploadingRef.current = false;
          onBusyChange(false);
       }
    };
@@ -256,6 +257,9 @@ export function PhotoBlock({
          return;
       }
       onFile?.(file);
+      /* A new photograph starts unframed, whatever the last one was given. */
+      framingRef.current = null;
+      setFraming(null);
       showPreview(file);
       void upload(file);
       // Cleared so taking the same photo twice still fires a change.
@@ -272,8 +276,8 @@ export function PhotoBlock({
       onPreviewUrl?.(null);
       setProgress(0);
       setError(null);
-      setRatio(null);
-      setFocus({ x: 0.5, y: 0.5 });
+      framingRef.current = null;
+      setFraming(null);
       uploadedRef.current = null;
       onChange(null);
       if (inputRef.current) {
@@ -315,19 +319,10 @@ export function PhotoBlock({
       <div className={cn('flex flex-col', className)}>
          <div
             id={`${idPrefix}-zone`}
-            ref={preview ? frameRef : undefined}
-            role={preview ? 'img' : undefined}
-            aria-label={
-               preview ? 'The photograph as the feed will show it' : undefined
-            }
-            onPointerDown={preview ? onFramePointerDown : undefined}
-            onPointerMove={preview ? onFramePointerMove : undefined}
-            onPointerUp={preview ? onFramePointerUp : undefined}
-            onPointerCancel={preview ? onFramePointerUp : undefined}
             className={cn(
                'relative flex flex-col items-center justify-center overflow-hidden text-paper',
                preview
-                  ? 'aspect-[4/3] cursor-grab touch-none bg-black-block-2 select-none active:cursor-grabbing'
+                  ? 'aspect-[4/3] bg-black-block-2'
                   : cell
                     ? 'h-[150px] gap-3.5 bg-black-block-2'
                     : 'aspect-[4/3] gap-4 bg-black-block'
@@ -344,24 +339,19 @@ export function PhotoBlock({
             {preview ? (
                /*
                 * The feed's own frame, four by three, with the picture inside
-                * it. Dragging the picture chooses what the frame keeps; the
-                * point travels with the photo and the feed crops to it.
+                * it as the feed will crop it. The settle eases `scale`, which
+                * is its own property, so the framing's transform is left to
+                * land at once when the tool closes.
                 */
                <img
                   src={preview}
-                  alt="The catch you just photographed"
+                  alt="The catch you just photographed, as the feed will show it"
                   draggable={false}
-                  onLoad={(event) =>
-                     setRatio(
-                        event.currentTarget.naturalWidth /
-                           Math.max(1, event.currentTarget.naturalHeight)
-                     )
-                  }
-                  style={{
-                     objectPosition: `${Math.round(focus.x * 100)}% ${Math.round(focus.y * 100)}%`,
-                  }}
+                  /* The tape cell's photograph is read whole on the board,
+                     centred, so it is not held on the catch default here. */
+                  style={cell ? undefined : framingStyle(framing)}
                   className={cn(
-                     'pointer-events-none absolute inset-0 h-full w-full object-cover [transition:opacity_700ms_var(--ease),transform_1400ms_var(--ease)]',
+                     'pointer-events-none absolute inset-0 h-full w-full object-cover [transition:opacity_700ms_var(--ease),scale_1400ms_var(--ease)]',
                      settled
                         ? 'scale-100 opacity-100'
                         : 'scale-[1.04] opacity-0'
@@ -408,20 +398,29 @@ export function PhotoBlock({
                   ) : null}
                </>
             ) : (
-               <div
-                  className="absolute right-0 bottom-0 z-[1] flex bg-black-block text-paper"
-                  onPointerDown={(event) => event.stopPropagation()}
-               >
+               <div className="absolute right-0 bottom-0 z-[1] flex bg-black-block text-paper">
+                  {/* The catch's own photograph is cropped wherever it is
+                      shown; the tape cell's is read whole, so it has no
+                      framing to do. */}
+                  {!cell ? (
+                     <button
+                        type="button"
+                        className="g-tracked grid h-11 place-items-center border-r border-paper/20 px-3.5 text-[15px] hover:text-teal md:px-4"
+                        onClick={() => setIsFraming(true)}
+                     >
+                        Frame it
+                     </button>
+                  ) : null}
                   <button
                      type="button"
-                     className="g-tracked grid h-10 place-items-center px-3.5 text-[15px] hover:text-teal md:h-11 md:px-4"
+                     className="g-tracked grid h-11 place-items-center px-3.5 text-[15px] hover:text-teal md:px-4"
                      onClick={() => pickRef.current?.click()}
                   >
                      Change
                   </button>
                   <button
                      type="button"
-                     className="g-tracked grid h-10 place-items-center border-l border-paper/20 px-3.5 text-[15px] hover:text-teal md:h-11 md:px-4"
+                     className="g-tracked grid h-11 place-items-center border-l border-paper/20 px-3.5 text-[15px] hover:text-teal md:px-4"
                      onClick={clear}
                   >
                      Remove
@@ -442,6 +441,15 @@ export function PhotoBlock({
             </span>
          </div>
          {children}
+         {!cell ? (
+            <FrameTool
+               open={isFraming}
+               onOpenChange={setIsFraming}
+               src={preview}
+               framing={framing}
+               onDone={commitFraming}
+            />
+         ) : null}
          {error ? (
             <p className="mt-2 text-[13px] text-destructive" role="alert">
                {error}

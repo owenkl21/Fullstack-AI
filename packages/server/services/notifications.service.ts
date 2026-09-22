@@ -28,18 +28,26 @@ export const notificationsService = {
       actorId?: string | null;
       kind: NotificationKind;
       postId?: string | null;
+      /* The comment the row is about, so removing the comment can find it. */
+      commentId?: string | null;
       competitionId?: string | null;
       body?: string | null;
    }) {
       if (input.actorId && input.actorId === input.userId) return;
       try {
-         if (input.kind === 'LIKE' || input.kind === 'FOLLOW') {
+         if (
+            input.kind === 'LIKE' ||
+            input.kind === 'FOLLOW' ||
+            input.kind === 'COMMENT_LIKE'
+         ) {
             const existing = await prisma.notification.findFirst({
                where: {
                   userId: input.userId,
                   actorId: input.actorId ?? null,
                   kind: input.kind,
                   postId: input.postId ?? null,
+                  /* Null for a post like or a follow, so those match as before. */
+                  commentId: input.commentId ?? null,
                   readAt: null,
                },
                select: { id: true },
@@ -52,6 +60,7 @@ export const notificationsService = {
                actorId: input.actorId ?? null,
                kind: input.kind,
                postId: input.postId ?? null,
+               commentId: input.commentId ?? null,
                competitionId: input.competitionId ?? null,
                body: input.body ? input.body.slice(0, 300) : null,
             },
@@ -77,6 +86,8 @@ export const notificationsService = {
                id: true,
                kind: true,
                postId: true,
+               /* So the inbox can open the thread at the comment it names. */
+               commentId: true,
                competitionId: true,
                body: true,
                readAt: true,
@@ -142,5 +153,41 @@ export const notificationsService = {
          data: { readAt: new Date() },
       });
       return { read: result.count };
+   },
+
+   /*
+    * The comments are gone, so what was said about them goes too. Takes the
+    * transaction the removal runs in and does not swallow a failure: a row
+    * left behind would go on quoting words their author took down, so the
+    * removal and this succeed or fail as one.
+    */
+   async forgetComments(
+      tx: { notification: typeof prisma.notification },
+      commentIds: string[]
+   ) {
+      if (commentIds.length === 0) return;
+      await tx.notification.deleteMany({
+         where: { commentId: { in: commentIds } },
+      });
+   },
+
+   /*
+    * An edit changes what the inbox quotes and nothing else: no new row and
+    * readAt left alone, so nobody is told twice. Swallowed like a write, as
+    * the edit itself has already been kept. A like row quotes the comment it
+    * is about as well, so all three kinds that carry a commentId are reworded.
+    */
+   async rewordComment(commentId: string, body: string) {
+      try {
+         await prisma.notification.updateMany({
+            where: {
+               commentId,
+               kind: { in: ['COMMENT', 'COMMENT_REPLY', 'COMMENT_LIKE'] },
+            },
+            data: { body: body.slice(0, 300) },
+         });
+      } catch (error) {
+         console.warn('[notifications] could not reword', String(error));
+      }
    },
 };

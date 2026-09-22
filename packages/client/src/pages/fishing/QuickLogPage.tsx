@@ -1290,8 +1290,7 @@ function QuickLog() {
             handle={session?.user?.username ?? null}
             avatarUrl={avatarUrl}
             photoUrl={photoPreview ?? photo?.url ?? null}
-            focusX={photo?.focusX}
-            focusY={photo?.focusY}
+            framing={photo}
             species={
                (typed.trim() ||
                   (chosen && chosen !== NOT_SURE ? chosen : '') ||

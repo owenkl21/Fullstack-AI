@@ -261,6 +261,13 @@ function AnglerScreen() {
                               thumbSrc={entry.thumbUrl}
                               alt={entry.sourceTitle}
                               ratio="1 / 1"
+                              /* A catch keeps its framing; a spot's
+                                 photograph is centred as it always was. */
+                              framing={
+                                 entry.sourceType === 'CATCH'
+                                    ? entry
+                                    : undefined
+                              }
                               /* Three up on a phone, four from the small
                                  breakpoint on. */
                               sizes="(min-width: 640px) 25vw, 33vw"

@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { getAuth } from '../lib/auth-context';
+import { isOwnImageKey, notYourImage } from '../lib/image-owner';
 import { updateProfileSchema } from '../schemas/user.schema';
 import { userService } from '../services/user.service';
 
@@ -88,6 +89,20 @@ export const userController = {
       const parsed = updateProfileSchema.safeParse(req.body);
       if (!parsed.success) {
          return res.status(400).json(parsed.error.format());
+      }
+
+      /* An address somebody else hosts is still allowed; one of our own
+       * storage keys has to be one of the angler's own uploads. */
+      const pictures = [parsed.data.avatarUrl, parsed.data.bannerUrl];
+      if (
+         pictures.some(
+            (value) =>
+               typeof value === 'string' &&
+               value.startsWith('users/') &&
+               !isOwnImageKey(auth, value)
+         )
+      ) {
+         return res.status(400).json(notYourImage);
       }
 
       try {

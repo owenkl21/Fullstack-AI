@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { formatDayMonth, plural } from '@/components/fishing/record/format';
 import type { SeasonItem } from './summary';
+import { framingStyle } from '@/lib/framing';
 import { cn } from '@/lib/utils';
 
 /*
@@ -77,6 +78,11 @@ export function SeasonStrip({
                                  src={item.entry.images[0].image.url}
                                  alt=""
                                  loading="lazy"
+                                 /* The tile already hides what spills, so the
+                                    angler's framing needs no box of its own. */
+                                 style={framingStyle(
+                                    item.entry.images[0].image
+                                 )}
                                  className="h-full w-full object-cover transition-transform duration-[600ms] [transition-timing-function:var(--ease)] hover:scale-[1.04]"
                               />
                            ) : (

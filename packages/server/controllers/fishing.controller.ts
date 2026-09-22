@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { getAuth } from '../lib/auth-context';
+import { isOwnImageKey, notYourImage } from '../lib/image-owner';
 import {
    createCatchSchema,
    createFishingSiteSchema,
@@ -93,6 +94,15 @@ export const fishingController = {
 
       if (!parseResult.success) {
          return res.status(400).json(parseResult.error.format());
+      }
+
+      /* Only the angler's own photographs go on their catch. */
+      if (
+         parseResult.data.images.some(
+            (image) => !isOwnImageKey(auth, image.storageKey)
+         )
+      ) {
+         return res.status(400).json(notYourImage);
       }
 
       try {
@@ -227,6 +237,15 @@ export const fishingController = {
 
       if (!parseResult.success) {
          return res.status(400).json(parseResult.error.format());
+      }
+
+      /* Only the angler's own photographs go on their spot. */
+      if (
+         parseResult.data.images.some(
+            (image) => !isOwnImageKey(auth, image.storageKey)
+         )
+      ) {
+         return res.status(400).json(notYourImage);
       }
 
       try {

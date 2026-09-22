@@ -23,12 +23,42 @@ const optionalTrimmedString = z
    .optional()
    .nullable();
 
+/*
+ * A framing figure is pinned into its range rather than refused. It comes out
+ * of pointer arithmetic in the browser, and a catch is not worth losing to a
+ * focus of 1.0000001. Anything that is not a number at all is still a 400.
+ */
+const pinned = (min: number, max: number) =>
+   z.coerce
+      .number()
+      .transform((value) => Math.min(max, Math.max(min, value)))
+      .optional()
+      .nullable();
+
+/*
+ * How a photograph sits in a frame: the point that stays put, as fractions
+ * across and down, and how far it is pushed in. Only ever numbers beside the
+ * image. The file itself is never cropped, so what the camera wrote in it
+ * (the time, the place) is still there to read. Absent or null means the
+ * photograph was never framed and the screens use their own default.
+ */
+const framingFields = {
+   focusX: pinned(0, 1),
+   focusY: pinned(0, 1),
+   zoom: pinned(1, 3),
+};
+
 const imageInputSchema = z.object({
    storageKey: z.string().trim().min(1).max(512),
    url: z.string().trim().url(),
-   /* The focal point, as fractions across and down; absent means the middle. */
-   focusX: z.coerce.number().min(0).max(1).optional().nullable(),
-   focusY: z.coerce.number().min(0).max(1).optional().nullable(),
+   ...framingFields,
+});
+
+/* Reframing a photograph already on a catch. It names the photo by its key and
+   carries the whole framing, so a reset (all three null) clears it. */
+const imageFramingSchema = z.object({
+   storageKey: z.string().trim().min(1).max(512),
+   ...framingFields,
 });
 
 /* A figure that may be absent either way: missing, or present and null. */
@@ -159,7 +189,9 @@ export const createCatchSchema = catchPayloadSchema.extend({
    images: z.array(imageInputSchema).max(8).optional().default([]),
 });
 
-export const updateCatchSchema = catchPayloadSchema;
+export const updateCatchSchema = catchPayloadSchema.extend({
+   imageFraming: z.array(imageFramingSchema).max(8).optional(),
+});
 
 const fishingSitePayloadSchema = z.object({
    name: z.string().trim().min(2).max(120),

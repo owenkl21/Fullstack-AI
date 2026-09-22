@@ -22,16 +22,31 @@ export type FeedImage = {
       url: string;
       cardUrl?: string | null;
       thumbUrl?: string | null;
+      /* How the angler framed it (lib/framing.ts); all null when they never did. */
       focusX?: number | null;
       focusY?: number | null;
+      zoom?: number | null;
    };
 };
 
+/*
+ * A comment, or a reply to one. The thread is one level deep: a top-level
+ * comment (`parentId` null) carries the replies the client holds and how many
+ * there are in all, and a reply carries neither. A handle is optional, because
+ * an account exists before its angler has picked one.
+ */
 export type FeedComment = {
    id: string;
+   parentId?: string | null;
    body: string;
    createdAt?: string | null;
-   user: { id?: string; displayName: string; username: string };
+   /* Set when the author changed the words, and by nothing else. */
+   editedAt?: string | null;
+   likeCount?: number;
+   likedByMe?: boolean;
+   user: { id?: string; displayName: string; username?: string | null };
+   replies?: FeedComment[];
+   replyCount?: number;
 };
 
 export type FeedAuthor = {
@@ -79,6 +94,12 @@ export type FeedPost = {
    authorFollowedByMe?: boolean;
    authorIsMe?: boolean;
    comments: FeedComment[];
+   /*
+    * How many top-level comments the post has. `commentCount` is the figure
+    * beside the bubble and counts replies as well, so it cannot say how many
+    * comments the thread has not shown yet. This one can.
+    */
+   threadCount?: number;
 };
 
 /** A post with the distance worked out, when we know where the reader is. */

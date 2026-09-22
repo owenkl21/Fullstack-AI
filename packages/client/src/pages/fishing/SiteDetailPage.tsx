@@ -28,6 +28,7 @@ import { NotFoundPage } from '@/pages/NotFoundPage';
 import { StaticMap } from '@/components/map/StaticMap';
 import { useIsSignedIn } from '@/lib/auth-client';
 import { NoPhoto } from '@/components/brand/FishMark';
+import { FramedPhoto } from '@/components/FramedPhoto';
 import { OnlyYou } from '@/components/fishing/rows/SpotRow';
 import {
    HeaderRating,
@@ -46,7 +47,16 @@ type SiteCatch = {
    id: string;
    title: string;
    caughtAt: string;
-   images: { image: { id: string; url: string } }[];
+   images: {
+      image: {
+         id: string;
+         url: string;
+         /* How the angler framed it (lib/framing.ts). */
+         focusX?: number | null;
+         focusY?: number | null;
+         zoom?: number | null;
+      };
+   }[];
    species: { commonName: string } | null;
    createdBy: { displayName: string; username: string } | null;
 };
@@ -647,13 +657,14 @@ function CatchRow({ item }: { item: SiteCatch }) {
             className="flex items-center gap-4 py-3 transition-colors duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2"
          >
             {photo ? (
-               <img
+               <FramedPhoto
                   src={photo}
                   alt=""
                   width={52}
                   height={52}
                   loading="lazy"
-                  className="size-[52px] shrink-0 object-cover"
+                  framing={item.images[0]?.image}
+                  className="size-[52px] shrink-0"
                />
             ) : (
                <NoPhoto className="size-[52px]" />

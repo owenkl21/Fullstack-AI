@@ -22,12 +22,12 @@ import {
    MIN_RADIUS_KM,
    type LocationState,
 } from '@/components/feed/FeedFilters';
+import type { ThreadViewer } from '@/components/feed/CommentThread';
 import { FeedPostBlock } from '@/components/feed/FeedPostBlock';
 import { FeedSkeleton } from '@/components/feed/FeedSkeleton';
 import { distanceInKm, plural } from '@/components/feed/format';
 import type {
    FeedAuthor,
-   FeedComment,
    FeedPost,
    FeedPostInView,
    ScopeFilter,
@@ -55,7 +55,10 @@ function readRadius(value: string | null): number {
    return Math.min(Math.max(stepped, MIN_RADIUS_KM), MAX_RADIUS_KM);
 }
 
-/** The feed embeds the five newest comments newest first; a thread reads oldest first. */
+/*
+ * The feed embeds the five newest comments newest first; a thread reads oldest
+ * first. The replies inside each already come oldest first and stay as sent.
+ */
 function normalisePost(post: FeedPost): FeedPost {
    return { ...post, comments: [...(post.comments ?? [])].reverse() };
 }
@@ -76,6 +79,30 @@ export function FeedPage() {
    const committedRadius = readRadius(searchParams.get('radius'));
    const [radiusKm, setRadiusKm] = useState(committedRadius);
 
+   /*
+    * A link to one post, and to one comment under it: where a notification
+    * about a reply or a like lands, and where a reader who was sent to sign in
+    * comes back to. A post has no page of its own, so the feed opens with that
+    * post first and its thread open.
+    */
+   const linkedPostId = searchParams.get('post');
+   const linkedCommentId = searchParams.get('comment');
+   const [linked, setLinked] = useState<FeedPost | null>(null);
+   const [linkedMissing, setLinkedMissing] = useState(false);
+
+   /* As much of the reader as one of their own comments prints. */
+   const viewer = useMemo<ThreadViewer | null>(
+      () =>
+         user
+            ? {
+                 id: user.id,
+                 displayName: user.name || user.username || 'You',
+                 username: user.username ?? null,
+              }
+            : null,
+      [user]
+   );
+
    const [posts, setPosts] = useState<FeedPost[]>([]);
    const [offset, setOffset] = useState(0);
    const [hasMore, setHasMore] = useState(true);
@@ -94,19 +121,9 @@ export function FeedPage() {
 
    const [openThreads, setOpenThreads] = useState<Record<string, boolean>>({});
    const [drafts, setDrafts] = useState<Record<string, string>>({});
-   const [sendingComment, setSendingComment] = useState<
-      Record<string, boolean>
-   >({});
-   const [commentErrors, setCommentErrors] = useState<
-      Record<string, string | null>
-   >({});
    const [actionErrors, setActionErrors] = useState<
       Record<string, string | null>
    >({});
-   const [readingThread, setReadingThread] = useState<Record<string, boolean>>(
-      {}
-   );
-   const [wholeThread, setWholeThread] = useState<Record<string, boolean>>({});
    const [pendingUnfollow, setPendingUnfollow] = useState<FeedAuthor | null>(
       null
    );
@@ -305,29 +322,62 @@ export function FeedPage() {
    }, [hasMore, isLoadingMore, load, moreFailed, offset, status]);
 
    const visiblePosts = useMemo<FeedPostInView[]>(() => {
+      /* The linked post leads and is not drawn a second time further down. It
+         was asked for by name, so the radius does not get a say in it. */
+      const rest = linked
+         ? posts.filter((post) => post.id !== linked.id)
+         : posts;
+      const lead: FeedPostInView[] = linked
+         ? [
+              {
+                 ...linked,
+                 distanceKm:
+                    scope === 'near-me' &&
+                    position &&
+                    typeof linked.latitude === 'number' &&
+                    typeof linked.longitude === 'number'
+                       ? distanceInKm(position, {
+                            latitude: linked.latitude,
+                            longitude: linked.longitude,
+                         })
+                       : null,
+              },
+           ]
+         : [];
+
       if (scope !== 'near-me' || !position) {
-         return posts.map((post) => ({ ...post, distanceKm: null }));
+         return [
+            ...lead,
+            ...rest.map((post) => ({ ...post, distanceKm: null })),
+         ];
       }
 
-      return posts.flatMap((post) => {
-         if (
-            typeof post.latitude !== 'number' ||
-            typeof post.longitude !== 'number'
-         ) {
-            return [];
-         }
-         const km = distanceInKm(position, {
-            latitude: post.latitude,
-            longitude: post.longitude,
-         });
-         return km <= radiusKm ? [{ ...post, distanceKm: km }] : [];
-      });
-   }, [position, posts, radiusKm, scope]);
+      return [
+         ...lead,
+         ...rest.flatMap((post) => {
+            if (
+               typeof post.latitude !== 'number' ||
+               typeof post.longitude !== 'number'
+            ) {
+               return [];
+            }
+            const km = distanceInKm(position, {
+               latitude: post.latitude,
+               longitude: post.longitude,
+            });
+            return km <= radiusKm ? [{ ...post, distanceKm: km }] : [];
+         }),
+      ];
+   }, [linked, position, posts, radiusKm, scope]);
 
+   /* The linked post is held beside the list, so a change reaches both. */
    const patchPost = useCallback(
       (postId: string, update: (post: FeedPost) => FeedPost) => {
          setPosts((previous) =>
             previous.map((post) => (post.id === postId ? update(post) : post))
+         );
+         setLinked((current) =>
+            current && current.id === postId ? update(current) : current
          );
       },
       []
@@ -340,9 +390,66 @@ export function FeedPage() {
                post.author.id === authorId ? update(post) : post
             )
          );
+         setLinked((current) =>
+            current && current.author.id === authorId
+               ? update(current)
+               : current
+         );
       },
       []
    );
+
+   /*
+    * Read the linked post on its own: it may be weeks down the feed. Read
+    * again when the reader signs in or out, like the list, because whose
+    * likes are filled in changes with who is asking.
+    */
+   useEffect(() => {
+      if (!linkedPostId) {
+         setLinked(null);
+         setLinkedMissing(false);
+         return;
+      }
+      const controller = new AbortController();
+      setLinkedMissing(false);
+      axios
+         .get('/api/feed', {
+            params: { postId: linkedPostId, limit: 1 },
+            signal: controller.signal,
+         })
+         .then(({ data }) => {
+            const found: FeedPost | undefined = (data.posts ?? [])[0];
+            if (!found) {
+               setLinked(null);
+               setLinkedMissing(true);
+               return;
+            }
+            setLinked(normalisePost(found));
+            setOpenThreads((previous) => ({ ...previous, [found.id]: true }));
+         })
+         .catch(() => {
+            if (!controller.signal.aborted) setLinkedMissing(true);
+         });
+      return () => controller.abort();
+   }, [isSignedIn, linkedPostId]);
+
+   /* Brought to the top of the window once, when it lands. A comment the link
+      names is scrolled to by the thread itself, which knows where it is. */
+   const linkedShownFor = useRef<string | null>(null);
+   useEffect(() => {
+      if (!linked || status !== 'ready' || linkedCommentId) return;
+      if (linkedShownFor.current === linked.id) return;
+      linkedShownFor.current = linked.id;
+      const calm = window.matchMedia(
+         '(prefers-reduced-motion: reduce)'
+      ).matches;
+      document
+         .getElementById(`post-card-${linked.id}`)
+         ?.scrollIntoView({
+            block: 'start',
+            behavior: calm ? 'auto' : 'smooth',
+         });
+   }, [linked, linkedCommentId, status]);
 
    const toggleSave = async (post: FeedPostInView) => {
       const keeping = !post.savedByMe;
@@ -390,84 +497,6 @@ export function FeedPage() {
             ...previous,
             [post.id]: 'That did not save. Try again.',
          }));
-      }
-   };
-
-   const submitComment = async (post: FeedPostInView) => {
-      const body = (drafts[post.id] ?? '').trim();
-      if (!body) return;
-
-      const pendingId = `pending-${post.id}-${Date.now()}`;
-      const optimistic: FeedComment = {
-         id: pendingId,
-         body,
-         createdAt: new Date().toISOString(),
-         user: {
-            displayName: user?.name ?? user?.username ?? 'You',
-            username: user?.username ?? '',
-         },
-      };
-
-      setSendingComment((previous) => ({ ...previous, [post.id]: true }));
-      setCommentErrors((previous) => ({ ...previous, [post.id]: null }));
-      setDrafts((previous) => ({ ...previous, [post.id]: '' }));
-      patchPost(post.id, (current) => ({
-         ...current,
-         comments: [...current.comments, optimistic],
-         commentCount: current.commentCount + 1,
-      }));
-
-      try {
-         const { data } = await axios.post(`/api/feed/${post.id}/comments`, {
-            body,
-         });
-         const saved: FeedComment | undefined = data?.comment;
-         if (saved) {
-            patchPost(post.id, (current) => ({
-               ...current,
-               comments: current.comments.map((entry) =>
-                  entry.id === pendingId ? saved : entry
-               ),
-            }));
-         }
-      } catch {
-         patchPost(post.id, (current) => ({
-            ...current,
-            comments: current.comments.filter(
-               (entry) => entry.id !== pendingId
-            ),
-            commentCount: Math.max(0, current.commentCount - 1),
-         }));
-         setDrafts((previous) => ({ ...previous, [post.id]: body }));
-         setCommentErrors((previous) => ({
-            ...previous,
-            [post.id]: 'That comment did not send. Try again.',
-         }));
-      } finally {
-         setSendingComment((previous) => ({ ...previous, [post.id]: false }));
-      }
-   };
-
-   const readWholeThread = async (post: FeedPostInView) => {
-      setReadingThread((previous) => ({ ...previous, [post.id]: true }));
-      setCommentErrors((previous) => ({ ...previous, [post.id]: null }));
-
-      try {
-         const { data } = await axios.get(`/api/feed/${post.id}/comments`);
-         const all: FeedComment[] = data.comments ?? [];
-         patchPost(post.id, (current) => ({
-            ...current,
-            comments: all,
-            commentCount: Math.max(current.commentCount, all.length),
-         }));
-         setWholeThread((previous) => ({ ...previous, [post.id]: true }));
-      } catch {
-         setCommentErrors((previous) => ({
-            ...previous,
-            [post.id]: 'The rest of the thread did not load. Try again.',
-         }));
-      } finally {
-         setReadingThread((previous) => ({ ...previous, [post.id]: false }));
       }
    };
 
@@ -651,6 +680,12 @@ export function FeedPage() {
                </div>
             ) : null}
 
+            {linkedMissing && status === 'ready' ? (
+               <p className="text-[15px] text-ink-2" role="status">
+                  That post is no longer here. The rest of the feed is below.
+               </p>
+            ) : null}
+
             {status === 'ready' && showList && visiblePosts.length === 0
                ? emptyState()
                : null}
@@ -682,12 +717,13 @@ export function FeedPage() {
                               [post.id]: next,
                            }))
                         }
-                        onSubmitComment={() => void submitComment(post)}
-                        isSubmittingComment={Boolean(sendingComment[post.id])}
-                        commentError={commentErrors[post.id] ?? null}
-                        onReadAllComments={() => void readWholeThread(post)}
-                        isReadingAllComments={Boolean(readingThread[post.id])}
-                        hasReadAllComments={Boolean(wholeThread[post.id])}
+                        viewer={viewer}
+                        onPatch={(update) => patchPost(post.id, update)}
+                        focusCommentId={
+                           linked && post.id === linked.id
+                              ? linkedCommentId
+                              : null
+                        }
                      />
                   ))}
                </div>

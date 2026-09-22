@@ -15,8 +15,10 @@ export type CatchImage = {
    image: {
       id: string;
       url: string;
+      /* How the angler framed it (lib/framing.ts); all null when they never did. */
       focusX?: number | null;
       focusY?: number | null;
+      zoom?: number | null;
    };
 };
 

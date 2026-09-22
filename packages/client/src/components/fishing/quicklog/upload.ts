@@ -70,8 +70,10 @@ export async function uploadPhoto(file: File): Promise<UploadedPhoto> {
       url: signed.readUrl,
       cardUrl: signed.cardReadUrl ?? null,
       thumbUrl: signed.thumbReadUrl ?? null,
-      focusX: 0.5,
-      focusY: 0.5,
+      /* Unframed until the angler frames it, so it follows the default. */
+      focusX: null,
+      focusY: null,
+      zoom: null,
    };
 }
 

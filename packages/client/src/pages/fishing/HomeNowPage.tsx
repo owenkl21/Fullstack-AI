@@ -195,6 +195,9 @@ function HomeNow() {
           */}
          <SpotHeader
             photoUrl={recent?.images[0]?.image.url ?? FALLBACK_PHOTO}
+            photoFraming={
+               recent?.images[0]?.image.url ? recent.images[0].image : undefined
+            }
             spotName={
                conditions.place ??
                (conditions.status === 'ready' ? 'Where you are' : 'Your log')

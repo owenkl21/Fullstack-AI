@@ -19,7 +19,10 @@ import {
    CarouselNext,
    CarouselPrevious,
 } from '@/components/ui/carousel';
-import { CommentThread } from '@/components/feed/CommentThread';
+import {
+   CommentThread,
+   type ThreadViewer,
+} from '@/components/feed/CommentThread';
 import {
    formatDistance,
    formatLength,
@@ -29,7 +32,7 @@ import {
    joinMeta,
    sourceWord,
 } from '@/components/feed/format';
-import type { FeedPostInView } from '@/components/feed/types';
+import type { FeedPost, FeedPostInView } from '@/components/feed/types';
 
 /*
  * A word, not a button drawn around a word. Follow, See the catch, Post and
@@ -104,14 +107,11 @@ export function FeedPostBlock({
    onFollow,
    onUnfollow,
    actionError,
+   viewer,
    draft,
    onDraftChange,
-   onSubmitComment,
-   isSubmittingComment,
-   commentError,
-   onReadAllComments,
-   isReadingAllComments,
-   hasReadAllComments,
+   onPatch,
+   focusCommentId,
 }: {
    post: FeedPostInView;
    isSignedIn: boolean;
@@ -123,14 +123,16 @@ export function FeedPostBlock({
    onFollow: () => void;
    onUnfollow: () => void;
    actionError: string | null;
+   /* Who is reading, for the thread. Null when nobody is signed in. */
+   viewer: ThreadViewer | null;
+   /* The new comment being written. Held by the page, so closing the thread
+      and opening it again does not lose a sentence half typed. */
    draft: string;
    onDraftChange: (next: string) => void;
-   onSubmitComment: () => void;
-   isSubmittingComment: boolean;
-   commentError: string | null;
-   onReadAllComments: () => void;
-   isReadingAllComments: boolean;
-   hasReadAllComments: boolean;
+   /* Everything the thread does to the post goes through this one door. */
+   onPatch: (update: (post: FeedPost) => FeedPost) => void;
+   /* A comment a link pointed at, for the thread to open to. */
+   focusCommentId?: string | null;
 }) {
    const images = post.catch?.images ?? [];
    /*
@@ -157,9 +159,15 @@ export function FeedPostBlock({
     * full width of the card at 4:3; at desktop the card turns sideways and this
     * is the left column, 600 wide and spanning both rows, so the header and the
     * fish sit beside it rather than under it.
+    *
+    * It fills the column's height, but only up to a portrait photograph's
+    * (3:4, 800 at this width) and never past the window. An open thread can
+    * make the column two thousand pixels tall, and a photograph stretched to
+    * that is a thin strip from the middle of the fish; instead it stops, and
+    * holds under the bar while the thread is read beside it.
     */
    const frame =
-      'relative aspect-[4/3] w-full overflow-hidden bg-black-block-2 lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:min-h-full lg:w-[600px]';
+      'relative aspect-[4/3] w-full overflow-hidden bg-black-block-2 lg:sticky lg:top-[60px] lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:min-h-[min(100%,800px,calc(100svh_-_60px))] lg:w-[600px] lg:self-start';
 
    return (
       <article
@@ -186,6 +194,9 @@ export function FeedPostBlock({
           */
          className="blk blk-flat grid h-full grid-cols-1 [content-visibility:auto] [contain-intrinsic-height:auto_660px] md:[contain-intrinsic-height:auto_1000px] lg:grid-cols-[600px_1fr] lg:grid-rows-[auto_1fr] lg:[contain-intrinsic-height:auto_470px]"
          aria-labelledby={`post-${post.id}`}
+         /* What a link to this post scrolls to, clear of the bar above. */
+         id={`post-card-${post.id}`}
+         style={{ scrollMarginTop: 88 }}
       >
          <header className="flex items-center gap-3 px-4 pt-4 pr-10 pb-3.5 lg:col-start-2 lg:row-start-1 lg:px-6 lg:pr-9 lg:pt-5 lg:pb-0">
             {/*
@@ -299,7 +310,9 @@ export function FeedPostBlock({
                               /* The whole width of a phone, and the card's own
                                  left column once the card turns sideways. */
                               sizes="(min-width: 1024px) 600px, 100vw"
-                              objectPosition={`${Math.round((entry.image.focusX ?? 0.5) * 100)}% ${Math.round((entry.image.focusY ?? 0.5) * 100)}%`}
+                              /* Held where the angler framed it, or on
+                                 the catch default when they never did. */
+                              framing={entry.image}
                            />
                         </CarouselItem>
                      ))}
@@ -501,17 +514,15 @@ export function FeedPostBlock({
             {commentsOpen ? (
                <CommentThread
                   id={threadId}
+                  postId={post.id}
                   comments={post.comments}
-                  commentCount={post.commentCount}
-                  isSignedIn={isSignedIn}
+                  threadCount={post.threadCount ?? post.comments.length}
+                  viewer={isSignedIn ? viewer : null}
+                  canModerate={post.authorIsMe === true}
                   draft={draft}
                   onDraftChange={onDraftChange}
-                  onSubmit={onSubmitComment}
-                  isSubmitting={isSubmittingComment}
-                  error={commentError}
-                  onReadAll={onReadAllComments}
-                  isReadingAll={isReadingAllComments}
-                  hasReadAll={hasReadAllComments}
+                  onPatch={onPatch}
+                  focusCommentId={focusCommentId}
                />
             ) : (
                <div id={threadId} hidden />

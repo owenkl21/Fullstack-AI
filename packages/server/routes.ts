@@ -409,10 +409,21 @@ router.post(
    requireApiAuth,
    feedController.createComment
 );
+/* Edit is the author's alone. Delete is the author's, or the post owner's. */
+router.put(
+   '/api/feed/comments/:commentId',
+   requireApiAuth,
+   feedController.updateComment
+);
 router.delete(
    '/api/feed/comments/:commentId',
    requireApiAuth,
    feedController.deleteComment
+);
+router.post(
+   '/api/feed/comments/:commentId/likes',
+   requireApiAuth,
+   feedController.toggleCommentLike
 );
 
 router.post('/api/gear', requireApiAuth, gearController.createGear);

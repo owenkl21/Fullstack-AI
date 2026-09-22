@@ -7,6 +7,7 @@ import {
    weightMetric,
 } from '@/components/fishing/record/format';
 import { NoPhoto } from '@/components/brand/FishMark';
+import { FramedPhoto } from '@/components/FramedPhoto';
 
 /*
  * The last few catches in the row anatomy the whole product uses: a 52px photo, the
@@ -50,11 +51,12 @@ export function RecentRows({
                         className="grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3.5 px-4 py-2.5 transition-colors duration-150 hover:bg-bg-2 md:px-8"
                      >
                         {photo ? (
-                           <img
+                           <FramedPhoto
                               src={photo}
                               alt=""
                               loading="lazy"
-                              className="size-[52px] bg-bg-2 object-cover"
+                              framing={entry.images[0]?.image}
+                              className="size-[52px] bg-bg-2"
                            />
                         ) : (
                            <NoPhoto className="size-[52px]" />

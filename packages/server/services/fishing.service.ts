@@ -24,6 +24,35 @@ type CreateImageInput = {
    url: string;
    focusX?: number | null;
    focusY?: number | null;
+   zoom?: number | null;
+};
+
+/* A saved photograph, reframed: the same three figures against its key. */
+type ImageFramingInput = Omit<CreateImageInput, 'url'>;
+
+/*
+ * The framing as it is written to the image row. The schema has already
+ * pinned each figure into its range; this is the last word on shape. A focus
+ * is a pair or it is nothing, and a zoom with no focus is kept, because the
+ * screens give an unfocused photograph their own default point.
+ */
+const framingColumns = (input: {
+   focusX?: number | null;
+   focusY?: number | null;
+   zoom?: number | null;
+}) => {
+   const pin = (value: number, min: number, max: number) =>
+      Math.min(max, Math.max(min, value));
+   const x = figure(input.focusX);
+   const y = figure(input.focusY);
+   const zoom = figure(input.zoom);
+   const focused = x !== null && y !== null;
+
+   return {
+      focusX: focused ? pin(x, 0, 1) : null,
+      focusY: focused ? pin(y, 0, 1) : null,
+      zoom: zoom === null ? null : pin(zoom, 1, 3),
+   };
 };
 
 const stripSignedUrlParams = (url: string) => {
@@ -176,7 +205,10 @@ type CreateFishingSiteInput = {
    images: CreateImageInput[];
 };
 
-type UpdateCatchInput = Omit<CreateCatchInput, 'images'>;
+type UpdateCatchInput = Omit<CreateCatchInput, 'images'> & {
+   /* Photographs already on the catch, reframed. Nothing is added or removed. */
+   imageFraming?: ImageFramingInput[];
+};
 type UpdateFishingSiteInput = Omit<CreateFishingSiteInput, 'images'>;
 
 /*
@@ -262,6 +294,7 @@ const catchDetailInclude = {
                storageKey: true,
                focusX: true,
                focusY: true,
+               zoom: true,
             },
          },
       },
@@ -280,6 +313,7 @@ const siteDetailInclude = {
                storageKey: true,
                focusX: true,
                focusY: true,
+               zoom: true,
             },
          },
       },
@@ -308,6 +342,7 @@ const siteDetailInclude = {
                      storageKey: true,
                      focusX: true,
                      focusY: true,
+                     zoom: true,
                   },
                },
             },
@@ -936,24 +971,36 @@ export const fishingService = {
          for (const [position, image] of input.images.entries()) {
             try {
                const normalizedUrl = stripSignedUrlParams(image.url);
-               const focus =
-                  typeof image.focusX === 'number' &&
-                  typeof image.focusY === 'number'
-                     ? { focusX: image.focusX, focusY: image.focusY }
-                     : {};
+               const framing = framingColumns(image);
                const createdImage = await tx.image.upsert({
                   where: { storageKey: image.storageKey },
                   create: {
                      uploadedById: user.id,
                      storageKey: image.storageKey,
                      url: normalizedUrl,
-                     ...focus,
+                     ...framing,
                   },
                   update: {
                      url: normalizedUrl,
-                     ...focus,
                   },
                });
+
+               /*
+                * A row that was already there is reframed only by the angler
+                * who uploaded it. The upsert finds a row by its key alone, so
+                * without this a key that belongs to somebody else would let
+                * one angler move another's photograph in its frame.
+                */
+               const reframed =
+                  createdImage.focusX !== framing.focusX ||
+                  createdImage.focusY !== framing.focusY ||
+                  createdImage.zoom !== framing.zoom;
+               if (reframed && createdImage.uploadedById === user.id) {
+                  await tx.image.update({
+                     where: { id: createdImage.id },
+                     data: framing,
+                  });
+               }
 
                await tx.catchImage.upsert({
                   where: {
@@ -1171,6 +1218,7 @@ export const fishingService = {
                         storageKey: true,
                         focusX: true,
                         focusY: true,
+                        zoom: true,
                      },
                   },
                },
@@ -1244,6 +1292,41 @@ export const fishingService = {
                where: { id: relations.siteId },
                data: { catchCount: { increment: 1 } },
             });
+         }
+
+         /*
+          * Reframing the photographs already on the catch. Only numbers move:
+          * the files are not touched, none is added and none is removed. A
+          * key is honoured when it is on THIS catch, which is already known
+          * to be the angler's own, and the angler uploaded it; anything else
+          * in the list is passed over without a word, so a guessed key
+          * learns nothing. Before the read below, so the answer carries it.
+          */
+         if (input.imageFraming?.length) {
+            const held = await tx.catchImage.findMany({
+               where: {
+                  catchId,
+                  image: {
+                     uploadedById: user.id,
+                     storageKey: {
+                        in: input.imageFraming.map((entry) => entry.storageKey),
+                     },
+                  },
+               },
+               select: { image: { select: { id: true, storageKey: true } } },
+            });
+            const idByKey = new Map(
+               held.map((entry) => [entry.image.storageKey, entry.image.id])
+            );
+
+            for (const entry of input.imageFraming) {
+               const imageId = idByKey.get(entry.storageKey);
+               if (!imageId) continue;
+               await tx.image.update({
+                  where: { id: imageId },
+                  data: framingColumns(entry),
+               });
+            }
          }
 
          const updated = await tx.catch.update({
@@ -1470,6 +1553,7 @@ export const fishingService = {
                         storageKey: true,
                         focusX: true,
                         focusY: true,
+                        zoom: true,
                      },
                   },
                },

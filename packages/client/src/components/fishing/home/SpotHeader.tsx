@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TornEdge } from '@/components/brand/TornEdge';
+import { framingStyle, type Framing } from '@/lib/framing';
 import { cn } from '@/lib/utils';
 
 /*
@@ -19,12 +20,20 @@ import { cn } from '@/lib/utils';
  */
 export function SpotHeader({
    photoUrl,
+   photoFraming,
    spotName,
    today,
    lastFished,
    lastSpot = null,
 }: {
    photoUrl: string;
+   /*
+    * The framing of the catch photograph, when that is what this is. The band
+    * is the widest crop in the product, so an upright photo keeps a sliver of
+    * itself and where that sliver is taken from is the whole picture. Left
+    * out for the house photograph, which was shot for the band.
+    */
+   photoFraming?: Framing | null;
    spotName: string;
    today: string;
    lastFished: string | null;
@@ -57,6 +66,11 @@ export function SpotHeader({
                src={photoUrl}
                alt=""
                fetchPriority="high"
+               style={
+                  photoFraming !== undefined
+                     ? framingStyle(photoFraming)
+                     : undefined
+               }
                className={cn(
                   'absolute inset-0 h-full w-full object-cover transition-transform duration-[12000ms] ease-linear',
                   settled ? 'scale-100' : 'scale-[1.06]'

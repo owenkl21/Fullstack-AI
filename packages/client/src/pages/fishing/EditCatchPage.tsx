@@ -27,7 +27,18 @@ type LoadedCatch = StoredConditions & {
    caughtAt: string;
    site: { id: string } | null;
    gears: GearOption[];
-   images: { image: { id: string; url: string; storageKey: string } }[];
+   images: {
+      image: {
+         id: string;
+         url: string;
+         cardUrl?: string | null;
+         storageKey: string;
+         /* How the angler framed it (lib/framing.ts), so Frame it opens on it. */
+         focusX?: number | null;
+         focusY?: number | null;
+         zoom?: number | null;
+      };
+   }[];
    length: number | null;
    weight: number | null;
    count: number | null;
@@ -152,6 +163,10 @@ export function EditCatchPage() {
          images: (record.images ?? []).map((entry) => ({
             storageKey: entry.image.storageKey,
             url: entry.image.url,
+            cardUrl: entry.image.cardUrl ?? null,
+            focusX: entry.image.focusX ?? null,
+            focusY: entry.image.focusY ?? null,
+            zoom: entry.image.zoom ?? null,
          })),
          snapshot: snapshotFromStoredConditions(record),
          weather: record.weather ?? null,

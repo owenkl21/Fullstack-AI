@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { NoPhoto } from '@/components/brand/FishMark';
 import { Img } from '@/components/Img';
+import type { Framing } from '@/lib/framing';
 import { cn } from '@/lib/utils';
 
 /*
@@ -17,7 +18,7 @@ export type RowPhoto = {
       url?: string | null;
       cardUrl?: string | null;
       thumbUrl?: string | null;
-   };
+   } & Framing;
 };
 
 export type RowProps = {
@@ -39,6 +40,11 @@ export type RowProps = {
    photoAlt?: string;
    /** Gear is photographed on a table, so it is contained rather than cropped. */
    photoFit?: 'cover' | 'contain';
+   /**
+    * A catch photograph's framing, so the square keeps what the angler kept.
+    * Only a catch passes it; a spot or gear is centred as it always was.
+    */
+   photoFraming?: Framing | null;
    /** The right hand cell: the headline number, or a sentence when there is none. */
    right?: ReactNode;
    /** A control that is not part of the link, such as Delete on gear. */
@@ -59,6 +65,7 @@ export function Row({
    photoThumbUrl,
    photoAlt = '',
    photoFit = 'cover',
+   photoFraming,
    right,
    trailing,
    muted = false,
@@ -87,6 +94,7 @@ export function Row({
                ratio="1 / 1"
                sizes="52px"
                fit={photoFit}
+               framing={photoFraming}
                className={cn(
                   'size-[52px] shrink-0',
                   photoFit === 'contain' && 'p-1'

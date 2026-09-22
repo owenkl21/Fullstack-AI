@@ -37,6 +37,11 @@ type ProfileImage = {
     * hundred pixels square and has no business fetching a camera original. */
    cardUrl: string;
    thumbUrl: string;
+   /* How the angler framed it, for a catch photograph: the tile is a square
+    * crop, and the crop is theirs to place. Absent on a spot's photograph. */
+   focusX?: number | null;
+   focusY?: number | null;
+   zoom?: number | null;
    sourceType: 'CATCH' | 'SITE';
    sourceId: string;
    sourceTitle: string;
@@ -348,7 +353,14 @@ const buildProfileView = async (userId: string) => {
                   take: 1,
                   select: {
                      image: {
-                        select: { id: true, url: true, storageKey: true },
+                        select: {
+                           id: true,
+                           url: true,
+                           storageKey: true,
+                           focusX: true,
+                           focusY: true,
+                           zoom: true,
+                        },
                      },
                   },
                },
@@ -388,6 +400,9 @@ const buildProfileView = async (userId: string) => {
                entry.images[0]!.image,
                'user:profileCatchImage'
             )),
+            focusX: entry.images[0]!.image.focusX,
+            focusY: entry.images[0]!.image.focusY,
+            zoom: entry.images[0]!.image.zoom,
             sourceType: 'CATCH' as const,
             sourceId: entry.id,
             sourceTitle: entry.title,
@@ -468,7 +483,14 @@ const buildPublicProfileView = async (
                   take: 1,
                   select: {
                      image: {
-                        select: { id: true, url: true, storageKey: true },
+                        select: {
+                           id: true,
+                           url: true,
+                           storageKey: true,
+                           focusX: true,
+                           focusY: true,
+                           zoom: true,
+                        },
                      },
                   },
                },
@@ -508,6 +530,9 @@ const buildPublicProfileView = async (
                entry.images[0]!.image,
                'user:publicCatchImage'
             )),
+            focusX: entry.images[0]!.image.focusX,
+            focusY: entry.images[0]!.image.focusY,
+            zoom: entry.images[0]!.image.zoom,
             sourceType: 'CATCH' as const,
             sourceId: entry.id,
             sourceTitle: entry.title,

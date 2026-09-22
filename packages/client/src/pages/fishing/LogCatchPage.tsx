@@ -2,9 +2,11 @@ import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { ViewfinderCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { MapLocationPicker } from '@/components/fishing/MapLocationPicker';
 import { R2ImagePicker } from '@/components/r2-image-picker';
+import { FramedPhoto } from '@/components/FramedPhoto';
+import { FrameTool, type FramingResult } from '@/components/FrameTool';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
@@ -55,7 +57,16 @@ export type GearOption = {
    imageUrl: string | null;
 };
 
-type UploadedImage = { storageKey: string; url: string };
+type UploadedImage = {
+   storageKey: string;
+   url: string;
+   /* The 1200px copy, which is all the framing tool needs to draw. */
+   cardUrl?: string | null;
+   /* How the angler framed it (lib/framing.ts); null or absent when never. */
+   focusX?: number | null;
+   focusY?: number | null;
+   zoom?: number | null;
+};
 
 /* Everything the edit route hands back so the one form can open prefilled. */
 export type CatchFormInitial = {
@@ -264,6 +275,16 @@ export function CatchForm({
       isEdit ? [] : (initial?.images ?? [])
    );
    const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+   /*
+    * An edit cannot add or remove a photograph yet, but it can reframe the
+    * ones the catch has: only numbers move, so there is nothing to upload.
+    * Held by storage key, only for the ones the angler touched, and sent with
+    * the save as `imageFraming`.
+    */
+   const [reframed, setReframed] = useState<Record<string, FramingResult>>({});
+   const [framingKey, setFramingKey] = useState<string | null>(null);
+   const framingImage =
+      initial?.images.find((image) => image.storageKey === framingKey) ?? null;
 
    const [sites, setSites] = useState<SiteOption[]>([]);
    const startsWithPin =
@@ -1029,7 +1050,13 @@ export function CatchForm({
             // not a patch, so every field the form holds is sent back with it.
             // TODO(api): appendix E item 6. It takes no images, so photos on an
             // existing catch cannot be changed here yet.
-            await axios.put(`/api/catches/${catchId}`, payload);
+            await axios.put(`/api/catches/${catchId}`, {
+               ...payload,
+               /* Only the photographs that were reframed in this sitting. */
+               imageFraming: Object.entries(reframed).map(
+                  ([storageKey, framing]) => ({ storageKey, ...framing })
+               ),
+            });
             toast({
                title: 'Catch saved.',
                description: successSentence(payload),
@@ -1181,16 +1208,39 @@ export function CatchForm({
                            {initial.images.map((image, index) => (
                               <li
                                  key={image.storageKey}
-                                 className="aspect-[4/3] bg-bg-2"
+                                 className="relative aspect-[4/3] bg-bg-2"
                               >
-                                 <img
-                                    src={image.url}
+                                 {/* The feed's own frame, cropped as the feed
+                                     will crop it once this is saved. */}
+                                 <FramedPhoto
+                                    src={image.cardUrl ?? image.url}
                                     alt={`Photo ${index + 1}`}
                                     width={400}
                                     height={300}
                                     loading="lazy"
-                                    className="h-full w-full object-cover"
+                                    framing={
+                                       reframed[image.storageKey] ?? image
+                                    }
+                                    className="size-full"
                                  />
+                                 <button
+                                    type="button"
+                                    aria-label={`Frame photo ${index + 1}`}
+                                    disabled={isSaving}
+                                    onClick={() =>
+                                       setFramingKey(image.storageKey)
+                                    }
+                                    /* The same corner control the log's own
+                                       photo tiles carry. */
+                                    className="g-tracked absolute right-0 bottom-0 flex h-11 items-center gap-1.5 bg-black-block/70 px-3 text-[15px] text-paper transition-[background-color,color] duration-150 [transition-timing-function:var(--ease)] hover:bg-black-block hover:text-teal disabled:opacity-50"
+                                 >
+                                    <ViewfinderCircleIcon
+                                       className="size-5"
+                                       strokeWidth={1.5}
+                                       aria-hidden="true"
+                                    />
+                                    Frame it
+                                 </button>
                               </li>
                            ))}
                         </ul>
@@ -1198,8 +1248,34 @@ export function CatchForm({
                         <p className="text-ink-2">No photos on this catch.</p>
                      )}
                      <p className="text-[14px] text-ink-3">
-                        Photos cannot be changed here yet.
+                        {initial?.images.length
+                           ? 'Photos cannot be added or removed here yet. Frame it moves one in its frame, and is kept when you save.'
+                           : 'Photos cannot be added here yet.'}
                      </p>
+                     <FrameTool
+                        open={framingImage !== null}
+                        onOpenChange={(open) => {
+                           if (!open) setFramingKey(null);
+                        }}
+                        src={
+                           framingImage
+                              ? (framingImage.cardUrl ?? framingImage.url)
+                              : null
+                        }
+                        framing={
+                           framingImage
+                              ? (reframed[framingImage.storageKey] ??
+                                framingImage)
+                              : null
+                        }
+                        onDone={(next) => {
+                           if (!framingKey) return;
+                           setReframed((was) => ({
+                              ...was,
+                              [framingKey]: next,
+                           }));
+                        }}
+                     />
                   </div>
                ) : (
                   <R2ImagePicker

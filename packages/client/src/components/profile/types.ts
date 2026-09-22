@@ -9,6 +9,11 @@ export type GalleryImage = {
    url: string;
    cardUrl?: string | null;
    thumbUrl?: string | null;
+   /* A catch photograph's framing (lib/framing.ts), so the square tile keeps
+      what the angler kept. A spot's photograph carries none. */
+   focusX?: number | null;
+   focusY?: number | null;
+   zoom?: number | null;
    sourceType: 'CATCH' | 'SITE';
    sourceId: string;
    sourceTitle: string;
