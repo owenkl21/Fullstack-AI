@@ -358,7 +358,7 @@ function Composer({
          const result = await removeRating(siteId);
          setData({
             ...data,
-            summary: result.summary,
+            summary: result.summary ?? data.summary,
             yours: null,
             viewer: { ...data.viewer, hasRated: false },
          });

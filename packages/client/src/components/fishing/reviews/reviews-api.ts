@@ -90,7 +90,9 @@ export async function leaveRating(
 export async function removeRating(siteId: string) {
    const { data } = await axios.delete<{
       removed: boolean;
-      summary: RatingSummary;
+      /* Null when the spot has been kept private since: the rating still
+         comes down, the figures of a spot you cannot open do not come back. */
+      summary: RatingSummary | null;
    }>(`/api/sites/${siteId}/reviews/me`);
    return data;
 }
