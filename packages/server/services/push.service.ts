@@ -128,6 +128,8 @@ type Announced = {
    postId: string | null;
    commentId?: string | null;
    competitionId: string | null;
+   /* The fish a BADGE line is about. */
+   catchId?: string | null;
    body: string | null;
 };
 
@@ -154,6 +156,33 @@ const threadLink = (row: Announced) => {
 };
 const competitionLink = (row: Announced) =>
    row.competitionId ? `/competitions/${row.competitionId}` : '/competitions';
+
+/*
+ * What a badge says, per kind, with the fish read in. The same eight sentences
+ * the inbox prints (client components/badges/kinds.ts): a lock screen and the
+ * notifications page should not word the same event two ways. A kind this
+ * build has not heard of falls through to a line that is still true.
+ */
+const BADGE_SAID: Record<string, (fish: string) => string> = {
+   GREAT_CATCH: (fish) => `called your ${fish} a great catch`,
+   COOL_SPECIES: (fish) => `called your ${fish} a cool species`,
+   PERSONAL_BEST: (fish) => `called your ${fish} a personal best`,
+   RARE_VISITOR: (fish) => `called your ${fish} a rare visitor`,
+   RELEASED_WELL: (fish) => `said you put your ${fish} back well`,
+   YOUNG_ANGLER: (fish) => `marked your ${fish} for a young angler`,
+   CATCH_OF_THE_WEEK: (fish) => `made your ${fish} catch of the week`,
+   TEAM_PICK: (fish) => `made your ${fish} a team pick`,
+};
+
+/* `KIND|what was caught|the note`, and the note may hold bars of its own. */
+const unpackBadge = (body: string | null) => {
+   const parts = (body ?? '').split('|');
+   return {
+      kind: parts[0] ?? '',
+      fish: parts[1]?.trim() || 'catch',
+      note: parts.slice(2).join('|').trim(),
+   };
+};
 
 export function pushMessageOf(row: Announced, actorName: string | null) {
    const who = actorName?.trim() || 'Somebody';
@@ -202,12 +231,26 @@ export function pushMessageOf(row: Announced, actorName: string | null) {
          url = competitionLink(row);
          break;
       }
+      case 'BADGE': {
+         const badge = unpackBadge(row.body);
+         const said = BADGE_SAID[badge.kind];
+         title = said
+            ? `${who} ${said(badge.fish)}`
+            : `${who} pinned a badge on your ${badge.fish}`;
+         body = clip(badge.note);
+         if (row.catchId) url = `/catches/${row.catchId}`;
+         break;
+      }
    }
 
    /* What collapses into one line: every reply on a post, every like on a
     * post, every like on one comment. */
    const about =
       (row.kind === 'COMMENT_LIKE' ? row.commentId : null) ??
+      /* A badge is about its fish. Without this the chain fell through to the
+         actor, and every badge the team gave would replace the last one on the
+         lock screen, however many different fish they were about. */
+      (row.kind === 'BADGE' ? row.catchId : null) ??
       row.postId ??
       row.competitionId ??
       row.actorId ??

@@ -8,6 +8,7 @@ import {
    DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { VerifiedMark } from '@/components/profile/VerifiedMark';
 import {
    type ConnectionUser,
    initialOf,
@@ -232,6 +233,9 @@ function Connections({
                            <span className="min-w-0">
                               <span className="block truncate text-[15px] text-paper">
                                  {person.displayName}
+                                 {person.verified ? (
+                                    <VerifiedMark className="size-[13px]" />
+                                 ) : null}
                               </span>
                               <span className="block truncate text-sm text-paper-2">
                                  {person.username ? `@${person.username}` : ''}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { signOut, useSession } from '@/lib/auth-client';
+import { isAdminSession, signOut, useSession } from '@/lib/auth-client';
 import { forgetPushOnSignOut } from '@/lib/push';
 import { initialOf } from '@/components/profile/types';
 import { useMyAvatar } from '@/components/profile/avatar-api';
@@ -46,6 +46,18 @@ const rows: { to: string; label: string; end?: boolean }[] = [
    { to: '/competitions', label: 'Competitions' },
    { to: '/account', label: 'Account' },
 ];
+
+/*
+ * The one row not everybody gets. The session says whether this account is the
+ * one the app is run from, and that is enough to decide what to draw: the page
+ * itself is decided by the server, which answers a stranger the same 404 it
+ * answers for an address that is not there. So a flag that was somehow wrong
+ * here would show a link to a page that still refuses.
+ */
+const adminRow: { to: string; label: string; end?: boolean } = {
+   to: '/admin',
+   label: 'Admin',
+};
 
 export function AccountMenu() {
    const { data } = useSession();
@@ -144,32 +156,36 @@ export function AccountMenu() {
                   aria-label="Your account"
                   className="thread-scroll min-h-0 flex-1 overflow-y-auto py-1"
                >
-                  {rows.map((row) => (
-                     <NavLink
-                        key={row.to}
-                        to={row.to}
-                        end={row.end}
-                        onClick={() => setOpen(false)}
-                        className={({ isActive }) =>
-                           cn(
-                              'flex min-h-[52px] items-center gap-3 border-l-[3px] px-4 transition-colors duration-100',
-                              isActive
-                                 ? 'border-teal bg-teal/10 text-ink'
-                                 : 'border-transparent hover:bg-bg-2'
-                           )
-                        }
-                     >
-                        <span className="g-tracked flex-1 truncate text-[19px]">
-                           {row.label}
-                        </span>
-                        {row.to === '/notifications' && unread > 0 ? (
-                           <>
-                              <CountBadge count={unread} />
-                              <span className="sr-only">{unread} unread</span>
-                           </>
-                        ) : null}
-                     </NavLink>
-                  ))}
+                  {(isAdminSession(user) ? [...rows, adminRow] : rows).map(
+                     (row) => (
+                        <NavLink
+                           key={row.to}
+                           to={row.to}
+                           end={row.end}
+                           onClick={() => setOpen(false)}
+                           className={({ isActive }) =>
+                              cn(
+                                 'flex min-h-[52px] items-center gap-3 border-l-[3px] px-4 transition-colors duration-100',
+                                 isActive
+                                    ? 'border-teal bg-teal/10 text-ink'
+                                    : 'border-transparent hover:bg-bg-2'
+                              )
+                           }
+                        >
+                           <span className="g-tracked flex-1 truncate text-[19px]">
+                              {row.label}
+                           </span>
+                           {row.to === '/notifications' && unread > 0 ? (
+                              <>
+                                 <CountBadge count={unread} />
+                                 <span className="sr-only">
+                                    {unread} unread
+                                 </span>
+                              </>
+                           ) : null}
+                        </NavLink>
+                     )
+                  )}
                </nav>
 
                {/* Sign out sits away from the list, so a thumb running down the

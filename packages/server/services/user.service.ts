@@ -1,8 +1,10 @@
 import type { Prisma } from '@prisma/client';
+import { isAdmin, TEAM_HANDLE } from '../lib/admin';
 import { requireEmailVerification } from '../lib/auth';
 import { prisma } from '../lib/prisma';
 import {
    handleProblemOf,
+   nameIsBrand,
    normaliseHandle,
    type HandleProblem,
 } from '../schemas/user.schema';
@@ -26,6 +28,8 @@ type ProfileShape = {
    bio: string | null;
    avatarUrl: string | null;
    bannerUrl: string | null;
+   /* The tick beside the name. True on one account in the app. */
+   verified: boolean;
    createdAt: Date;
    updatedAt: Date;
 };
@@ -68,6 +72,7 @@ type ConnectionUser = {
    displayName: string;
    avatarUrl: string | null;
    avatarThumbUrl: string | null;
+   verified: boolean;
 };
 
 /* One row of the angler search. No email: this is a list of other people. */
@@ -82,7 +87,7 @@ export type HandleCheck =
 
 type UpdateProfileResult =
    | ProfileResult
-   | { code: 'username_taken' | 'username_reserved' };
+   | { code: 'username_taken' | 'username_reserved' | 'display_name_reserved' };
 
 const SEARCH_PAGE = 20;
 /* Far enough to page through any real search, short of letting one request
@@ -237,14 +242,21 @@ const checkHandleFor = async (
 
    const current = await prisma.user.findUnique({
       where: { id: userId },
-      select: { username: true },
+      select: { username: true, role: true },
    });
 
    if (current?.username && current.username.toLowerCase() === handle) {
       return { handle, available: true };
    }
 
-   const problem = handleProblemOf(handle);
+   /*
+    * The team's handle is the admin account's and nobody else's. The brand
+    * rule in the schema refuses it, and every spelling of it, to everybody;
+    * this is the one account that is let past, and only for that exact word.
+    */
+   const problem = handleProblemOf(handle, {
+      allowReserved: isAdmin(current) ? TEAM_HANDLE : null,
+   });
    if (problem) {
       return { handle, available: false, reason: problem };
    }
@@ -276,6 +288,7 @@ const anglerSelect = {
    username: true,
    displayName: true,
    avatarUrl: true,
+   verified: true,
    _count: { select: { followers: true } },
 } satisfies Prisma.UserSelect;
 
@@ -333,6 +346,7 @@ const buildProfileView = async (userId: string) => {
          bio: true,
          avatarUrl: true,
          bannerUrl: true,
+         verified: true,
          createdAt: true,
          updatedAt: true,
          _count: {
@@ -432,6 +446,7 @@ const buildProfileView = async (userId: string) => {
       bio: profile.bio,
       avatarUrl: profile.avatarUrl,
       bannerUrl: profile.bannerUrl,
+      verified: profile.verified,
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
    });
@@ -468,6 +483,7 @@ const buildPublicProfileView = async (
          bio: true,
          avatarUrl: true,
          bannerUrl: true,
+         verified: true,
          createdAt: true,
          /* No email. This page is public. */
          _count: { select: { followers: true, following: true } },
@@ -581,6 +597,7 @@ const buildPublicProfileView = async (
       avatarThumbUrl: avatar.thumbUrl,
       bannerUrl: banner.url,
       bannerCardUrl: banner.cardUrl,
+      verified: profile.verified,
       createdAt: profile.createdAt,
       followersCount: profile._count.followers,
       followingCount: profile._count.following,
@@ -623,6 +640,20 @@ export const userService = {
       input: UserProfileInput
    ): Promise<UpdateProfileResult> {
       let username: string | undefined;
+
+      /*
+       * The app's own name is not a name an angler may go by. A handle is
+       * grey and small; the display name is the line people actually read on
+       * a card, so leaving it open would have made the handle rule decorative.
+       * The admin account is the exception, because it is the app.
+       */
+      if (input.displayName !== undefined && nameIsBrand(input.displayName)) {
+         const actor = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { role: true },
+         });
+         if (!isAdmin(actor)) return { code: 'display_name_reserved' };
+      }
 
       if (input.username !== undefined) {
          const check = await checkHandleFor(input.username, userId);
@@ -772,6 +803,7 @@ export const userService = {
                           username: true,
                           displayName: true,
                           avatarUrl: true,
+                          verified: true,
                        },
                     },
                  }
@@ -782,6 +814,7 @@ export const userService = {
                           username: true,
                           displayName: true,
                           avatarUrl: true,
+                          verified: true,
                        },
                     },
                  },
@@ -803,6 +836,7 @@ export const userService = {
                displayName: target.displayName,
                avatarUrl: resolvedAvatar.url,
                avatarThumbUrl: resolvedAvatar.thumbUrl,
+               verified: Boolean(target.verified),
             };
          })
       );
@@ -914,6 +948,7 @@ export const userService = {
                displayName: row.displayName,
                avatarUrl: avatar.url,
                avatarThumbUrl: avatar.thumbUrl,
+               verified: row.verified,
                followersCount: row._count.followers,
                followedByMe: followed.has(row.id),
             };

@@ -18,6 +18,14 @@ import { waypointsController } from './controllers/waypoints.controller';
 import { gearController } from './controllers/gear.controller';
 import { feedController } from './controllers/feed.controller';
 import { reviewsController } from './controllers/reviews.controller';
+import { adminController } from './controllers/admin.controller';
+import { badgesController } from './controllers/badges.controller';
+/*
+ * The role guard: it reads the role off the row behind the session and drops
+ * anybody else out of the router, so the answer is the 404 a path that was
+ * never registered gives.
+ */
+import { requireAdmin as requireAdminRole } from './lib/admin';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from './lib/auth';
 import { setAuthContext } from './lib/auth-context';
@@ -149,6 +157,30 @@ router.get(
    attachApiAuth,
    fishingController.getCatchById
 );
+
+/*
+ * The badges the Fisherfeed team pins on a fish. Admin only, all three of
+ * them, including the read: an angler already gets every badge on a catch with
+ * the catch itself, and this one exists for the picker, so there is no reason
+ * for it to answer anybody else. The guard reads the role from the session's
+ * own user row on every request, and a signed-in angler gets a 404, the same
+ * answer as a path that is not there.
+ */
+router.get(
+   '/api/catches/:catchId/badges',
+   requireAdminRole,
+   badgesController.list
+);
+router.post(
+   '/api/catches/:catchId/badges',
+   requireAdminRole,
+   badgesController.award
+);
+router.delete(
+   '/api/catches/:catchId/badges/:kind',
+   requireAdminRole,
+   badgesController.remove
+);
 /* Public, and the reader's own private spots ride along when there is one. */
 router.get('/api/sites', attachApiAuth, fishingController.listFishingSites);
 
@@ -223,6 +255,12 @@ router.delete(
 
 /* What happened to you. Polled, never pushed. */
 router.get('/api/notifications', requireApiAuth, notificationsController.list);
+/* Clearing is a delete: only ever the caller's own inbox. */
+router.delete(
+   '/api/notifications',
+   requireApiAuth,
+   notificationsController.clear
+);
 router.get(
    '/api/notifications/unread',
    requireApiAuth,
@@ -477,5 +515,21 @@ router.delete(
    requireApiAuth,
    userController.unfollowUser
 );
+
+/*
+ * The admin panel. One guard, and it is the role guard, which reads the session
+ * and then reads the role off that session's own row on every request. Nothing
+ * here reads a flag the browser sent, and the client's copy of "am I an admin"
+ * only ever decides what to draw, never what may be answered.
+ *
+ * requireApiAuth is deliberately NOT in front of it. It would answer a signed
+ * out caller with 401 while an ordinary angler got 404, and the difference
+ * between the two is a map of the admin surface. requireAdmin drops everybody
+ * who is not the admin out of the router, so all three cases read alike.
+ *
+ * It is the one route in the product that returns another person's email
+ * address, which is why there is a single door rather than six.
+ */
+router.get('/api/admin/:section', requireAdminRole, adminController.section);
 
 export default router;

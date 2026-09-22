@@ -55,8 +55,20 @@ export const normaliseHandle = (raw: string) =>
 
 export type HandleProblem = 'invalid' | 'reserved';
 
-/** Why a normalised handle cannot be had, before anyone else is asked. */
-export const handleProblemOf = (handle: string): HandleProblem | null => {
+/**
+ * Why a normalised handle cannot be had, before anyone else is asked.
+ *
+ * allowReserved is the one door through the brand-word rule, and it is a
+ * single exact handle rather than a flag: the admin account is given
+ * fisherfeedteam and is refused fisherfeed_support along with everybody else.
+ * The caller decides who gets it, because only the service knows who is
+ * asking. The shape rules are checked first, so the exception cannot smuggle
+ * through a handle with a capital or a space in it.
+ */
+export const handleProblemOf = (
+   handle: string,
+   options?: { allowReserved?: string | null }
+): HandleProblem | null => {
    if (
       handle.length < HANDLE_MIN ||
       handle.length > HANDLE_MAX ||
@@ -65,11 +77,66 @@ export const handleProblemOf = (handle: string): HandleProblem | null => {
       return 'invalid';
    }
 
+   if (options?.allowReserved && handle === options.allowReserved) {
+      return null;
+   }
+
    return RESERVED_HANDLES.has(handle) ||
       RESERVED_WITHIN.some((word) => handle.replaceAll('_', '').includes(word))
       ? 'reserved'
       : null;
 };
+
+/*
+ * A display name read the way somebody glancing at a feed card reads it:
+ * lowercase, and without the spaces, dots and punctuation that only look like
+ * a gap. "Fisher.Feed Team" and "FisherfeedTeam" come out the same, which is
+ * the point, because they pass for the same account.
+ */
+export const flattenName = (raw: string) =>
+   raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Whether a display name passes for the app itself.
+ *
+ * Refused for everybody but the one account the app is run from, which the
+ * service decides. The handle rule alone was not enough: a handle is small
+ * grey text under a name set in 16px, and it is the name people read.
+ */
+export const nameIsBrand = (displayName: string) => {
+   const flat = flattenName(displayName);
+   return RESERVED_WITHIN.some((word) => flat.includes(word));
+};
+
+/*
+ * Characters that draw a tick.
+ *
+ * The app draws one tick, beside one name, from a column the server alone
+ * writes. A name ending in ✓ would sit in exactly the same place and read as
+ * exactly the same thing, so the characters are refused in a name outright.
+ * Nobody loses anything: this is punctuation nobody needs in what they are
+ * called, and the account that really is verified gets the real mark drawn
+ * for it.
+ *
+ * √ is in the list because it is the tick people reach for when the real one
+ * is not on the keyboard, and beside a name it reads as one rather than as a
+ * root sign.
+ */
+const TICK_MARKS = /[✓✔✅☑√\u{1F5F8}\u{1F5F9}]/u;
+
+/**
+ * Whether a display name draws its own tick.
+ *
+ * Exported because a display name is written from three places, not one: this
+ * schema, better-auth's sign-up and better-auth's own name endpoint. The rule
+ * only holds if all three ask, so there is one predicate for all three to ask
+ * rather than a regex each.
+ *
+ * Refused for every account, the admin included: the real mark is drawn from
+ * the column, so nobody needs to type one.
+ */
+export const nameHasTick = (displayName: string) =>
+   TICK_MARKS.test(displayName);
 
 export const updateProfileSchema = z
    .object({
@@ -78,6 +145,10 @@ export const updateProfileSchema = z
          .trim()
          .min(2, 'Display name must be at least 2 characters.')
          .max(80, 'Display name must be less than 80 characters.')
+         .refine(
+            (value) => !nameHasTick(value),
+            'A display name cannot use a tick mark.'
+         )
          .optional(),
       /*
        * Normalised before it is checked, so what is validated is exactly what

@@ -9,7 +9,9 @@ export type NotificationKind =
    | 'INVITE'
    | 'INVITE_ANSWER'
    | 'COMMENT_REPLY'
-   | 'COMMENT_LIKE';
+   | 'COMMENT_LIKE'
+   /* The team pinned a badge on one of your fish; the row names the catch. */
+   | 'BADGE';
 
 const PAGE = 20;
 
@@ -31,6 +33,8 @@ export const notificationsService = {
       /* The comment the row is about, so removing the comment can find it. */
       commentId?: string | null;
       competitionId?: string | null;
+      /* The catch a BADGE row is about, so a tap opens the fish. */
+      catchId?: string | null;
       body?: string | null;
    }) {
       if (input.actorId && input.actorId === input.userId) return;
@@ -62,6 +66,7 @@ export const notificationsService = {
                postId: input.postId ?? null,
                commentId: input.commentId ?? null,
                competitionId: input.competitionId ?? null,
+               catchId: input.catchId ?? null,
                body: input.body ? input.body.slice(0, 300) : null,
             },
          });
@@ -89,6 +94,8 @@ export const notificationsService = {
                /* So the inbox can open the thread at the comment it names. */
                commentId: true,
                competitionId: true,
+               /* So a badge line can open the fish it is about. */
+               catchId: true,
                body: true,
                readAt: true,
                createdAt: true,
@@ -140,6 +147,18 @@ export const notificationsService = {
          }),
       ]);
       return { unread, newestId: newest?.id ?? null };
+   },
+
+   /**
+    * Take the whole inbox away. A notification is a nudge, not a record: once
+    * it is read there is nothing in it the catch, the comment or the profile
+    * it points at does not hold, so clearing removes rather than hides.
+    */
+   async clear(userId: string) {
+      const result = await prisma.notification.deleteMany({
+         where: { userId },
+      });
+      return { cleared: result.count };
    },
 
    /** Everything, or the ids given. Only ever your own. */

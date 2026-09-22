@@ -7,8 +7,13 @@ import {
    HeartIcon as HeartSolid,
    BookmarkIcon as BookmarkSolid,
 } from '@heroicons/react/24/solid';
+import { useState } from 'react';
+import { BadgeStrip } from '@/components/badges/Badge';
+import { BadgeControl } from '@/components/badges/BadgePicker';
+import type { BadgeKind } from '@/components/badges/kinds';
 import { FishMark } from '@/components/brand/FishMark';
 import { Img } from '@/components/Img';
+import { VerifiedMark } from '@/components/profile/VerifiedMark';
 import { Link } from 'react-router-dom';
 
 import {
@@ -155,6 +160,21 @@ export function FeedPostBlock({
    const canFollow = isSignedIn && post.authorIsMe !== true;
 
    /*
+    * The badges live on the post the page holds, so a badge pinned here is
+    * still there when the card is redrawn. Which one just landed is the card's
+    * own business and is forgotten on the next render of the feed.
+    */
+   const badges = post.catch?.badges ?? [];
+   const [landed, setLanded] = useState<BadgeKind | null>(null);
+   const setBadges = (next: typeof badges, justLanded: BadgeKind | null) => {
+      setLanded(justLanded);
+      onPatch((current) => ({
+         ...current,
+         catch: current.catch ? { ...current.catch, badges: next } : null,
+      }));
+   };
+
+   /*
     * The photograph's box, at both shapes the card takes. On a phone it is the
     * full width of the card at 4:3; at desktop the card turns sideways and this
     * is the left column, 600 wide and spanning both rows, so the header and the
@@ -238,6 +258,7 @@ export function FeedPostBlock({
                <span className="min-w-0 leading-tight">
                   <span className="line-clamp-2 block text-[16px] font-semibold text-paper underline-offset-4 group-hover:underline">
                      {post.author.displayName}
+                     {post.author.verified ? <VerifiedMark /> : null}
                   </span>
                   {/*
                    * A username is optional now: better-auth creates an account
@@ -385,6 +406,18 @@ export function FeedPostBlock({
                   </p>
                ) : null}
 
+               {/*
+                * What the team called the fish, with the fish: under the
+                * species and the figures, above where and when. Never over the
+                * photograph, which is the angler's and holds the fish and
+                * often the angler as well.
+                */}
+               <BadgeStrip
+                  badges={badges}
+                  justLanded={landed}
+                  className="mt-0.5 text-paper"
+               />
+
                {/* Where and when, after what: the meta line reads as a caption
                    to the fish rather than as a preamble to the photograph. */}
                <p className="text-[14px] text-paper-2">
@@ -493,6 +526,21 @@ export function FeedPostBlock({
                         />
                      )}
                   </button>
+               ) : null}
+
+               {/*
+                * The team's own control, and nobody else's: it draws nothing
+                * at all unless the session says admin, and the routes behind
+                * it answer 404 to everyone else whatever is on the screen.
+                */}
+               {post.catch ? (
+                  <BadgeControl
+                     catchId={post.catch.id}
+                     fishName={heading ?? 'this catch'}
+                     badges={badges}
+                     onChange={setBadges}
+                     compact
+                  />
                ) : null}
 
                {recordHref ? (

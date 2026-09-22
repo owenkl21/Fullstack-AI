@@ -1,3 +1,5 @@
+import type { CatchBadge } from '@/components/badges/badges-api';
+
 /*
  * The shape the feed route returns today, plus the fields the post would read if
  * the API carried them. Everything optional here is absent from the current
@@ -44,7 +46,13 @@ export type FeedComment = {
    editedAt?: string | null;
    likeCount?: number;
    likedByMe?: boolean;
-   user: { id?: string; displayName: string; username?: string | null };
+   /* verified is the app's own tick, from the server's column alone. */
+   user: {
+      id?: string;
+      displayName: string;
+      username?: string | null;
+      verified?: boolean;
+   };
    replies?: FeedComment[];
    replyCount?: number;
 };
@@ -58,6 +66,8 @@ export type FeedAuthor = {
    /* The one an avatar is allowed to load. Forty pixels of photograph never
     * justifies a camera original, and the feed draws twenty five of them. */
    avatarThumbUrl?: string | null;
+   /* The app's own account. One in the whole product carries it. */
+   verified?: boolean;
 };
 
 export type FeedPost = {
@@ -84,6 +94,9 @@ export type FeedPost = {
       weightKg?: number | null;
       lengthSource?: string | null;
       weightSource?: string | null;
+      /* What the Fisherfeed team has called this fish. On the catch and not on
+         the post: the same badges show on the record and in a row. */
+      badges?: CatchBadge[];
       site?: { id: string; name: string } | null;
    } | null;
    /* The spot the fish was taken at, as the post recorded it. An angler who

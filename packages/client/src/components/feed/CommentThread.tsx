@@ -12,6 +12,7 @@ import { HeartIcon } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid';
 import { Link } from 'react-router-dom';
 
+import { VerifiedMark } from '@/components/profile/VerifiedMark';
 import { Button } from '@/components/ui/button';
 import {
    Dialog,
@@ -56,6 +57,9 @@ export type ThreadViewer = {
    id: string;
    displayName: string;
    username: string | null;
+   /* So a comment the reader has only just written carries the same mark it
+      will have once the server answers, rather than growing one on reload. */
+   verified?: boolean;
 };
 
 const initialOf = (name: string) => (name.trim()[0] ?? '?').toUpperCase();
@@ -765,6 +769,9 @@ export function CommentThread({
                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <p className="text-[14px] leading-[1.3] font-semibold text-paper">
                      {name}
+                     {comment.user.verified ? (
+                        <VerifiedMark className="size-[12px]" />
+                     ) : null}
                      {age ? (
                         <span className="font-normal text-paper-2">
                            {' '}

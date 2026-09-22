@@ -5,8 +5,10 @@ import {
    createAuthMiddleware,
    getSessionFromCtx,
 } from 'better-auth/api';
+import { isAdmin, isAdminEmail, settleAdminRole } from './admin';
 import { LEGAL_VERSION } from './legal';
 import { prisma } from './prisma';
+import { nameHasTick, nameIsBrand } from '../schemas/user.schema';
 import {
    sendChangeEmailConfirmation,
    sendPasswordChanged,
@@ -152,13 +154,74 @@ export const auth = betterAuth({
           * left open across a change of words has to be reloaded first.
           */
          if (ctx.path === '/sign-up/email') {
-            const body = ctx.body as { acceptTerms?: unknown } | undefined;
+            const body = ctx.body as
+               | { acceptTerms?: unknown; name?: unknown; email?: unknown }
+               | undefined;
             if (body?.acceptTerms !== LEGAL_VERSION) {
                throw new APIError('BAD_REQUEST', {
                   code: 'TERMS_NOT_ACCEPTED',
                   message:
                      'Agree to the Terms and the Privacy Policy to start a log. If you did, reload the page and try again.',
                });
+            }
+            /*
+             * The name is set here, not by the profile endpoint, so the two
+             * rules the profile endpoint keeps have to be stated here as
+             * well. A tick is refused to everybody, the admin address
+             * included: the real mark is drawn from a column and nobody has
+             * to type one.
+             */
+            if (typeof body.name === 'string' && nameHasTick(body.name)) {
+               throw new APIError('BAD_REQUEST', {
+                  code: 'DISPLAY_NAME_TICK',
+                  message: 'A display name cannot use a tick mark.',
+               });
+            }
+            /*
+             * Only the admin address may sign up as Fisherfeed anything, and
+             * even then the tick waits on the confirmation link.
+             */
+            if (
+               typeof body.name === 'string' &&
+               nameIsBrand(body.name) &&
+               !isAdminEmail(typeof body.email === 'string' ? body.email : null)
+            ) {
+               throw new APIError('BAD_REQUEST', {
+                  code: 'DISPLAY_NAME_RESERVED',
+                  message: 'That display name is reserved. Pick another one.',
+               });
+            }
+         }
+
+         /*
+          * better-auth's own endpoint for changing a name, which exists
+          * whether or not a page calls it. Without this the rule above could
+          * be walked around by signing up plainly and renaming afterwards.
+          */
+         if (ctx.path === '/update-user') {
+            const body = ctx.body as { name?: unknown } | undefined;
+            /* A tick is refused to everybody, so this one costs no lookup:
+               there is nobody it would be allowed for. */
+            if (typeof body?.name === 'string' && nameHasTick(body.name)) {
+               throw new APIError('BAD_REQUEST', {
+                  code: 'DISPLAY_NAME_TICK',
+                  message: 'A display name cannot use a tick mark.',
+               });
+            }
+            if (typeof body?.name === 'string' && nameIsBrand(body.name)) {
+               const session = await getSessionFromCtx(ctx);
+               const actor = session?.user?.id
+                  ? await prisma.user.findUnique({
+                       where: { id: session.user.id },
+                       select: { role: true },
+                    })
+                  : null;
+               if (!isAdmin(actor)) {
+                  throw new APIError('BAD_REQUEST', {
+                     code: 'DISPLAY_NAME_RESERVED',
+                     message: 'That display name is reserved.',
+                  });
+               }
             }
          }
 
@@ -266,7 +329,19 @@ export const auth = betterAuth({
        * need telling to log the first one.
        */
       afterEmailVerification: async (user, request) => {
-         if (tokenClaims(tokenInRequest(request)).updateTo) return;
+         /*
+          * The address is now confirmed, which is the only thing the admin
+          * grant waits for. Settled here as well as at sign-in so the owner
+          * does not have to sign out and back in after opening the link.
+          *
+          * A change of address may withdraw the role as well as grant it, and
+          * it is the only place that may: the row's own address has just
+          * moved, so an account that has left info@fisherfeed.com has to leave
+          * the tick behind with it.
+          */
+         const changed = Boolean(tokenClaims(tokenInRequest(request)).updateTo);
+         await settleAdminRole(user.id, { withdraw: changed });
+         if (changed) return;
          await sendWelcome({ user: { email: user.email, name: user.name } });
       },
    },
@@ -314,6 +389,15 @@ export const auth = betterAuth({
          /* Which words the account agreed to, and when. Set on create only. */
          termsVersion: { type: 'string', required: false, input: false },
          termsAcceptedAt: { type: 'date', required: false, input: false },
+         /*
+          * So the menu can show the admin panel's link without a second
+          * request, and so a name can carry its tick wherever the session is
+          * already to hand. input: false is the important word on both: it is
+          * what stops a sign-up body carrying role: 'ADMIN' and being believed.
+          * Every admin route still reads the role from the database itself.
+          */
+         role: { type: 'string', required: false, input: false },
+         verified: { type: 'boolean', required: false, input: false },
       },
    },
 
@@ -361,6 +445,32 @@ export const auth = betterAuth({
                   termsAcceptedAt: new Date(),
                },
             }),
+            /*
+             * A sign-up with the admin address is still an ordinary angler
+             * here, because an address nobody has confirmed proves nothing.
+             * Settled anyway so the rule is stated at the one moment a row
+             * comes into being; it grants only if the row already arrived
+             * confirmed, which email sign-up never does.
+             */
+            after: async (user) => {
+               await settleAdminRole(user.id);
+            },
+         },
+      },
+      /*
+       * Every sign-in, and every other moment better-auth opens a session.
+       * The grant is re-stated rather than remembered, so the owner does not
+       * have to be signed in at the moment an address is added to the list.
+       *
+       * It grants and never takes back: taking an address out of ADMIN_EMAILS
+       * does not undo a role that was already written, because settling is
+       * not policing. Removing somebody is a deliberate act on the row.
+       */
+      session: {
+         create: {
+            before: async (session) => {
+               await settleAdminRole(session.userId);
+            },
          },
       },
    },

@@ -11,6 +11,7 @@ import {
    toMetricTemperature,
    toMetricWindSpeed,
 } from '@/lib/weather';
+import { CatchBadges } from '@/components/badges/CatchBadges';
 import { CountIn } from '@/components/fishing/record/CountIn';
 import { RecordActions } from '@/components/fishing/record/RecordActions';
 import { RecordCell, RecordRail } from '@/components/fishing/record/RecordRail';
@@ -481,6 +482,16 @@ function CatchRecord({
                ) : null}
             </RecordCell>
          </RecordRail>
+
+         {/* What the Fisherfeed team called this fish, under the figures the
+             record leads with and above where it came from. Keyed by the
+             catch, so moving to another fish starts it again. */}
+         <CatchBadges
+            key={data.id}
+            catchId={data.id}
+            fishName={name}
+            initial={data.badges ?? []}
+         />
 
          {coords && position ? (
             <section className="px-4 pt-6 md:px-8">

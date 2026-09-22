@@ -12,6 +12,7 @@ import { NotificationFace } from '@/components/notifications/NotificationFace';
 import { describe } from '@/components/notifications/notification-text';
 import {
    fetchNotifications,
+   clearNotifications,
    markNotificationsRead,
    settleUnread,
    type Notification,
@@ -127,6 +128,26 @@ function Inbox() {
       void clearShownNotifications();
    }, []);
 
+   /* Clearing is quiet: the rows go at once, and a failure puts them back
+      rather than leaving a reader looking at an inbox that is not theirs. */
+   const [clearing, setClearing] = useState(false);
+   const clearAll = async () => {
+      const had = rows;
+      setClearing(true);
+      setRows([]);
+      setTotal(0);
+      setFresh(new Set());
+      try {
+         await clearNotifications();
+      } catch {
+         setRows(had);
+         setTotal(had.length);
+         setStatus('error');
+      } finally {
+         setClearing(false);
+      }
+   };
+
    const newCount = fresh.size;
    const firstLoad = status === 'loading' && rows.length === 0;
    /* The nudge is there from the first paint and stays while older pages are
@@ -155,8 +176,18 @@ function Inbox() {
          />
 
          {shown ? (
-            <div className="mt-6 max-w-[820px] md:mt-8">
+            <div className="mt-6 flex max-w-[820px] flex-col gap-3 md:mt-8">
                <InboxNudge />
+               {rows.length > 0 ? (
+                  <button
+                     type="button"
+                     onClick={() => void clearAll()}
+                     disabled={clearing}
+                     className="g-tracked inline-flex min-h-11 items-center self-end text-[15px] text-ink-2 transition-colors hover:text-ink disabled:opacity-50"
+                  >
+                     {clearing ? 'Clearing' : 'Clear them all'}
+                  </button>
+               ) : null}
             </div>
          ) : null}
 

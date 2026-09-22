@@ -6,6 +6,7 @@ import { Img } from '@/components/Img';
 import { Banner } from '@/components/profile/Banner';
 import { RankCard } from '@/components/profile/RankCard';
 import { FollowCounts } from '@/components/profile/FollowCounts';
+import { VerifiedMark } from '@/components/profile/VerifiedMark';
 import {
    initialOf,
    monthAndYear,
@@ -185,9 +186,20 @@ function AnglerScreen() {
                   </span>
                )}
 
-               <div className="min-w-0 flex-1">
+               {/*
+                * A basis wide enough for a word, so the row wraps the Follow
+                * button onto its own line rather than squeezing the name into
+                * a column narrower than it. Without it a name as long as the
+                * app's own broke mid-word at 390 and read as FISHERFEE / D
+                * TEAM. grow rather than flex-1, because flex-1 would set the
+                * basis back to zero.
+                */}
+               <div className="min-w-0 grow basis-[14rem]">
                   <h1 className="g text-[40px] break-words md:text-[52px]">
                      {profile.displayName}
+                     {profile.verified ? (
+                        <VerifiedMark className="ml-2 size-[20px] align-[0.16em] md:size-[24px]" />
+                     ) : null}
                   </h1>
                   {profile.username ? (
                      <p className="text-[15px] text-ink-2">

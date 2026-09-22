@@ -8,6 +8,7 @@ import {
    sitesVisibleTo,
    withSiteShownTo,
 } from '../lib/site-privacy';
+import { badgeRead } from './badges.service';
 import { entriesService } from './competition-entries.service';
 import { getCoordinates } from '../clients/geocoding.client';
 import {
@@ -281,6 +282,9 @@ const catchDetailInclude = {
       },
    },
    species: { select: { id: true, commonName: true, scientificName: true } },
+   /* What the team has called this fish, and who called it that: the record is
+      where a badge says so in full. */
+   badges: badgeRead,
    gears: {
       select: { id: true, name: true, brand: true, type: true, imageUrl: true },
       orderBy: { createdAt: 'desc' as const },
@@ -348,6 +352,8 @@ const siteDetailInclude = {
             },
          },
          species: { select: { commonName: true } },
+         /* The team's marks, beside the name in the spot's list of fish. */
+         badges: badgeRead,
          createdBy: { select: { displayName: true, username: true } },
       },
    },
@@ -1207,6 +1213,9 @@ export const fishingService = {
             /* The fast log offers the species this angler actually logs, so the
              * list has to carry them. */
             species: { select: { id: true, commonName: true } },
+            /* A row shows the mark beside the fish, so the log has to carry
+               what the team called it. */
+            badges: badgeRead,
             images: {
                take: 1,
                orderBy: { position: 'asc' },

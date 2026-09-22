@@ -19,6 +19,15 @@ export const authClient = createAuthClient({
             username: { type: 'string', required: false },
             bio: { type: 'string', required: false },
             storagePrefixId: { type: 'string', required: false },
+            /*
+             * Who is running the app, so the menu can offer the admin panel
+             * without a second request. The server writes both and refuses
+             * them as input, and every admin route reads the role from the
+             * database again: this is for showing a link, never for opening
+             * one.
+             */
+            role: { type: 'string', required: false },
+            verified: { type: 'boolean', required: false },
          },
       }),
    ],
@@ -33,7 +42,14 @@ export type SessionUser = {
    name: string;
    image?: string | null;
    username?: string | null;
+   role?: string | null;
+   verified?: boolean | null;
 };
+
+/** Whether the signed-in account may be shown the admin panel's link. */
+export const isAdminSession = (
+   user: { role?: string | null } | null | undefined
+) => user?.role === 'ADMIN';
 
 /**
  * True only once the session is known, so a caller can tell "signed out" apart

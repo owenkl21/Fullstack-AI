@@ -2464,3 +2464,112 @@ h1[tabindex='-1']:focus:not(:focus-visible),
       cursor: pointer;
    }
 }
+
+/* ---- Badges: what the Fisherfeed team calls a fish ---------------------------
+   A chip is a square of the kind's colour carrying the kind's mark, drawn in
+   the ink that reads on it (components/badges/kinds.ts sets both). Solid and
+   square, because the same chip has to hold on a black feed card, on the paper
+   record and in a list row without being restyled for each. Three sizes only:
+   eighteen in a row, twenty on a card, sixty four on the record. */
+.badge-chip {
+   display: inline-grid;
+   place-items: center;
+   flex: none;
+   width: var(--badge-size, 20px);
+   height: var(--badge-size, 20px);
+   background: var(--badge, var(--teal));
+   color: var(--badge-ink, #0b0909);
+}
+.badge-mark {
+   display: block;
+   width: 76%;
+   height: 76%;
+}
+/* The card's line of badges: the chip, its name, and a plain count for the
+   rest. It wraps at 390px rather than squeezing the names. */
+.badge-strip {
+   display: flex;
+   flex-wrap: wrap;
+   align-items: center;
+   gap: 6px 14px;
+}
+.badge-tag {
+   display: inline-flex;
+   align-items: center;
+   gap: 7px;
+   min-width: 0;
+}
+.badge-tag-name {
+   font-size: 15px;
+   line-height: 1;
+}
+.badge-more {
+   font-size: 13px;
+   letter-spacing: 0.06em;
+   opacity: 0.75;
+}
+/* A row carries the marks alone: one line of type, and the colour says the
+   team has been here. */
+.badge-marks {
+   display: inline-flex;
+   align-items: center;
+   gap: 4px;
+   vertical-align: -3px;
+}
+/* The mark on the control that opens the picker: a badge in outline, so the
+   word beside it reads as a badge control and not as another action. */
+.badge-cue {
+   position: relative;
+   width: 15px;
+   height: 15px;
+   border: 1.6px solid currentColor;
+}
+/* Drawn in the control's own ink, not in teal of its own: the control is teal
+   while the fish carries a badge and quiet while it does not, and a fixed teal
+   centre made it shout on every fish the team had not marked yet. */
+.badge-cue::after {
+   content: '';
+   position: absolute;
+   inset: 3px;
+   background: currentColor;
+}
+/* In the card's action row it stands beside 22px icons, so it is drawn at
+   their weight rather than at the weight of a word. */
+.badge-cue-lg {
+   width: 21px;
+   height: 21px;
+   border-width: 1.8px;
+}
+.badge-cue-lg::after {
+   inset: 4px;
+}
+/* A badge that was just pinned lands, once. Anything already on the card was
+   there before the reader arrived and simply is there. */
+.badge-landed {
+   animation: badge-land 420ms var(--ease) both;
+}
+@keyframes badge-land {
+   from {
+      opacity: 0;
+      transform: scale(0.55) translateY(-6px);
+   }
+   to {
+      opacity: 1;
+      transform: none;
+   }
+}
+/* The picker: the pickers' own panel and sheet heights, so it opens the way
+   every other chooser in the app opens. */
+/* Tall enough for the head, the note and all eight kinds when the window has
+   the room, and no taller than the room Radix says there is. */
+.badge-panel {
+   max-height: min(540px, var(--radix-popover-content-available-height, 540px));
+}
+.badge-sheet {
+   height: min(78vh, 560px);
+}
+@media (prefers-reduced-motion: reduce) {
+   .badge-landed {
+      animation: none;
+   }
+}

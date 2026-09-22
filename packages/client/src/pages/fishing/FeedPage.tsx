@@ -98,6 +98,7 @@ export function FeedPage() {
                  id: user.id,
                  displayName: user.name || user.username || 'You',
                  username: user.username ?? null,
+                 verified: Boolean(user.verified),
               }
             : null,
       [user]
@@ -443,12 +444,10 @@ export function FeedPage() {
       const calm = window.matchMedia(
          '(prefers-reduced-motion: reduce)'
       ).matches;
-      document
-         .getElementById(`post-card-${linked.id}`)
-         ?.scrollIntoView({
-            block: 'start',
-            behavior: calm ? 'auto' : 'smooth',
-         });
+      document.getElementById(`post-card-${linked.id}`)?.scrollIntoView({
+         block: 'start',
+         behavior: calm ? 'auto' : 'smooth',
+      });
    }, [linked, linkedCommentId, status]);
 
    const toggleSave = async (post: FeedPostInView) => {

@@ -31,6 +31,8 @@ export type UserProfile = {
    /* The wide photograph behind the name. */
    bannerUrl: string | null;
    bannerCardUrl?: string | null;
+   /* The tick beside the name, written by the server alone. */
+   verified?: boolean;
    followersCount: number;
    followingCount: number;
    galleryImages: GalleryImage[];
@@ -49,6 +51,7 @@ export type ConnectionUser = {
    displayName: string;
    avatarUrl: string | null;
    avatarThumbUrl?: string | null;
+   verified?: boolean;
 };
 
 /** One row of the angler search: a person, how followed they are, and by you. */

@@ -6,6 +6,8 @@ import {
    TrophyIcon,
    UserPlusIcon,
 } from '@heroicons/react/24/solid';
+import { BADGES, isBadgeKind } from '@/components/badges/kinds';
+import { BadgeCueMark } from '@/components/badges/marks';
 import type { Notification } from '@/components/social/notifications-api';
 
 /*
@@ -43,6 +45,29 @@ export function threadLink(n: Pick<Notification, 'postId' | 'commentId'>) {
 /* The competition itself when the row names one, else the list of them. */
 const competitionLink = (n: Pick<Notification, 'competitionId'>) =>
    n.competitionId ? `/competitions/${n.competitionId}` : '/competitions';
+
+/*
+ * A badge line, unpacked. The row carries `KIND|what was caught|the note` in
+ * its one body column, and the wording for each kind lives with the badges
+ * (components/badges/kinds.ts), so a badge renamed on the screen is renamed
+ * in the inbox too. The note can hold a bar of its own, so only the first two
+ * separators are split on.
+ */
+function badgeLine(n: Notification, who: string): NotificationLine {
+   const parts = (n.body ?? '').split('|');
+   const fish = parts[1]?.trim() || 'catch';
+   const note = parts.slice(2).join('|').trim() || null;
+   const kind = parts[0] ?? '';
+   const to = n.catchId ? `/catches/${n.catchId}` : null;
+   return {
+      who,
+      did: isBadgeKind(kind)
+         ? BADGES[kind].said(fish)
+         : `pinned a badge on your ${fish}`,
+      quote: note,
+      to,
+   };
+}
 
 export function describe(n: Notification): NotificationLine {
    const who = n.actor?.displayName ?? 'Somebody';
@@ -82,6 +107,8 @@ export function describe(n: Notification): NotificationLine {
             quote: words,
             to: competitionLink(n),
          };
+      case 'BADGE':
+         return badgeLine(n, who);
       case 'INVITE_ANSWER': {
          const [answer, name] = (n.body ?? '').split('|');
          return {
@@ -111,6 +138,7 @@ const MARKS: Partial<Record<Notification['kind'], Mark>> = {
    COMMENT_LIKE: HeartIcon,
    INVITE: TrophyIcon,
    INVITE_ANSWER: TrophyIcon,
+   BADGE: BadgeCueMark,
 };
 
 export const markOf = (kind: Notification['kind']): Mark =>

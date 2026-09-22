@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { CatchBadge } from '@/components/badges/badges-api';
 import {
    formatCardinal,
    toMetricTemperature,
@@ -51,6 +52,8 @@ export type CatchSummary = {
    } | null;
    species: { id: string; commonName: string } | null;
    gears?: { id: string; name: string; type: string }[];
+   /* The team's marks, so a row in the log can carry them beside the name. */
+   badges?: CatchBadge[];
    images: CatchImage[];
 };
 
@@ -95,6 +98,8 @@ export type CatchDetail = {
       longitude: number | null;
    } | null;
    species: { commonName: string; scientificName?: string | null } | null;
+   /* What the Fisherfeed team has called this fish, oldest first. */
+   badges?: CatchBadge[];
    gears: {
       id: string;
       name: string;

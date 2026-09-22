@@ -1,3 +1,5 @@
+import { BadgeMarks } from '@/components/badges/Badge';
+import type { CatchBadge } from '@/components/badges/badges-api';
 import { Row, RowNumber, type RowPhoto } from './Row';
 import {
    formatDateTime,
@@ -36,6 +38,8 @@ export type CatchRowItem = {
     * fallback for a catch photographed before the variants existed.
     */
    images?: RowPhoto[];
+   /* What the Fisherfeed team called this fish, as a mark beside the name. */
+   badges?: CatchBadge[];
 };
 
 export function CatchRow({
@@ -85,6 +89,9 @@ export function CatchRow({
             its own: it is still a catch, so it still gets the catch default. */
          photoFraming={photo ?? null}
          photoAlt={`Photo of ${item.title}`}
+         titleMark={
+            item.badges?.length ? <BadgeMarks badges={item.badges} /> : null
+         }
          marked={marked}
          right={
             headline ? (

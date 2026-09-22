@@ -148,6 +148,12 @@ const TermsPage = lazyRoute(() =>
 const AccountPage = lazyRoute(() =>
    import('@/pages/auth/AccountPage').then((m) => ({ default: m.AccountPage }))
 );
+/* The admin panel. Split like the rest, and worth splitting more than most:
+   it is a page one account ever opens, and nobody else should pay for it in
+   the bundle. What it may show is decided by the server, not by this route. */
+const AdminPage = lazyRoute(() =>
+   import('@/pages/AdminPage').then((m) => ({ default: m.AdminPage }))
+);
 
 function App() {
    return (
@@ -181,6 +187,7 @@ function App() {
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/account" element={<AccountPage />} />
+            <Route path="/admin" element={<AdminPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/anglers" element={<AnglersPage />} />

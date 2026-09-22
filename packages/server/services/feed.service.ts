@@ -5,6 +5,7 @@ import {
    withSiteShownTo,
    type SiteGate,
 } from '../lib/site-privacy';
+import { badgeRead } from './badges.service';
 import { notificationsService } from './notifications.service';
 import { uploadsService } from './uploads.service';
 import { resolveAvatarReadUrls, userService } from './user.service';
@@ -19,9 +20,11 @@ type FeedScope = 'GLOBAL' | 'NEARBY';
  */
 type FeedType = 'CATCH';
 
-/* Who wrote a comment, as the thread prints it. Never an email address. */
+/* Who wrote a comment, as the thread prints it. Never an email address.
+   verified carries the tick beside the name; it is one boolean the server
+   alone writes, so the thread never has to work out who is who. */
 const commentAuthor = {
-   select: { id: true, username: true, displayName: true },
+   select: { id: true, username: true, displayName: true, verified: true },
 };
 
 /*
@@ -40,7 +43,13 @@ const THREAD_CAP = 1000;
 
 const feedInclude = {
    author: {
-      select: { id: true, username: true, displayName: true, avatarUrl: true },
+      select: {
+         id: true,
+         username: true,
+         displayName: true,
+         avatarUrl: true,
+         verified: true,
+      },
    },
    catch: {
       select: {
@@ -56,6 +65,9 @@ const feedInclude = {
          weight: true,
          weightSource: true,
          species: { select: { commonName: true } },
+         /* What the team has called this fish. On the card it sits with the
+            species and the figures, so it comes down with them. */
+         badges: badgeRead,
          images: {
             orderBy: { position: 'asc' as const },
             select: {
@@ -127,7 +139,12 @@ type CommentRow = {
    likeCount: number;
    editedAt: Date | null;
    createdAt: Date;
-   user: { id: string; username: string | null; displayName: string };
+   user: {
+      id: string;
+      username: string | null;
+      displayName: string;
+      verified: boolean;
+   };
    replies?: CommentRow[];
    _count?: { replies: number };
 };

@@ -35,6 +35,12 @@ export const notificationsController = {
       return res.json(await notificationsService.pulse(auth.userId));
    },
 
+   async clear(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      return res.json(await notificationsService.clear(auth.userId));
+   },
+
    async markRead(req: Request, res: Response) {
       const auth = getAuth(req);
       if (!auth.userId) return res.status(401).json(unauthorized);

@@ -49,6 +49,11 @@ export type RowProps = {
    right?: ReactNode;
    /** A control that is not part of the link, such as Delete on gear. */
    trailing?: ReactNode;
+   /**
+    * A small mark after the name, inside the link: the badges a catch carries.
+    * Decorative, so it reads as part of the row rather than as a second target.
+    */
+   titleMark?: ReactNode;
    /** Quiet the title, for a row that records a trip rather than a fish. */
    muted?: boolean;
    /** The row that just landed from a save, marked for four seconds. */
@@ -68,6 +73,7 @@ export function Row({
    photoFraming,
    right,
    trailing,
+   titleMark,
    muted = false,
    marked = false,
 }: RowProps) {
@@ -113,7 +119,14 @@ export function Row({
                   muted ? 'text-ink-3' : 'text-ink'
                )}
             >
-               <span className="block truncate">{title}</span>
+               {titleMark ? (
+                  <span className="flex min-w-0 items-center gap-2">
+                     <span className="truncate">{title}</span>
+                     {titleMark}
+                  </span>
+               ) : (
+                  <span className="block truncate">{title}</span>
+               )}
             </Link>
             <p className="truncate text-sm text-ink-2">{subline}</p>
          </div>

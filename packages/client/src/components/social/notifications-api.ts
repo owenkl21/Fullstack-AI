@@ -8,7 +8,9 @@ export type NotificationKind =
    | 'INVITE'
    | 'INVITE_ANSWER'
    | 'COMMENT_REPLY'
-   | 'COMMENT_LIKE';
+   | 'COMMENT_LIKE'
+   /* The Fisherfeed team pinned a badge on one of your fish. */
+   | 'BADGE';
 
 export type Notification = {
    id: string;
@@ -17,6 +19,8 @@ export type Notification = {
    /* The comment a reply or a comment like is about, when there is one. */
    commentId?: string | null;
    competitionId: string | null;
+   /* The fish a badge line is about, so a tap opens the record. */
+   catchId?: string | null;
    body: string | null;
    readAt: string | null;
    createdAt: string;
@@ -56,6 +60,14 @@ export async function fetchPulse(signal?: AbortSignal) {
       newestId: data.newestId ?? null,
       serverNow: Number.isFinite(stamped) ? stamped : Date.now(),
    };
+}
+
+export async function clearNotifications() {
+   const { data } = await axios.delete<{ cleared: number }>(
+      '/api/notifications'
+   );
+   settleUnread(0);
+   return data.cleared ?? 0;
 }
 
 export async function markNotificationsRead(ids?: string[]) {

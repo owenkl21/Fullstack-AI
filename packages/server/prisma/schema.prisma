@@ -60,6 +60,16 @@ enum UnitSystem {
   IMPERIAL
 }
 
+/**
+ * What an account is allowed to do. ANGLER is everybody; ADMIN is the one
+ * account the app is run from, and it is granted by address in lib/admin.ts
+ * rather than set by hand, so no request can ask for it.
+ */
+enum UserRole {
+  ANGLER
+  ADMIN
+}
+
 enum CompetitionMeasure {
   LENGTH
   WEIGHT
@@ -152,6 +162,8 @@ enum NotificationKind {
   // above, so they sit at the end: the column is an enum and only grows.
   COMMENT_REPLY
   COMMENT_LIKE
+  /* The Fisherfeed team pinned a badge on one of your fish. */
+  BADGE
 }
 
 model User {
@@ -181,6 +193,16 @@ model User {
    */
   termsVersion               String?
   termsAcceptedAt            DateTime?
+  /**
+   * What this account may do. Written by the server alone, from the address on
+   * a confirmed row, and never from anything a request carries.
+   */
+  role                       UserRole             @default(ANGLER)
+  /**
+   * The tick beside the name. One account in the app has it, the same one that
+   * holds ADMIN, so it is not a thing an angler can earn or ask for.
+   */
+  verified                   Boolean              @default(false)
   catches                    Catch[]
   sites                      FishingSite[]
   reviews                    Review[]
@@ -215,6 +237,12 @@ model User {
   competitionInvitesSent     CompetitionInvite[]  @relation("CompetitionInvitesSent")
 
   competitionCatchEntries CompetitionEntry[] @relation("CompetitionEntriesByUser")
+
+  /**
+   * Badges this account pinned on other anglers' fish. Only an ADMIN ever has
+   * a row here, so it is the team's own record of what it has marked.
+   */
+  badgesAwarded CatchBadge[] @relation("BadgesAwarded")
 
   @@map("users")
 }
@@ -400,6 +428,12 @@ model Catch {
   commentCount                   Int          @default(0)
   comments                       Comment[]
   likes                          CatchLike[]
+  /**
+   * What the Fisherfeed team has marked this fish as. It hangs on the catch
+   * and not on the post: one catch can be posted, opened on its own page and
+   * listed in a row, and the badge belongs to the fish in all three.
+   */
+  badges                         CatchBadge[]
   images                         CatchImage[]
   feedPosts                      FeedPost[]
   createdAt                      DateTime     @default(now())
@@ -838,6 +872,12 @@ model Notification {
    * inbox from quoting words their author took down.
    */
   commentId     String?
+  /**
+   * The catch a BADGE row is about, so tapping the line opens the fish. A
+   * plain id like postId: the notification survives whatever happens to the
+   * catch, and a tap on a row whose catch has gone lands on Not found.
+   */
+  catchId       String?
   body          String?          @db.VarChar(300)
   readAt        DateTime?
   createdAt     DateTime         @default(now())
@@ -1086,4 +1126,51 @@ model ServerSetting {
   updatedAt DateTime @updatedAt
 
   @@map("server_settings")
+}
+
+/**
+ * What the Fisherfeed team can call a fish.
+ *
+ * An enum rather than a table of kinds: there are eight, they are written by
+ * us and not by anglers, and each one needs a mark drawn for it in the client
+ * anyway. Adding a ninth is a new value here and a new drawing there, which is
+ * the honest amount of work for a new badge.
+ */
+enum BadgeKind {
+  GREAT_CATCH
+  COOL_SPECIES
+  PERSONAL_BEST
+  RARE_VISITOR
+  RELEASED_WELL
+  YOUNG_ANGLER
+  CATCH_OF_THE_WEEK
+  TEAM_PICK
+}
+
+/**
+ * One badge on one fish.
+ *
+ * One of each kind per catch, which is what the unique pair says: a second
+ * Great catch on the same fish is the same fact twice. Several kinds may sit
+ * on one catch, and the feed card shows two of them with a "+1".
+ *
+ * The note is the team's own line about this fish, shown on the catch page
+ * under the badge. Short on purpose: it is a caption, not a comment.
+ */
+model CatchBadge {
+  id          String    @id @default(cuid())
+  catchId     String
+  catch       Catch     @relation(fields: [catchId], references: [id], onDelete: Cascade)
+  kind        BadgeKind
+  /* Who pinned it. Kept so the catch page can say the team did, and which of
+     us, and so taking it off can be told apart from never having awarded. */
+  awardedById String
+  awardedBy   User      @relation("BadgesAwarded", fields: [awardedById], references: [id])
+  note        String?   @db.VarChar(140)
+  createdAt   DateTime  @default(now())
+
+  @@unique([catchId, kind])
+  @@index([catchId])
+  @@index([awardedById])
+  @@map("catch_badges")
 }

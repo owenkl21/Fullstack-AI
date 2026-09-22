@@ -8,6 +8,7 @@ import { FishMark } from '@/components/brand/FishMark';
 import { Img } from '@/components/Img';
 import { useRevealIn } from '@/components/brand/Reveal';
 import type { ConnectionsKind } from '@/components/profile/ConnectionsDialog';
+import { VerifiedMark } from '@/components/profile/VerifiedMark';
 import {
    initialOf,
    monthAndYear,
@@ -82,6 +83,11 @@ export function ProfileView({
                <div className="min-w-0">
                   <h1 className="g text-[44px] leading-none break-words hyphens-auto md:text-[56px]">
                      {profile.displayName}
+                     {/* Bigger here than on a card, because the name is, and
+                         the mark has to read as part of the same line. */}
+                     {profile.verified ? (
+                        <VerifiedMark className="ml-2 size-[22px] align-[0.16em] md:size-[26px]" />
+                     ) : null}
                   </h1>
                   {profile.username ? (
                      <p className="mt-1 text-[15px] break-all text-ink-2">

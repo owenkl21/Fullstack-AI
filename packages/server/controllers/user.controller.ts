@@ -114,15 +114,26 @@ export const userController = {
          /* The race on the unique index lands here too: the service turns
           * the duplicate key into the same answer as a handle seen taken. */
          if ('code' in result) {
-            return result.code === 'username_taken'
-               ? res.status(409).json({
-                    code: 'username_already_exists',
-                    message: 'That username is already in use.',
-                 })
-               : res.status(400).json({
-                    code: 'username_reserved',
-                    message: 'That username is reserved.',
-                 });
+            if (result.code === 'username_taken') {
+               return res.status(409).json({
+                  code: 'username_already_exists',
+                  message: 'That username is already in use.',
+               });
+            }
+
+            /* The app's own name, in the line people read. Said plainly, so
+             * the field can repeat it rather than shrug. */
+            if (result.code === 'display_name_reserved') {
+               return res.status(400).json({
+                  code: 'display_name_reserved',
+                  message: 'That display name is reserved.',
+               });
+            }
+
+            return res.status(400).json({
+               code: 'username_reserved',
+               message: 'That username is reserved.',
+            });
          }
 
          return res.json({
