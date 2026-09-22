@@ -491,6 +491,13 @@ export function buildJudgeRequest(
       model: JUDGE_MODEL,
       max_tokens: 8000,
       /*
+       * Medium effort: the judging a competition needs, at a price a Saturday
+       * of entries can carry. It is the only dial left, since thinking is out
+       * for the reason below, and a request that comes back refused drops it
+       * on the retry rather than leaving the entry unchecked.
+       */
+      output_config: { effort: 'medium' },
+      /*
        * No extended thinking. The API refuses thinking alongside a forced
        * tool_choice (only auto or none are allowed with it), so asking for
        * both turned every call into a 400 and every entry into "not seen by
@@ -598,16 +605,23 @@ function defaultClient(): MessagesClient | null {
    return sharedClient;
 }
 
-/* The same request with strict mode taken off every tool. */
+/*
+ * The same request with the two parts the API might not take: strict mode on
+ * the tool, and the effort dial. Both are asked for first and dropped only if
+ * the request comes back refused, so a judgement is never lost to a setting.
+ */
 export const withoutStrict = (
    request: Anthropic.MessageCreateParamsNonStreaming
-): Anthropic.MessageCreateParamsNonStreaming => ({
-   ...request,
-   tools: request.tools?.map((tool) => {
-      const { strict: _strict, ...rest } = tool as Anthropic.Tool;
-      return rest;
-   }),
-});
+): Anthropic.MessageCreateParamsNonStreaming => {
+   const { output_config: _effort, ...rest } = request;
+   return {
+      ...rest,
+      tools: request.tools?.map((tool) => {
+         const { strict: _strict, ...plain } = tool as Anthropic.Tool;
+         return plain;
+      }),
+   };
+};
 
 export type JudgeDeps = {
    /* Null means no key: the judge is off. Left out, the real client. */

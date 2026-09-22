@@ -462,6 +462,8 @@ describe('what the live API accepts', () => {
          name: 'judge_entry',
       });
       expect('thinking' in request).toBe(false);
+      expect(request.output_config).toEqual({ effort: 'medium' });
+      expect(request.model).toBe('claude-sonnet-5');
    });
 
    test('a schema the API turns down is asked again once, without strict', async () => {
@@ -493,6 +495,7 @@ describe('what the live API accepts', () => {
       expect(calls).toBe(2);
       expect((sent[0]!.tools![0] as Anthropic.Tool).strict).toBe(true);
       expect('strict' in (sent[1]!.tools![0] as Anthropic.Tool)).toBe(false);
+      expect(sent[1]!.output_config).toBeUndefined();
       expect(record).toMatchObject({ status: 'checked' });
    });
 });
