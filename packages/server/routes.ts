@@ -13,6 +13,7 @@ import { forecastController } from './controllers/forecast.controller';
 import { visionController } from './controllers/vision.controller';
 import { savedController } from './controllers/saved.controller';
 import { notificationsController } from './controllers/notifications.controller';
+import { pushController } from './controllers/push.controller';
 import { waypointsController } from './controllers/waypoints.controller';
 import { gearController } from './controllers/gear.controller';
 import { feedController } from './controllers/feed.controller';
@@ -226,6 +227,13 @@ router.post(
    requireApiAuth,
    notificationsController.markRead
 );
+
+/* Web push: the key a browser subscribes with, the browsers that have, and a
+ * line to your own to see it work. All four are yours alone. */
+router.get('/api/push/key', requireApiAuth, pushController.key);
+router.post('/api/push/subscriptions', requireApiAuth, pushController.save);
+router.delete('/api/push/subscriptions', requireApiAuth, pushController.remove);
+router.post('/api/push/test', requireApiAuth, pushController.test);
 
 router.get('/api/saved/gear', requireApiAuth, savedController.listGear);
 router.post(

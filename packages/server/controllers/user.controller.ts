@@ -141,7 +141,13 @@ export const userController = {
          });
       }
 
-      const raw = typeof req.query.handle === 'string' ? req.query.handle : '';
+      /* Cut well past the longest handle there can be: what is left is still
+       * refused as too long, and the answer never echoes a whole query string
+       * back. */
+      const raw =
+         typeof req.query.handle === 'string'
+            ? req.query.handle.trim().slice(0, 64)
+            : '';
       const check = await userService.checkHandle(raw, auth.userId);
 
       return res.json(

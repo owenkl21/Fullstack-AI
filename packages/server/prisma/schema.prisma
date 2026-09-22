@@ -148,6 +148,10 @@ enum NotificationKind {
   LIKE
   INVITE
   INVITE_ANSWER
+  // Somebody answered a comment of yours, or liked one. Added after the five
+  // above, so they sit at the end: the column is an enum and only grows.
+  COMMENT_REPLY
+  COMMENT_LIKE
 }
 
 model User {
@@ -202,6 +206,7 @@ model User {
   savedPosts                 SavedPost[]          @relation("SavedPosts")
   notifications              Notification[]       @relation("Notifications")
   notificationsSent          Notification[]       @relation("NotificationsSent")
+  pushSubscriptions          PushSubscription[]   @relation("PushSubscriptions")
   createdAt                  DateTime             @default(now())
   updatedAt                  DateTime             @updatedAt
   deletedAt                  DateTime?
@@ -947,4 +952,47 @@ model CompetitionEntry {
   @@index([competitionId, state])
   @@index([userId])
   @@map("competition_entries")
+}
+
+/**
+ * One browser on one device that has asked to be told when something happens.
+ *
+ * The endpoint is the push service's own address for that browser and can run
+ * to several hundred characters, past what MySQL will index whole, so the
+ * unique key is its SHA-256 and the address itself is only ever read. A
+ * browser belongs to whoever turned it on last: signing in as somebody else
+ * on the same phone and turning it on moves the row rather than adding one.
+ */
+model PushSubscription {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation("PushSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+  endpointHash  String    @unique @db.Char(64)
+  endpoint      String    @db.Text
+  p256dh        String    @db.VarChar(255)
+  auth          String    @db.VarChar(255)
+  userAgent     String?   @db.VarChar(300)
+  createdAt     DateTime  @default(now())
+  /**
+   * The last time a push service took a message for this browser. Null is a
+   * browser that has never been reached.
+   */
+  lastSuccessAt DateTime?
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+/**
+ * Small things the server has to remember across deploys and has nowhere else
+ * to keep. The first is the VAPID key pair web push signs with: made once when
+ * no pair is set in the environment, and kept here because a new pair would
+ * orphan every browser that subscribed under the old one.
+ */
+model ServerSetting {
+  key       String   @id @db.VarChar(64)
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("server_settings")
 }

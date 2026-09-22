@@ -19,7 +19,6 @@ export function HandleField({
    serverError,
    onBlur,
    ref,
-   autoFocus,
 }: {
    /** Already normalised. */
    value: string;
@@ -32,7 +31,6 @@ export function HandleField({
    serverError?: string;
    onBlur?: () => void;
    ref?: Ref<HTMLInputElement>;
-   autoFocus?: boolean;
 }) {
    const said = describeHandle(check, finished);
    const error = serverError || (said.tone === 'bad' ? said.text : '');
@@ -53,7 +51,6 @@ export function HandleField({
                   said.text
                )
             }
-            autoFocus={autoFocus}
             autoComplete="off"
             autoCapitalize="none"
             autoCorrect="off"
@@ -61,9 +58,12 @@ export function HandleField({
             enterKeyHint="done"
          />
          {/* A refusal is already an alert. Good news is only a hint, which
-             a screen reader would not hear arrive, so it is said here too. */}
+             a screen reader would not hear arrive, so it is said here too.
+             Not once the server has refused the save: the check can still
+             think a handle is free that somebody took a moment ago, and
+             this line went on saying so under the refusal. */}
          <p aria-live="polite" className="sr-only">
-            {said.tone === 'good' ? said.text : ''}
+            {said.tone === 'good' && !serverError ? said.text : ''}
          </p>
       </div>
    );

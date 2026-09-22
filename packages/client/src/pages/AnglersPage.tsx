@@ -1,6 +1,11 @@
 import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import {
+   Link,
+   useLocation,
+   useNavigationType,
+   useSearchParams,
+} from 'react-router-dom';
 import { Img } from '@/components/Img';
 import { PageHead } from '@/components/brand/PageHead';
 import { SearchField } from '@/components/fishing/rows/SearchField';
@@ -40,6 +45,9 @@ type View =
    | { key: string; status: 'error' };
 
 const SEARCH_DEBOUNCE_MS = 300;
+/* As far as the server reads. Past this a pasted paragraph would only ride
+ * along in the address for nothing. */
+const SEARCH_MAX = 60;
 const LOAD_FAILED = 'Could not search anglers just now.';
 
 export function AnglersPage() {
@@ -56,8 +64,31 @@ export function AnglersPage() {
 function AnglerSearch() {
    const [params, setParams] = useSearchParams();
    const query = (params.get('q') ?? '').trim();
+   const location = useLocation();
+   const arrivedBy = useNavigationType();
 
-   const [input, setInput] = useState(params.get('q') ?? '');
+   /* Capped here too: a link can carry a longer q than the box lets anyone
+    * type, and the box would then shed most of it at the first key. */
+   const [input, setInput] = useState(() =>
+      (params.get('q') ?? '').slice(0, SEARCH_MAX)
+   );
+   const [seenKey, setSeenKey] = useState(location.key);
+
+   /*
+    * The box writes the address, and now and then the address changes under
+    * the box: Find anglers in the account panel while a search is up, or Back
+    * to an earlier one. The box used to win, and wrote its old text straight
+    * back over the address it had just been sent to. Any arrival that is not
+    * one of the box's own writes is followed instead.
+    */
+   if (seenKey !== location.key) {
+      setSeenKey(location.key);
+
+      const own =
+         arrivedBy === 'REPLACE' &&
+         (location.state as { typed?: boolean } | null)?.typed === true;
+      if (!own) setInput(query.slice(0, SEARCH_MAX));
+   }
    const [attempt, setAttempt] = useState(0);
    const [view, setView] = useState<View | null>(null);
    const [more, setMore] = useState<{
@@ -81,8 +112,9 @@ function AnglerSearch() {
                return updated;
             },
             /* Replaced, not pushed, so Back leaves the page rather than
-             * stepping back through every letter typed. */
-            { replace: true }
+             * stepping back through every letter typed. Marked as typed, so
+             * the box knows its own writes from an arrival. */
+            { replace: true, state: { typed: true } }
          );
       },
       [setParams]
@@ -245,10 +277,25 @@ function AnglerSearch() {
                   label="Search anglers by name or handle"
                   placeholder="Name or @handle"
                   value={input}
-                  onChange={setInput}
+                  onChange={(next) => setInput(next.slice(0, SEARCH_MAX))}
                />
             </div>
          </header>
+
+         {/* The list changes under the box without a word, so a screen reader
+             is told how the search came out once the answer is in. Always in
+             the page, so the change is what gets read. */}
+         <p aria-live="polite" className="sr-only">
+            {current?.status === 'ready' && query
+               ? current.page.users.length
+                  ? `${plural(current.page.users.length, 'angler')} found.${
+                       current.page.nextCursor
+                          ? ' More load as you scroll.'
+                          : ''
+                    }`
+                  : 'Nobody goes by that.'
+               : ''}
+         </p>
 
          <div className="mt-8">
             {!shown ? (
@@ -364,11 +411,17 @@ function AnglerRow({
             <p className="num truncate text-sm text-ink-2">{subline}</p>
          </div>
 
+         {/*
+          * Not disabled while the request is out. A disabled button drops
+          * the keyboard focus onto the page, so somebody walking the list
+          * with Tab lost their place at every press. The label has already
+          * turned, and a second press while it is out is ignored above.
+          */}
          <Button
             type="button"
             variant={person.followedByMe ? 'secondary' : 'outline'}
             onClick={onToggle}
-            disabled={busy}
+            aria-busy={busy || undefined}
             aria-pressed={person.followedByMe}
             className="relative z-10"
          >

@@ -41,6 +41,9 @@ const DialogContent = React.forwardRef<
       <DialogOverlay />
       <DialogPrimitive.Content
          ref={ref}
+         /* The black block's token remap in index.css keys on this, so text-ink,
+          * outline buttons, fields and text-destructive all read on the black. */
+         data-slot="dialog-content"
          className={cn(
             'fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[86dvh] w-full flex-col overflow-y-auto border-t-[3px] border-teal bg-black-block px-5 pt-6 pb-[calc(24px+env(safe-area-inset-bottom))] text-paper',
             'duration-300 [animation-timing-function:var(--ease)] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-8 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-8',

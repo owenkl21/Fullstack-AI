@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
  * `ghost` is a text control. `destructive` is text plus a red outline, never a red block.
  */
 const buttonVariants = cva(
-   "g-tracked inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap border border-transparent text-[19px] transition-[background-color,color,filter,transform] duration-150 outline-none select-none disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-5 [&_svg]:shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal aria-invalid:border-destructive",
+   "g-tracked inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap border border-transparent text-[19px] transition-[background-color,color,filter,transform] duration-150 outline-hidden select-none disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-5 [&_svg]:shrink-0 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-teal aria-invalid:border-destructive",
    {
       variants: {
          variant: {

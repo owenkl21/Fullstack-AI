@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { authClient, signOut, useSession } from '@/lib/auth-client';
+import { forgetPushOnSignOut } from '@/lib/push';
 import { useDocumentTitle } from '@/lib/title';
 import { AuthForm, AuthShell, Field } from './AuthShell';
 import { SendConfirmation } from './SendConfirmation';
@@ -333,6 +334,8 @@ function AccountPanel() {
                   variant="outline"
                   className="justify-self-start"
                   onClick={async () => {
+                     /* This device stops ringing for the account leaving it. */
+                     await forgetPushOnSignOut();
                      await signOut();
                      navigate('/');
                   }}

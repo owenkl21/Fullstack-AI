@@ -38,6 +38,14 @@ const RESERVED_HANDLES = new Set([
    'official',
 ]);
 
+/*
+ * The product's name anywhere in a handle passes for the product as well as
+ * the name alone does: fisherfeed_support reads as the help desk, and the
+ * list above let it through. Read without underscores, so fisher_feed is the
+ * same name with a gap in it.
+ */
+const RESERVED_WITHIN = ['fisherfeed', 'fishlogger'];
+
 /**
  * @Owen, " owen " and OWEN are one handle: owen. The @ is how people write a
  * handle in a sentence, so one leading @ is taken as that and dropped.
@@ -57,7 +65,10 @@ export const handleProblemOf = (handle: string): HandleProblem | null => {
       return 'invalid';
    }
 
-   return RESERVED_HANDLES.has(handle) ? 'reserved' : null;
+   return RESERVED_HANDLES.has(handle) ||
+      RESERVED_WITHIN.some((word) => handle.replaceAll('_', '').includes(word))
+      ? 'reserved'
+      : null;
 };
 
 export const updateProfileSchema = z

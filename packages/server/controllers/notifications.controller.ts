@@ -32,9 +32,7 @@ export const notificationsController = {
       const auth = getAuth(req);
       if (!auth.userId) return res.status(401).json(unauthorized);
       res.setHeader('Cache-Control', 'no-store');
-      return res.json({
-         unread: await notificationsService.unreadCount(auth.userId),
-      });
+      return res.json(await notificationsService.pulse(auth.userId));
    },
 
    async markRead(req: Request, res: Response) {

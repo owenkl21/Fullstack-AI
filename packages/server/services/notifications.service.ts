@@ -1,12 +1,15 @@
 import { prisma } from '../lib/prisma';
-import { maybeResolveAvatarReadUrl } from './user.service';
+import { pushService } from './push.service';
+import { resolveAvatarReadUrls } from './user.service';
 
 export type NotificationKind =
    | 'FOLLOW'
    | 'COMMENT'
    | 'LIKE'
    | 'INVITE'
-   | 'INVITE_ANSWER';
+   | 'INVITE_ANSWER'
+   | 'COMMENT_REPLY'
+   | 'COMMENT_LIKE';
 
 const PAGE = 20;
 
@@ -43,7 +46,7 @@ export const notificationsService = {
             });
             if (existing) return;
          }
-         await prisma.notification.create({
+         const written = await prisma.notification.create({
             data: {
                userId: input.userId,
                actorId: input.actorId ?? null,
@@ -53,6 +56,10 @@ export const notificationsService = {
                body: input.body ? input.body.slice(0, 300) : null,
             },
          });
+         /* The same line, to any browser of theirs that asked to be told with
+          * the app closed. Started and not waited for: it cannot throw into
+          * this, and the follow or the reply does not wait on a push service. */
+         pushService.announce(written);
       } catch (error) {
          console.warn('[notifications] could not write', String(error));
       }
@@ -88,23 +95,40 @@ export const notificationsService = {
          prisma.notification.count({ where: { userId, readAt: null } }),
       ]);
       const notifications = await Promise.all(
-         rows.map(async (row) => ({
-            ...row,
-            actor: row.actor
-               ? {
-                    ...row.actor,
-                    avatarUrl: await maybeResolveAvatarReadUrl(
-                       row.actor.avatarUrl
-                    ),
-                 }
-               : null,
-         }))
+         rows.map(async (row) => {
+            if (!row.actor) return { ...row, actor: null };
+            /* The face is drawn at forty pixels, so the thumb rides along and
+             * the original is only what a missing thumb falls back to. */
+            const face = await resolveAvatarReadUrls(row.actor.avatarUrl);
+            return {
+               ...row,
+               actor: {
+                  ...row.actor,
+                  avatarUrl: face.url,
+                  avatarThumbUrl: face.thumbUrl,
+               },
+            };
+         })
       );
       return { notifications, total, unread, page, size };
    },
 
-   async unreadCount(userId: string) {
-      return prisma.notification.count({ where: { userId, readAt: null } });
+   /*
+    * What the bell asks every forty five seconds: how many, and which one is
+    * newest. The id is how an open app tells that something arrived since it
+    * last asked without reading the list each time. It reads the list only
+    * when this changes, and that is when a popup is shown.
+    */
+   async pulse(userId: string) {
+      const [unread, newest] = await Promise.all([
+         prisma.notification.count({ where: { userId, readAt: null } }),
+         prisma.notification.findFirst({
+            where: { userId, readAt: null },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true },
+         }),
+      ]);
+      return { unread, newestId: newest?.id ?? null };
    },
 
    /** Everything, or the ids given. Only ever your own. */

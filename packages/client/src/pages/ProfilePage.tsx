@@ -5,6 +5,7 @@ import {
    type ConnectionsKind,
 } from '@/components/profile/ConnectionsDialog';
 import { ProfileSettingsPanel } from '@/components/profile/ProfileSettingsPanel';
+import { DeviceSettings } from '@/components/notifications/DeviceSettings';
 import { ProfileStatsPanel } from '@/components/social/ProfileStats';
 import { RankCard } from '@/components/profile/RankCard';
 import { ProfileView } from '@/components/profile/ProfileView';
@@ -268,6 +269,21 @@ function ProfileScreen() {
                         onSaved={onSaved}
                      />
                   </div>
+               </div>
+
+               {/*
+                * Not folded away with the profile settings: these are about
+                * the phone or the computer this is open on, not about the
+                * angler, and the way onto a home screen has to be findable
+                * by somebody who has never opened a settings panel.
+                */}
+               <div className="mt-12 border-t border-line pt-6">
+                  <h2 className="g text-[30px] md:text-[36px]">This device</h2>
+                  <p className="mt-2 max-w-[60ch] text-[15px] text-ink-2">
+                     Hear about follows, replies and likes with Fisherfeed
+                     closed, and put it on your home screen.
+                  </p>
+                  <DeviceSettings className="mt-6 max-w-[640px]" />
                </div>
             </>
          )}

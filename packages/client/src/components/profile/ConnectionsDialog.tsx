@@ -62,7 +62,10 @@ export function ConnectionsDialog({
             }
          }}
       >
-         <DialogContent>
+         {/* `on-black` remaps the ground and ink tokens for the black block.
+             Without it the search field kept the page's paper ground under
+             paper text, and on the light theme what was typed was invisible. */}
+         <DialogContent className="on-black">
             <Connections
                key={kind}
                kind={kind}
@@ -203,9 +206,15 @@ function Connections({
                            onClick={onClose}
                            className="flex min-h-11 items-center gap-3 py-2 transition-colors duration-150 [transition-timing-function:var(--ease)] hover:bg-paper/10"
                         >
-                           {person.avatarUrl ? (
+                           {person.avatarThumbUrl || person.avatarUrl ? (
+                              /* The thumb the server sends for exactly this:
+                                 a 40px circle has no use for the original. */
                               <img
-                                 src={person.avatarUrl}
+                                 src={
+                                    person.avatarThumbUrl ??
+                                    person.avatarUrl ??
+                                    ''
+                                 }
                                  alt=""
                                  width={40}
                                  height={40}

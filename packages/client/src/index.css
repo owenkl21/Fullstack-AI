@@ -2227,3 +2227,83 @@ h1[tabindex='-1']:focus:not(:focus-visible),
       animation: none;
    }
 }
+
+/* ---- Notifications: the inbox rows and the popups ---------------------------
+   One block for pages/NotificationsPage.tsx and components/notifications/.
+   The row's ground is a variable as well as a colour, so the ring around the
+   mark on a face (NotificationFace) always matches what it sits on: the paper
+   grey of a read row, the teal tint of an unread one, or either on hover.
+   Read rows have a ground too, so a long list is a stack of soft tiles and not
+   loose lines floating on the page. */
+.note-row {
+   --note-ground: var(--bg-2);
+   background: var(--note-ground);
+   transition: background-color 150ms var(--ease);
+}
+.note-row[data-fresh] {
+   --note-ground: color-mix(in srgb, var(--teal) 12%, var(--bg));
+}
+.note-row-link:hover {
+   --note-ground: color-mix(in srgb, var(--ink) 7%, var(--bg-2));
+}
+.note-row-link[data-fresh]:hover {
+   --note-ground: color-mix(in srgb, var(--teal) 19%, var(--bg));
+}
+/* A popup arrives from the edge it sits against: up from the bottom bar on a
+   phone, in from the right on a desktop. */
+.note-pop {
+   animation: note-pop-in 320ms var(--ease) both;
+}
+@keyframes note-pop-in {
+   from {
+      opacity: 0;
+      transform: translateY(12px);
+   }
+   to {
+      opacity: 1;
+      transform: none;
+   }
+}
+@media (min-width: 768px) {
+   @keyframes note-pop-in {
+      from {
+         opacity: 0;
+         transform: translateX(16px);
+      }
+      to {
+         opacity: 1;
+         transform: none;
+      }
+   }
+}
+/* How long a popup has left, as a teal line running out along its foot. The
+   duration is set inline from the same number the timer uses. The line
+   stops while the popup is held under a pointer or holds the focus, because
+   the timer does. */
+.note-pop-life {
+   animation: note-pop-life linear both;
+}
+.note-pop[data-held] .note-pop-life {
+   animation-play-state: paused;
+}
+@keyframes note-pop-life {
+   from {
+      transform: scaleX(1);
+   }
+   to {
+      transform: scaleX(0);
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .note-row {
+      transition: none;
+   }
+   .note-pop {
+      animation: none;
+   }
+   /* A line shrinking for seven seconds is motion too: the popup simply sits
+      and then goes. */
+   .note-pop-life {
+      display: none;
+   }
+}

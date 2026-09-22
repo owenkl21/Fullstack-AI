@@ -85,6 +85,14 @@ const SEARCH_PAGE = 20;
 const SEARCH_MAX_OFFSET = 400;
 const SEARCH_MAX_TERM = 60;
 
+/*
+ * contains and startsWith are LIKE underneath, and Prisma hands the term over
+ * as it was typed. Left alone, "%" or "_" matched every angler there is, and
+ * the _ in @tess_t stood for any letter at all. A backslash in front makes
+ * MySQL read each of them as the character it is.
+ */
+const escapeLike = (term: string) => term.replace(/[\\%_]/g, '\\$&');
+
 type ReadUrls = {
    url: string | null;
    cardUrl: string | null;
@@ -699,7 +707,8 @@ export const userService = {
          select: { id: true },
       });
       /* "@owen" is how a handle gets typed, and no stored handle has the @. */
-      const normalizedSearch = search?.trim().replace(/^@/, '');
+      const typed = search?.trim().replace(/^@/, '').slice(0, SEARCH_MAX_TERM);
+      const normalizedSearch = typed ? escapeLike(typed) : '';
 
       /*
        * No mode: 'insensitive'. Prisma only has it on Postgres and Mongo, and
@@ -821,19 +830,28 @@ export const userService = {
             : 0;
          /* One past the page, which is how we know there is a next one. */
          const wanted = offset + SEARCH_PAGE + 1;
-         const tiers = searchTiers(term, byHandle);
+         const tiers = searchTiers(escapeLike(term), byHandle);
          const found: typeof rows = [];
 
-         for (const [index, tier] of tiers.entries()) {
+         for (const tier of tiers) {
             if (found.length >= wanted) break;
 
             found.push(
                ...(await prisma.user.findMany({
-                  /* Each rank leaves out everyone an earlier rank took, so
-                   * nobody is listed twice. */
+                  /*
+                   * Each rank leaves out everyone an earlier rank took, so
+                   * nobody is listed twice. By id, not by NOT over the
+                   * earlier ranks: a handle that is NULL makes that NOT come
+                   * out NULL, and MySQL drops the row, so an angler without
+                   * a handle could only be found by the start of their name.
+                   * A rank is only reached once the ones before it were read
+                   * to the end, so the ids are all of them.
+                   */
                   where: {
                      AND: [visible, tier],
-                     ...(index > 0 ? { NOT: tiers.slice(0, index) } : {}),
+                     ...(found.length
+                        ? { id: { notIn: found.map((row) => row.id) } }
+                        : {}),
                   },
                   orderBy: anglerOrder,
                   take: wanted - found.length,

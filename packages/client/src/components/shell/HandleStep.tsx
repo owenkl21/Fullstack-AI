@@ -12,6 +12,7 @@ import {
 } from '@/components/profile/handle';
 import { Button } from '@/components/ui/button';
 import { signOut, useSession } from '@/lib/auth-client';
+import { forgetPushOnSignOut } from '@/lib/push';
 import { useDocumentTitle } from '@/lib/title';
 import { AuthForm, AuthShell } from '@/pages/auth/AuthShell';
 
@@ -84,6 +85,8 @@ export function HandleStep() {
    };
 
    const leave = async () => {
+      /* This device stops ringing for the account that is leaving it. */
+      await forgetPushOnSignOut();
       await signOut();
       navigate('/');
    };
@@ -115,7 +118,6 @@ export function HandleStep() {
                check={check}
                finished={finished}
                serverError={serverError}
-               autoFocus
             />
             <Button
                type="submit"

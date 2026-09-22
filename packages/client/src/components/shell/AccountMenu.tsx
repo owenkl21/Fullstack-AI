@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { signOut, useSession } from '@/lib/auth-client';
+import { forgetPushOnSignOut } from '@/lib/push';
 import { initialOf } from '@/components/profile/types';
 import { useMyAvatar } from '@/components/profile/avatar-api';
 import { useUnreadCount } from '@/components/social/notifications-api';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { CountBadge } from '@/components/ui/count-badge';
 import { Sheet } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 
@@ -72,6 +74,8 @@ export function AccountMenu() {
 
    const leave = async () => {
       setOpen(false);
+      /* This device stops ringing for the account that is leaving it. */
+      await forgetPushOnSignOut();
       await signOut();
       navigate('/');
    };
@@ -159,12 +163,10 @@ export function AccountMenu() {
                            {row.label}
                         </span>
                         {row.to === '/notifications' && unread > 0 ? (
-                           <span
-                              aria-hidden="true"
-                              className="num grid min-w-[22px] shrink-0 place-items-center bg-teal px-1 text-[12px] leading-[20px] text-teal-ink"
-                           >
-                              {unread > 99 ? '99+' : unread}
-                           </span>
+                           <>
+                              <CountBadge count={unread} />
+                              <span className="sr-only">{unread} unread</span>
+                           </>
                         ) : null}
                      </NavLink>
                   ))}

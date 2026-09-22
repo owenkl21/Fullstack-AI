@@ -149,7 +149,8 @@ export function describeHandle(
               }
             : { tone: 'bad', text: NOT_VALID };
       case 'own':
-         return { tone: 'quiet', text: `@${check.handle} is your handle now.` };
+         /* Not "now": nothing has changed, and it read as if a save had. */
+         return { tone: 'quiet', text: `@${check.handle} is your handle.` };
       case 'checking':
          return { tone: 'quiet', text: `Checking @${check.handle}.` };
       case 'free':

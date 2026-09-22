@@ -5,6 +5,12 @@ import App from './App.tsx';
 import './index.css';
 import { Toaster } from '@/components/ui/toaster';
 import { BootGate } from '@/components/shell/BootGate';
+/*
+ * For its side effect only. Chromium offers the home screen install through
+ * one event fired early in the load; this catches it before any page exists
+ * to show the button (see lib/install.ts).
+ */
+import '@/lib/install';
 
 /*
  * No provider and no key. Auth is a cookie against our own API, so there is

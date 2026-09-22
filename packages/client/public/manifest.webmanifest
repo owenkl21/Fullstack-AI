@@ -1,0 +1,47 @@
+{
+   "name": "Fisherfeed",
+   "short_name": "Fisherfeed",
+   "description": "A fishing log that stamps the place, the minute and the weather the moment you tap.",
+   "id": "/",
+   "start_url": "/",
+   "scope": "/",
+   "display": "standalone",
+   "lang": "en",
+   "dir": "ltr",
+   "background_color": "#ffffff",
+   "theme_color": "#0b0909",
+   "categories": ["sports", "lifestyle", "social"],
+   "icons": [
+      {
+         "src": "/icons/icon-192.png",
+         "sizes": "192x192",
+         "type": "image/png",
+         "purpose": "any"
+      },
+      {
+         "src": "/icons/icon-512.png",
+         "sizes": "512x512",
+         "type": "image/png",
+         "purpose": "any"
+      },
+      {
+         "src": "/icons/maskable-512.png",
+         "sizes": "512x512",
+         "type": "image/png",
+         "purpose": "maskable"
+      }
+   ],
+   "shortcuts": [
+      {
+         "name": "Log a catch",
+         "short_name": "Log",
+         "url": "/log",
+         "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      },
+      {
+         "name": "Notifications",
+         "url": "/notifications",
+         "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+      }
+   ]
+}

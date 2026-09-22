@@ -2,71 +2,59 @@ import { useLoadOnScroll } from '@/lib/load-on-scroll';
 import { PageHead } from '@/components/brand/PageHead';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-   BellAlertIcon,
-   ChatBubbleOvalLeftIcon,
-   HeartIcon,
-   TrophyIcon,
-   UserPlusIcon,
-} from '@heroicons/react/24/outline';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { InlineError } from '@/components/states/InlineError';
+import { PlainState } from '@/components/states/PlainState';
+import { Button } from '@/components/ui/button';
 import { formatStamp, formatRelative } from '@/components/feed/format';
+import { InboxNudge } from '@/components/notifications/InboxNudge';
+import { NotificationFace } from '@/components/notifications/NotificationFace';
+import { describe } from '@/components/notifications/notification-text';
 import {
    fetchNotifications,
    markNotificationsRead,
    settleUnread,
    type Notification,
 } from '@/components/social/notifications-api';
+import { clearShownNotifications } from '@/lib/push';
 import { useDocumentTitle } from '@/lib/title';
 import { cn } from '@/lib/utils';
 
 const LOAD_FAILED = 'Could not read your notifications.';
 
-const initialOf = (name: string) => (name.trim()[0] ?? '?').toUpperCase();
-
-/* One line per kind, in words rather than codes. */
-function describe(n: Notification): { text: string; to: string | null } {
-   const who = n.actor?.displayName ?? 'Somebody';
-   const profile = n.actor ? `/anglers/${n.actor.id}` : null;
-   switch (n.kind) {
-      case 'FOLLOW':
-         return { text: `${who} started following you.`, to: profile };
-      case 'COMMENT':
-         return {
-            text: n.body
-               ? `${who} replied: ${n.body}`
-               : `${who} replied to your post.`,
-            to: '/',
-         };
-      case 'LIKE':
-         return { text: `${who} liked your post.`, to: '/' };
-      case 'INVITE':
-         return {
-            text: n.body
-               ? `${who} invited you to ${n.body}.`
-               : `${who} invited you to a competition.`,
-            to: '/competitions',
-         };
-      case 'INVITE_ANSWER': {
-         const [answer, name] = (n.body ?? '').split('|');
-         return {
-            text: `${who} ${answer === 'accepted' ? 'accepted' : 'declined'} your invitation${name ? ` to ${name}` : ''}.`,
-            to: '/competitions',
-         };
-      }
-      default:
-         return { text: `${who} did something.`, to: null };
-   }
-}
-
-const ICON = {
-   FOLLOW: UserPlusIcon,
-   COMMENT: ChatBubbleOvalLeftIcon,
-   LIKE: HeartIcon,
-   INVITE: TrophyIcon,
-   INVITE_ANSWER: TrophyIcon,
+/*
+ * The list falls into days, the way a phone's own notifications do: what
+ * happened today reads first and on its own, and a week ago is one label and
+ * not seven. Worked out on the reader's clock, which is whose today it is.
+ */
+const DAY_MS = 24 * 60 * 60 * 1000;
+const dayOf = (iso: string) => {
+   const at = new Date(iso);
+   return new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime();
 };
+function whenGroup(iso: string, today: number) {
+   const days = Math.round((today - dayOf(iso)) / DAY_MS);
+   if (days <= 0) return 'Today';
+   if (days === 1) return 'Yesterday';
+   if (days < 7) return 'This week';
+   return 'Earlier';
+}
+function byDay(rows: Notification[]) {
+   const now = new Date();
+   const today = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+   ).getTime();
+   const groups: { label: string; rows: Notification[] }[] = [];
+   for (const row of rows) {
+      const label = whenGroup(row.createdAt, today);
+      const last = groups[groups.length - 1];
+      if (last && last.label === label) last.rows.push(row);
+      else groups.push({ label, rows: [row] });
+   }
+   return groups;
+}
 
 export function NotificationsPage() {
    useDocumentTitle('Notifications');
@@ -77,6 +65,17 @@ export function NotificationsPage() {
    );
 }
 
+/*
+ * What happened, newest first. Opening the page reads everything: the bell
+ * goes quiet and the phone's own lines about it are cleared. What was unread
+ * when the page opened stays marked for the visit, so the eye can find it.
+ *
+ * Each row is one person and one thing they did. The face carries the kind
+ * (notifications/NotificationFace) and the sentence and time sit beside it,
+ * all of it inset from the column's edge and on a soft rounded ground: this
+ * used to be a hard-edged strip with the face against one side and a mark
+ * against the other, which read as a table and not as news.
+ */
 function Inbox() {
    const [rows, setRows] = useState<Notification[]>([]);
    const [total, setTotal] = useState(0);
@@ -89,7 +88,6 @@ function Inbox() {
       () => setPage((p) => p + 1),
       status === 'ready' && rows.length < total
    );
-   /* What was unread when the page opened stays marked so it can be seen. */
    const [fresh, setFresh] = useState<Set<string>>(() => new Set());
 
    useEffect(() => {
@@ -123,13 +121,44 @@ function Inbox() {
       return () => controller.abort();
    }, [page, attempt]);
 
+   /* Whatever the phone is still showing about the inbox is answered by
+    * being here, so it goes. */
+   useEffect(() => {
+      void clearShownNotifications();
+   }, []);
+
+   const newCount = fresh.size;
+   const firstLoad = status === 'loading' && rows.length === 0;
+   /* The nudge is there from the first paint and stays while older pages are
+    * read: tied to "ready" it left and came back on every scroll to the foot,
+    * and arrived after the rows, and both times the list jumped under the
+    * reader's thumb. Only a page that failed to load at all goes without. */
+   const shown = rows.length > 0 || status !== 'error';
+
    return (
       <section className="relative mx-auto w-[min(1120px,100%-32px)] pb-10 md:pb-14">
          <PageHead
             column="w-[min(1120px,100%-32px)]"
             kicker="What happened"
             title="Notifications"
+            lede={
+               rows.length > 0
+                  ? newCount > 0
+                     ? `${newCount} new since you last looked.`
+                     : 'You are up to date.'
+                  : /* Holds the line the count will take, so the rows do
+                     * not land lower than their skeleton did. */
+                    firstLoad
+                    ? 'Reading what happened.'
+                    : undefined
+            }
          />
+
+         {shown ? (
+            <div className="mt-6 max-w-[820px] md:mt-8">
+               <InboxNudge />
+            </div>
+         ) : null}
 
          {status === 'error' && rows.length === 0 ? (
             <div className="mt-8">
@@ -138,83 +167,152 @@ function Inbox() {
                   onRetry={() => setAttempt((n) => n + 1)}
                />
             </div>
-         ) : rows.length === 0 && status === 'ready' ? (
-            <div className="mt-10 flex max-w-[52ch] flex-col items-start gap-3">
-               <BellAlertIcon
-                  aria-hidden="true"
-                  className="size-8 text-ink-3"
-                  strokeWidth={1.5}
-               />
-               <p className="text-[17px] text-ink-2">
-                  Nothing yet. When somebody follows you, replies to a post of
-                  yours, likes it, or invites you to a competition, it lands
-                  here.
-               </p>
+         ) : firstLoad ? (
+            <InboxSkeleton />
+         ) : rows.length === 0 ? (
+            <div className="mt-8">
+               <PlainState
+                  role="status"
+                  sentence="Nothing yet. When somebody follows you, replies to a post of yours, likes it, or invites you to a competition, it lands here."
+               >
+                  <Button asChild variant="outline">
+                     <Link to="/anglers">Find anglers to follow</Link>
+                  </Button>
+               </PlainState>
             </div>
          ) : (
-            <ul className="relative mt-8 flex flex-col">
-               {rows.map((n, i) => {
-                  const { text, to } = describe(n);
-                  const Icon = ICON[n.kind] ?? BellAlertIcon;
-                  const isFresh = fresh.has(n.id);
-                  const inner = (
-                     <>
-                        <span
-                           aria-hidden="true"
-                           className={cn(
-                              'g grid size-10 shrink-0 place-items-center rounded-full text-[18px]',
-                              isFresh
-                                 ? 'bg-teal text-teal-ink'
-                                 : 'bg-bg-2 text-ink-2'
-                           )}
-                        >
-                           {n.actor ? initialOf(n.actor.displayName) : '?'}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                           <span className="block text-[16px] leading-snug text-ink">
-                              {text}
-                           </span>
-                           <span className="lab mt-1 block text-ink-3">
-                              {formatRelative(n.createdAt) ??
-                                 formatStamp(n.createdAt)}
-                           </span>
-                        </span>
-                        <Icon
-                           aria-hidden="true"
-                           className={cn(
-                              'size-5 shrink-0',
-                              isFresh ? 'text-teal-text' : 'text-ink-3'
-                           )}
-                        />
-                     </>
-                  );
-                  const row =
-                     'fact flex items-center gap-4 border-t border-line py-3.5 first:border-t-0';
-                  return (
-                     <li
-                        key={n.id}
-                        className={cn(isFresh && 'bg-teal/5')}
-                        style={
-                           { '--i': Math.min(i, 10) } as React.CSSProperties
-                        }
-                     >
-                        {to ? (
-                           <Link to={to} className={cn(row, 'hover:bg-bg-2')}>
-                              {inner}
-                           </Link>
-                        ) : (
-                           <div className={row}>{inner}</div>
-                        )}
-                     </li>
-                  );
-               })}
-            </ul>
+            <div className="mt-6 flex max-w-[820px] flex-col gap-8 md:mt-8">
+               {byDay(rows).map((group) => (
+                  <section key={group.label}>
+                     <h2 className="lab mb-3 pl-1">{group.label}</h2>
+                     <ul className="flex flex-col gap-1.5">
+                        {group.rows.map((n) => (
+                           <NotificationRow
+                              key={n.id}
+                              notification={n}
+                              fresh={fresh.has(n.id)}
+                              index={rows.indexOf(n)}
+                           />
+                        ))}
+                     </ul>
+                  </section>
+               ))}
+            </div>
          )}
 
          <div ref={moreSentinel} aria-hidden="true" className="h-px" />
          {rows.length < total && status === 'loading' ? (
-            <p className="lab mt-6 text-ink-3">Reading older ones</p>
+            <p className="lab mt-6 pl-4 text-ink-3">Reading older ones</p>
          ) : null}
       </section>
+   );
+}
+
+function NotificationRow({
+   notification,
+   fresh,
+   index,
+}: {
+   notification: Notification;
+   fresh: boolean;
+   index: number;
+}) {
+   const line = describe(notification);
+   const when =
+      formatRelative(notification.createdAt) ??
+      formatStamp(notification.createdAt);
+
+   const inner = (
+      <>
+         <NotificationFace notification={notification} />
+         <span className="min-w-0 flex-1">
+            {fresh ? <span className="sr-only">New. </span> : null}
+            {/* Unread speaks up: the whole sentence in ink. Once read, only
+                the name keeps its weight and the rest steps back. */}
+            <span
+               className={cn(
+                  'block text-[16px] leading-snug',
+                  fresh ? 'text-ink' : 'text-ink-2'
+               )}
+            >
+               <span className="font-semibold text-ink">{line.who}</span>{' '}
+               {line.did}
+            </span>
+            {line.quote ? (
+               <span className="mt-0.5 line-clamp-2 block text-[15px] leading-snug text-ink-2">
+                  {line.quote}
+               </span>
+            ) : null}
+            <span className="lab mt-1.5 block">{when}</span>
+         </span>
+         {/* The one mark of unread: a teal point at the far end, where a
+             thumb scrolling the list sees a column of them. */}
+         {fresh ? (
+            <span
+               aria-hidden="true"
+               className="size-2.5 shrink-0 rounded-full bg-teal"
+            />
+         ) : null}
+      </>
+   );
+
+   const row = cn(
+      'note-row flex min-h-[76px] items-center gap-4 rounded-[14px] py-3.5 pr-5 pl-4',
+      line.to && 'note-row-link'
+   );
+
+   return (
+      <li
+         className="fact"
+         style={{ '--i': Math.min(index, 10) } as React.CSSProperties}
+      >
+         {line.to ? (
+            <Link
+               to={line.to}
+               data-fresh={fresh ? '' : undefined}
+               className={row}
+            >
+               {inner}
+            </Link>
+         ) : (
+            <div data-fresh={fresh ? '' : undefined} className={row}>
+               {inner}
+            </div>
+         )}
+      </li>
+   );
+}
+
+/* The shape of the first rows before they arrive, so the page does not jump
+ * when they do. Still, like the profile's: nothing here needs to move. */
+function InboxSkeleton() {
+   return (
+      <div
+         role="status"
+         aria-label="Loading your notifications"
+         className="mt-6 max-w-[820px] md:mt-8"
+      >
+         {/* The room the first day's label takes, kept empty. */}
+         <p aria-hidden="true" className="lab invisible mb-3 pl-1">
+            Today
+         </p>
+         <ul className="flex flex-col gap-1.5">
+            {[0, 1, 2, 3].map((i) => (
+               <li
+                  key={i}
+                  className="flex min-h-[76px] items-center gap-4 rounded-[14px] bg-bg-2 py-3.5 pr-5 pl-4"
+               >
+                  <span className="size-11 shrink-0 rounded-full border border-line-2 bg-bg" />
+                  <span className="flex flex-1 flex-col gap-2.5">
+                     <span
+                        className="block h-3.5 bg-line"
+                        style={{ width: `${62 - i * 9}%` }}
+                     />
+                     <span className="block h-2.5 w-16 bg-line" />
+                  </span>
+               </li>
+            ))}
+         </ul>
+      </div>
    );
 }
