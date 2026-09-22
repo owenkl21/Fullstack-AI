@@ -8,7 +8,10 @@ import {
    reviewEntrySchema,
    submitEntrySchema,
 } from '../schemas/competition.schema';
-import { competitionsService } from '../services/competitions.service';
+import {
+   UnknownSpeciesError,
+   competitionsService,
+} from '../services/competitions.service';
 import { entriesService } from '../services/competition-entries.service';
 
 /* Express can hand back a repeated route value as an array. */
@@ -122,6 +125,13 @@ export const competitionsController = {
          ]);
          return res.status(201).json({ competition });
       } catch (error) {
+         if (error instanceof UnknownSpeciesError) {
+            return res.status(400).json({
+               code: 'bad_competition',
+               message: error.message,
+               field: 'speciesIds',
+            });
+         }
          console.error('[competitions:create] failed', error);
          return res.status(500).json({
             code: 'failed_to_create_competition',
@@ -205,10 +215,12 @@ export const competitionsController = {
       try {
          const result = await entriesService.submit(auth.userId, id, {
             catchId: parsed.data.catchId,
+            fishImage: parsed.data.fishImage ?? null,
             measureImage: parsed.data.measureImage ?? null,
             declaredValue: parsed.data.declaredValue ?? null,
             areaConfirmed: parsed.data.areaConfirmed,
             photoTakenAt: parsed.data.photoTakenAt ?? null,
+            measureTakenAt: parsed.data.measureTakenAt ?? null,
             note: parsed.data.note ?? null,
          });
          if ('error' in result) {
@@ -222,6 +234,14 @@ export const competitionsController = {
                measure_photo_required: [
                   400,
                   'A photograph of the fish on the tape or scale is needed.',
+               ],
+               fish_photo_not_on_catch: [
+                  400,
+                  'The fish photo has to be one of the catch photos.',
+               ],
+               same_photo_twice: [
+                  400,
+                  'The fish and the measure need two different photos.',
                ],
             };
             const [status, message] = messages[result.error];

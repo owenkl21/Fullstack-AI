@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CheckIcon, MinusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
+import { FramedPhoto } from '@/components/FramedPhoto';
 import {
    entryStateLabel,
    type Competition,
@@ -12,8 +13,9 @@ import {
    checkValue,
    orderedReport,
 } from '@/components/social/entry-checks';
+import { JudgeFindings } from '@/components/social/JudgeFindings';
 import { formatStamp } from '@/components/fishing/record/format';
-import { formatMeasure, type UnitSystem } from '@/lib/units';
+import { formatMeasure, type UnitChoice } from '@/lib/units';
 import { cn } from '@/lib/utils';
 
 /*
@@ -65,7 +67,7 @@ function CheckLines({
 }: {
    entry: CompetitionEntry;
    competition: Competition;
-   units: UnitSystem;
+   units: UnitChoice;
 }) {
    const lines = orderedReport(entry.report);
    if (entry.state === 'PENDING')
@@ -118,7 +120,7 @@ export function EntryRow({
 }: {
    competition: Competition;
    entry: CompetitionEntry;
-   units: UnitSystem;
+   units: UnitChoice;
    open: boolean;
    onToggle: () => void;
    busy: string | null;
@@ -152,10 +154,11 @@ export function EntryRow({
       <div className="flex items-center gap-3">
          <span className="size-14 shrink-0 bg-black-block">
             {entry.heroUrl ? (
-               <img
+               <FramedPhoto
                   src={entry.heroUrl}
                   alt=""
-                  className="size-14 object-cover"
+                  framing={entry.heroFraming ?? null}
+                  className="size-14"
                />
             ) : null}
          </span>
@@ -219,25 +222,62 @@ export function EntryRow({
 
          <CheckLines entry={entry} competition={c} units={units} />
 
+         <JudgeFindings judge={entry.judge} competition={c} units={units} />
+
          {entry.note ? (
             <p className="text-[14px] text-ink-2">{entry.note}</p>
          ) : null}
 
-         {entry.measureUrl ? (
-            <figure className="m-0 flex flex-col gap-1.5">
-               <figcaption className="lab">
-                  {c.measure === 'LENGTH' ? 'On the tape' : 'On the scale'}
-               </figcaption>
-               <img
-                  src={entry.measureUrl}
-                  alt={
-                     c.measure === 'LENGTH'
-                        ? 'The fish on the tape'
-                        : 'The fish on the scale'
-                  }
-                  className="block aspect-[4/3] w-full bg-black-block object-cover"
-               />
-            </figure>
+         {/* The two photographs the entry was judged on, each by what it
+             is, whole rather than cropped: a tape's last mark is exactly
+             what a crop takes off. Each opens full size. */}
+         {entry.heroUrl || entry.measureUrl ? (
+            <div className="grid grid-cols-2 gap-2.5">
+               {[
+                  {
+                     url: entry.heroUrl,
+                     caption: 'The fish',
+                     alt: `${entry.displayName}'s fish`,
+                  },
+                  {
+                     url: entry.measureUrl,
+                     caption:
+                        c.measure === 'LENGTH' ? 'On the tape' : 'On the scale',
+                     alt:
+                        c.measure === 'LENGTH'
+                           ? 'The fish on the tape'
+                           : 'The fish on the scale',
+                  },
+               ].map((shot, i) =>
+                  shot.url ? (
+                     <figure
+                        key={shot.caption}
+                        className="m-0 flex min-w-0 flex-col gap-1.5"
+                     >
+                        <figcaption className="lab">
+                           <span className="num">
+                              {String(i + 1).padStart(2, '0')}
+                           </span>{' '}
+                           {shot.caption}
+                        </figcaption>
+                        <a
+                           href={shot.url}
+                           target="_blank"
+                           rel="noreferrer"
+                           className="block"
+                           aria-label={`${shot.alt}, full size`}
+                        >
+                           <img
+                              src={shot.url}
+                              alt={shot.alt}
+                              loading="lazy"
+                              className="block aspect-[4/3] w-full bg-black-block object-contain"
+                           />
+                        </a>
+                     </figure>
+                  ) : null
+               )}
+            </div>
          ) : null}
 
          {entry.canReview ? (

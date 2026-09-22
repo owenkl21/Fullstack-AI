@@ -89,6 +89,12 @@ export default defineRailway(() => {
          CLOUDFLARE_R2_ACCESS_KEY_ID: preserve(),
          CLOUDFLARE_R2_SECRET_ACCESS_KEY: preserve(),
          CLOUDFLARE_R2_BUCKET: preserve(),
+         /*
+          * Claude: the competition judge (Sonnet 5) and the measurement
+          * reader (Haiku). Without it both stand down and entries go on
+          * unchecked, so it is declared here where an apply cannot drop it.
+          */
+         ANTHROPIC_API_KEY: preserve(),
       },
    });
 

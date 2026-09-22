@@ -1,7 +1,7 @@
 import { useLoadOnScroll } from '@/lib/load-on-scroll';
 import { useState } from 'react';
 import type { RivalStanding, Standing } from './api';
-import { formatLength, formatMass, readUnitSystem } from '@/lib/units';
+import { formatMeasure, useUnits } from '@/lib/units';
 import { cn } from '@/lib/utils';
 
 /*
@@ -49,7 +49,8 @@ export function StandingsTable({
 }) {
    const [ownRankBy, setRankBy] = useState<RankBy>('points');
    const rankBy = rankByProp ?? ownRankBy;
-   const [units] = useState(() => readUnitSystem());
+   /* The reader's own cm or in, kg or lb, the same as on a competition. */
+   const units = useUnits();
    const [page, setPage] = useState(0);
    const moreSentinel = useLoadOnScroll(
       () => setPage((p) => p + 1),
@@ -72,11 +73,11 @@ export function StandingsTable({
    /* Written the way the figure is actually measured. */
    const written = (s: (typeof standings)[number]) => {
       if (rankBy === 'weight') {
-         return formatMass(s.totalMassKg, units) ?? 'Nothing yet';
+         return formatMeasure(s.totalMassKg, 'WEIGHT', units) ?? 'Nothing yet';
       }
       if (rankBy === 'length') {
          return s.longestCm
-            ? (formatLength(s.longestCm, units) ?? 'Not measured')
+            ? (formatMeasure(s.longestCm, 'LENGTH', units) ?? 'Not measured')
             : 'Not measured';
       }
       if (rankBy === 'bag') {

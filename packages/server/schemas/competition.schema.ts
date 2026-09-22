@@ -1,5 +1,19 @@
 import z from 'zod';
 
+/* How many fish one competition can be for. */
+export const MAX_COMPETITION_SPECIES = 12;
+const TOO_MANY_SPECIES = `A competition can be for ${MAX_COMPETITION_SPECIES} species at most.`;
+
+/* The two species fields as the one list the service keeps: each fish once. */
+const speciesOf = (value: {
+   speciesIds: string[];
+   speciesId?: string | null;
+}) =>
+   new Set([
+      ...value.speciesIds,
+      ...(value.speciesId ? [value.speciesId] : []),
+   ]);
+
 /*
  * What an angler is allowed to decide when they start a competition.
  *
@@ -22,8 +36,19 @@ export const createCompetitionSchema = z
          .max(100)
          .optional()
          .default([]),
-      /* Set, and the competition is for that one fish. */
-      speciesId: z.string().trim().min(1).optional().nullable(),
+      /*
+       * The fish it is for. An empty list is any species. Twelve is past any
+       * list an organiser would read out at a weigh in, and it keeps the rules
+       * line on a card to something a person can take in.
+       */
+      speciesIds: z
+         .array(z.string().trim().min(1).max(64))
+         .max(MAX_COMPETITION_SPECIES, TOO_MANY_SPECIES)
+         .optional()
+         .default([]),
+      /* The older single field, still read so a client that has not reloaded
+       * since this shipped keeps working. It is folded into the list. */
+      speciesId: z.string().trim().min(1).max(64).optional().nullable(),
       groupId: z.string().trim().min(1).optional().nullable(),
       startsAt: z.coerce.date(),
       endsAt: z.coerce.date(),
@@ -49,6 +74,19 @@ export const createCompetitionSchema = z
       message: 'A competition has to end after it starts.',
       path: ['endsAt'],
    })
+   .refine((value) => speciesOf(value).size <= MAX_COMPETITION_SPECIES, {
+      message: TOO_MANY_SPECIES,
+      path: ['speciesIds'],
+   })
+   .refine(
+      /* One fish cannot be won on variety; none, or several, can. */
+      (value) =>
+         value.rule !== 'SPECIES_VARIETY' || speciesOf(value).size !== 1,
+      {
+         message: 'Most species needs more than one fish to choose from.',
+         path: ['speciesIds'],
+      }
+   )
    .refine((value) => value.scope !== 'GROUP' || Boolean(value.groupId), {
       message: 'A group competition needs a group.',
       path: ['groupId'],
@@ -68,6 +106,12 @@ export const listCompetitionsSchema = z.object({
 /* A catch entered in a competition. Figures are metric on the wire. */
 export const submitEntrySchema = z.object({
    catchId: z.string().trim().min(1),
+   /* Which of the catch's photographs is the fish. Left out by a client
+      older than the two photo steps; the catch's cover stands in. */
+   fishImage: z
+      .object({ storageKey: z.string().trim().min(1).max(512) })
+      .optional()
+      .nullable(),
    measureImage: z
       .object({
          storageKey: z.string().trim().min(1).max(512),
@@ -83,6 +127,8 @@ export const submitEntrySchema = z.object({
       .nullable(),
    areaConfirmed: z.boolean().default(false),
    photoTakenAt: z.coerce.date().optional().nullable(),
+   /* What the camera wrote in the measure photograph. */
+   measureTakenAt: z.coerce.date().optional().nullable(),
    note: z.string().trim().min(1).max(280).optional().nullable(),
 });
 

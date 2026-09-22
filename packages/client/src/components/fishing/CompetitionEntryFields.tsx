@@ -1,10 +1,9 @@
-import {
-   PhotoBlock,
-   type UploadedPhoto,
-} from '@/components/fishing/quicklog/PhotoBlock';
+import { type UploadedPhoto } from '@/components/fishing/quicklog/PhotoBlock';
+import { MeasureStep } from '@/components/fishing/EntryPhotos';
 import {
    areaSentence,
    needsMeasurePhoto,
+   speciesWords,
    type Competition,
 } from '@/components/social/competitions-api';
 import { AREA_SENTENCE } from '@/components/fishing/competition-entry';
@@ -13,10 +12,12 @@ import { cn } from '@/lib/utils';
 /*
  * What entering a catch in a competition asks for, beyond the catch itself.
  *
- * Two things: a photograph of the fish on the tape or the scale with the
- * figure readable, which is what the reader reads and the namer names, and
- * one sentence to tick about where it was caught. Both log forms draw these
- * from here, so an entry asks the same questions wherever it is made.
+ * Two things: a photograph of the same fish on the tape or the scale with
+ * the figure readable, which is what the judge reads the figure off, and one
+ * sentence to tick about where it was caught. Both log forms draw these from
+ * here, so an entry asks the same questions wherever it is made. The quick
+ * log draws the photograph as the second of its two numbered steps
+ * (EntryPhotos.tsx); this draws the same step on its own.
  *
  * On the log the two live in different steps, because they belong to
  * different questions: the photograph goes under the catch photo in step one,
@@ -66,10 +67,12 @@ export function CompetitionBanner({
          <span className="lab block text-paper-2">Entering</span>
          <h3 className="g mt-1 text-[26px] text-paper">{competition.name}</h3>
          <p className="mt-1 text-[14px] leading-[1.5] text-paper-2">
-            {judged}
-            {competition.species
-               ? `, ${competition.species.commonName} only`
-               : ''}
+            {/* Every name here, not the card's first two: this is the last
+                thing read before a fish is entered, and the fish has to be
+                on the list. */}
+            {[judged, speciesWords(competition.species, false)]
+               .filter(Boolean)
+               .join(', ')}
             . {[where, when].filter(Boolean).join(', ')}.
          </p>
       </div>
@@ -81,6 +84,7 @@ export function CompetitionEntryFields({
    measurePhoto,
    onMeasurePhoto,
    onMeasureBusy,
+   onMeasureFile,
    areaConfirmed,
    onAreaConfirmed,
    problem,
@@ -91,6 +95,8 @@ export function CompetitionEntryFields({
    measurePhoto: UploadedPhoto | null;
    onMeasurePhoto: (photo: UploadedPhoto | null) => void;
    onMeasureBusy: (busy: boolean) => void;
+   /* The measure file as picked, for the time the camera wrote in it. */
+   onMeasureFile?: (file: File) => void;
    areaConfirmed: boolean;
    onAreaConfirmed: (confirmed: boolean) => void;
    /* What stopped the save, if anything did. */
@@ -105,28 +111,15 @@ export function CompetitionEntryFields({
    return (
       <div className={cn('flex flex-col gap-5', className)}>
          {photo ? (
-            <div className="flex flex-col gap-2">
-               <div className="flex items-center justify-between gap-3">
-                  <span className="lab">
-                     {competition.measure === 'LENGTH'
-                        ? 'On the tape'
-                        : 'On the scale'}
-                  </span>
-                  <span className="lab text-teal-text">Required</span>
-               </div>
-               <PhotoBlock
-                  variant="cell"
-                  idPrefix="measure-photo"
-                  title={
-                     competition.measure === 'LENGTH'
-                        ? 'Photograph the fish on the tape'
-                        : 'Photograph the fish on the scale'
-                  }
-                  initial={measurePhoto}
-                  onChange={onMeasurePhoto}
-                  onBusyChange={onMeasureBusy}
+            <ol aria-label="The measure photo" className="flex flex-col">
+               <MeasureStep
+                  competition={competition}
+                  measurePhoto={measurePhoto}
+                  onMeasurePhoto={onMeasurePhoto}
+                  onMeasureBusy={onMeasureBusy}
+                  onMeasureFile={onMeasureFile}
                />
-            </div>
+            </ol>
          ) : null}
 
          {area ? (

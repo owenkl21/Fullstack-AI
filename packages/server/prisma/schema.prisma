@@ -284,6 +284,7 @@ model Species {
   limitsSource   String? // the brochure and its date
   catches        Catch[]
   competitions   Competition[]
+  competitionsAllowedIn CompetitionSpecies[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 }
@@ -725,6 +726,13 @@ model Competition {
    */
   speciesId           String?
   species             Species?             @relation(fields: [speciesId], references: [id], onDelete: SetNull)
+  /**
+   * The fish a competition is for, when it is for more than any fish. No rows
+   * means any species. speciesId above is the older single column: it is still
+   * written when exactly one fish is chosen, and a row that has it and no rows
+   * here is read as a list of one.
+   */
+  speciesAllowed      CompetitionSpecies[]
   startsAt            DateTime
   endsAt              DateTime
   /**
@@ -870,6 +878,23 @@ model Waypoint {
   @@map("waypoints")
 }
 
+/**
+ * One fish a competition is for. A join rather than a list in a column, so a
+ * species that is deleted takes its row with it and the rest of the list stands.
+ */
+model CompetitionSpecies {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  speciesId     String
+  species       Species     @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+
+  @@unique([competitionId, speciesId])
+  @@index([speciesId])
+  @@map("competition_species")
+}
+
 model CompetitionEntrant {
   id            String      @id @default(cuid())
   competitionId String
@@ -971,11 +996,28 @@ model CompetitionEntry {
   longitude       Float?
   areaConfirmed   Boolean            @default(false)
   photoTakenAt    DateTime?
+  /**
+   * The two photographs, each by what it is rather than by its place in a
+   * list: the fish, and the fish on the tape, board or scale.
+   */
   heroImageKey    String?            @db.VarChar(512)
   heroImageUrl    String?            @db.VarChar(512)
   measureImageKey String?            @db.VarChar(512)
   measureImageUrl String?            @db.VarChar(512)
+  /**
+   * What the camera wrote in the measure photograph, when it wrote a time.
+   * A fish and its weigh in are minutes apart; days apart is worth a look.
+   */
+  measureTakenAt  DateTime?
   note            String?            @db.VarChar(280)
+  /**
+   * The judge's reading of both photographs against the rules, as it came
+   * back and was checked (services/competition-judge.service.ts), or why it
+   * did not run. Null on an entry made before the judge existed.
+   */
+  judge           Json?
+  judgeModel      String?            @db.VarChar(64)
+  judgedAt        DateTime?
   /**
    * The fish's embedding from the namer, for the duplicate check.
    */

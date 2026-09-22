@@ -29,12 +29,12 @@ export function entryProblem(
    hasHeroPhoto = true
 ) {
    if (!hasHeroPhoto) {
-      return 'Add the catch photo. It is the one that goes on the board.';
+      return 'Add the photo of the fish first. It is the one that goes on the board.';
    }
    if (needsMeasurePhoto(competition) && !measurePhoto) {
       return competition.measure === 'LENGTH'
-         ? 'Add the photograph of the fish on the tape.'
-         : 'Add the photograph of the fish on the scale.';
+         ? 'Add the second photo: the same fish on the tape.'
+         : 'Add the second photo: the same fish on the scale.';
    }
    if (
       needsMeasurePhoto(competition) &&

@@ -7,6 +7,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 import { formatClock, formatCoords } from '@/components/fishing/record/format';
+import { DateTimeField } from '@/components/ui/date-time-field';
+import { fromLocalValue, toLocalValue } from '@/lib/local-time';
 import type { FixStatus } from './useFix';
 
 /*
@@ -32,10 +34,6 @@ export type Where = {
    source: 'phone' | 'photo' | 'pin' | 'map';
    accuracy?: number;
 };
-
-const pad = (n: number) => String(n).padStart(2, '0');
-const toLocalInput = (d: Date) =>
-   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 export function Receipt({
    at,
@@ -134,19 +132,19 @@ export function Receipt({
          </div>
 
          {editingTime ? (
-            <label className="mt-2 flex flex-col">
-               <span className="lab">Caught at</span>
-               <input
-                  type="datetime-local"
-                  className="input-line num mt-1.5 text-[16px]"
-                  value={toLocalInput(at)}
-                  max={toLocalInput(new Date())}
-                  onChange={(event) => {
-                     const next = new Date(event.target.value);
-                     if (!Number.isNaN(next.getTime())) onTime(next);
-                  }}
-               />
-            </label>
+            <DateTimeField
+               className="mt-2"
+               label="Caught at"
+               value={toLocalValue(at)}
+               max={toLocalValue(new Date())}
+               onChange={(value) => {
+                  /* A half filled field reports empty and a year still being
+                     typed reads as none; the time stands until there is a
+                     whole one to replace it with. */
+                  const next = fromLocalValue(value);
+                  if (next) onTime(next);
+               }}
+            />
          ) : null}
 
          <span

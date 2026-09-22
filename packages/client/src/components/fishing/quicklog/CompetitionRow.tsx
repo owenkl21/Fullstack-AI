@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { Sheet } from '@/components/ui/sheet';
 import {
    fetchCompetitions,
+   speciesWords,
    type Competition,
 } from '@/components/social/competitions-api';
 
@@ -91,12 +92,14 @@ export function CompetitionRow({
                               </span>
                               {option ? (
                                  <span className="text-[13px] text-ink-3">
-                                    {option.measure === 'LENGTH'
-                                       ? 'Length'
-                                       : 'Weight'}
-                                    {option.species
-                                       ? `, ${option.species.commonName} only`
-                                       : ''}
+                                    {[
+                                       option.measure === 'LENGTH'
+                                          ? 'Length'
+                                          : 'Weight',
+                                       speciesWords(option.species),
+                                    ]
+                                       .filter(Boolean)
+                                       .join(', ')}
                                  </span>
                               ) : null}
                            </button>

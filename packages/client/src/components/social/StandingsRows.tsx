@@ -6,7 +6,7 @@ import {
    type CompetitionStanding,
 } from '@/components/social/competitions-api';
 import { formatStamp } from '@/components/fishing/record/format';
-import { type UnitSystem } from '@/lib/units';
+import { type UnitChoice } from '@/lib/units';
 
 /*
  * The standings, as rows rather than a table.
@@ -30,7 +30,7 @@ export function StandingsRows({
    competition: Competition;
    standings: CompetitionStanding[];
    entries: CompetitionEntry[];
-   units: UnitSystem;
+   units: UnitChoice;
    /* Final standings print the name alone, with no catch under it. */
    final?: boolean;
 }) {

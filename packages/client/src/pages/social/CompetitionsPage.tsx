@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Segment } from '@/components/fishing/quicklog/Segment';
 import { InlineError } from '@/components/states/InlineError';
 import { useDocumentTitle } from '@/lib/title';
-import { readUnitSystem, type UnitSystem } from '@/lib/units';
+import { useUnits } from '@/lib/units';
 
 /*
  * Competitions, the ones anglers run themselves.
@@ -55,7 +55,8 @@ function CompetitionsScreen() {
       'loading'
    );
    const [attempt, setAttempt] = useState(0);
-   const [units] = useState<UnitSystem>(() => readUnitSystem());
+   /* The reader's cm or in, kg or lb, as chosen on any competition. */
+   const units = useUnits();
    const moreSentinel = useLoadOnScroll(
       () => setPage((p) => p + 1),
       status === 'ready' && items.length < total && page * size < total

@@ -38,6 +38,8 @@ import {
    type Competition,
 } from '@/components/social/competitions-api';
 import { ChoiceGroup, TextArea, TextField } from '@/components/ui/field';
+import { DateTimeField } from '@/components/ui/date-time-field';
+import { fromLocalValue, toLocalValue } from '@/lib/local-time';
 import { Fold } from '@/components/ui/fold';
 import { MeasureField } from '@/components/fishing/quicklog/MeasureField';
 import { toMetricValue } from '@/components/fishing/quicklog/measure';
@@ -134,23 +136,17 @@ const GEAR_KINDS: { value: GearKind; word: string; plural: string }[] = [
 const TITLE_LIMIT = 120;
 const MAX_PHOTOS = 8;
 
-const pad = (value: number) => String(value).padStart(2, '0');
-
-/* datetime-local speaks local time, so the record has to be read in local time too. */
+/* The field speaks local time, so the record has to be read in local time too. */
 const clock = (date: Date) =>
    date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
-const toLocalInputValue = (date: Date) =>
-   `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-
-const fromLocalInputValue = (value: string) => {
-   const trimmed = value.trim();
-   if (!trimmed) {
-      return null;
-   }
-   const parsed = new Date(trimmed);
-   return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
+/*
+ * The date and time field's own two helpers, under the names this form has
+ * always used them by. The instant is built from the parts, not from
+ * new Date(string), which is a local time in one browser and UTC in another.
+ */
+const toLocalInputValue = toLocalValue;
+const fromLocalInputValue = fromLocalValue;
 
 const numberOrNull = (value: string) => {
    const trimmed = value.trim();
@@ -838,6 +834,11 @@ export function CatchForm({
          case 'caughtAt': {
             const parsed = fromLocalInputValue(caughtAt);
             if (!parsed) return 'Pick the date and time the fish came out.';
+            /* The calendar stops at today where the browser honours max;
+               iOS does not, so it is said in words as well. The minute's
+               grace is for a clock that ticked over while the form was open. */
+            if (parsed.getTime() > Date.now() + 60000)
+               return 'That has not happened yet.';
             return undefined;
          }
          case 'newSpotName': {
@@ -1103,6 +1104,10 @@ export function CatchForm({
             try {
                await submitEntry(competition.id, {
                   catchId: data.catch.id,
+                  /* The long form's first photograph is its cover: named. */
+                  fishImage: images[0]
+                     ? { storageKey: images[0].storageKey }
+                     : null,
                   measureImage: measurePhoto
                      ? {
                           storageKey: measurePhoto.storageKey,
@@ -1709,13 +1714,14 @@ export function CatchForm({
             <section className="flex flex-col gap-6">
                <GroupHeading>When</GroupHeading>
 
-               <div>
-                  <TextField
+               {/* Wide enough for a day and a time side by side, and no
+                   wider: the same measure every other field here stops at. */}
+               <div className="max-w-[32rem]">
+                  <DateTimeField
                      label="Caught at"
-                     data-field="caughtAt"
-                     type="datetime-local"
-                     numeric
+                     dataField="caughtAt"
                      value={caughtAt}
+                     max={toLocalInputValue(new Date())}
                      error={errors.caughtAt}
                      hint={
                         <>
@@ -1725,9 +1731,9 @@ export function CatchForm({
                               : ''}
                         </>
                      }
-                     onChange={(event) => {
+                     onChange={(next) => {
                         caughtAtEdited.current = true;
-                        setCaughtAt(event.target.value);
+                        setCaughtAt(next);
                      }}
                      onBlur={() => markTouched('caughtAt')}
                   />

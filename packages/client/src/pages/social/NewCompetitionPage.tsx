@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { PlaceSearch } from '@/components/forecast/PlaceSearch';
@@ -10,10 +11,11 @@ import {
 } from '@/components/fishing/quicklog/species';
 import { Segment } from '@/components/fishing/quicklog/Segment';
 import {
-   PROVINCES,
    createCompetition,
    fetchMyFollowers,
+   listWords,
    ruleSentence,
+   speciesWords,
    whenSentence,
    type CompetitionArea,
    type CompetitionChecks,
@@ -22,8 +24,13 @@ import {
    type Follower,
 } from '@/components/social/competitions-api';
 import { checkSentences } from '@/components/social/entry-checks';
-import { formatClock, formatDay } from '@/components/fishing/record/format';
+import { formatDay } from '@/components/fishing/record/format';
+import { ProvinceGrid } from '@/components/social/ProvinceGrid';
 import { RulesTable } from '@/components/social/RulesTable';
+import {
+   SpeciesField,
+   type SpeciesMode,
+} from '@/components/social/SpeciesField';
 import {
    ChoiceRow,
    LineField,
@@ -31,8 +38,9 @@ import {
    RadioDot,
    TickBox,
 } from '@/components/social/StepLine';
+import { DateTimeField } from '@/components/ui/date-time-field';
+import { fromLocalValue, toLocalValue } from '@/lib/local-time';
 import { MeasureBox } from '@/components/ui/measure-box';
-import { Picker } from '@/components/ui/picker';
 import { Sheet } from '@/components/ui/sheet';
 import { toast } from '@/components/ui/use-toast';
 import { useDocumentTitle } from '@/lib/title';
@@ -64,18 +72,45 @@ const STEP_TITLES: Record<StepKey, string> = {
    look: 'One last look',
 };
 
-/* Local date and time, in the shape a datetime-local input wants. */
-const inputValue = (at: Date) => {
-   const pad = (n: number) => String(n).padStart(2, '0');
-   return (
-      `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` +
-      `T${pad(at.getHours())}:${pad(at.getMinutes())}`
-   );
+/*
+ * Where the dates start: the coming Saturday at six in the morning to the
+ * Sunday after it at three, which is the weekend most competitions are. Never
+ * today, even on a Saturday: a competition that has already started before
+ * anyone has been told about it is not the one being planned.
+ */
+const comingWeekend = () => {
+   const start = new Date();
+   start.setDate(start.getDate() + ((6 - start.getDay() + 7) % 7 || 7));
+   start.setHours(6, 0, 0, 0);
+   const end = new Date(start);
+   end.setDate(end.getDate() + 1);
+   end.setHours(15, 0, 0, 0);
+   return {
+      start: toLocalValue(start),
+      end: toLocalValue(end),
+      /* How long that is, for an end that follows a moved start. */
+      length: end.getTime() - start.getTime(),
+   };
 };
 
-/* "Fri 18 Sep" and "06:00", the way every other date in the app is written. */
-const dayOf = (local: string) => formatDay(local) ?? 'Pick a day';
-const timeOf = (local: string) => formatClock(local) ?? '';
+/* "Fri 18 Sep", the way every other date in the app is written. */
+const dayOf = (local: string) =>
+   formatDay(fromLocalValue(local)) ?? 'Pick a day';
+
+/* "1 day 9 h", for the line that says how long the dates make it. */
+const runsFor = (from: Date, to: Date) => {
+   const minutes = Math.round((to.getTime() - from.getTime()) / 60000);
+   const days = Math.floor(minutes / 1440);
+   const hours = Math.floor((minutes % 1440) / 60);
+   const rest = minutes % 60;
+   return [
+      days ? `${days} ${days === 1 ? 'day' : 'days'}` : '',
+      hours ? `${hours} h` : '',
+      !days && rest ? `${rest} min` : '',
+   ]
+      .filter(Boolean)
+      .join(' ');
+};
 
 export function NewCompetitionPage() {
    useDocumentTitle('Start a competition');
@@ -88,29 +123,39 @@ export function NewCompetitionPage() {
 
 function NewCompetition() {
    const navigate = useNavigate();
-   const now = useMemo(() => new Date(), []);
-   const inAWeek = useMemo(() => new Date(now.getTime() + 7 * 86400000), [now]);
+   const [weekend] = useState(comingWeekend);
 
    const [name, setName] = useState('');
    const [blurb, setBlurb] = useState('');
    const [measure, setMeasure] = useState<CompetitionMeasure>('WEIGHT');
    const [rule, setRule] = useState<CompetitionRule>('BIGGEST_FISH');
-   const [speciesId, setSpeciesId] = useState('');
-   const [species, setSpecies] = useState<Species[]>([]);
+   const [speciesMode, setSpeciesMode] = useState<SpeciesMode>('any');
+   const [speciesIds, setSpeciesIds] = useState<string[]>([]);
+   const [species, setSpecies] = useState<Species[] | null>(null);
    const [areaType, setAreaType] = useState<CompetitionArea>('ANYWHERE');
    const [place, setPlace] = useState<PlaceHit | null>(null);
    const [pickingSpot, setPickingSpot] = useState(false);
    const [radiusKm, setRadiusKm] = useState('25');
    const [province, setProvince] = useState('');
-   const [startsAt, setStartsAt] = useState(inputValue(now));
-   const [endsAt, setEndsAt] = useState(inputValue(inAWeek));
+   /* Local wall clock, as typed. They become instants once, when it is sent. */
+   const [startsAt, setStartsAt] = useState(weekend.start);
+   const [endsAt, setEndsAt] = useState(weekend.end);
    const [scope, setScope] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
    const [checks, setChecks] = useState<CompetitionChecks>('CASUAL');
    const [followers, setFollowers] = useState<Follower[] | null>(null);
    const [search, setSearch] = useState('');
    const [invitees, setInvitees] = useState<string[]>([]);
    const [busy, setBusy] = useState(false);
-   const [error, setError] = useState<string | null>(null);
+   /*
+    * A step's complaint is about what was on it when Continue was pressed.
+    * Once any of that changes the complaint is stale, and a fixed field that
+    * kept an old one under it would read as still broken. So a complaint is
+    * kept with the answers it was about, and shown only while they stand.
+    */
+   const [complaint, setComplaint] = useState<{
+      text: string;
+      about: string;
+   } | null>(null);
    const [entered, setEntered] = useState(false);
    const [step, setStep] = useState<StepKey>('what');
 
@@ -127,6 +172,23 @@ function NewCompetition() {
       return () => controller.abort();
    }, []);
 
+   const about = JSON.stringify([
+      name,
+      speciesMode,
+      speciesIds,
+      rule,
+      areaType,
+      place?.latitude,
+      place?.longitude,
+      province,
+      startsAt,
+      endsAt,
+      radiusKm,
+   ]);
+   const error = complaint?.about === about ? complaint.text : null;
+   const setError = (text: string | null) =>
+      setComplaint(text ? { text, about } : null);
+
    useEffect(() => {
       if (scope !== 'PRIVATE' || followers) return;
       const controller = new AbortController();
@@ -142,21 +204,60 @@ function NewCompetition() {
    const order = STEPS.filter(live);
    const index = Math.max(0, order.indexOf(step));
 
-   const chosenSpecies = species.find((s) => s.id === speciesId) ?? null;
+   /* The fish it is for, by name, in the list's order, which is how the
+      competition will print them. Empty is any species, whichever way that
+      was arrived at. */
+   const chosenSpecies =
+      speciesMode === 'chosen'
+         ? (species ?? []).filter((s) => speciesIds.includes(s.id))
+         : [];
+
+   const from = fromLocalValue(startsAt);
+   const to = fromLocalValue(endsAt);
+   /* Said under the field the moment it is true, not only on Continue. */
+   const endProblem =
+      from && to && to <= from
+         ? 'It has to end after it starts.'
+         : to && to <= new Date()
+           ? 'That is already past. Choose an end after now.'
+           : null;
+
+   /*
+    * The end follows the start, the weekend's length later, until the
+    * organiser sets the end by hand; after that the start is theirs to move
+    * and an end it overtakes is said, not silently moved. Following is done
+    * from the new start alone: a day typed segment by segment passes through
+    * years like 0202 on the way, and a length measured against one of those
+    * would fling the end into the far future.
+    */
+   const [endSetByHand, setEndSetByHand] = useState(false);
+   const changeStart = (next: string) => {
+      setStartsAt(next);
+      const now = fromLocalValue(next);
+      if (endSetByHand || !now) return;
+      setEndsAt(toLocalValue(new Date(now.getTime() + weekend.length)));
+   };
+   const changeEnd = (next: string) => {
+      setEndSetByHand(true);
+      setEndsAt(next);
+   };
 
    const problemWith = (key: StepKey): string | null => {
-      if (key === 'what' && name.trim().length < 2)
-         return 'Give your competition a name, at least 2 characters.';
+      if (key === 'what') {
+         if (name.trim().length < 2)
+            return 'Give your competition a name, at least 2 characters.';
+         if (speciesMode === 'chosen' && chosenSpecies.length === 0)
+            return 'Pick the species it is for, or make it any species.';
+         if (rule === 'SPECIES_VARIETY' && chosenSpecies.length === 1)
+            return 'Most species needs more than one fish to choose from.';
+      }
       if (key === 'where') {
          if (areaType === 'WATERBODY' && !place)
             return 'Pick the spot it is on.';
          if (areaType === 'REGION' && !province) return 'Pick the region.';
-         const from = new Date(startsAt);
-         const to = new Date(endsAt);
-         if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()))
-            return 'Set when it starts and when it ends.';
-         if (to <= from) return 'Choose an end after the start.';
-         if (to <= new Date()) return 'Choose an end after now.';
+         if (!from || !to)
+            return 'Set the day and the time it starts and ends.';
+         if (endProblem) return endProblem;
          if (
             areaType === 'WATERBODY' &&
             !(Number(radiusKm) > 0 && Number(radiusKm) <= 500)
@@ -219,11 +320,12 @@ function NewCompetition() {
             areaLongitude: areaType === 'WATERBODY' ? place?.longitude : null,
             areaRadiusKm: areaType === 'WATERBODY' ? Number(radiusKm) : null,
             inviteeIds: scope === 'PRIVATE' ? invitees : [],
-            speciesId: rule === 'SPECIES_VARIETY' ? null : speciesId || null,
+            speciesIds: chosenSpecies.map((s) => s.id),
             /* Sent as instants, so a competition means the same thing to
-             * everyone reading it wherever they are. */
-            startsAt: new Date(startsAt).toISOString(),
-            endsAt: new Date(endsAt).toISOString(),
+             * everyone reading it wherever they are. The checks above have
+             * already turned both away if either was not a date. */
+            startsAt: (from as Date).toISOString(),
+            endsAt: (to as Date).toISOString(),
          });
          toast({
             title: 'Competition started.',
@@ -236,8 +338,27 @@ function NewCompetition() {
             variant: 'success',
          });
          navigate(`/competitions/${competition.id}`, { replace: true });
-      } catch {
-         setError('That did not save. Try again.');
+      } catch (failure) {
+         /* A form the server turned away says why, on the step that holds
+            the field, so it can be put right there. Anything else is a
+            failure to save and worth another go. */
+         const refused =
+            axios.isAxiosError(failure) && failure.response?.status === 400
+               ? (failure.response.data as { message?: string; field?: string })
+               : null;
+         if (refused?.message) {
+            const field = refused.field ?? '';
+            setStep(
+               /^species/.test(field)
+                  ? 'what'
+                  : /^(startsAt|endsAt|area)/.test(field)
+                    ? 'where'
+                    : step
+            );
+            setError(refused.message);
+         } else {
+            setError('That did not save. Try again.');
+         }
          setBusy(false);
       }
    };
@@ -245,11 +366,6 @@ function NewCompetition() {
    const close = () => navigate('/competitions');
 
    /* ---- the words a step is remembered by, on the rail and at the end --- */
-
-   const ruleSummary =
-      rule === 'SPECIES_VARIETY'
-         ? ruleSentence(rule, measure)
-         : `${ruleSentence(rule, measure)}, ${chosenSpecies ? `${chosenSpecies.commonName.toLowerCase()} only` : 'any species'}`;
 
    const whereSummary =
       areaType === 'ANYWHERE'
@@ -266,13 +382,14 @@ function NewCompetition() {
          : 'Open to all';
 
    const checksSummary =
+      /* In the words the competition's own page prints once it is made. */
       checks === 'REVIEW'
-         ? 'Six checks, then you review'
-         : 'Six checks, then it counts';
+         ? 'Six checks and the judge, then you review'
+         : 'Six checks and the judge, then it counts';
 
    const answers: Record<StepKey, string> = {
       what: name.trim()
-         ? `${name.trim()}, ${ruleSentence(rule, measure).toLowerCase()}`
+         ? `${name.trim()}, ${ruleSentence(rule, measure).toLowerCase()}, ${speciesWords(chosenSpecies) || 'any species'}`
          : '',
       where: `${whereSummary} · ${dayOf(startsAt)} to ${dayOf(endsAt)}`,
       who: `${entrySummary} · ${checksSummary.toLowerCase()}`,
@@ -318,10 +435,7 @@ function NewCompetition() {
             <Segment
                label="How it is won"
                value={rule}
-               onChange={(nextRule) => {
-                  setRule(nextRule);
-                  if (nextRule === 'SPECIES_VARIETY') setSpeciesId('');
-               }}
+               onChange={setRule}
                options={ruleOptions}
                className="[&_button]:px-2 md:[&_button]:text-[16px]"
             />
@@ -354,22 +468,16 @@ function NewCompetition() {
                      className="hidden md:flex"
                   />
                </div>
-               <Picker
-                  variant="line"
-                  label="Species"
-                  allLabel="Any species"
-                  value={speciesId}
-                  onChange={(nextId) => setSpeciesId(nextId as string)}
-                  options={[
-                     { value: '', label: 'Any species' },
-                     ...species.map((s) => ({
-                        value: s.id,
-                        label: s.commonName,
-                     })),
-                  ]}
-               />
             </div>
          ) : null}
+
+         <SpeciesField
+            mode={speciesMode}
+            onMode={setSpeciesMode}
+            chosen={speciesIds}
+            onChosen={setSpeciesIds}
+            species={species}
+         />
       </>
    );
 
@@ -410,29 +518,45 @@ function NewCompetition() {
                />
             </div>
          ) : areaType === 'REGION' ? (
-            <Picker
-               variant="line"
-               label="Region"
-               allLabel="Pick a region"
+            <ProvinceGrid
                value={province}
-               onChange={(nextProvince) => setProvince(nextProvince as string)}
-               options={PROVINCES.map((p) => ({ value: p, label: p }))}
+               onChange={setProvince}
+               invalid={Boolean(error) && !province}
             />
          ) : null}
 
-         <div className="grid grid-cols-2 gap-4">
-            <WhenField
-               id="starts"
-               label="Starts"
-               value={startsAt}
-               onChange={setStartsAt}
-            />
-            <WhenField
-               id="ends"
-               label="Ends"
-               value={endsAt}
-               onChange={setEndsAt}
-            />
+         <div className="flex flex-col gap-3">
+            {/* Side by side only from lg: between md and lg the step rail
+                takes half the card, and a day and a time in a quarter of it
+                were cut to "2026/" and "06". */}
+            <div className="grid gap-6 lg:grid-cols-2">
+               <DateTimeField
+                  variant="line"
+                  label="Starts"
+                  value={startsAt}
+                  onChange={changeStart}
+               />
+               <DateTimeField
+                  variant="line"
+                  label="Ends"
+                  value={endsAt}
+                  onChange={changeEnd}
+                  min={startsAt || undefined}
+                  error={endProblem}
+               />
+            </div>
+            {/* The dates read back in words, because a native date input
+                writes them in whatever order the phone is set to. */}
+            {from && to && !endProblem ? (
+               <p className="text-[14px] text-ink-2" aria-live="polite">
+                  <span className="num">
+                     {whenSentence(from.toISOString(), to.toISOString())}
+                  </span>
+                  {'. '}
+                  Runs for <span className="num">{runsFor(from, to)}</span>, in
+                  your own time.
+               </p>
+            ) : null}
          </div>
       </>
    );
@@ -453,7 +577,7 @@ function NewCompetition() {
          <div className="flex flex-col gap-2">
             <span className="lab">Every entry is checked for</span>
             <div className="flex flex-col">
-               {checkSentences(measure).map((sentence) => (
+               {checkSentences(measure, rule).map((sentence) => (
                   <ChoiceRow key={sentence}>
                      <TickBox on />
                      <span className="text-[16px]">{sentence}</span>
@@ -558,7 +682,16 @@ function NewCompetition() {
             onEdit={() => go('what')}
             rows={[
                { label: 'Name', value: name.trim() || 'Unnamed' },
-               { label: 'Rule', value: ruleSummary },
+               { label: 'Rule', value: ruleSentence(rule, measure) },
+               {
+                  label: 'Species',
+                  value: chosenSpecies.length
+                     ? listWords(
+                          chosenSpecies.map((s) => s.commonName),
+                          'and'
+                       )
+                     : 'Any species',
+               },
             ]}
          />
          <SummaryGroup
@@ -570,10 +703,9 @@ function NewCompetition() {
                   label: 'When',
                   value: (
                      <span className="num">
-                        {whenSentence(
-                           new Date(startsAt).toISOString(),
-                           new Date(endsAt).toISOString()
-                        )}
+                        {from && to
+                           ? whenSentence(from.toISOString(), to.toISOString())
+                           : 'Not set yet'}
                      </span>
                   ),
                },
@@ -808,47 +940,6 @@ function SummaryGroup({
             </button>
          </div>
          <RulesTable rows={rows} compact />
-      </div>
-   );
-}
-
-/*
- * A day over a time on one line. The native picker is still what opens, so
- * the control is the platform's; it sits invisibly over the two lines the
- * design draws, which a datetime input cannot be talked into drawing itself.
- */
-function WhenField({
-   id,
-   label,
-   value,
-   onChange,
-}: {
-   id: string;
-   label: string;
-   value: string;
-   onChange: (value: string) => void;
-}) {
-   return (
-      <div className="flex min-w-0 flex-col gap-2">
-         <label className="lab" htmlFor={id}>
-            {label}
-         </label>
-         <div className="relative h-[52px] border-b border-ink">
-            <span className="pointer-events-none flex h-full flex-col justify-center leading-[1.25]">
-               <span className="truncate text-[16px]">{dayOf(value)}</span>
-               <span className="num text-[14px] text-ink-2">
-                  {timeOf(value)}
-               </span>
-            </span>
-            <input
-               id={id}
-               name={id}
-               type="datetime-local"
-               value={value}
-               onChange={(event) => onChange(event.target.value)}
-               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            />
-         </div>
       </div>
    );
 }

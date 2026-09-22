@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Fold } from '@/components/ui/fold';
 import { Picker } from '@/components/ui/picker';
 import { Sheet } from '@/components/ui/sheet';
+import { FramedPhoto } from '@/components/FramedPhoto';
 import { toast } from '@/components/ui/use-toast';
 import {
    answerInvite,
@@ -20,8 +21,9 @@ import {
    flagEntry,
    inviteToCompetition,
    leaveCompetition,
+   listWords,
    reviewEntry,
-   ruleWords,
+   ruleSentence,
    scopeLabel,
    statusLabel,
    whenSentence,
@@ -37,7 +39,8 @@ import { StandingsRows } from '@/components/social/StandingsRows';
 import { WinnerCard } from '@/components/social/WinnerCard';
 import { formatDayMonth } from '@/components/fishing/record/format';
 import { useDocumentTitle } from '@/lib/title';
-import { readUnitSystem, type UnitSystem } from '@/lib/units';
+import { unitFor, useUnits, type Units } from '@/lib/units';
+import { UnitToggle } from '@/components/social/UnitToggle';
 
 /*
  * One competition: its rules, who is where, and every entry with what was
@@ -74,7 +77,9 @@ function CompetitionScreen() {
       'loading'
    );
    const [attempt, setAttempt] = useState(0);
-   const [units] = useState<UnitSystem>(() => readUnitSystem());
+   /* The reader's cm or in, kg or lb: the toggle on the standings sets it,
+      and everything on the page, the entry form too, follows it. */
+   const units = useUnits();
    const [busy, setBusy] = useState<string | null>(null);
    const [inviting, setInviting] = useState(false);
    useDocumentTitle(detail?.competition.name ?? 'Competition');
@@ -284,7 +289,31 @@ function CompetitionScreen() {
                <div className="flex flex-col gap-8 lg:gap-9">
                   <RulesTable
                      rows={[
-                        { label: 'Rule', value: ruleWords(c) },
+                        {
+                           label: 'Rule',
+                           value:
+                              c.rule === 'SPECIES_VARIETY' ? (
+                                 ruleSentence(c.rule, c.measure)
+                              ) : (
+                                 <>
+                                    {ruleSentence(c.rule, c.measure)}
+                                    <span className="block text-[14px] text-ink-3">
+                                       {rankedWords(c.measure, units)}
+                                    </span>
+                                 </>
+                              ),
+                        },
+                        {
+                           /* Every name, however many: this is where an
+                              angler checks their fish is on the list. */
+                           label: 'Species',
+                           value: c.species.length
+                              ? listWords(
+                                   c.species.map((s) => s.commonName),
+                                   'and'
+                                )
+                              : 'Any species',
+                        },
                         { label: 'Where', value: whereSentence(c) },
                         {
                            label: 'When',
@@ -303,12 +332,17 @@ function CompetitionScreen() {
                   />
 
                   <section aria-labelledby="standings-heading">
-                     <h2
-                        id="standings-heading"
-                        className="g text-[26px] lg:text-[28px]"
-                     >
-                        Provisional standings
-                     </h2>
+                     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                        <h2
+                           id="standings-heading"
+                           className="g text-[26px] lg:text-[28px]"
+                        >
+                           Provisional standings
+                        </h2>
+                        {c.rule !== 'SPECIES_VARIETY' ? (
+                           <UnitToggle measure={c.measure} />
+                        ) : null}
+                     </div>
                      <div className="mt-3">
                         {detail.standings.length ? (
                            <StandingsRows
@@ -355,6 +389,21 @@ function CompetitionScreen() {
    );
 }
 
+/*
+ * The competition's own unit beside the reader's. Every figure is held and
+ * ranked in centimetres or kilograms whatever the reader picks, and saying
+ * so under the rule is what lets a board shown in inches be trusted.
+ */
+function rankedWords(measure: 'LENGTH' | 'WEIGHT', units: Units) {
+   const own = measure === 'LENGTH' ? 'centimetres' : 'kilograms';
+   const shown = unitFor(measure, units);
+   const shownWord =
+      shown === 'in' ? 'inches' : shown === 'lb' ? 'pounds' : null;
+   return shownWord
+      ? `Ranked in ${own}, shown here in ${shownWord}.`
+      : `Ranked in ${own}.`;
+}
+
 /* What happens to an entry here, in the words the rules table prints. */
 function entrySentence(detail: CompetitionDetail) {
    const c = detail.competition;
@@ -362,14 +411,14 @@ function entrySentence(detail: CompetitionDetail) {
       c.rule === 'SPECIES_VARIETY'
          ? 'A photo of the fish.'
          : c.measure === 'LENGTH'
-           ? 'Photo on the tape.'
-           : 'Photo on the scale.';
+           ? 'A photo of the fish, then one on the tape.'
+           : 'A photo of the fish, then one on the scale.';
    const after =
       c.checks === 'REVIEW'
          ? detail.you.organise
-            ? 'Six checks, then you review.'
-            : 'Six checks, then the organiser reviews.'
-         : 'Six checks, then it counts.';
+            ? 'Six checks and the judge, then you review.'
+            : 'Six checks and the judge, then the organiser reviews.'
+         : 'Six checks and the judge, then it counts.';
    return `${photo} ${after}`;
 }
 
@@ -381,7 +430,7 @@ function Entries({
    competitionId,
 }: {
    detail: CompetitionDetail;
-   units: UnitSystem;
+   units: Units;
    busy: string | null;
    act: (key: string, run: () => Promise<unknown>) => Promise<void>;
    competitionId: string;
@@ -460,7 +509,7 @@ function Results({
    units,
 }: {
    detail: CompetitionDetail;
-   units: UnitSystem;
+   units: Units;
 }) {
    const c = detail.competition;
    const winner =
@@ -481,9 +530,14 @@ function Results({
          ) : null}
 
          <section aria-labelledby="final-heading">
-            <h2 id="final-heading" className="g text-[26px] lg:text-[28px]">
-               Final standings
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+               <h2 id="final-heading" className="g text-[26px] lg:text-[28px]">
+                  Final standings
+               </h2>
+               {c.rule !== 'SPECIES_VARIETY' ? (
+                  <UnitToggle measure={c.measure} />
+               ) : null}
+            </div>
             <div className="mt-3">
                {detail.standings.length ? (
                   <StandingsRows
@@ -534,10 +588,11 @@ function ClosedEntry({ entry }: { entry: CompetitionEntry }) {
       <li className="flex items-center gap-3 border-b border-line py-3.5 last:border-b-0">
          <span className="size-14 shrink-0 bg-black-block">
             {entry.heroUrl ? (
-               <img
+               <FramedPhoto
                   src={entry.heroUrl}
                   alt=""
-                  className="size-14 object-cover"
+                  framing={entry.heroFraming ?? null}
+                  className="size-14"
                />
             ) : null}
          </span>

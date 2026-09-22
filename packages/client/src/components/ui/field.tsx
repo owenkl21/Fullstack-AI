@@ -233,21 +233,53 @@ export function ChoiceGroup<T extends string>({
          <div
             role="radiogroup"
             aria-labelledby={id}
+            onKeyDown={(event) => {
+               /*
+                * Only the chosen chip is a tab stop, so the arrows are the one
+                * way a keyboard reaches the others. Without this, Only me on
+                * the spot and catch forms could not be chosen without a mouse.
+                * It chooses as it moves, the way a native radio group does.
+                */
+               const step =
+                  event.key === 'ArrowRight' || event.key === 'ArrowDown'
+                     ? 1
+                     : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+                       ? -1
+                       : 0;
+               if (!step || !options.length) return;
+               event.preventDefault();
+               const at = options.findIndex((o) => o.value === value);
+               const index =
+                  (Math.max(at, 0) + step + options.length) % options.length;
+               const next = options[index];
+               if (!next) return;
+               onChange(next.value);
+               const chips =
+                  event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                     '[role=radio]'
+                  );
+               chips[index]?.focus();
+            }}
             className={cn(
                'flex gap-2',
                nowrap ? 'flex-nowrap' : 'flex-wrap',
                !inline && 'mt-1.5'
             )}
          >
-            {options.map((option) => {
+            {options.map((option, index) => {
                const on = option.value === value;
+               /* With nothing chosen the first chip holds the tab stop, or
+                  the group could not be reached at all. */
+               const stop =
+                  on ||
+                  (index === 0 && !options.some((o) => o.value === value));
                return (
                   <button
                      key={option.value}
                      type="button"
                      role="radio"
                      aria-checked={on}
-                     tabIndex={on ? 0 : -1}
+                     tabIndex={stop ? 0 : -1}
                      onClick={() => onChange(option.value)}
                      className={cn(
                         'g-tracked inline-flex items-center border transition-colors duration-150 [transition-timing-function:var(--ease)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal',

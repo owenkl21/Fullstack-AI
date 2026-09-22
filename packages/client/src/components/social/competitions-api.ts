@@ -5,7 +5,7 @@ import {
    formatDayMonth,
    toDate,
 } from '@/components/fishing/record/format';
-import { formatMeasure, type UnitSystem } from '@/lib/units';
+import { formatMeasure, type UnitChoice } from '@/lib/units';
 
 /*
  * The competitions an angler runs or enters. Figures are metric on the wire.
@@ -44,8 +44,10 @@ export type Competition = {
    endsAt: string;
    timeZoneId?: string;
    maxPerSpeciesPerDay: number;
+   /* The older single column. Read `species` instead. */
    speciesId: string | null;
-   species: { id: string; commonName: string } | null;
+   /* Every fish it is for, by name. Empty means any species. */
+   species: CompetitionSpecies[];
    createdBy: { id: string; displayName: string; username: string | null };
    entrantCount: number;
    entryCount?: number;
@@ -60,6 +62,13 @@ export type Competition = {
    } | null;
    /* The viewer's own pending invitation, when there is one. */
    invite?: { id: string; expiresAt: string } | null;
+};
+
+/* One fish a competition is for. */
+export type CompetitionSpecies = {
+   id: string;
+   commonName: string;
+   scientificName: string | null;
 };
 
 export type CompetitionStanding = {
@@ -105,6 +114,13 @@ export type CompetitionEntry = {
    caughtAt: string;
    note: string | null;
    heroUrl: string | null;
+   /* How the angler framed the fish photograph (lib/framing.ts), so a small
+      square keeps what the feed keeps. Null when it was never framed. */
+   heroFraming?: {
+      focusX: number | null;
+      focusY: number | null;
+      zoom: number | null;
+   } | null;
    measureUrl: string | null;
    areaConfirmed: boolean;
    flaggedBy: string | null;
@@ -114,7 +130,47 @@ export type CompetitionEntry = {
    canReview: boolean;
    canFlag: boolean;
    createdAt: string;
+   /* What the judge made of it, cut by the server to who is looking. */
+   judge?: JudgeView | null;
 };
+
+export type JudgeYesNo = 'yes' | 'no' | 'unsure';
+
+/*
+ * The judge's findings. The organiser gets all of it; the angler gets the
+ * one sentence written for them; anybody else gets nothing (null).
+ */
+export type JudgeView =
+   | {
+        status: 'checked';
+        audience: 'organiser';
+        overall: 'accept' | 'review' | 'reject';
+        holds: boolean;
+        organiserNote: string;
+        anglerNote: string;
+        reading: {
+           value: number | null;
+           unit: 'cm' | 'in' | 'kg' | 'lb' | null;
+           confidence: number;
+           seen: 'tape' | 'board' | 'scale' | 'none';
+        };
+        fishOnMeasure: JudgeYesNo;
+        sameFish: JudgeYesNo;
+        species: { plausible: JudgeYesNo; bestGuess: string | null };
+        tamperSigns: {
+           kind: 'screen' | 'edited_digits' | 'lighting' | 'other';
+           detail: string;
+        }[];
+        checks: {
+           check: CheckCode;
+           verdict: 'pass' | 'fail' | 'unsure';
+           reason: string;
+        }[];
+        model: string | null;
+        at: string | null;
+     }
+   | { status: 'checked'; audience: 'angler'; anglerNote: string }
+   | { status: 'unchecked'; audience: 'organiser'; reason: string };
 
 export type CompetitionDetail = {
    competition: Competition;
@@ -128,6 +184,24 @@ export type CompetitionDetail = {
 };
 
 export type CompetitionTab = 'all' | 'mine' | 'invites';
+
+/*
+ * A competition as it came off the wire, made safe to read. `species` is a
+ * list now and was one fish or null before, and for the minutes a deploy
+ * takes a page can be talking to a server a version away from it. Read here,
+ * once, so nothing that draws a competition has to wonder which it got.
+ */
+function readCompetition<T extends { species?: unknown }>(
+   raw: T
+): T & { species: CompetitionSpecies[] } {
+   const was = raw.species;
+   const species = Array.isArray(was)
+      ? (was as CompetitionSpecies[])
+      : was && typeof was === 'object'
+        ? [{ scientificName: null, ...(was as object) } as CompetitionSpecies]
+        : [];
+   return { ...raw, species };
+}
 
 export async function fetchCompetitions(
    signal?: AbortSignal,
@@ -146,7 +220,7 @@ export async function fetchCompetitions(
       size: number;
    }>('/api/competitions', { params: { page, tab }, signal });
    return {
-      items: data.competitions,
+      items: data.competitions.map(readCompetition),
       total: data.total,
       page: data.page,
       size: data.size,
@@ -161,7 +235,7 @@ export async function fetchCompetition(
       `/api/competitions/${id}`,
       { signal }
    );
-   return data;
+   return { ...data, competition: readCompetition(data.competition) };
 }
 
 export type NewCompetition = {
@@ -177,7 +251,8 @@ export type NewCompetition = {
    areaLongitude?: number | null;
    areaRadiusKm?: number | null;
    inviteeIds?: string[];
-   speciesId?: string | null;
+   /* The fish it is for. Empty is any species. */
+   speciesIds?: string[];
    startsAt: string;
    endsAt: string;
    maxPerSpeciesPerDay?: number;
@@ -186,9 +261,15 @@ export type NewCompetition = {
 export async function createCompetition(input: NewCompetition) {
    const { data } = await axios.post<{ competition: Competition }>(
       '/api/competitions',
-      input
+      {
+         ...input,
+         /* The older single field rides along when there is exactly one fish,
+            which is all a server a version behind knows how to keep. The
+            current one folds the two into one list. */
+         speciesId: input.speciesIds?.length === 1 ? input.speciesIds[0] : null,
+      }
    );
-   return data.competition;
+   return readCompetition(data.competition);
 }
 
 export const enterCompetition = (id: string) =>
@@ -201,8 +282,13 @@ export const leaveCompetition = (id: string) =>
 
 export type NewEntry = {
    catchId: string;
+   /* Which of the catch's photographs is the fish, by name: the entry keeps
+      each photograph as what it is, not as the first of a list. */
+   fishImage: { storageKey: string } | null;
    /* The fish on the tape or scale; null for a most-species competition. */
    measureImage: { storageKey: string; url: string } | null;
+   /* What the camera wrote in the measure photograph. */
+   measureTakenAt?: string | null;
    /* What the angler typed, metric: cm or kg. Null when nothing is judged. */
    declaredValue: number | null;
    areaConfirmed: boolean;
@@ -369,13 +455,40 @@ export const whereSentence = (
    return c.areaName;
 };
 
+/** "Carp", "Carp or Barbel", "Carp, Barbel or Tilapia". */
+export const listWords = (names: string[], joiner = 'or') =>
+   names.length <= 1
+      ? (names[0] ?? '')
+      : `${names.slice(0, -1).join(', ')} ${joiner} ${names[names.length - 1]}`;
+
+/*
+ * The fish a competition is for, as the tail of a sentence: "carp only",
+ * "carp or barbel only", and past three the first two and a count, because a
+ * card has one line for the rule and twelve names are not a line. The "only"
+ * is what keeps a list of fish after a comma from reading as more of the
+ * rule. Empty when it is for any species, so a caller can leave the comma out
+ * too.
+ */
+export const speciesWords = (
+   species: Pick<CompetitionSpecies, 'commonName'>[] | null | undefined,
+   short = true
+) => {
+   const names = (species ?? []).map((s) => s.commonName.toLowerCase());
+   if (!names.length) return '';
+   if (short && names.length > 3)
+      return `${names[0]}, ${names[1]} and ${names.length - 2} more species`;
+   return `${listWords(names)} only`;
+};
+
 /** The rule with its species folded in, the way a card prints it. */
 export const ruleWords = (
    c: Pick<Competition, 'rule' | 'measure' | 'species'>
-) =>
-   c.species
-      ? `${ruleSentence(c.rule, c.measure)}, ${c.species.commonName.toLowerCase()} only`
+) => {
+   const fish = speciesWords(c.species);
+   return fish
+      ? `${ruleSentence(c.rule, c.measure)}, ${fish}`
       : ruleSentence(c.rule, c.measure);
+};
 
 /** "6 anglers", "1 angler". */
 export const anglerWords = (count: number) =>
@@ -385,7 +498,7 @@ export const anglerWords = (count: number) =>
 export function leadingFigure(
    competition: Competition,
    value: number | null | undefined,
-   units: UnitSystem
+   units: UnitChoice
 ) {
    if (value === null || value === undefined) return null;
    if (competition.rule === 'SPECIES_VARIETY') {
@@ -487,7 +600,10 @@ export async function fetchInvites(signal?: AbortSignal) {
       '/api/competitions/invites',
       { signal }
    );
-   return data.invites;
+   return data.invites.map((invite) => ({
+      ...invite,
+      competition: readCompetition(invite.competition),
+   }));
 }
 
 export async function answerInvite(inviteId: string, accept: boolean) {

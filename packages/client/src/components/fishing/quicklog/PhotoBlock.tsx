@@ -57,6 +57,7 @@ export function PhotoBlock({
    second = 'Choose one instead',
    variant = 'hero',
    idPrefix = 'quicklog-photo',
+   retake = false,
    children,
    className,
 }: {
@@ -75,11 +76,15 @@ export function PhotoBlock({
    initial?: UploadedPhoto | null;
    /* The words on the block's own button. */
    title?: string;
-   /* The quiet second way in, on the hero frame only. */
+   /* The quiet second way in. The cell draws it only when it is given one. */
    second?: string;
    variant?: 'hero' | 'cell';
    /* Two blocks on one page need two sets of ids. */
    idPrefix?: string;
+   /* On a phone, a Retake beside Change that opens the camera again: a
+      competition photo that came out blurred is taken again, not hunted
+      for in the camera roll. */
+   retake?: boolean;
    /* The namer's band, butted against the bottom of the picture. */
    children?: ReactNode;
    className?: string;
@@ -345,13 +350,21 @@ export function PhotoBlock({
                 */
                <img
                   src={preview}
-                  alt="The catch you just photographed, as the feed will show it"
+                  alt={
+                     cell
+                        ? 'The measure photo you just added, whole'
+                        : 'The catch you just photographed, as the feed will show it'
+                  }
                   draggable={false}
                   /* The tape cell's photograph is read whole on the board,
                      centred, so it is not held on the catch default here. */
                   style={cell ? undefined : framingStyle(framing)}
                   className={cn(
-                     'pointer-events-none absolute inset-0 h-full w-full object-cover [transition:opacity_700ms_var(--ease),scale_1400ms_var(--ease)]',
+                     /* And shown whole here too: a crop can take off the
+                        very figure the judge has to read, and the angler
+                        should see what the judge will see. */
+                     'pointer-events-none absolute inset-0 h-full w-full [transition:opacity_700ms_var(--ease),scale_1400ms_var(--ease)]',
+                     cell ? 'object-contain' : 'object-cover',
                      settled
                         ? 'scale-100 opacity-100'
                         : 'scale-[1.04] opacity-0'
@@ -381,17 +394,20 @@ export function PhotoBlock({
                      className={cn(
                         'g-tracked relative z-[1] grid place-items-center transition-[filter,border-color] duration-150',
                         cell
-                           ? 'h-10 border border-paper/40 px-4 text-[15px] text-paper hover:border-teal'
+                           ? 'h-11 border border-paper/40 px-4 text-[15px] text-paper hover:border-teal'
                            : 'h-12 bg-teal px-6 text-[20px] text-teal-ink hover:brightness-95'
                      )}
                   >
                      {title}
                   </button>
-                  {!cell && second ? (
+                  {second && (!cell || phone) ? (
                      <button
                         type="button"
                         onClick={() => pickRef.current?.click()}
-                        className="g-tracked relative z-[1] text-[15px] text-paper-2 hover:text-paper"
+                        className={cn(
+                           'g-tracked relative z-[1] text-[15px] text-paper-2 hover:text-paper',
+                           cell && 'min-h-11'
+                        )}
                      >
                         {second}
                      </button>
@@ -409,6 +425,15 @@ export function PhotoBlock({
                         onClick={() => setIsFraming(true)}
                      >
                         Frame it
+                     </button>
+                  ) : null}
+                  {retake && phone ? (
+                     <button
+                        type="button"
+                        className="g-tracked grid h-11 place-items-center border-r border-paper/20 px-3.5 text-[15px] hover:text-teal"
+                        onClick={() => inputRef.current?.click()}
+                     >
+                        Retake
                      </button>
                   ) : null}
                   <button

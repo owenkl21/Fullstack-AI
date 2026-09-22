@@ -2,7 +2,14 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { namePlace } from '../clients/geocoding.client';
 import { uploadsService } from './uploads.service';
-import { visionService } from './vision.service';
+import { visionService, type MeasureRead } from './vision.service';
+import {
+   UNCHECKED_WORDS,
+   judgeEntry,
+   judgeReading,
+   type JudgeRecord,
+   type JudgeVerdict,
+} from './competition-judge.service';
 
 /*
  * A catch entered in a competition.
@@ -15,7 +22,9 @@ import { visionService } from './vision.service';
  * entered before. Pass on all and it counts; any flag holds it for the
  * organiser. A check that could not run is written down as not checked, and
  * for the two that matter most (species and figure) that holds the entry too,
- * so nothing goes on a board unseen.
+ * so nothing goes on a board unseen. After the six, the judge looks at both
+ * photographs together (competition-judge.service); it can hold an entry for
+ * the organiser, never count one the checks would have held.
  */
 
 export type CheckCode =
@@ -62,7 +71,11 @@ export const ENTRY_SELECT = {
    heroImageUrl: true,
    measureImageKey: true,
    measureImageUrl: true,
+   measureTakenAt: true,
    note: true,
+   judge: true,
+   judgeModel: true,
+   judgedAt: true,
    fingerprint: true,
    report: true,
    flags: true,
@@ -79,14 +92,65 @@ export type EntryRow = Prisma.CompetitionEntryGetPayload<{
    select: typeof ENTRY_SELECT;
 }>;
 
+/*
+ * The fish a competition is for.
+ *
+ * A competition can be for several fish, kept as rows in competition_species.
+ * The older single column is still on the table, so a competition made before
+ * the list existed is read as a list of one. Everything that reads a
+ * competition gets the same answer from here: `species` is always a list, and
+ * an empty list means any species.
+ */
+export type AllowedSpecies = {
+   id: string;
+   commonName: string;
+   scientificName: string | null;
+};
+
+const SPECIES_FIELDS = {
+   id: true,
+   commonName: true,
+   scientificName: true,
+} as const;
+
+/** Spread into a competition select; read back with allowedSpeciesOf. */
+export const SPECIES_ALLOWED_SELECT = {
+   speciesId: true,
+   species: { select: SPECIES_FIELDS },
+   speciesAllowed: {
+      orderBy: { species: { commonName: 'asc' } },
+      select: { species: { select: SPECIES_FIELDS } },
+   },
+} as const;
+
+export function allowedSpeciesOf(row: {
+   species: AllowedSpecies | null;
+   speciesAllowed: { species: AllowedSpecies }[];
+}): AllowedSpecies[] {
+   if (row.speciesAllowed.length)
+      return row.speciesAllowed.map((r) => r.species);
+   return row.species ? [row.species] : [];
+}
+
+/** "Carp", "Carp or Barbel", "Carp, Barbel or Tilapia". */
+export const speciesListWords = (names: string[], joiner = 'or') =>
+   names.length <= 1
+      ? (names[0] ?? '')
+      : `${names.slice(0, -1).join(', ')} ${joiner} ${names[names.length - 1]}`;
+
 type CompetitionForEntries = {
    id: string;
+   /* The name and the organiser's own words, for the judge. */
+   name: string;
+   blurb: string | null;
    createdById: string;
    rule: 'SPECIES_POINTS' | 'BIGGEST_FISH' | 'SPECIES_VARIETY';
    measure: 'LENGTH' | 'WEIGHT';
    checks: 'CASUAL' | 'REVIEW';
+   /* The older single column. Read `species` instead. */
    speciesId: string | null;
-   species: { id: string; commonName: string } | null;
+   /* Every fish it is for. Empty means any species. */
+   species: AllowedSpecies[];
    startsAt: Date;
    endsAt: Date;
    timeZoneId: string;
@@ -100,12 +164,13 @@ type CompetitionForEntries = {
 
 const COMPETITION_FOR_ENTRIES = {
    id: true,
+   name: true,
+   blurb: true,
    createdById: true,
    rule: true,
    measure: true,
    checks: true,
-   speciesId: true,
-   species: { select: { id: true, commonName: true } },
+   ...SPECIES_ALLOWED_SELECT,
    startsAt: true,
    endsAt: true,
    timeZoneId: true,
@@ -119,10 +184,19 @@ const COMPETITION_FOR_ENTRIES = {
 
 export type SubmitEntryInput = {
    catchId: string;
+   /*
+    * Which of the catch's photographs is the fish, named rather than taken to
+    * be the first: a catch carries several, and the entry keeps each of its
+    * two by what it is. Null from a client older than the two steps, which
+    * gets the catch's cover as before.
+    */
+   fishImage: { storageKey: string } | null;
    measureImage: { storageKey: string; url: string } | null;
    declaredValue: number | null;
    areaConfirmed: boolean;
    photoTakenAt: Date | null;
+   /* What the camera wrote in the measure photograph. */
+   measureTakenAt: Date | null;
    note: string | null;
 };
 
@@ -133,7 +207,9 @@ export type SubmitFailure =
    | 'closed'
    | 'catch_not_found'
    | 'already_entered'
-   | 'measure_photo_required';
+   | 'measure_photo_required'
+   | 'fish_photo_not_on_catch'
+   | 'same_photo_twice';
 
 const norm = (text: string) =>
    text
@@ -232,6 +308,13 @@ export type ShapedEntry = {
    caughtAt: string;
    note: string | null;
    heroUrl: string | null;
+   /* How the angler framed the fish photograph, so a row's small square crops
+      it where the feed does. Null when it was never framed. */
+   heroFraming: {
+      focusX: number | null;
+      focusY: number | null;
+      zoom: number | null;
+   } | null;
    measureUrl: string | null;
    areaConfirmed: boolean;
    flaggedBy: string | null;
@@ -241,7 +324,74 @@ export type ShapedEntry = {
    canReview: boolean;
    canFlag: boolean;
    createdAt: string;
+   /* What the judge made of it, cut to who is looking (judgeViewFor). */
+   judge: JudgeView | null;
 };
+
+/*
+ * The judge's findings, by who is asking. The organiser gets all of it,
+ * because deciding is their job. The angler gets the one kind sentence
+ * written for them and nothing that reads as an accusation. Everybody else
+ * gets nothing: another entrant's doubts are the organiser's business.
+ */
+export type JudgeView =
+   | {
+        status: 'checked';
+        audience: 'organiser';
+        overall: JudgeVerdict['overall'];
+        holds: boolean;
+        organiserNote: string;
+        anglerNote: string;
+        reading: JudgeVerdict['measure'];
+        fishOnMeasure: JudgeVerdict['fishVisibleOnMeasure'];
+        sameFish: JudgeVerdict['sameFishInBothPhotos'];
+        species: JudgeVerdict['species'];
+        tamperSigns: JudgeVerdict['tamperSigns'];
+        checks: JudgeVerdict['checks'];
+        model: string | null;
+        at: string | null;
+     }
+   | { status: 'checked'; audience: 'angler'; anglerNote: string }
+   | { status: 'unchecked'; audience: 'organiser'; reason: string };
+
+function judgeViewFor(
+   entry: Pick<EntryRow, 'judge' | 'judgeModel' | 'judgedAt'>,
+   viewer: { organiser: boolean },
+   yours: boolean
+): JudgeView | null {
+   const record = entry.judge as unknown as JudgeRecord | null;
+   if (!record || typeof record !== 'object') return null;
+   if (record.status === 'checked' && record.verdict) {
+      const v = record.verdict;
+      if (viewer.organiser)
+         return {
+            status: 'checked',
+            audience: 'organiser',
+            overall: v.overall,
+            holds: record.holds,
+            organiserNote: v.organiserNote,
+            anglerNote: v.anglerNote,
+            reading: v.measure,
+            fishOnMeasure: v.fishVisibleOnMeasure,
+            sameFish: v.sameFishInBothPhotos,
+            species: v.species,
+            tamperSigns: v.tamperSigns,
+            checks: v.checks,
+            model: entry.judgeModel,
+            at: entry.judgedAt?.toISOString() ?? null,
+         };
+      return yours && v.anglerNote
+         ? { status: 'checked', audience: 'angler', anglerNote: v.anglerNote }
+         : null;
+   }
+   if (record.status === 'unchecked' && viewer.organiser)
+      return {
+         status: 'unchecked',
+         audience: 'organiser',
+         reason: UNCHECKED_WORDS[record.reason] ?? UNCHECKED_WORDS.failed,
+      };
+   return null;
+}
 
 export type Standing = {
    place: number;
@@ -256,12 +406,47 @@ export type Standing = {
    distinctSpecies: number;
 };
 
+/**
+ * Null when the fish is one the competition is for, otherwise the sentence the
+ * report prints. Matched on the species id, and on the name for a catch whose
+ * fish was typed rather than picked, so the same fish is not turned away for
+ * how it was written down. It needs no photograph, so it is asked whether or
+ * not the namer answers.
+ */
+export function speciesProblem(
+   allowed: AllowedSpecies[],
+   entry: { speciesId: string | null; speciesName: string | null }
+): string | null {
+   if (!allowed.length) return null;
+   const declared = entry.speciesName ?? '';
+   const named = norm(declared);
+   const onList = allowed.some(
+      (s) =>
+         (entry.speciesId !== null && s.id === entry.speciesId) ||
+         (Boolean(named) && norm(s.commonName) === named)
+   );
+   if (onList) return null;
+   const wanted = speciesListWords(allowed.map((s) => s.commonName));
+   return declared
+      ? `This competition is for ${wanted}; the catch is a ${declared}.`
+      : `This competition is for ${wanted}; the catch has no species.`;
+}
+
 export const entriesService = {
-   async competitionFor(competitionId: string) {
-      return prisma.competition.findFirst({
+   /** The competition as the checks read it, `species` already a list. */
+   async competitionFor(
+      competitionId: string
+   ): Promise<CompetitionForEntries | null> {
+      const row = await prisma.competition.findFirst({
          where: { id: competitionId, deletedAt: null },
          select: COMPETITION_FOR_ENTRIES,
       });
+      if (!row) return null;
+      const { species, speciesAllowed, ...rest } = row;
+      return {
+         ...rest,
+         species: allowedSpeciesOf({ species, speciesAllowed }),
+      };
    },
 
    async isIn(competitionId: string, userId: string) {
@@ -310,12 +495,27 @@ export const entriesService = {
             site: { select: { latitude: true, longitude: true } },
             images: {
                orderBy: { position: 'asc' },
-               take: 1,
                select: { image: { select: { storageKey: true, url: true } } },
             },
          },
       });
       if (!record) return { error: 'catch_not_found' };
+
+      /* The fish photograph has to be one of this catch's own. */
+      const hero = input.fishImage
+         ? (record.images.find(
+              (link) => link.image.storageKey === input.fishImage!.storageKey
+           )?.image ?? null)
+         : (record.images[0]?.image ?? null);
+      if (input.fishImage && !hero) return { error: 'fish_photo_not_on_catch' };
+      /* One photograph cannot be both: the two steps ask for two. */
+      if (
+         hero &&
+         input.measureImage &&
+         hero.storageKey === input.measureImage.storageKey
+      ) {
+         return { error: 'same_photo_twice' };
+      }
 
       const existing = await prisma.competitionEntry.findUnique({
          where: {
@@ -325,7 +525,6 @@ export const entriesService = {
       });
       if (existing) return { error: 'already_entered' };
 
-      const hero = record.images[0]?.image ?? null;
       const declared =
          input.declaredValue ??
          (competition.measure === 'LENGTH' ? record.length : record.weight) ??
@@ -355,6 +554,7 @@ export const entriesService = {
             measureImageUrl: input.measureImage
                ? stripSigned(input.measureImage.url)
                : null,
+            measureTakenAt: input.measureTakenAt,
             note: input.note,
          },
          select: ENTRY_SELECT,
@@ -390,19 +590,31 @@ export const entriesService = {
          entry.measureImageUrl
       );
       const heroUrl = await readUrl(entry.heroImageKey, entry.heroImageUrl);
-      const photoUrl = measureUrl ?? heroUrl;
+      /* The namer looks at the clear photograph of the fish first: that is
+         what step one of the entry asks for, and a fish is better named
+         from it than from one lying along a tape. */
+      const photoUrl = heroUrl ?? measureUrl;
+
+      /*
+       * Whether the fish is one this competition is for. Asked before the
+       * photograph is looked at, because it does not need one: a carp in a
+       * bass competition is off the list whether or not the namer answers.
+       */
+      const offList = speciesProblem(competition.species, entry);
+      const speciesUnseen = (detail: string) =>
+         line('species', offList ? 'flag' : 'skip', offList ?? detail);
 
       /* 1 and 2: a fish in the photo, and which fish. */
       let fingerprint: number[] | null = null;
       if (!photoUrl) {
          line('fish', 'flag', 'No photograph on the entry.');
-         line('species', 'skip', 'No photograph to name the fish from.');
+         speciesUnseen('No photograph to name the fish from.');
       } else {
          try {
             const seen = await visionService.inspect(photoUrl);
             if (!seen) {
                line('fish', 'skip', 'The fish namer is not connected.');
-               line('species', 'skip', 'The fish namer is not connected.');
+               speciesUnseen('The fish namer is not connected.');
             } else {
                fingerprint = seen.embedding;
                if (!seen.fishFound) {
@@ -417,7 +629,6 @@ export const entriesService = {
                   );
                }
                const declared = entry.speciesName ?? '';
-               const target = competition.species?.commonName ?? null;
                const top = seen.candidates[0] ?? null;
                const names = seen.candidates.slice(0, 2);
                const matches = (name: string) => {
@@ -435,16 +646,8 @@ export const entriesService = {
                );
                if (!declared) {
                   line('species', 'flag', 'The catch has no species.');
-               } else if (
-                  target &&
-                  competition.speciesId &&
-                  entry.speciesId !== competition.speciesId
-               ) {
-                  line(
-                     'species',
-                     'flag',
-                     `This competition is for ${target}; the catch is a ${declared}.`
-                  );
+               } else if (offList) {
+                  line('species', 'flag', offList);
                } else if (!seen.fishFound) {
                   line('species', 'skip', 'No fish to name.');
                } else if (agrees) {
@@ -477,102 +680,21 @@ export const entriesService = {
             }
          } catch (error) {
             line('fish', 'skip', 'The fish namer did not answer.');
-            line('species', 'skip', 'The fish namer did not answer.');
+            speciesUnseen('The fish namer did not answer.');
             console.warn('[entry:verify] namer', entryId, String(error));
          }
       }
 
-      /* 3: the figure, read off the tape or scale. */
-      let readValue: number | null = null;
-      let readConfidence: number | null = null;
-      let readNote: string | null = null;
-      if (isVariety) {
-         line(
-            'figure',
-            'pass',
-            'No measurement needed for a most-species competition.'
-         );
-      } else if (!measureUrl) {
-         line(
-            'figure',
-            'flag',
-            `No photograph of the fish on the ${measure === 'LENGTH' ? 'tape' : 'scale'}.`
-         );
-      } else {
-         try {
-            const read = await visionService.readMeasure(measureUrl, measure);
-            if (!read) {
-               line('figure', 'skip', 'The photo reader is not switched on.');
-            } else {
-               readConfidence = read.confidence;
-               readNote = read.note.slice(0, 280);
-               const unitFits =
-                  read.unit !== null &&
-                  (measure === 'LENGTH'
-                     ? read.unit === 'cm' || read.unit === 'in'
-                     : read.unit === 'kg' || read.unit === 'lb');
-               if (read.seen === 'none') {
-                  line(
-                     'figure',
-                     'flag',
-                     `No ${measure === 'LENGTH' ? 'tape' : 'scale'} in the photograph. ${read.note}`
-                  );
-               } else if (
-                  read.value === null ||
-                  !unitFits ||
-                  read.confidence < SURE_ENOUGH
-               ) {
-                  line(
-                     'figure',
-                     'flag',
-                     `Could not read the ${measure === 'LENGTH' ? 'tape' : 'scale'} well enough (${Math.round(read.confidence * 100)}% sure). ${read.note}`
-                  );
-               } else {
-                  readValue = toMetric(
-                     read.value,
-                     read.unit as 'cm' | 'in' | 'kg' | 'lb'
-                  );
-                  const declared = entry.declaredValue;
-                  if (declared === null) {
-                     line(
-                        'figure',
-                        'pass',
-                        `Read ${fmt(readValue, measure)} off the ${read.seen}; no typed figure to compare.`
-                     );
-                  } else {
-                     const tolerance = Math.max(
-                        0.05 * readValue,
-                        measure === 'LENGTH' ? 1 : 0.1
-                     );
-                     const diff = Math.abs(readValue - declared);
-                     if (diff <= tolerance) {
-                        line(
-                           'figure',
-                           'pass',
-                           `Read ${fmt(readValue, measure)} off the ${read.seen}; typed ${fmt(declared, measure)}.`
-                        );
-                     } else {
-                        line(
-                           'figure',
-                           'flag',
-                           `Read ${fmt(readValue, measure)} off the ${read.seen}, but ${fmt(declared, measure)} was typed.`
-                        );
-                     }
-                  }
-               }
-            }
-         } catch (error) {
-            line('figure', 'skip', 'The photo reader did not answer.');
-            console.warn('[entry:verify] reader', entryId, String(error));
-         }
-      }
-
-      /* 4: the window. */
+      /* 3: the window. The camera's own times, where the photographs carry
+         them, are held to the dates as well as the typed one. */
       {
          const start = competition.startsAt.getTime();
          const end = competition.endsAt.getTime();
          const caught = entry.caughtAt.getTime();
          const taken = entry.photoTakenAt?.getTime() ?? null;
+         const measured = entry.measureTakenAt?.getTime() ?? null;
+         const outside = (at: number | null) =>
+            at !== null && (at < start - GRACE_MS || at > end + GRACE_MS);
          const submitted = entry.createdAt.getTime();
          if (caught < start || caught > end) {
             line(
@@ -580,14 +702,17 @@ export const entriesService = {
                'flag',
                'The catch time is outside the competition dates.'
             );
-         } else if (
-            taken !== null &&
-            (taken < start - GRACE_MS || taken > end + GRACE_MS)
-         ) {
+         } else if (outside(taken)) {
             line(
                'window',
                'flag',
                'The photograph was taken outside the competition dates.'
+            );
+         } else if (outside(measured)) {
+            line(
+               'window',
+               'flag',
+               `The photograph on the ${measure === 'LENGTH' ? 'tape' : 'scale'} was taken outside the competition dates.`
             );
          } else if (submitted > end + LATE_MS) {
             line('window', 'flag', 'Submitted more than a day after the end.');
@@ -602,7 +727,7 @@ export const entriesService = {
          }
       }
 
-      /* 5: the area. */
+      /* 4: the area. */
       {
          const here =
             entry.latitude !== null && entry.longitude !== null
@@ -692,7 +817,7 @@ export const entriesService = {
          }
       }
 
-      /* 6: the same fish twice. */
+      /* 5: the same fish twice. */
       {
          const others = await prisma.competitionEntry.findMany({
             where: {
@@ -757,6 +882,139 @@ export const entriesService = {
          }
       }
 
+      /*
+       * The judge: both photographs in one look, told what the checks above
+       * found, since the position and the fingerprint are the two things it
+       * cannot see for itself. It can only add a hold. When it does not
+       * answer, everything below runs exactly as it did before it existed.
+       */
+      const [heroCard, measureCard] = await Promise.all([
+         readUrl(entry.heroImageKey, entry.heroImageUrl, 'card'),
+         readUrl(entry.measureImageKey, entry.measureImageUrl, 'card'),
+      ]);
+      const cardOf = new Map<string, string | null>();
+      if (heroUrl) cardOf.set(heroUrl, heroCard);
+      if (measureUrl) cardOf.set(measureUrl, measureCard);
+      const judged: JudgeRecord = await judgeEntry(
+         {
+            competition,
+            entry: {
+               speciesName: entry.speciesName,
+               declaredValue: entry.declaredValue,
+               caughtAt: entry.caughtAt,
+               photoTakenAt: entry.photoTakenAt,
+               measureTakenAt: entry.measureTakenAt,
+               submittedAt: entry.createdAt,
+               report,
+            },
+            photos: { fish: heroUrl, measure: isVariety ? null : measureUrl },
+         },
+         {
+            loadImage: (url, signal) =>
+               visionService.imageForModel(
+                  url,
+                  cardOf.get(url) ?? null,
+                  signal
+               ),
+         }
+      );
+      /* What happened, never what was in the photographs. */
+      console.info(
+         '[entry:judge]',
+         entry.id,
+         judged.status === 'checked'
+            ? judged.holds
+               ? `holds (${judged.holdReasons.join(', ')})`
+               : 'clear'
+            : `not checked (${judged.reason}${judged.error ? `, ${judged.error}` : ''})`,
+         `${judged.ms} ms`
+      );
+
+      /* 6: the figure, read off the tape or scale: by the judge when it
+         looked, else by the reader, as before the judge. */
+      let readValue: number | null = null;
+      let readConfidence: number | null = null;
+      let readNote: string | null = null;
+      const device = measure === 'LENGTH' ? 'tape' : 'scale';
+      const figureFrom = (read: MeasureRead) => {
+         readConfidence = read.confidence;
+         readNote = read.note.slice(0, 280);
+         const unitFits =
+            read.unit !== null &&
+            (measure === 'LENGTH'
+               ? read.unit === 'cm' || read.unit === 'in'
+               : read.unit === 'kg' || read.unit === 'lb');
+         if (read.seen === 'none') {
+            line(
+               'figure',
+               'flag',
+               `No ${device} in the photograph. ${read.note}`
+            );
+            return;
+         }
+         if (
+            read.value === null ||
+            !unitFits ||
+            read.confidence < SURE_ENOUGH
+         ) {
+            line(
+               'figure',
+               'flag',
+               `Could not read the ${device} well enough (${Math.round(read.confidence * 100)}% sure). ${read.note}`
+            );
+            return;
+         }
+         const metric = toMetric(
+            read.value,
+            read.unit as 'cm' | 'in' | 'kg' | 'lb'
+         );
+         readValue = metric;
+         const declared = entry.declaredValue;
+         if (declared === null) {
+            line(
+               'figure',
+               'pass',
+               `Read ${fmt(metric, measure)} off the ${read.seen}; no typed figure to compare.`
+            );
+            return;
+         }
+         const tolerance = Math.max(
+            0.05 * metric,
+            measure === 'LENGTH' ? 1 : 0.1
+         );
+         const agrees = Math.abs(metric - declared) <= tolerance;
+         line(
+            'figure',
+            agrees ? 'pass' : 'flag',
+            agrees
+               ? `Read ${fmt(metric, measure)} off the ${read.seen}; typed ${fmt(declared, measure)}.`
+               : `Read ${fmt(metric, measure)} off the ${read.seen}, but ${fmt(declared, measure)} was typed.`
+         );
+      };
+      if (isVariety) {
+         line(
+            'figure',
+            'pass',
+            'No measurement needed for a most-species competition.'
+         );
+      } else if (!measureUrl) {
+         line('figure', 'flag', `No photograph of the fish on the ${device}.`);
+      } else if (judged.status === 'checked') {
+         figureFrom(judgeReading(judged.verdict));
+      } else {
+         try {
+            const read = await visionService.readMeasure(measureUrl, measure);
+            if (!read) {
+               line('figure', 'skip', 'The photo reader is not switched on.');
+            } else {
+               figureFrom(read);
+            }
+         } catch (error) {
+            line('figure', 'skip', 'The photo reader did not answer.');
+            console.warn('[entry:verify] reader', entryId, String(error));
+         }
+      }
+
       const flags = report
          .filter((l) => l.status === 'flag')
          .map((l) => l.code as string);
@@ -769,6 +1027,8 @@ export const entriesService = {
       ) {
          flags.push('unverified');
       }
+      /* The judge's doubts hold an entry; its approval never counts one. */
+      if (judged.status === 'checked' && judged.holds) flags.push('judge');
       const value = readValue ?? entry.declaredValue ?? null;
       const state: EntryState =
          competition.checks === 'REVIEW' || flags.length ? 'HELD' : 'COUNTED';
@@ -782,6 +1042,9 @@ export const entriesService = {
             readNote,
             value,
             fingerprint: fingerprint ?? undefined,
+            judge: judged as unknown as Prisma.InputJsonValue,
+            judgeModel: judged.model,
+            judgedAt: new Date(),
             report: report as unknown as Prisma.InputJsonValue,
             flags: flags as unknown as Prisma.InputJsonValue,
          },
@@ -886,10 +1149,18 @@ export const entriesService = {
       entry: EntryRow,
       viewer: { id: string | null; organiser: boolean; entrant: boolean }
    ): Promise<ShapedEntry> {
-      const [heroUrl, measureUrl] = await Promise.all([
+      const [heroUrl, measureUrl, heroFraming] = await Promise.all([
          /* The full picture: not every upload has a card-size variant. */
          readUrl(entry.heroImageKey, entry.heroImageUrl),
          readUrl(entry.measureImageKey, entry.measureImageUrl),
+         /* The entry keeps the photograph's key, and the framing lives on the
+            image row, so it is read from there and follows a later reframe. */
+         entry.heroImageKey
+            ? prisma.image.findUnique({
+                 where: { storageKey: entry.heroImageKey },
+                 select: { focusX: true, focusY: true, zoom: true },
+              })
+            : null,
       ]);
       let flaggedBy: string | null = null;
       if (entry.flaggedById) {
@@ -918,6 +1189,7 @@ export const entriesService = {
          caughtAt: entry.caughtAt.toISOString(),
          note: entry.note,
          heroUrl,
+         heroFraming,
          measureUrl,
          areaConfirmed: entry.areaConfirmed,
          flaggedBy,
@@ -930,6 +1202,7 @@ export const entriesService = {
             !yours &&
             (entry.state === 'COUNTED' || entry.state === 'PENDING'),
          createdAt: entry.createdAt.toISOString(),
+         judge: judgeViewFor(entry, viewer, yours),
       };
    },
 

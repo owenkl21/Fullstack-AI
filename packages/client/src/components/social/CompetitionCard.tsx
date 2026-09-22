@@ -12,7 +12,7 @@ import {
    whereWords,
    type Competition,
 } from '@/components/social/competitions-api';
-import { type UnitSystem } from '@/lib/units';
+import { type UnitChoice } from '@/lib/units';
 import { cn } from '@/lib/utils';
 
 /*
@@ -35,7 +35,7 @@ export function CompetitionCard({
    onAccept,
 }: {
    competition: Competition;
-   units: UnitSystem;
+   units: UnitChoice;
    /* The first card sits closer to the wave than the ones under it. */
    first?: boolean;
    onEnter: () => void;

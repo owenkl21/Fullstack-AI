@@ -4,7 +4,8 @@ import {
    type CompetitionEntry,
    type CompetitionStanding,
 } from '@/components/social/competitions-api';
-import { type UnitSystem } from '@/lib/units';
+import { type UnitChoice } from '@/lib/units';
+import { FramedPhoto } from '@/components/FramedPhoto';
 
 /*
  * Who won, on the one black card the results page carries.
@@ -25,13 +26,14 @@ export function WinnerCard({
    competition: Competition;
    winner: CompetitionStanding;
    entries: CompetitionEntry[];
-   units: UnitSystem;
+   units: UnitChoice;
 }) {
    const theirs = entries
       .filter((e) => e.anglerId === winner.anglerId && e.state === 'COUNTED')
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
-   const photo = theirs.find((e) => e.heroUrl)?.heroUrl ?? null;
+   const pictured = theirs.find((e) => e.heroUrl) ?? null;
+   const photo = pictured?.heroUrl ?? null;
    const species = [
       ...new Set(
          theirs.map((e) => e.speciesName).filter((n): n is string => Boolean(n))
@@ -46,10 +48,13 @@ export function WinnerCard({
    return (
       <article className="blk blk-flat flex flex-col">
          {photo ? (
-            <img
+            /* The widest crop in the product, so the framing matters most
+               here: a tall photo keeps a third of itself. */
+            <FramedPhoto
                src={photo}
                alt=""
-               className="block aspect-[16/9] w-full object-cover"
+               framing={pictured?.heroFraming ?? null}
+               className="aspect-[16/9] w-full"
             />
          ) : null}
          <div className="flex flex-col gap-1 px-4 pt-4 pb-[18px]">

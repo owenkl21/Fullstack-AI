@@ -51,6 +51,7 @@ import { SpeciesGuess } from '@/components/fishing/SpeciesGuess';
 import {
    enterCompetition,
    fetchCompetition,
+   listWords,
    needsMeasurePhoto,
    submitEntry,
    type Competition,
@@ -60,6 +61,8 @@ import {
    CompetitionEntryFields,
 } from '@/components/fishing/CompetitionEntryFields';
 import { entryProblem } from '@/components/fishing/competition-entry';
+import { EntryPhotoSteps } from '@/components/fishing/EntryPhotos';
+import { readUnits, writeUnits } from '@/lib/units';
 import { SpeciesCombobox } from '@/components/fishing/SpeciesCombobox';
 import type { GearOption } from '@/pages/fishing/LogCatchPage';
 import { readDraft, removeDraft, saveDraft } from '@/lib/drafts';
@@ -73,6 +76,7 @@ import {
    fetchSpecies,
    matchSpecies,
    speciesChoices,
+   speciesKey,
    type Species,
 } from '@/components/fishing/quicklog/species';
 import { usePositionFix } from '@/components/fishing/quicklog/useFix';
@@ -105,6 +109,14 @@ const away = (metres: number) =>
       : metres < 10000
         ? `${(metres / 1000).toFixed(1)} km`
         : `${Math.round(metres / 1000)} km`;
+
+/*
+ * The one fish a competition is for, when it is for exactly one: the log then
+ * names the fish itself. A competition for several leaves the choice open and
+ * says which count.
+ */
+const onlyFish = (c: Competition | null | undefined) =>
+   c && c.species.length === 1 ? c.species[0]!.commonName : null;
 
 /* Which way the pressure is going, read off the hour three hours back. */
 const PRESSURE_STEP_HOURS = 3;
@@ -306,6 +318,8 @@ function QuickLog() {
    const [entryIssue, setEntryIssue] = useState<string | null>(null);
    /* What the camera wrote in the hero photo, for the window check. */
    const photoTakenAt = useRef<Date | null>(null);
+   /* And in the measure photo: the judge sets the two times side by side. */
+   const measureTakenAt = useRef<Date | null>(null);
    useEffect(() => {
       if (!competitionId) return;
       const controller = new AbortController();
@@ -313,26 +327,36 @@ function QuickLog() {
          .then((detail) => {
             setCompetition(detail.competition);
             setCompetitionEntered(detail.you.entered);
-            if (detail.competition.species) {
-               setChosen(detail.competition.species.commonName);
+            const fish = onlyFish(detail.competition);
+            if (fish) {
+               setChosen(fish);
                setTyped('');
             }
          })
-         .catch(() =>
+         .catch(() => {
+            /* A read this page called off itself (it left, or the link
+               changed) is not a failure to tell anyone about. */
+            if (controller.signal.aborted) return;
             toast({
                title: 'Could not read the competition.',
                description: 'The catch still logs as usual.',
                variant: 'error',
-            })
-         );
+            });
+         });
       return () => controller.abort();
    }, [competitionId]);
 
    const [length, setLength] = useState('');
-   const [lengthUnit, setLengthUnit] = useState<MeasureUnit>('cm');
+   /* The reader's own units to begin with (lib/units.ts), the same ones a
+      competition's standings are shown in. A draft brings back its own. */
+   const [lengthUnit, setLengthUnit] = useState<MeasureUnit>(
+      () => readUnits().length
+   );
    const [lengthSource, setLengthSource] = useState<'EYE' | 'TAPE'>('EYE');
    const [weight, setWeight] = useState('');
-   const [weightUnit, setWeightUnit] = useState<MeasureUnit>('kg');
+   const [weightUnit, setWeightUnit] = useState<MeasureUnit>(
+      () => readUnits().mass
+   );
    const [weightSource, setWeightSource] = useState<'EYE' | 'SCALE'>('EYE');
    /* The photographs, the first of them the cover. */
    const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
@@ -758,6 +782,8 @@ function QuickLog() {
                if (!competitionEntered) await enterCompetition(competition.id);
                await submitEntry(competition.id, {
                   catchId: data.catch.id,
+                  /* Named, not taken to be the first of the catch's list. */
+                  fishImage: photo ? { storageKey: photo.storageKey } : null,
                   measureImage: measurePhoto
                      ? {
                           storageKey: measurePhoto.storageKey,
@@ -767,6 +793,9 @@ function QuickLog() {
                   declaredValue,
                   areaConfirmed,
                   photoTakenAt: photoTakenAt.current?.toISOString() ?? null,
+                  measureTakenAt: measurePhoto
+                     ? (measureTakenAt.current?.toISOString() ?? null)
+                     : null,
                   note: notes.trim() || null,
                });
                toast({
@@ -893,26 +922,71 @@ function QuickLog() {
          onPreviewUrl={setPhotoPreview}
          title={phone ? 'Take a photo' : 'Choose a photo'}
          second={phone ? 'Choose one instead' : ''}
+         retake={Boolean(competition)}
       >
          {namerBand}
       </PhotoBlock>
    );
 
-   const tapeBlock =
-      competition && needsMeasurePhoto(competition) ? (
-         <CompetitionEntryFields
-            part="photo"
-            competition={competition}
-            measurePhoto={measurePhoto}
-            onMeasurePhoto={(next) => {
-               setMeasurePhoto(next);
-               setEntryIssue(null);
-            }}
-            onMeasureBusy={setMeasureBusy}
-            areaConfirmed={areaConfirmed}
-            onAreaConfirmed={setAreaConfirmed}
-         />
-      ) : null;
+   /* The catch's other photographs, on a desktop, under the cover. */
+   const photoStrip = (
+      <PhotoStrip
+         photos={photos}
+         onChange={setPhotos}
+         onBusyChange={setStripBusy}
+         onFiles={onStripFiles}
+         coverPreview={photoPreview}
+      />
+   );
+
+   /*
+    * Entering a competition, the photographs are two numbered steps: the
+    * fish, then the same fish on the measure, which opens once the first is
+    * chosen. Without a competition the photo block stands alone as before.
+    */
+   const photoSteps = competition ? (
+      <EntryPhotoSteps
+         competition={competition}
+         fish={
+            /* What the photograph did to the pin belongs to the fish photo,
+               so on a phone it is said under step one, not under the tape. */
+            phone ? (
+               <>
+                  {photoBlock}
+                  {photoNote ? (
+                     <p className="mt-2 text-[14px] text-ink-3">{photoNote}</p>
+                  ) : null}
+               </>
+            ) : (
+               /* The strip can make another photograph the cover, which is
+                  then the fish: it belongs to this step, not after the tape. */
+               <>
+                  {photoBlock}
+                  {photos.length ? (
+                     <div className="mt-4">{photoStrip}</div>
+                  ) : null}
+               </>
+            )
+         }
+         fishIn={photo !== null || photoBusy}
+         fishDone={photo !== null}
+         measurePhoto={measurePhoto}
+         onMeasurePhoto={(next) => {
+            setMeasurePhoto(next);
+            if (!next) measureTakenAt.current = null;
+            setEntryIssue(null);
+         }}
+         onMeasureBusy={setMeasureBusy}
+         onMeasureFile={(file) => {
+            measureTakenAt.current = null;
+            void readPhotoMeta(file).then((meta) => {
+               measureTakenAt.current = meta.takenAt ?? null;
+            });
+         }}
+      />
+   ) : (
+      photoBlock
+   );
 
    const areaBlock = competition ? (
       <CompetitionEntryFields
@@ -930,12 +1004,24 @@ function QuickLog() {
       />
    ) : null;
 
-   const speciesBlock = competition?.species ? (
+   /* The fish a competition for several is for, and whether the one named
+      here is among them. Matched the way the server matches it, on the name. */
+   const allowedFish =
+      competition && competition.species.length > 1
+         ? competition.species.map((s) => s.commonName)
+         : [];
+   const namedFish = (chosen ?? typed).trim();
+   const offList =
+      allowedFish.length > 0 &&
+      namedFish !== '' &&
+      !allowedFish.some((n) => speciesKey(n) === speciesKey(namedFish));
+
+   const speciesBlock = onlyFish(competition) ? (
       <div className="flex flex-col gap-2">
          <span className="lab">Species</span>
          <div className="flex h-12 items-center justify-between gap-3 border-b border-dashed border-line-2">
             <span className="g-tracked text-[18px]">
-               {competition.species.commonName}
+               {onlyFish(competition)}
             </span>
             <span className="text-[13px] text-ink-3">
                The competition's fish
@@ -953,7 +1039,8 @@ function QuickLog() {
             label=""
             value={chosen ?? typed}
             species={species}
-            recent={options}
+            /* The competition's own fish come first in the list. */
+            recent={allowedFish.length ? allowedFish : options}
             error={speciesError}
             inputRef={speciesInput}
             onChange={(name) => {
@@ -963,6 +1050,19 @@ function QuickLog() {
             }}
             onCreated={(made) => setSpecies((list) => [...list, made])}
          />
+         {allowedFish.length ? (
+            <p
+               className={cn(
+                  'text-[14px]',
+                  offList ? 'text-destructive' : 'text-ink-3'
+               )}
+               role={offList ? 'status' : undefined}
+            >
+               {offList
+                  ? `Not one of the competition's fish, so the entry would be held. It is for ${listWords(allowedFish)}.`
+                  : `The competition is for ${listWords(allowedFish)}.`}
+            </p>
+         ) : null}
       </div>
    );
 
@@ -1076,7 +1176,10 @@ function QuickLog() {
             unit={lengthUnit}
             value={length}
             onChange={setLength}
-            onUnitChange={setLengthUnit}
+            onUnitChange={(next) => {
+               setLengthUnit(next);
+               writeUnits({ length: next as 'cm' | 'in' });
+            }}
             placeholder="0"
             sources={[
                { value: 'EYE', label: 'By eye' },
@@ -1092,7 +1195,10 @@ function QuickLog() {
             unit={weightUnit}
             value={weight}
             onChange={setWeight}
-            onUnitChange={setWeightUnit}
+            onUnitChange={(next) => {
+               setWeightUnit(next);
+               writeUnits({ mass: next as 'kg' | 'lb' });
+            }}
             placeholder="0.0"
             sources={[
                { value: 'EYE', label: 'By eye' },
@@ -1332,8 +1438,9 @@ function QuickLog() {
             setCompetition(next);
             setCompetitionEntered(Boolean(next?.youEntered));
             setEntryIssue(null);
-            if (next?.species) {
-               setChosen(next.species.commonName);
+            const fish = onlyFish(next);
+            if (fish) {
+               setChosen(fish);
                setTyped('');
             }
          }}
@@ -1447,13 +1554,12 @@ function QuickLog() {
                         <CompetitionBanner competition={competition} />
                      ) : null}
                      {heading('The catch')}
-                     {photoBlock}
-                     {photoNote ? (
+                     {photoSteps}
+                     {photoNote && !competition ? (
                         <p className="-mt-3 text-[14px] text-ink-3">
                            {photoNote}
                         </p>
                      ) : null}
-                     {tapeBlock}
                      {speciesBlock}
                      {caughtAtBlock}
                      {mapBlock}
@@ -1524,17 +1630,8 @@ function QuickLog() {
                   <CompetitionBanner competition={competition} />
                ) : null}
                {heading('The catch')}
-               {photoBlock}
-               {photos.length ? (
-                  <PhotoStrip
-                     photos={photos}
-                     onChange={setPhotos}
-                     onBusyChange={setStripBusy}
-                     onFiles={onStripFiles}
-                     coverPreview={photoPreview}
-                  />
-               ) : null}
-               {tapeBlock}
+               {photoSteps}
+               {photos.length && !competition ? photoStrip : null}
                {speciesBlock}
                {measureBlock}
                <div className="grid grid-cols-2 items-end gap-6">
@@ -1583,8 +1680,9 @@ function QuickLog() {
                                     Boolean(next?.youEntered)
                                  );
                                  setEntryIssue(null);
-                                 if (next?.species) {
-                                    setChosen(next.species.commonName);
+                                 const fish = onlyFish(next);
+                                 if (fish) {
+                                    setChosen(fish);
                                     setTyped('');
                                  }
                               }}

@@ -5,7 +5,7 @@ import type {
    CompetitionMeasure,
    EntryCheck,
 } from '@/components/social/competitions-api';
-import { formatMeasure, type UnitSystem } from '@/lib/units';
+import { formatMeasure, type UnitChoice } from '@/lib/units';
 
 /*
  * The six checks, named once.
@@ -40,17 +40,31 @@ export const CHECK_LABELS: Record<CheckCode, string> = {
    duplicate: 'Entered once',
 };
 
-/** The same six as sentences, for the organiser starting a competition. */
-export function checkSentences(measure: CompetitionMeasure): string[] {
+/**
+ * The same six as sentences, for the organiser starting a competition. A
+ * most-species competition asks for one photo and no figure, so it is not
+ * promised a reading or a comparison of two photos it will never have.
+ */
+export function checkSentences(
+   measure: CompetitionMeasure,
+   rule?: Competition['rule']
+): string[] {
+   const measured = rule !== 'SPECIES_VARIETY';
    return [
       'A fish in the photo',
       'The species the namer sees',
-      measure === 'LENGTH'
-         ? 'The figure read off the tape'
-         : 'The figure read off the scale',
+      ...(measured
+         ? [
+              measure === 'LENGTH'
+                 ? 'The figure read off the tape'
+                 : 'The figure read off the scale',
+           ]
+         : []),
       'Caught inside the window',
       'Caught inside the area',
       'Not entered twice',
+      /* The judge's own question, the one no single check can ask. */
+      ...(measured ? ['The same fish in both photos'] : []),
    ];
 }
 
@@ -87,7 +101,7 @@ export function checkValue(
    check: EntryCheck,
    entry: CompetitionEntry,
    competition: Competition,
-   units: UnitSystem
+   units: UnitChoice
 ): string {
    const detail = check.detail.replace(/\s+$/, '');
    const passed = check.status === 'pass';

@@ -3,6 +3,10 @@ import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { stripLocation } from '../lib/strip-location';
 import { uploadsService } from './uploads.service';
+import {
+   MEASURE_READING_RULES,
+   type ImageForModel,
+} from './competition-judge.service';
 
 /*
  * Two eyes on a photograph.
@@ -11,7 +15,11 @@ import { uploadsService } from './uploads.service';
  * figure off the picture so a competition entry is what the picture says,
  * not what the angler typed. Haiku is the model on purpose: this is a read,
  * not a judgement, it costs a few tenths of a cent a photograph, and a
- * competition can put a hundred photographs through it on a Saturday.
+ * competition can put a hundred photographs through it on a Saturday. An
+ * entry is read by the judge now (competition-judge.service, on Sonnet 5,
+ * both photographs in one look); this reader answers /api/vision/read and
+ * stands in when the judge does not answer. Both read by the same rules,
+ * prompts/measure-reading.txt.
  *
  * The species namer: Fishial's open model, running on Owen's own machine,
  * reached through a URL the server is told about. It names the fish; the
@@ -56,14 +64,15 @@ const mediaTypeOf = (contentType: string | undefined): MediaType =>
 
 /*
  * Every photograph this file sends anywhere comes through here, so this is
- * where its location is taken out. The namer and the reader need the fish,
- * not the spot.
+ * where its location is taken out. The namer, the reader and the judge need
+ * the fish, not the spot.
  */
-async function fetchImage(url: string) {
+async function fetchImage(url: string, signal?: AbortSignal) {
    const response = await axios.get<ArrayBuffer>(url, {
       responseType: 'arraybuffer',
       timeout: 15000,
       maxContentLength: 12 * 1024 * 1024,
+      signal,
    });
    return {
       data: stripLocation(Buffer.from(response.data)).toString('base64'),
@@ -71,8 +80,36 @@ async function fetchImage(url: string) {
    };
 }
 
+/*
+ * The model takes a photograph of up to 5 MB once encoded, which is about
+ * 3.7 MB of file. A phone's original can be more, so past that the smaller
+ * copy made at upload is sent instead: 1200 across still shows a tape's
+ * marks, and a photograph that is refused shows nothing.
+ */
+const MODEL_IMAGE_BYTES = Math.floor((5 * 1024 * 1024 * 3) / 4) - 1024;
+
 export const visionService = {
    available: () => Boolean(process.env.ANTHROPIC_API_KEY),
+
+   /**
+    * A photograph for the judge, location taken out. The original when it
+    * fits what the model takes, else the smaller copy; throws when neither
+    * could be fetched. Nothing about the photograph is logged.
+    */
+   async imageForModel(
+      fullUrl: string,
+      cardUrl: string | null,
+      signal?: AbortSignal
+   ): Promise<ImageForModel> {
+      try {
+         const image = await fetchImage(fullUrl, signal);
+         if ((image.data.length * 3) / 4 <= MODEL_IMAGE_BYTES || !cardUrl)
+            return image;
+      } catch (error) {
+         if (!cardUrl || signal?.aborted) throw error;
+      }
+      return fetchImage(cardUrl!, signal);
+   },
 
    /**
     * Read a length or a weight off a photograph. Returns null when there is
@@ -94,11 +131,11 @@ export const visionService = {
       const response = await api.messages.create({
          model: MODEL,
          max_tokens: 1024,
-         system:
-            'You read measurements off photographs of fish for a fishing competition. ' +
-            'You are strict: you report only a figure you can actually read from the tape, ruler or scale in the picture, ' +
-            'you never estimate from the fish itself, and if the figure is not clearly readable you say so with low confidence. ' +
-            "Read the number at the fish's nose or tail on a tape, or the display on a scale.",
+         /* The same reading rules the judge is given, from one file, so
+            the two can never disagree about how a tape is read. */
+         system: `You read measurements off photographs of fish for a fishing competition, and report them with the report_reading tool.
+
+${MEASURE_READING_RULES}`,
          tools: [
             {
                name: 'report_reading',

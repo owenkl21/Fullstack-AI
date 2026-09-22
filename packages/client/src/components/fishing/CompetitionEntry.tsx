@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
    fetchCompetitions,
+   speciesWords,
    type Competition,
 } from '@/components/social/competitions-api';
 import { Button } from '@/components/ui/button';
@@ -103,7 +104,12 @@ export function CompetitionEntry({
                      options={(running ?? []).map((c) => ({
                         value: c.id,
                         label: c.name,
-                        hint: `${c.measure === 'LENGTH' ? 'Length' : 'Weight'}${c.species ? `, ${c.species.commonName} only` : ''}`,
+                        hint: [
+                           c.measure === 'LENGTH' ? 'Length' : 'Weight',
+                           speciesWords(c.species),
+                        ]
+                           .filter(Boolean)
+                           .join(', '),
                      }))}
                      className="min-w-[240px]"
                   />

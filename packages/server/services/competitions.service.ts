@@ -2,7 +2,10 @@ import { prisma } from '../lib/prisma';
 import type { Prisma } from '@prisma/client';
 import {
    ENTRY_SELECT,
+   SPECIES_ALLOWED_SELECT,
+   allowedSpeciesOf,
    entriesService,
+   type AllowedSpecies,
    type EntryRow,
 } from './competition-entries.service';
 import { notificationsService } from './notifications.service';
@@ -12,7 +15,7 @@ import { notificationsService } from './notifications.service';
  *
  * The Competition table existed but nothing ever read or wrote it, so there was
  * no way to start one. This gives an angler the four decisions that actually
- * make a competition: when it runs, whether it is for one species, what a fish
+ * make a competition: when it runs, which fish it is for, what a fish
  * is judged on, and who can enter.
  *
  * Standings are worked out from the catches themselves every time, never stored.
@@ -38,6 +41,9 @@ export type CreateCompetitionInput = {
    rule: CompetitionRule;
    measure: CompetitionMeasure;
    scope: CompetitionScope;
+   /* The fish it is for. Empty, or left out, is any species. */
+   speciesIds?: string[];
+   /* The older single field; folded into the list. */
    speciesId?: string | null;
    groupId?: string | null;
    startsAt: Date;
@@ -55,6 +61,14 @@ export type CreateCompetitionInput = {
 /* A week to answer an invitation. */
 const INVITE_DAYS = 7;
 
+/** A species id on the form that is not a species. The controller says so. */
+export class UnknownSpeciesError extends Error {
+   constructor() {
+      super('One of those species could not be found.');
+      this.name = 'UnknownSpeciesError';
+   }
+}
+
 const COMPETITION_SELECT = {
    id: true,
    name: true,
@@ -69,8 +83,7 @@ const COMPETITION_SELECT = {
    maxPerSpeciesPerDay: true,
    createdById: true,
    groupId: true,
-   speciesId: true,
-   species: { select: { id: true, commonName: true } },
+   ...SPECIES_ALLOWED_SELECT,
    createdBy: { select: { id: true, displayName: true, username: true } },
    areaType: true,
    areaName: true,
@@ -84,7 +97,24 @@ const COMPETITION_SELECT = {
 type CompetitionRow = Prisma.CompetitionGetPayload<{
    select: typeof COMPETITION_SELECT;
 }>;
-export type DecoratedCompetition = Omit<CompetitionRow, '_count'> & {
+
+/*
+ * The row as a client reads it: `species` is the list of fish it is for,
+ * whichever of the two columns they were kept in, and empty means any species.
+ */
+const withSpecies = <T extends Parameters<typeof allowedSpeciesOf>[0]>(
+   row: T
+): Omit<T, 'species' | 'speciesAllowed'> & { species: AllowedSpecies[] } => {
+   const { species, speciesAllowed, ...rest } = row;
+   return { ...rest, species: allowedSpeciesOf({ species, speciesAllowed }) };
+};
+
+export type DecoratedCompetition = Omit<
+   CompetitionRow,
+   '_count' | 'species' | 'speciesAllowed'
+> & {
+   /* Every fish it is for. Empty means any species. */
+   species: AllowedSpecies[];
    entrantCount: number;
    entryCount: number;
    youEntered: boolean;
@@ -104,6 +134,20 @@ export const competitionsService = {
          throw new Error('A competition has to end after it starts.');
       }
 
+      /* One list from the two fields, each fish once, and only real fish. */
+      const speciesIds = [
+         ...new Set([
+            ...(input.speciesIds ?? []),
+            ...(input.speciesId ? [input.speciesId] : []),
+         ]),
+      ];
+      if (speciesIds.length) {
+         const known = await prisma.species.count({
+            where: { id: { in: speciesIds } },
+         });
+         if (known !== speciesIds.length) throw new UnknownSpeciesError();
+      }
+
       const competition = await prisma.competition.create({
          data: {
             name: input.name,
@@ -111,7 +155,12 @@ export const competitionsService = {
             rule: input.rule,
             measure: input.measure,
             scope: input.scope,
-            speciesId: input.speciesId ?? null,
+            /* The older column stays true for a competition with one fish, so
+             * anything still reading it sees what it always saw. */
+            speciesId: speciesIds.length === 1 ? speciesIds[0]! : null,
+            speciesAllowed: {
+               create: speciesIds.map((speciesId) => ({ speciesId })),
+            },
             groupId: input.scope === 'GROUP' ? (input.groupId ?? null) : null,
             startsAt: input.startsAt,
             endsAt: input.endsAt,
@@ -213,7 +262,7 @@ export const competitionsService = {
          expiresAt: row.expiresAt,
          invitedBy: row.invitedBy,
          competition: {
-            ...row.competition,
+            ...withSpecies(row.competition),
             entrantCount: row.competition._count.entrants,
          },
       }));
@@ -327,7 +376,7 @@ export const competitionsService = {
          byCompetition.set(e.competitionId, list);
       }
       return rows.map((row) => {
-         const { _count, ...rest } = row;
+         const { _count, ...rest } = withSpecies(row);
          const own = byCompetition.get(row.id) ?? [];
          const invite = invited.get(row.id);
          return {
