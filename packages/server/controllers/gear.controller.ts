@@ -1,6 +1,10 @@
 import type { Request, Response } from 'express';
 import { getAuth } from '../lib/auth-context';
-import { isOwnImageKey, notYourImage } from '../lib/image-owner';
+import {
+   isAddressOfKey,
+   isOwnImageKey,
+   notYourImage,
+} from '../lib/image-owner';
 import { createGearSchema, updateGearSchema } from '../schemas/gear.schema';
 import { gearService } from '../services/gear.service';
 
@@ -11,6 +15,15 @@ const unauthorizedResponse = {
 
 const asSingleParam = (value: string | string[] | undefined) =>
    Array.isArray(value) ? value[0] : value;
+
+/* The key has to be the caller's, and the address has to be that key's: gear
+   keeps the address and finds its photograph again by it. */
+const isOwnGearImage = (
+   auth: Parameters<typeof isOwnImageKey>[0],
+   image: { storageKey: string; url: string }
+) =>
+   isOwnImageKey(auth, image.storageKey) &&
+   isAddressOfKey(image.url, image.storageKey);
 
 export const gearController = {
    async createGear(req: Request, res: Response) {
@@ -25,7 +38,7 @@ export const gearController = {
       }
       if (
          parseResult.data.image &&
-         !isOwnImageKey(auth, parseResult.data.image.storageKey)
+         !isOwnGearImage(auth, parseResult.data.image)
       ) {
          return res.status(400).json(notYourImage);
       }
@@ -73,7 +86,7 @@ export const gearController = {
       }
       if (
          parseResult.data.image &&
-         !isOwnImageKey(auth, parseResult.data.image.storageKey)
+         !isOwnGearImage(auth, parseResult.data.image)
       ) {
          return res.status(400).json(notYourImage);
       }
