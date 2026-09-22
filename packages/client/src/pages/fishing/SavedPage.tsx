@@ -1,4 +1,5 @@
 import { BookmarkIcon } from '@heroicons/react/24/outline';
+import { PageHead } from '@/components/brand/PageHead';
 import { NoData } from '@/components/states/NoData';
 import axios from 'axios';
 import { useEffect, useState } from 'react';
@@ -64,32 +65,33 @@ function Saved() {
    }, [attempt]);
 
    return (
-      <section className="mx-auto w-[min(1680px,100%-32px)] py-8 md:py-12">
-         <div className="flex flex-wrap items-baseline justify-between gap-4">
-            <h1 className="g text-[44px] md:text-[56px]">Kept</h1>
-            {state.status === 'ready' ? (
-               <p className="lab num text-ink-3">
-                  {state.spots.length} spots, {state.gear.length} gear
-               </p>
-            ) : null}
-         </div>
-         <p className="mt-3 max-w-[58ch] text-[17px] text-ink-2">
-            Other anglers' spots and gear you have kept. A reference, not a
-            copy: if they take it down, it goes from here too.
-         </p>
+      <section className="relative mx-auto w-[min(1680px,100%-32px)] pb-8 md:pb-12">
+         {/* The same plate and waterline every other list opens on. */}
+         <PageHead
+            kicker="From other anglers"
+            title="Kept"
+            lede="Other anglers' spots and gear you have kept. A reference, not a copy: if they take it down, it goes from here too."
+            aside={
+               state.status === 'ready' ? (
+                  <span className="lab num text-paper-2">
+                     {state.spots.length} spots, {state.gear.length} gear
+                  </span>
+               ) : null
+            }
+         />
 
          {state.status === 'loading' ? (
             <div
                role="status"
                aria-label="Loading"
-               className="mt-8 flex flex-col gap-px"
+               className="flex flex-col gap-px"
             >
                {[0, 1, 2].map((i) => (
                   <span key={i} className="h-16 bg-bg-2" />
                ))}
             </div>
          ) : state.status === 'error' ? (
-            <div className="mt-8">
+            <div>
                <p className="text-[17px] text-ink-2">
                   Could not load what you have kept.
                </p>
@@ -103,7 +105,7 @@ function Saved() {
             </div>
          ) : (
             <>
-               <section className="mt-10">
+               <section>
                   <h2 className="g text-[30px]">Posts</h2>
                   {state.posts.length === 0 ? (
                      <p className="mt-2 max-w-[52ch] text-[15px] text-ink-2">

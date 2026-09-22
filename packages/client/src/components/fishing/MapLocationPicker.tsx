@@ -4,6 +4,8 @@ import {
    ViewfinderCircleIcon,
 } from '@heroicons/react/24/outline';
 import type { Map as LeafletMap, Marker as LeafletMarker } from 'leaflet';
+import { PlaceSearch } from '@/components/forecast/PlaceSearch';
+import type { PlaceHit } from '@/components/forecast/forecast-api';
 import { Button } from '@/components/ui/button';
 import {
    BASE_LAYERS,
@@ -15,13 +17,8 @@ import {
    stopMapEvents,
    type BaseLayer,
 } from '@/lib/leaflet';
-import {
-   formatCoordinate,
-   parseGoogleMapsCoordinates,
-   readPair,
-   readPosition,
-   type MapPosition,
-} from '@/lib/maps';
+import { formatCoordinate, readPosition, type MapPosition } from '@/lib/maps';
+import { requestPosition, usePosition } from '@/lib/position';
 import { cn } from '@/lib/utils';
 
 type MapLocationPickerProps = {
@@ -49,70 +46,61 @@ type MapLocationPickerProps = {
     * under it. The quick log uses this; the full form has room for the rest.
     */
    compact?: boolean;
+   /*
+    * The wheel zooms the map. Off unless asked for, because a map in the
+    * middle of a long form should let the page scroll past it. Add a spot
+    * asks: there the map is the job, and a wheel that did nothing over it
+    * read as a map that could not be zoomed at all.
+    */
+   wheelZoom?: boolean;
+   /*
+    * How close the map goes when it is sent to a position. A catch wants the
+    * bay around the pin; a spot wants the gully itself, as close as the
+    * imagery has pictures for.
+    */
+   closeZoom?: number;
+   /*
+    * With no position on the form, open on the best one known rather than on
+    * the whole country: the last fix this device shared, refreshed without a
+    * prompt where that was already allowed. Only the view moves. No pin is
+    * dropped and nothing is reported, because where the angler is sitting is
+    * not where the spot is until they say so.
+    */
+   seek?: boolean;
 };
 
 /* The country the first anglers fish, rather than a continent they do not. */
 const DEFAULT_CENTER: MapPosition = { lat: -30.5595, lng: 22.9375 };
 const DEFAULT_ZOOM = 5;
 const FOCUSED_ZOOM = 15;
+/*
+ * Where a seeking picker opens when the device has never said where it is:
+ * the Cape's south coast from Table Bay round to Hermanus, which is water
+ * most of the first anglers fish and close enough in to read as a coast
+ * rather than as a country.
+ */
+const COAST_CENTER: MapPosition = { lat: -34.2, lng: 18.85 };
+const COAST_ZOOM = 9;
+/*
+ * A named place is a town or a beach rather than a point, so it is shown one
+ * step further out than an exact position: close enough to pick the gully,
+ * far enough to see which side of the harbour it is on.
+ */
+const NAMED_ZOOM_BACKOFF = 1;
 /* About a tenth of a metre: closer than this is the same pin. */
 const SAME_POSITION = 0.000001;
 /* One arrow key press. Short enough to sit the pin on a gully mouth. */
 const NUDGE_METRES = 10;
 const METRES_PER_DEGREE = 111320;
+/*
+ * How long a tap waits to find out whether it was half of a double tap. Two
+ * taps zoom the map, and without the wait the first of them had already moved
+ * the pin to wherever the zoom was aimed.
+ */
+const TAP_WAIT_MS = 250;
 
 const PIN_LABEL =
    'The pin. Drag it, or move it ten metres a press with the arrow keys.';
-
-type Found = { label: string; lat: number; lng: number };
-
-/*
- * The product's own place search, the same one the forecast uses: real
- * places, farms, dams and harbours as well as towns, the near ones first.
- */
-const searchPlaces = async (
-   q: string,
-   signal: AbortSignal,
-   near: MapPosition | null
-): Promise<Found[]> => {
-   const params = new URLSearchParams({ q });
-   if (near) {
-      params.set('lat', near.lat.toFixed(4));
-      params.set('lng', near.lng.toFixed(4));
-   }
-   const res = await fetch(`/api/places/search?${params.toString()}`, {
-      signal,
-      headers: { Accept: 'application/json' },
-   });
-   if (!res.ok) return [];
-   const { places } = (await res.json()) as {
-      places?: {
-         name: string;
-         region: string | null;
-         country: string | null;
-         kind?: string | null;
-         latitude: number;
-         longitude: number;
-      }[];
-   };
-   return (places ?? []).map((p) => ({
-      label: [p.name, [p.kind, p.region, p.country].filter(Boolean).join(', ')]
-         .filter(Boolean)
-         .join(' · '),
-      lat: p.latitude,
-      lng: p.longitude,
-   }));
-};
-
-/*
- * A link, rather than anything with two numbers in it. The link parser's last
- * pattern matches any "5, 6" inside a string, so "Shop 5, 6th Avenue" would
- * otherwise become a position in the Gulf of Guinea.
- */
-const LINK = /^(https?:\/\/|www\.)|maps\.app|goo\.gl|google\.[a-z.]+\/maps/i;
-
-const readLink = (text: string) =>
-   LINK.test(text.trim()) ? parseGoogleMapsCoordinates(text) : null;
 
 const samePlace = (a: MapPosition | null, b: MapPosition) =>
    Boolean(
@@ -150,29 +138,47 @@ export function MapLocationPicker({
    readout: showReadout = true,
    source = null,
    compact = false,
+   wheelZoom = false,
+   closeZoom = FOCUSED_ZOOM,
+   seek = false,
 }: MapLocationPickerProps) {
    const fieldId = useId();
    const mapContainerRef = useRef<HTMLDivElement | null>(null);
    const mapRef = useRef<LeafletMap | null>(null);
    const markerRef = useRef<LeafletMarker | null>(null);
+   const searchField = useRef<HTMLInputElement | null>(null);
    const onChangeRef = useRef(onChange);
-   const startRef = useRef<MapPosition | null>(
-      readPosition(latitude, longitude)
-   );
+   /* The position on the form when the picker opened, read once. */
+   const [start] = useState(() => readPosition(latitude, longitude));
+   const startRef = useRef<MapPosition | null>(start);
    /* The last position this picker put on the form, or took from it. */
-   const lastSentRef = useRef<MapPosition | null>(startRef.current);
-   const searchRequest = useRef<AbortController | null>(null);
+   const lastSentRef = useRef<MapPosition | null>(start);
+   /* Once the reader has moved the map or the pin, the view is theirs. */
+   const touchedRef = useRef(false);
+   /* Read once when the map is made; later changes come through the props. */
+   const optionsRef = useRef({ wheelZoom, closeZoom, seek, compact });
+
+   /*
+    * The device's last known position, shared with the rest of the product.
+    * Asking for it here never puts up a prompt: `auto` only refreshes where
+    * the browser has already been told yes.
+    */
+   const { fix } = usePosition({ auto: seek });
+   const fixRef = useRef(fix);
 
    const [mapFailed, setMapFailed] = useState(false);
-   const [hasPin, setHasPin] = useState(Boolean(startRef.current));
    const [base, setBase] = useState<BaseLayer>('satellite');
    const [isLocating, setIsLocating] = useState(false);
    const [note, setNote] = useState<string | null>(null);
    const [problem, setProblem] = useState<string | null>(null);
-   const [query, setQuery] = useState('');
    const [searchOpen, setSearchOpen] = useState(false);
-   const [found, setFound] = useState<Found[] | null>(null);
-   const [searching, setSearching] = useState(false);
+   /* Where the pin is while it is in the hand, so the readout follows it. */
+   const [dragAt, setDragAt] = useState<MapPosition | null>(null);
+   /* Where the map is looking, so of two Kommetjies the near one is first. */
+   const [near, setNear] = useState<{
+      latitude: number;
+      longitude: number;
+   } | null>(null);
    /* The typed fields hold a draft only while they are being typed in. */
    const [draft, setDraft] = useState<{ lat: string; lng: string } | null>(
       null
@@ -183,10 +189,14 @@ export function MapLocationPicker({
    }, [onChange]);
 
    const position = readPosition(latitude, longitude);
+   /* The pin stands wherever the form has a position: every way of putting
+      it down reports to the form, and the form's answer is what is drawn. */
+   const hasPin = Boolean(position);
 
    /* The one way out to the form. Nothing else calls onChange. */
    const report = useCallback((next: MapPosition) => {
       lastSentRef.current = next;
+      touchedRef.current = true;
       onChangeRef.current(next.lat, next.lng);
    }, []);
 
@@ -247,8 +257,16 @@ export function MapLocationPicker({
             riseOnHover: true,
             title: PIN_LABEL,
          }).addTo(map);
+         /* The readout follows the pin while it is held, not only when it is
+            let go: the figures moving is how you know the drag is doing
+            something. The form only hears about where it lands. */
+         marker.on('drag', () => {
+            const held = marker.getLatLng();
+            setDragAt({ lat: held.lat, lng: held.lng });
+         });
          marker.on('dragend', () => {
             const at2 = marker.getLatLng();
+            setDragAt(null);
             report({ lat: at2.lat, lng: at2.lng });
          });
          markerRef.current = marker;
@@ -258,30 +276,48 @@ export function MapLocationPicker({
             el.setAttribute('aria-label', PIN_LABEL);
             el.addEventListener('keydown', onPinKey);
          }
-         setHasPin(true);
       },
       [onPinKey, report]
    );
 
-   /* Bring a position into view. Never reports: moving the map is not a move. */
-   const flyTo = useCallback((next: MapPosition, zoomIn = true) => {
-      const map = mapRef.current;
-      if (!map) return;
-      const zoom = zoomIn
-         ? Math.max(map.getZoom(), FOCUSED_ZOOM)
-         : map.getZoom();
-      if (reduceMotion()) {
-         map.setView([next.lat, next.lng], zoom, { animate: false });
-         return;
-      }
-      map.flyTo([next.lat, next.lng], zoom, { duration: 0.9 });
-   }, []);
+   /*
+    * Bring a position into view. Never reports: moving the map is not a move.
+    *
+    * Zooming in only ever goes closer: a map already standing at the gully
+    * is not pulled back out to fly to a point ten metres away. `settle` is
+    * the exception, for a named place: a town looked at from a street away
+    * is a street, not a town, so the view goes to that zoom whichever way.
+    */
+   const flyTo = useCallback(
+      (
+         next: MapPosition,
+         zoomIn = true,
+         target = closeZoom,
+         settle = false
+      ) => {
+         const map = mapRef.current;
+         if (!map) return;
+         /* Never past what the base on screen has pictures for. */
+         const zoom = zoomIn
+            ? Math.min(
+                 settle ? target : Math.max(map.getZoom(), target),
+                 map.getMaxZoom()
+              )
+            : map.getZoom();
+         if (reduceMotion()) {
+            map.setView([next.lat, next.lng], zoom, { animate: false });
+            return;
+         }
+         map.flyTo([next.lat, next.lng], zoom, { duration: 0.9 });
+      },
+      [closeZoom]
+   );
 
    /* A position the reader chose: pin, view and form, in that order. */
    const put = useCallback(
-      (next: MapPosition, zoomIn = true) => {
+      (next: MapPosition, zoomIn = true, target?: number, settle = false) => {
          placePin(next);
-         flyTo(next, zoomIn);
+         flyTo(next, zoomIn, target, settle);
          report(next);
       },
       [flyTo, placePin, report]
@@ -292,30 +328,92 @@ export function MapLocationPicker({
       if (!node || mapRef.current) return;
 
       let observer: ResizeObserver | null = null;
+      let tapTimer: number | null = null;
+      const touched = () => {
+         touchedRef.current = true;
+      };
+      const options = optionsRef.current;
 
       try {
          const start = startRef.current;
+         const known = options.seek ? fixRef.current : null;
+         /*
+          * The best position there is, in order: the one on the form, the
+          * last one this device shared, then a stretch of coast. Only the
+          * first of those is a pin. A spot opens as close as the imagery
+          * goes; a guess at where the reader is opens one step further out.
+          */
+         const view = start
+            ? { centre: start, zoom: options.closeZoom }
+            : known
+              ? {
+                   centre: { lat: known.latitude, lng: known.longitude },
+                   zoom: Math.max(options.closeZoom - 1, FOCUSED_ZOOM),
+                }
+              : options.seek
+                ? { centre: COAST_CENTER, zoom: COAST_ZOOM }
+                : { centre: DEFAULT_CENTER, zoom: DEFAULT_ZOOM };
+
          const map = createMap(node, {
-            centre: start ?? DEFAULT_CENTER,
-            zoom: start ? FOCUSED_ZOOM : DEFAULT_ZOOM,
+            ...view,
             /*
-             * The wheel belongs to the page. A map sitting inside a form is
-             * not the page, so scrolling past it should move the form rather
-             * than zoom the imagery; the plus and minus and a pinch still
-             * zoom. This is lib/leaflet's own default, stated here because
-             * this picker used to override it.
+             * The wheel belongs to the page unless the form says the map is
+             * the job (see `wheelZoom` above). The plus and minus, a pinch
+             * and a double tap zoom either way.
              */
-            wheelZoom: false,
+            wheelZoom: options.wheelZoom,
          });
          mapRef.current = map;
          if (start) placePin(start);
 
-         /* Tapping the map is the other way to put the pin somewhere. */
+         /*
+          * The plus and minus move to the top right on the full picker. The
+          * top left carries a margin meant for the big map's toolbar, which
+          * left them floating a third of the way down a map with no toolbar
+          * on it. The compact map keeps the left: its own controls sit right.
+          */
+         if (!options.compact) map.zoomControl?.setPosition('topright');
+
+         /*
+          * Tapping the map is the other way to put the pin somewhere. The tap
+          * waits a moment first, because two taps are a zoom and the first of
+          * them must not drag the pin across the bay to wherever the zoom
+          * was aimed.
+          */
          map.on('click', (event) => {
+            if (tapTimer !== null) window.clearTimeout(tapTimer);
             const { lat, lng } = event.latlng;
-            placePin({ lat, lng });
-            report({ lat, lng });
+            tapTimer = window.setTimeout(() => {
+               tapTimer = null;
+               placePin({ lat, lng });
+               report({ lat, lng });
+            }, TAP_WAIT_MS);
          });
+         map.on('dblclick', () => {
+            if (tapTimer !== null) window.clearTimeout(tapTimer);
+            tapTimer = null;
+         });
+
+         /* Where the map is looking, rounded, so the search ranks against it
+            without asking again for every hundred metres of panning. */
+         map.on('moveend', () => {
+            const centre = map.getCenter();
+            const next = {
+               latitude: Math.round(centre.lat * 20) / 20,
+               longitude: Math.round(centre.lng * 20) / 20,
+            };
+            setNear((current) =>
+               current &&
+               current.latitude === next.latitude &&
+               current.longitude === next.longitude
+                  ? current
+                  : next
+            );
+         });
+
+         /* The reader's own hand on the map, as opposed to this code's. */
+         for (const type of ['pointerdown', 'wheel', 'keydown', 'touchstart'])
+            node.addEventListener(type, touched, { passive: true });
 
          observer = new ResizeObserver(() => refreshSize(map));
          observer.observe(node);
@@ -326,6 +424,9 @@ export function MapLocationPicker({
 
       return () => {
          observer?.disconnect();
+         if (tapTimer !== null) window.clearTimeout(tapTimer);
+         for (const type of ['pointerdown', 'wheel', 'keydown', 'touchstart'])
+            node.removeEventListener(type, touched);
          markerRef.current = null;
          mapRef.current?.remove();
          mapRef.current = null;
@@ -344,7 +445,6 @@ export function MapLocationPicker({
       if (!next) {
          markerRef.current?.remove();
          markerRef.current = null;
-         setHasPin(false);
          return;
       }
       if (samePlace(lastSentRef.current, next)) return;
@@ -353,6 +453,30 @@ export function MapLocationPicker({
       flyTo(next);
    }, [latitude, longitude, mapFailed, flyTo, placePin]);
 
+   /*
+    * A fix that lands after the map is up: the device had none stored, or the
+    * stored one was stale and a fresh reading came in behind it. The view
+    * goes there once, quietly, and only while the map is still as this code
+    * left it. A reader who has already panned, zoomed or dropped a pin is
+    * somewhere on purpose and is left there.
+    */
+   useEffect(() => {
+      fixRef.current = fix;
+      const map = mapRef.current;
+      if (!seek || !fix || !map) return;
+      if (touchedRef.current || markerRef.current || startRef.current) return;
+      map.setView(
+         [fix.latitude, fix.longitude],
+         Math.max(closeZoom - 1, FOCUSED_ZOOM),
+         { animate: false }
+      );
+   }, [seek, fix, closeZoom]);
+
+   /*
+    * Through the shared position (lib/position) rather than the browser
+    * directly, so the fix is kept: the next form that opens with no pin, this
+    * one included, opens on it instead of on a stretch of coast.
+    */
    const useMyPosition = () => {
       if (!navigator.geolocation) {
          setProblem('This browser will not share your position.');
@@ -360,76 +484,42 @@ export function MapLocationPicker({
       }
       setIsLocating(true);
       setProblem(null);
-      navigator.geolocation.getCurrentPosition(
-         ({ coords }) => {
-            put({ lat: coords.latitude, lng: coords.longitude });
-            setIsLocating(false);
-            setNote('The pin is on your position.');
-         },
-         () => {
-            setIsLocating(false);
+      void requestPosition().then((found) => {
+         setIsLocating(false);
+         if (!found) {
             setProblem(
                'Could not get your position. Allow location in your browser, or tap the map yourself.'
             );
-         },
-         { enableHighAccuracy: true, timeout: 10000 }
-      );
+            return;
+         }
+         put({ lat: found.latitude, lng: found.longitude });
+         setNote('The pin is on your position.');
+      });
    };
 
-   const runSearch = async (text: string) => {
-      const q = text.trim();
-      setNote(null);
+   /*
+    * A place chosen in the search: the pin goes there and the map goes in
+    * close. A typed pair or a pasted link is an exact position and gets the
+    * full zoom; a name is a town or a beach, so it stops a step short and
+    * says that the pin still wants dragging to the mark itself.
+    */
+   const pickPlace = (place: PlaceHit) => {
+      const exact = place.id.startsWith('at:');
       setProblem(null);
-      setFound(null);
-      if (!q) return;
-
-      /*
-       * A typed pair is read before a link is looked for. The link parser's
-       * last pattern matches a bare pair too, so "-34.1275, 18.4487" landed on
-       * the right position and told the reader it had come from a link.
-       */
-      const pair = readPair(q);
-      if (pair) {
-         put(pair);
-         setQuery('');
-         return;
-      }
-      const link = readLink(q);
-      if (link) {
-         put({ lat: link.parsedLatitude, lng: link.parsedLongitude });
-         setNote('The pin is on the position from the link.');
-         setQuery('');
-         return;
-      }
-
-      searchRequest.current?.abort();
-      const controller = new AbortController();
-      searchRequest.current = controller;
-      setSearching(true);
-      try {
-         const centre = mapRef.current?.getCenter();
-         const places = await searchPlaces(
-            q,
-            controller.signal,
-            centre ? { lat: centre.lat, lng: centre.lng } : null
-         );
-         if (controller.signal.aborted) return;
-         if (places.length === 0) {
-            setProblem('Nothing found by that name. Try the nearest town.');
-         } else if (places.length === 1 && places[0]) {
-            put(places[0]);
-            setQuery('');
-         } else {
-            setFound(places);
-         }
-      } catch (error) {
-         if (!controller.signal.aborted) {
-            console.error(error);
-            setProblem('The search did not answer. Tap the map instead.');
-         }
-      } finally {
-         if (!controller.signal.aborted) setSearching(false);
-      }
+      put(
+         { lat: place.latitude, lng: place.longitude },
+         true,
+         exact
+            ? closeZoom
+            : Math.max(closeZoom - NAMED_ZOOM_BACKOFF, FOCUSED_ZOOM),
+         !exact
+      );
+      setNote(
+         exact
+            ? 'The pin is on that position.'
+            : `The pin is on ${place.name}. Drag it to the exact mark.`
+      );
+      if (compact) setSearchOpen(false);
    };
 
    const cycleBase = () => {
@@ -437,7 +527,20 @@ export function MapLocationPicker({
       const next =
          order[(order.indexOf(base) + 1) % order.length] ?? 'satellite';
       setBase(next);
-      if (mapRef.current) setBaseLayer(mapRef.current, next);
+      const map = mapRef.current;
+      if (!map) return;
+      setBaseLayer(map, next);
+      /*
+       * Terrain stops at 17 and the map may be standing at 18, where that
+       * layer draws nothing at all: a grey box where the map was. Step back
+       * to the closest the new base has.
+       */
+      const limit = (
+         map as LeafletMap & { __base?: { options: { maxZoom?: number } } }
+      ).__base?.options.maxZoom;
+      if (typeof limit === 'number' && map.getZoom() > limit) {
+         map.setZoom(limit, { animate: !reduceMotion() });
+      }
    };
 
    const applyTyped = (lat: string, lng: string) => {
@@ -459,8 +562,9 @@ export function MapLocationPicker({
    };
 
    const typed = draft ?? { lat: latitude, lng: longitude };
-   const pair = position
-      ? `${formatCoordinate(position.lat)}, ${formatCoordinate(position.lng)}`
+   const shown = dragAt ?? position;
+   const pair = shown
+      ? `${formatCoordinate(shown.lat)}, ${formatCoordinate(shown.lng)}`
       : 'No pin yet';
    const baseLabel =
       BASE_LAYERS.find((b) => b.value === base)?.label ?? 'Satellite';
@@ -476,94 +580,35 @@ export function MapLocationPicker({
       stopMapEvents(element);
    }, []);
 
-   /* Said only while there is nothing on the map; a pin explains itself. */
-   const hint = hasPin ? null : 'Tap the map to drop the pin.';
-
    /*
-    * The search sits on top of the map and shares its edge, so the two read as
-    * one instrument rather than a field that happens to be near a picture.
-    * Enter asks; a link or a typed pair goes straight there.
+    * The product's one place search, the same field the forecast and the big
+    * map use: it looks things up as you type, the glass is the button it
+    * looks like, Enter takes the first result, the arrows walk the list,
+    * Escape shuts it and the cross empties it. A pasted Maps link or a typed
+    * pair of figures goes straight to the pin.
     *
-    * It is a div and not a form on purpose. This picker is dropped inside the
-    * page's own form on Add a spot and on the full Log a catch, and a form
-    * inside a form is not a thing HTML has: the browser hands the field to
-    * the outer form, so Enter reloaded the page with an empty query string
-    * and the search never ran. Enter is read off the field instead, which
-    * works the same wherever the picker is put.
+    * This picker used to carry a search of its own that only ran on Enter or
+    * on a small GO at the far end of the field, beside a magnifier that was a
+    * drawing. People pressed the drawing, nothing happened, and the search
+    * read as broken. Two searches was also one more than the product needs.
+    *
+    * It sits inside the page's own form on Add a spot and on Log a catch. The
+    * field is not a form of its own, and with the glass switched on it keeps
+    * every Enter to itself, so a search never saves the page around it.
     */
-   const ask = () => {
-      if (searching || !query.trim()) return;
-      void runSearch(query);
-   };
-
-   const form = (
-      <div role="search" className="relative z-[400]">
-         <div className="flex h-11 items-center border border-line bg-background focus-within:border-ink">
-            <MagnifyingGlassIcon
-               aria-hidden="true"
-               className="ml-3 size-5 shrink-0 text-ink-3"
-            />
-            <input
-               id={`${fieldId}-search`}
-               type="search"
-               value={query}
-               onChange={(event) => {
-                  setQuery(event.target.value);
-                  setFound(null);
-               }}
-               onPaste={(event) => {
-                  const pasted = event.clipboardData.getData('text');
-                  if (pasted && (readPair(pasted) || readLink(pasted))) {
-                     event.preventDefault();
-                     void runSearch(pasted);
-                  }
-               }}
-               onKeyDown={(event) => {
-                  if (event.key !== 'Enter') return;
-                  /* Never let it reach the page's own form. */
-                  event.preventDefault();
-                  ask();
-               }}
-               autoComplete="off"
-               aria-label="Search a place, or paste a link from Maps"
-               placeholder="Search, or paste a Maps link"
-               className="h-full min-w-0 flex-1 bg-transparent px-3 text-[16px] text-ink outline-none placeholder:text-ink-3"
-            />
-            <button
-               type="button"
-               onClick={ask}
-               disabled={searching || !query.trim()}
-               className="g-tracked h-full shrink-0 px-3 text-[16px] text-ink-2 hover:text-ink disabled:opacity-40"
-            >
-               {searching ? 'Looking' : 'Go'}
-            </button>
-         </div>
-         {found ? (
-            <ul
-               role="listbox"
-               aria-label="Places found"
-               className="thread-scroll absolute right-0 left-0 z-[401] mt-1 max-h-[220px] overflow-auto border border-line bg-background"
-            >
-               {found.map((place) => (
-                  <li key={`${place.lat},${place.lng}`}>
-                     <button
-                        type="button"
-                        role="option"
-                        aria-selected={false}
-                        onClick={() => {
-                           put(place);
-                           setFound(null);
-                           setQuery('');
-                        }}
-                        className="block w-full truncate border-t border-line px-3 py-2.5 text-left text-[15px] text-ink first:border-t-0 hover:bg-bg-2"
-                     >
-                        {place.label}
-                     </button>
-                  </li>
-               ))}
-            </ul>
-         ) : null}
-      </div>
+   const search = (
+      <PlaceSearch
+         className="w-full"
+         /* This picker has its own way to the reader's position, worded. */
+         showMine={false}
+         onUseMine={useMyPosition}
+         searchButton
+         clearable
+         placeholder="Search a beach or a town"
+         near={near}
+         inputRef={searchField}
+         onPick={pickPlace}
+      />
    );
 
    const BASE_SHORT: Record<BaseLayer, string> = {
@@ -589,13 +634,7 @@ export function MapLocationPicker({
             onClick={() => {
                setSearchOpen((open) => !open);
                if (!searchOpen) {
-                  requestAnimationFrame(() =>
-                     document
-                        .querySelector<HTMLInputElement>(
-                           `#${CSS.escape(fieldId)}-search`
-                        )
-                        ?.focus()
-                  );
+                  requestAnimationFrame(() => searchField.current?.focus());
                }
             }}
             aria-expanded={searchOpen}
@@ -637,24 +676,29 @@ export function MapLocationPicker({
       </div>
    );
 
-   /* Under the map, in flow: where I am, and which map to draw. */
+   /*
+    * Under the map, in flow: where I am, and which map to draw. The locate
+    * control carries its words as well as its mark. As a bare viewfinder it
+    * was one more drawing to guess at, on a form whose whole job is this map.
+    */
    const controls = (
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
          <button
             type="button"
             onClick={useMyPosition}
             disabled={isLocating}
-            aria-label={
-               isLocating ? 'Finding your position' : 'Put the pin where I am'
-            }
             title="Put the pin where I am"
-            className={cn(control, 'w-11')}
+            className={cn(
+               control,
+               'g-tracked grid-flow-col gap-2 px-3 text-[15px]'
+            )}
          >
             <ViewfinderCircleIcon
-               className="size-6"
+               className="size-5"
                strokeWidth={1.5}
                aria-hidden="true"
             />
+            {isLocating ? 'Finding you' : 'Where I am'}
          </button>
          <button
             type="button"
@@ -675,11 +719,20 @@ export function MapLocationPicker({
             </p>
          ) : (
             <div className="flex flex-col">
-               {compact ? (searchOpen ? form : null) : form}
+               {compact ? (
+                  searchOpen ? (
+                     <div className="mb-2">{search}</div>
+                  ) : null
+               ) : (
+                  <div className="mb-2">{search}</div>
+               )}
                <div
                   /* The base is on the element so the night rule can leave a
                      photograph alone and only invert the drawn maps. */
                   data-base={base}
+                  /* Which picker this is, so the stylesheet can keep the plus
+                     and minus on the full one under a finger as well. */
+                  data-picker={compact ? 'compact' : 'full'}
                   /* Where the pin stands and what it stands on, readable by
                      the audit scripts without reaching into Leaflet. */
                   data-pin={
@@ -690,12 +743,25 @@ export function MapLocationPicker({
                   data-source={source ?? ''}
                   className={cn(
                      'map-surface relative h-[280px] overflow-hidden border border-line md:h-[320px]',
-                     compact && !searchOpen ? '' : 'border-t-0',
                      mapClassName
                   )}
                >
                   <div ref={mapContainerRef} className="absolute inset-0" />
                   {compact ? overlay : null}
+                  {/*
+                   * Said on the map itself while it is empty, where the eye
+                   * already is, and gone the moment there is a pin: a pin
+                   * explains itself. It takes no taps, so the water under it
+                   * is still water you can drop the pin on.
+                   */}
+                  {!compact && !hasPin ? (
+                     <p
+                        aria-hidden="true"
+                        className="picker-hint g-tracked pointer-events-none absolute bottom-8 left-1/2 z-[500] -translate-x-1/2 border border-line bg-background px-3 py-1.5 text-[15px] whitespace-nowrap text-ink"
+                     >
+                        Tap the map to drop the pin
+                     </p>
+                  ) : null}
                </div>
                {compact ? null : controls}
             </div>
@@ -742,27 +808,24 @@ export function MapLocationPicker({
             </div>
          ) : null}
 
-         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            {showReadout ? (
-               <p
-                  aria-live="polite"
-                  className="flex flex-wrap items-baseline gap-x-3"
+         {showReadout ? (
+            <p
+               /* Quiet while the pin is in the hand: the figures change sixty
+                  times a second and nobody wants them read out. */
+               aria-live={dragAt ? 'off' : 'polite'}
+               className="flex flex-wrap items-baseline gap-x-3"
+            >
+               <span className="lab">Pin</span>
+               <span
+                  className={cn(
+                     'num text-[15px]',
+                     shown ? 'text-ink' : 'text-ink-3'
+                  )}
                >
-                  <span className="lab">Pin</span>
-                  <span
-                     className={cn(
-                        'num text-[15px]',
-                        position ? 'text-ink' : 'text-ink-3'
-                     )}
-                  >
-                     {position && source ? `${source} · ${pair}` : pair}
-                  </span>
-               </p>
-            ) : null}
-            {!mapFailed && hint && !compact ? (
-               <p className="text-[14px] text-ink-3">{hint}</p>
-            ) : null}
-         </div>
+                  {shown && source && !dragAt ? `${source} · ${pair}` : pair}
+               </span>
+            </p>
+         ) : null}
          <p aria-live="polite" className="text-[15px] text-ink-2 empty:hidden">
             {isLocating ? 'Finding your position.' : note}
          </p>

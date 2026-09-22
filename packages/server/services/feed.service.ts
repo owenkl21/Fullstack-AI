@@ -1,4 +1,10 @@
 import { prisma } from '../lib/prisma';
+import {
+   siteGateSelect,
+   sitesVisibleTo,
+   withSiteShownTo,
+   type SiteGate,
+} from '../lib/site-privacy';
 import { notificationsService } from './notifications.service';
 import { uploadsService } from './uploads.service';
 import { resolveAvatarReadUrls, userService } from './user.service';
@@ -51,11 +57,15 @@ const feedInclude = {
     * The spot the fish was taken at, named on the card. Its photographs are not
     * selected any more: the card shows the fish, and signing read URLs for a
     * gallery nothing renders cost a round trip per post.
+    *
+    * The gate columns ride along so withSpotShownTo can ask whether this
+    * reader may be told about the spot at all. They never leave the file.
     */
    site: {
       select: {
          id: true,
          name: true,
+         ...siteGateSelect,
       },
    },
    comments: {
@@ -66,6 +76,38 @@ const feedInclude = {
          user: { select: { id: true, username: true, displayName: true } },
       },
    },
+};
+
+/*
+ * The spot on a card, as one reader may see it.
+ *
+ * A post is a snapshot, and the spot under it can be kept private long after
+ * the post was written. So the question is asked on the way out, every time:
+ * when the spot is not this reader's to see, its name and its link come off
+ * the card, and so does the post's position unless the post is their own,
+ * because a pin dropped on a private mark is the mark (lib/site-privacy).
+ * What is left of the spot is the two fields a card prints.
+ */
+const withSpotShownTo = <
+   T extends {
+      authorId: string;
+      site: ({ id: string; name: string } & SiteGate) | null;
+   },
+>(
+   post: T,
+   viewerId: string | null | undefined
+) => {
+   /* The gate reads the record's owner as createdById; a post calls its
+      owner the author. Lent for the question, then taken back off. */
+   const { createdById: _author, ...shown } = withSiteShownTo(
+      { ...post, createdById: post.authorId },
+      viewerId
+   );
+
+   return {
+      ...shown,
+      site: shown.site ? { id: shown.site.id, name: shown.site.name } : null,
+   };
 };
 
 const withResolvedFeedImageUrls = async <
@@ -168,6 +210,15 @@ export const feedService = {
       limit: number;
       offset: number;
    }) {
+      /*
+       * Only a position this reader may be told can put a post in the box.
+       * A post written while its spot was public still has the spot's pin on
+       * the row, and withSpotShownTo takes it off the card, but a box drawn
+       * around a point is a question about the pin all the same: slide the
+       * box a little at a time and the edge where the post drops out is the
+       * mark. So a post on a spot the reader may not see is not nearby
+       * anything, unless it is their own.
+       */
       const nearbyWhere =
          input.scope === 'NEARBY' &&
          typeof input.latitude === 'number' &&
@@ -178,6 +229,11 @@ export const feedService = {
                     gte: input.longitude - 1,
                     lte: input.longitude + 1,
                  },
+                 OR: [
+                    { siteId: null },
+                    { site: { is: sitesVisibleTo(input.userId) } },
+                    ...(input.userId ? [{ authorId: input.userId }] : []),
+                 ],
               }
             : {};
 
@@ -209,7 +265,10 @@ export const feedService = {
 
       const postsWithResolvedImageUrls = await Promise.all(
          posts.map(async (post: any) => {
-            const resolved = await withResolvedFeedImageUrls(post);
+            /* Before anything else reads the post: a spot this reader may
+               not see never reaches the card (withSpotShownTo). */
+            const shown: any = withSpotShownTo(post, input.userId);
+            const resolved = await withResolvedFeedImageUrls(shown);
             /* The author's photograph is a storage key too; unsigned it is
              * a broken image on every card. It is drawn at 40px, so the card
              * is handed the thumb as well and reads that instead: this one
@@ -299,19 +358,36 @@ export const feedService = {
    ) {
       await getUserId(userId); // throws if the user is gone
 
-      return prisma.feedPost.create({
+      /*
+       * A post can only stand on a spot its author may see. Any id used to
+       * do, and the answer came back with that spot's name on it, so the id
+       * of a private spot could be traded for what it is called.
+       */
+      const site = input.siteId
+         ? await prisma.fishingSite.findFirst({
+              where: {
+                 id: input.siteId,
+                 deletedAt: null,
+                 ...sitesVisibleTo(userId),
+              },
+              select: { id: true },
+           })
+         : null;
+
+      const post = await prisma.feedPost.create({
          data: {
             authorId: userId,
             type: input.type,
             scope: input.scope,
             content: input.content,
             catchId: input.catchId,
-            siteId: input.siteId,
+            siteId: site?.id ?? null,
             latitude: input.latitude,
             longitude: input.longitude,
          },
          include: feedInclude,
       });
+      return withSpotShownTo(post, userId);
    },
 
    async updateFeedPost(
@@ -329,11 +405,14 @@ export const feedService = {
          return null;
       }
 
-      return prisma.feedPost.update({
+      const post = await prisma.feedPost.update({
          where: { id: postId },
          data: { content: input.content, scope: input.scope },
          include: feedInclude,
       });
+      /* Their own post, but the spot under it may be somebody else's and
+         kept private since: asked here like everywhere else. */
+      return withSpotShownTo(post, userId);
    },
 
    async deleteFeedPost(userId: string, postId: string) {

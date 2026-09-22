@@ -2,6 +2,7 @@ import axios from 'axios';
 import { TrashIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { PageHead } from '@/components/brand/PageHead';
 import { useRevealIn } from '@/components/brand/Reveal';
 import { GearRow, type GearRowItem } from '@/components/fishing/rows/GearRow';
 import { RowList } from '@/components/fishing/rows/Row';
@@ -51,6 +52,8 @@ export function MyGearPage() {
 function MyGearList() {
    const root = useRef<HTMLElement>(null);
    useRevealIn(root);
+   /* Where focus lands after a delete, now that the row it was on has gone:
+      the page's title on the plate. */
    const heading = useRef<HTMLHeadingElement>(null);
 
    const [params, setParams] = useSearchParams();
@@ -190,31 +193,31 @@ function MyGearList() {
    return (
       <section
          ref={root}
-         className="mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14"
+         className="relative mx-auto w-[min(1680px,100%-32px)] pb-10 md:pb-14"
       >
+         {/* The same plate and waterline My catches opens on, so the three
+             pages of the log read as one set. The count and the way to add
+             gear sit on the plate's right. */}
+         <PageHead
+            kicker="Your tackle"
+            title="My gear"
+            titleRef={heading}
+            aside={
+               status === 'ready' ? (
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+                     <span className="lab num text-paper-2">{countLine}</span>
+                     {items.length > 0 ? (
+                        <Button asChild className="text-[18px]">
+                           <Link to="/gear/new">Add gear</Link>
+                        </Button>
+                     ) : null}
+                  </div>
+               ) : null
+            }
+         />
          <header className="rv">
-            <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
-               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                  <h1
-                     ref={heading}
-                     tabIndex={-1}
-                     className="g text-[44px] md:text-[56px]"
-                  >
-                     My gear
-                  </h1>
-                  {status === 'ready' ? (
-                     <p className="lab num">{countLine}</p>
-                  ) : null}
-               </div>
-               {status === 'ready' && items.length > 0 ? (
-                  <Button asChild>
-                     <Link to="/gear/new">Add gear</Link>
-                  </Button>
-               ) : null}
-            </div>
-
             {status === 'ready' && items.length > 0 ? (
-               <div className="mt-8">
+               <div>
                   <SearchField
                      id="gear-search"
                      label="Search your gear"

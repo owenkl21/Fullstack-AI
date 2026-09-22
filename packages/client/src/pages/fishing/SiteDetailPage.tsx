@@ -28,6 +28,7 @@ import { NotFoundPage } from '@/pages/NotFoundPage';
 import { StaticMap } from '@/components/map/StaticMap';
 import { useIsSignedIn } from '@/lib/auth-client';
 import { NoPhoto } from '@/components/brand/FishMark';
+import { OnlyYou } from '@/components/fishing/rows/SpotRow';
 import {
    HeaderRating,
    SpotRatings,
@@ -63,6 +64,8 @@ type SiteDetail = {
    catches: SiteCatch[];
    /* Kept on the row and returned with it, so the pin can carry it. */
    catchCount?: number | null;
+   /* Only ever read by the owner: nobody else is handed a private spot. */
+   visibility?: string | null;
 };
 
 type LoadState =
@@ -330,7 +333,16 @@ function SiteRecord({
          />
 
          <SiteBody>
-            <p className="rv num text-base text-ink-2">{facts}</p>
+            <p className="rv num text-base text-ink-2">
+               {/* The same quiet mark the row in My spots wears, so the owner
+                   can tell on the page itself that this one is theirs alone. */}
+               {isOwner && data.visibility === 'PRIVATE' ? (
+                  <>
+                     <OnlyYou /> ·{' '}
+                  </>
+               ) : null}
+               {facts}
+            </p>
 
             <p
                className="rv mt-6 max-w-[68ch] text-base whitespace-pre-line text-ink"

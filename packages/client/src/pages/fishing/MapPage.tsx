@@ -43,6 +43,7 @@ type SiteRow = {
    lastCatchAt?: string | null;
    rating?: SpotRating | null;
    species?: { id: string; name: string; count: number }[];
+   visibility?: string | null;
 };
 
 export function MapPage() {
@@ -92,6 +93,8 @@ function MapScreen() {
                      lastCatchAt: row.lastCatchAt ?? null,
                      rating: row.rating ?? null,
                      species: row.species ?? [],
+                     /* So a spot kept to yourself says so on its card. */
+                     visibility: row.visibility ?? null,
                   }))
             );
          })
@@ -179,6 +182,11 @@ function MapScreen() {
                /* What was asked stays in the field: the pin on the water is
                   the answer to it, and the question should still be there. */
                keepQuery
+               /* The glass is the button it looks like, and the cross takes
+                  the question and the pin that answered it away together. */
+               searchButton
+               clearable
+               onClear={() => setFound(null)}
                near={
                   near ??
                   (fix

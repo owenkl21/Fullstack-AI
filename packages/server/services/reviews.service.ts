@@ -315,6 +315,17 @@ export const reviewsService = {
          });
       });
 
-      return { removed: true, summary: await summaryOf(input.siteId) };
+      /*
+       * A rating can outlive the reader's right to see the spot: they rated
+       * it while it was public and the owner has kept it private since. It
+       * is still theirs to take down, so the removal goes through, but the
+       * figures of a spot they can no longer open do not come back with it.
+       */
+      const site = await visibleSite(input.siteId, input.userId);
+
+      return {
+         removed: true,
+         summary: site ? await summaryOf(input.siteId) : null,
+      };
    },
 };

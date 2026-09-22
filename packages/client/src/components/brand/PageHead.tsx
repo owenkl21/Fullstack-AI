@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { TornEdge } from '@/components/brand/TornEdge';
 import { Contours } from '@/components/brand/Contours';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ export function PageHead({
    aside,
    lede,
    column = 'w-[min(1680px,100%-32px)]',
+   titleRef,
    children,
 }: {
    /*
@@ -40,6 +41,11 @@ export function PageHead({
    lede?: ReactNode;
    /* The page's own column, so the title lines up with what follows. */
    column?: string;
+   /*
+    * For a page that sends focus back to its title, after a delete has taken
+    * away the row that held it. Given one, the title can take focus.
+    */
+   titleRef?: Ref<HTMLHeadingElement>;
    children?: ReactNode;
 }) {
    return (
@@ -85,7 +91,11 @@ export function PageHead({
                         {kicker}
                      </p>
                   ) : null}
-                  <h1 className="g mt-1 text-[44px] leading-none text-paper md:text-[64px]">
+                  <h1
+                     ref={titleRef}
+                     tabIndex={titleRef ? -1 : undefined}
+                     className="g mt-1 text-[44px] leading-none text-paper focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal md:text-[64px]"
+                  >
                      {title}
                   </h1>
                   {lede ? (

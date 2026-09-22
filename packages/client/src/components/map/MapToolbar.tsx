@@ -23,8 +23,25 @@ import { cn } from '@/lib/utils';
  * Every control carries its word. They used to carry a word and an icon of
  * the same thing, which says it twice and is the one thing the house rules
  * forbid outright; the icons are gone and the words do the work.
+ *
+ * Only what is about the whole map lives here: what is drawn, which fish, and
+ * where you are standing. "Drop a mark" and "Log here" used to stand in this
+ * row too, and both were about a point a toolbar cannot know. The first armed
+ * a mode and the second logged the middle of the view, whatever had been
+ * tapped. A tap on the map opens a menu for that exact point now, so they are
+ * gone rather than mended: the header's Log a catch and the phone's Log key
+ * already start a log from where the angler is standing.
  */
 type Layers = { others: boolean; marks: boolean; places: boolean };
+
+/*
+ * The one gesture, in one place, for the legend and the layers panel on a
+ * desktop and the layers sheet on a phone, in the verb of the hand holding
+ * it. "Anywhere else" rather than "open water": most taps near a dam or a
+ * river land on the bank.
+ */
+const gesture = (verb: 'Tap' | 'Click') =>
+   `${verb} a pin for what is there. ${verb} anywhere else for what you can do there.`;
 
 const control =
    'g-tracked inline-flex h-11 shrink-0 items-center whitespace-nowrap border border-line bg-background px-3.5 text-[15px] text-ink transition-[background-color,border-color,transform] duration-150 [transition-timing-function:var(--ease)] hover:border-ink active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal data-[state=open]:border-ink';
@@ -37,9 +54,6 @@ export function MapToolbar({
    speciesOptions,
    layers,
    onLayer,
-   dropping,
-   onDrop,
-   onLogHere,
    onLocate,
    locating = false,
    placement = 'overlay',
@@ -53,9 +67,6 @@ export function MapToolbar({
    speciesOptions: { value: string; label: string }[];
    layers: Layers;
    onLayer: (key: keyof Layers) => void;
-   dropping: boolean;
-   onDrop: () => void;
-   onLogHere: () => void;
    /* Where the angler is standing. The bar always carries it; the overlay
       carries it on the map that is a whole screen and has no other copy. */
    onLocate?: () => void;
@@ -221,6 +232,7 @@ export function MapToolbar({
                      </li>
                   ))}
                </ul>
+               <p className="mt-3 text-[14px] text-ink-3">{gesture('Tap')}</p>
                <button
                   type="button"
                   onClick={() => setLayersOpen(false)}
@@ -229,6 +241,13 @@ export function MapToolbar({
                   Done
                </button>
             </>
+         ) : anchor === 'bottom' ? (
+            /* The whole-screen map on a desktop has no legend of its own,
+               so the one line about the gesture lives here, where a reader
+               who has forgotten it goes looking. */
+            <p className="mt-4 border-t border-line pt-3 text-[14px] text-ink-3">
+               {gesture('Click')}
+            </p>
          ) : null}
       </div>
    );
@@ -256,13 +275,18 @@ export function MapToolbar({
       <div
          className={cn(
             bar
-               ? 'grid grid-cols-4 gap-px border border-line bg-line'
+               ? /* As many cells as there are controls, so two do not sit in
+                    half of a bar ruled for four. */
+                 cn(
+                    'grid gap-px border border-line bg-line',
+                    onLocate ? 'grid-cols-2' : 'grid-cols-1'
+                 )
                : /*
                   * One line, at its own width. An absolutely positioned flex
                   * row that is allowed to wrap takes the width of its widest
                   * item rather than the sum of them, so this row broke in two
                   * over the water on a 1440 screen for no reason a reader
-                  * could see. There is always room for five controls.
+                  * could see. There is always room for three controls.
                   */
                  anchor === 'bottom'
                  ? 'absolute bottom-8 left-3 z-[500] flex w-max flex-nowrap items-center gap-2'
@@ -321,25 +345,6 @@ export function MapToolbar({
             />
          ) : null}
 
-         <button
-            type="button"
-            aria-pressed={dropping}
-            onClick={onDrop}
-            className={cn(
-               bar ? barButton : control,
-               dropping &&
-                  (bar
-                     ? 'bg-teal text-teal-ink'
-                     : 'border-teal bg-teal text-teal-ink')
-            )}
-         >
-            {bar ? (
-               <span>{dropping ? 'Tap map' : 'Mark'}</span>
-            ) : (
-               <span>{dropping ? 'Tap the map' : 'Drop a mark'}</span>
-            )}
-         </button>
-
          {onLocate ? (
             <button
                type="button"
@@ -352,14 +357,6 @@ export function MapToolbar({
                <span>{locating ? 'Finding' : 'Locate'}</span>
             </button>
          ) : null}
-
-         <button
-            type="button"
-            onClick={onLogHere}
-            className={bar ? barButton : control}
-         >
-            <span>Log here</span>
-         </button>
       </div>
    );
 }
@@ -502,10 +499,7 @@ export function MapLegend() {
                      </li>
                   ))}
                </ul>
-               <p className="mt-3 text-[13px] text-ink-3">
-                  Tap a pin for what is there. Press and hold anywhere to drop a
-                  mark of your own.
-               </p>
+               <p className="mt-3 text-[14px] text-ink-3">{gesture('Click')}</p>
             </Popover.Content>
          </Popover.Portal>
       </Popover.Root>

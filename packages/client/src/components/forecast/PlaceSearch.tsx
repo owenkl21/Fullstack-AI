@@ -1,4 +1,8 @@
-import { MagnifyingGlassIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import {
+   MagnifyingGlassIcon,
+   MapPinIcon,
+   XMarkIcon,
+} from '@heroicons/react/24/outline';
 import axios from 'axios';
 import { useEffect, useId, useMemo, useRef, useState, type Ref } from 'react';
 import { Button } from '@/components/ui/button';
@@ -87,6 +91,10 @@ export function PlaceSearch({
    showMine = true,
    near = null,
    keepQuery = false,
+   searchButton = false,
+   clearable = false,
+   onClear,
+   placeholder = 'A beach, a town, a headland',
    inputRef,
    className,
 }: {
@@ -104,6 +112,21 @@ export function PlaceSearch({
     * changes to the place.
     */
    keepQuery?: boolean;
+   /**
+    * Make the magnifier the button it looks like. The field searches as you
+    * type, but a reader who clicks the glass is asking for the search to
+    * happen, and a drawing that does nothing taught one of them that the
+    * search was broken. Pressed, it takes the first result, as Enter does,
+    * and waits for one if the answer is still on its way. Off by default, so
+    * a field inside somebody else's form keeps its Enter.
+    */
+   searchButton?: boolean;
+   /** A cross that empties the field, at a size a thumb can hit. */
+   clearable?: boolean;
+   /** After the field is emptied, for a page with a pin to take down. */
+   onClear?: () => void;
+   /** What the empty field says, for a form that asks the question its own way. */
+   placeholder?: string;
    /** So a page can send the reader here, from an empty map for instance. */
    inputRef?: Ref<HTMLInputElement>;
    className?: string;
@@ -118,7 +141,17 @@ export function PlaceSearch({
    }>({ asked: '', hits: [], failed: false });
    const [shut, setShut] = useState(false);
    const [active, setActive] = useState(0);
+   /* Counted up to ask the same question again after the search failed. */
+   const [attempt, setAttempt] = useState(0);
+   /* The question that was submitted before its answer was in. A ref, since
+      nothing is drawn from it: it is set by a press and read when the answer
+      lands. */
+   const wanted = useRef<string | null>(null);
    const box = useRef<HTMLDivElement>(null);
+
+   /* The field's ref belongs to the page, so the field is found through the
+      box around it when this component needs to put the caret back in it. */
+   const focusField = () => box.current?.querySelector('input')?.focus();
 
    const q = query.trim();
    const direct = useMemo(() => (q.length > 3 ? readDirect(q) : null), [q]);
@@ -135,6 +168,9 @@ export function PlaceSearch({
    useEffect(() => {
       nearRef.current = near;
    }, [near]);
+   /* The same for picking, so an answer that lands after a submit is taken
+      with the `choose` of the render it lands in. */
+   const chooseRef = useRef<(place: PlaceHit) => void>(() => undefined);
 
    useEffect(() => {
       if (direct || q.length < 2) return;
@@ -144,12 +180,12 @@ export function PlaceSearch({
       const timer = window.setTimeout(() => {
          searchPlaces(q, controller.signal, nearRef.current)
             .then((found) => {
-               if (live)
-                  setAnswer({
-                     asked: q,
-                     hits: tidy(found),
-                     failed: false,
-                  });
+               if (!live) return;
+               const rows = tidy(found);
+               setAnswer({ asked: q, hits: rows, failed: false });
+               /* Submitted while this was on its way: the first result is
+                  the one Enter would have taken. */
+               if (wanted.current === q && rows[0]) chooseRef.current(rows[0]);
             })
             .catch((error) => {
                if (live && !axios.isCancel(error))
@@ -162,7 +198,7 @@ export function PlaceSearch({
          window.clearTimeout(timer);
          controller.abort();
       };
-   }, [q, nearKey, direct]);
+   }, [q, nearKey, direct, attempt]);
 
    /* A click anywhere else closes the list. */
    useEffect(() => {
@@ -189,6 +225,40 @@ export function PlaceSearch({
       if (!keepQuery) setQuery('');
       setShut(true);
       setActive(0);
+      wanted.current = null;
+   };
+   useEffect(() => {
+      chooseRef.current = choose;
+   });
+
+   /*
+    * The magnifier, and Enter where the list is not up. With results it takes
+    * the one that is lit. With the answer still on its way it remembers the
+    * question and takes the first result when it lands. With nothing typed or
+    * nothing found it opens the list again, which is where the field says so.
+    */
+   const submit = () => {
+      focusField();
+      setShut(false);
+      if (q.length < 2) return;
+      const hit = hits[at];
+      if (hit) choose(hit);
+      else if (failed) {
+         /* The list says "Try again", and the glass is how to: the same
+            question is asked again and its first answer taken. */
+         wanted.current = q;
+         setAnswer({ asked: '', hits: [], failed: false });
+         setAttempt((count) => count + 1);
+      } else if (working) wanted.current = q;
+   };
+
+   const clear = () => {
+      setQuery('');
+      setShut(true);
+      setActive(0);
+      wanted.current = null;
+      onClear?.();
+      focusField();
    };
 
    const listId = `${id}-list`;
@@ -207,10 +277,12 @@ export function PlaceSearch({
             <label htmlFor={id} className="sr-only">
                Search for a place
             </label>
-            <MagnifyingGlassIcon
-               aria-hidden="true"
-               className="pointer-events-none absolute top-1/2 left-3.5 size-[18px] -translate-y-1/2 text-ink-3"
-            />
+            {searchButton ? null : (
+               <MagnifyingGlassIcon
+                  aria-hidden="true"
+                  className="pointer-events-none absolute top-1/2 left-3.5 size-[18px] -translate-y-1/2 text-ink-3"
+               />
+            )}
             <input
                id={id}
                ref={inputRef}
@@ -224,11 +296,17 @@ export function PlaceSearch({
                }
                autoComplete="off"
                value={query}
-               placeholder="A beach, a town, a headland"
+               placeholder={placeholder}
                onChange={(event) => {
                   setQuery(event.target.value);
                   setShut(false);
                   setActive(0);
+                  /* The question moved on, so an old submit is not about
+                     this one. */
+                  wanted.current = null;
+                  /* Emptied by any means, the browser's own clear included:
+                     a pin that answered a question should go with it. */
+                  if (query && !event.target.value) onClear?.();
                }}
                onPaste={(event) => {
                   /* A link or a pair goes straight to the pin, the way the
@@ -244,7 +322,24 @@ export function PlaceSearch({
                onFocus={() => setShut(false)}
                onKeyDown={(event) => {
                   if (event.key === 'Escape') {
+                     /* One layer at a time. With the list up, Escape shuts
+                        the list and nothing else: not the sheet this field
+                        may stand in, and not the text, which Chrome empties
+                        from a search field on its own. With the list down
+                        it falls through to whatever holds the field. */
+                     if (open) event.preventDefault();
                      setShut(true);
+                     wanted.current = null;
+                     return;
+                  }
+                  /* Enter with no list to choose from is the magnifier. */
+                  if (
+                     searchButton &&
+                     event.key === 'Enter' &&
+                     (!open || !hits.length)
+                  ) {
+                     event.preventDefault();
+                     submit();
                      return;
                   }
                   if (!open || !hits.length) return;
@@ -260,8 +355,49 @@ export function PlaceSearch({
                      if (hit) choose(hit);
                   }
                }}
-               className="input-line h-11 !pl-10 text-[16px]"
+               className={cn(
+                  'input-line h-11 text-[16px]',
+                  searchButton ? '!pl-11' : '!pl-10',
+                  /* The field's own cross, in place of the browser's small
+                     one, which only some browsers draw at all. */
+                  clearable && '!pr-11 [&::-webkit-search-cancel-button]:hidden'
+               )}
             />
+
+            {/* After the field in the document, so Tab reaches the field
+                first and then the two controls drawn inside it. */}
+            {searchButton ? (
+               <button
+                  type="button"
+                  onClick={submit}
+                  aria-label={working ? 'Searching' : 'Search'}
+                  className={cn(
+                     /* Darker once there is something to search for, so it
+                        reads as the thing to press rather than a drawing. */
+                     q.length >= 2 ? 'text-ink' : 'text-ink-3',
+                     'absolute top-0 left-0 grid size-11 place-items-center transition-colors duration-150 [transition-timing-function:var(--ease)] hover:text-ink focus-visible:text-ink focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-teal'
+                  )}
+               >
+                  <MagnifyingGlassIcon
+                     aria-hidden="true"
+                     className={cn(
+                        'size-[18px]',
+                        /* The glass breathes while the answer is on its way. */
+                        working && 'animate-pulse motion-reduce:animate-none'
+                     )}
+                  />
+               </button>
+            ) : null}
+            {clearable && query ? (
+               <button
+                  type="button"
+                  onClick={clear}
+                  aria-label="Clear the search"
+                  className="absolute top-0 right-0 grid size-11 place-items-center text-ink-3 transition-colors duration-150 [transition-timing-function:var(--ease)] hover:text-ink focus-visible:text-ink focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-teal"
+               >
+                  <XMarkIcon aria-hidden="true" className="size-5" />
+               </button>
+            ) : null}
 
             {open ? (
                <ul

@@ -407,6 +407,37 @@ export const foundPin = (name: string): L.DivIcon => {
    return icon;
 };
 
+/*
+ * The point a tap is asking about, while its menu is open.
+ *
+ * Not a teardrop: every teardrop on this map is something that exists, and
+ * this is only a question about a place. It is a sight, a ring with four
+ * ticks and a teal centre, so the exact point is the middle of it rather
+ * than the tip of anything. Paper over a dark keyline, because the base is a
+ * photograph and can be any colour underneath. The box is 44 square so the
+ * stylesheet has room to run a ring out from the centre.
+ */
+export const HERE_PIN_CLASS = 'map-here';
+
+const HERE_TICKS = 'M22 3v9M22 32v9M3 22h9M32 22h9';
+
+export const herePin = (): L.DivIcon =>
+   L.divIcon({
+      html:
+         `<span class="map-here-ring" aria-hidden="true"></span>` +
+         `<svg class="map-here-svg" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">` +
+         `<circle cx="22" cy="22" r="12" fill="rgba(11,9,9,0.18)" stroke="#0b0909" stroke-opacity="0.55" stroke-width="4.5"/>` +
+         `<path d="${HERE_TICKS}" stroke="#0b0909" stroke-opacity="0.55" stroke-width="4.5"/>` +
+         `<circle cx="22" cy="22" r="12" fill="none" stroke="#f4f1ec" stroke-width="2"/>` +
+         `<path d="${HERE_TICKS}" stroke="#f4f1ec" stroke-width="2"/>` +
+         `<circle cx="22" cy="22" r="4.5" fill="var(--teal)" stroke="#f4f1ec" stroke-width="1.5"/>` +
+         `</svg>`,
+      className: HERE_PIN_CLASS,
+      iconSize: [44, 44],
+      /* The middle of the sight is the point. */
+      iconAnchor: [22, 22],
+   });
+
 /**
  * A control drawn over the map, kept out of the map's hands.
  *
@@ -558,9 +589,13 @@ export { L };
  * cluster, because two clusters that do not know about each other still land
  * on top of each other; the disc goes teal the moment one of yours is inside,
  * so "there is something of mine here" survives the zoom out. Tapping one
- * zooms in until they separate, which the plugin does on its own.
+ * zooms in until they separate, which the plugin does on its own unless the
+ * map takes that over (`overrides`), as the big map does to keep the spots
+ * clear of what floats over its edges.
  */
-export const clusterGroup = (): L.MarkerClusterGroup =>
+export const clusterGroup = (
+   overrides: L.MarkerClusterGroupOptions = {}
+): L.MarkerClusterGroup =>
    L.markerClusterGroup({
       maxClusterRadius: 44,
       showCoverageOnHover: false,
@@ -600,4 +635,5 @@ export const clusterGroup = (): L.MarkerClusterGroup =>
             iconAnchor: [24, 24],
          });
       },
+      ...overrides,
    });

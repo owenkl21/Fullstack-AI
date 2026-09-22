@@ -2099,3 +2099,131 @@ h1[tabindex='-1']:focus:not(:focus-visible),
       touch-action: manipulation;
    }
 }
+
+/* ---- Map: the point a tap asks about (map-page) ------------------------------
+ *
+ * The sight that stands on a tapped point while its menu is open, and the
+ * menu's entrance on a desktop. The sight is paper over a dark keyline with a
+ * teal centre, the same in both themes, because what is under it is a
+ * photograph and not a ground either theme controls; the menu beside it is
+ * drawn in tokens and turns with the theme on its own. It lands rather than
+ * appearing, and one ring runs out from the centre so the eye finds it; both
+ * are decoration, so both go under reduced motion and the sight is simply
+ * there. It never takes a pointer: a tap on it is a tap on the map.
+ */
+/*
+ * Every pin out of the flow, where Leaflet means it to be. Leaflet places a
+ * marker with a transform from the corner of its pane and pulls it back by
+ * its anchor with a negative margin, and that lands the tip on the point only
+ * for an element that takes no room. The pin vocabulary above makes
+ * .map-pin-kind relative, for the stem and the disc it once held, and that
+ * won over Leaflet's absolute: each pin then stood below the ones before it
+ * in the pane, a pixel for every pin and half a disc for every cluster. With
+ * a country's worth of spots they drew out at sea, and a cluster opened onto
+ * pins that were not where its spots are. Absolute is still a containing
+ * block for anything placed inside a pin.
+ */
+.leaflet-marker-icon.map-pin-kind {
+   position: absolute;
+}
+.map-here {
+   /* Over every pin. Leaflet writes a z-index from the latitude into the
+      style attribute, and nothing short of this outranks that. */
+   z-index: 660 !important;
+   pointer-events: none !important;
+}
+.map-here-svg {
+   display: block;
+   overflow: visible;
+   filter: drop-shadow(0 1px 2px rgba(11, 9, 9, 0.5));
+   transform-origin: 50% 50%;
+   animation: map-here-land 260ms var(--ease) both;
+}
+.map-here-ring {
+   position: absolute;
+   inset: 8px;
+   border: 2px solid var(--teal);
+   border-radius: 50%;
+   opacity: 0;
+   animation: map-here-ring 1600ms var(--ease) 200ms 2 both;
+}
+@keyframes map-here-land {
+   from {
+      opacity: 0;
+      transform: scale(1.5);
+   }
+   to {
+      opacity: 1;
+      transform: scale(1);
+   }
+}
+@keyframes map-here-ring {
+   from {
+      opacity: 0.9;
+      transform: scale(0.6);
+   }
+   to {
+      opacity: 0;
+      transform: scale(2.4);
+   }
+}
+/* The menu steps in from the side of its point. The outer box is the one the
+   map moves by hand, so the entrance lives on the inner one. */
+.map-point-menu-in {
+   animation: map-point-menu-in 180ms var(--ease) both;
+}
+.map-point-menu[data-side='left'] .map-point-menu-in {
+   --from: 8px;
+}
+@keyframes map-point-menu-in {
+   from {
+      opacity: 0;
+      translate: var(--from, -8px) 0;
+   }
+   to {
+      opacity: 1;
+      translate: 0 0;
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .map-here-svg,
+   .map-point-menu-in {
+      animation: none;
+   }
+   .map-here-ring {
+      display: none;
+   }
+}
+
+/* ---- The pin picker in a form (MapLocationPicker) --------------------------
+   On the full picker, Add a spot and Log a catch, the plus and minus stay
+   under a finger as well: choosing the point is the job there, the map has
+   room for them, and a reader who does not pinch still has a way in. The
+   compact picker in the fast log keeps the rule above and hides them. The
+   hint on the empty map rises in once, and stands still for a reader who
+   asked for less motion. */
+@media (pointer: coarse) {
+   .map-surface[data-picker='full'] .leaflet-control-zoom {
+      display: block;
+   }
+}
+.picker-hint {
+   animation: picker-hint-in 360ms var(--ease) 200ms both;
+}
+/* Only the rise is transform: the centring is Tailwind's own `translate`
+   property and is left to it. */
+@keyframes picker-hint-in {
+   from {
+      opacity: 0;
+      transform: translateY(8px);
+   }
+   to {
+      opacity: 1;
+      transform: none;
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .picker-hint {
+      animation: none;
+   }
+}

@@ -9,6 +9,7 @@ import {
    SpotForm,
    SpotFormSkeleton,
    type SpotValues,
+   type SpotVisibility,
    type WaterType,
 } from './LogSitePage';
 
@@ -20,6 +21,12 @@ const asWaterType = (value: unknown): WaterType | '' =>
    WATER_VALUES.find((water) => water === value) ?? '';
 
 const asText = (value: unknown) => (typeof value === 'string' ? value : '');
+
+/* Anything that is not PUBLIC is shown as Only me. GROUPS reads as private
+   on the server too, so a save that writes PRIVATE back changes nothing a
+   reader could see; shown as Everyone it would open the spot up. */
+const asVisibility = (value: unknown): SpotVisibility =>
+   value === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE';
 
 const asCoordinate = (value: unknown) =>
    typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
@@ -60,6 +67,7 @@ export function EditSitePage() {
                accessNotes: asText(site.accessNotes),
                latitude: asCoordinate(site.latitude),
                longitude: asCoordinate(site.longitude),
+               visibility: asVisibility(site.visibility),
             });
             setState('ready');
          } catch (error) {

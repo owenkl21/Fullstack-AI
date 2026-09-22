@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Img } from '@/components/Img';
+import { PageHead } from '@/components/brand/PageHead';
 import { SearchField } from '@/components/fishing/rows/SearchField';
 import {
    initialOf,
@@ -228,13 +229,17 @@ function AnglerSearch() {
    };
 
    return (
-      <section className="mx-auto w-[min(960px,100%-32px)] py-10 md:py-14">
+      <section className="relative mx-auto w-[min(960px,100%-32px)] pb-10 md:pb-14">
+         {/* The same plate and waterline every other list opens on, kept to
+             this page's narrower column so the title lines up with the rows. */}
+         <PageHead
+            column="w-[min(960px,100%-32px)]"
+            kicker="Who else is out"
+            title="Find anglers"
+            lede="Search by name, or start with @ to search by handle."
+         />
          <header>
-            <h1 className="g text-[44px] md:text-[56px]">Find anglers</h1>
-            <p className="mt-2 max-w-[52ch] text-[17px] text-ink-2">
-               Search by name, or start with @ to search by handle.
-            </p>
-            <div className="mt-6">
+            <div>
                <SearchField
                   id="angler-search"
                   label="Search anglers by name or handle"

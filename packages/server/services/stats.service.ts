@@ -1,5 +1,6 @@
 import { maybeResolveAvatarReadUrl } from './user.service';
 import { prisma } from '../lib/prisma';
+import { canSeeSite, siteGateSelect, type SiteGate } from '../lib/site-privacy';
 import {
    buildSpeciesBoards,
    buildStandings,
@@ -27,8 +28,8 @@ const CATCH_FOR_SCORING = {
    released: true,
    caughtAt: true,
    title: true,
-   /* For a favourite spot. */
-   site: { select: { id: true, name: true } },
+   /* For a favourite spot, and the gate that says whether it may be named. */
+   site: { select: { id: true, name: true, ...siteGateSelect } },
    species: {
       select: {
          id: true,
@@ -53,7 +54,7 @@ type RawCatch = {
    released: boolean;
    caughtAt: Date;
    title: string;
-   site: { id: string; name: string } | null;
+   site: ({ id: string; name: string } & SiteGate) | null;
    species: {
       id: string;
       commonName: string;
@@ -218,9 +219,14 @@ export const statsService = {
          (r) => r.species?.commonName ?? 'Unknown'
       );
 
+      /*
+       * Their own log, but not always their own spot: a mark somebody else
+       * made, fished while it was public and kept private since, is not
+       * named back to them here any more than it is on the catch.
+       */
       const favouriteSpot = favourite(
          rows,
-         (r) => r.site?.id,
+         (r) => (canSeeSite(r.site, userId) ? r.site?.id : null),
          (r) => r.site?.name ?? 'Unknown'
       );
 

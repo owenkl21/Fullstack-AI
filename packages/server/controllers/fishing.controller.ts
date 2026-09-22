@@ -359,8 +359,15 @@ export const fishingController = {
       return res.status(204).send();
    },
 
-   async listFishingSites(_req: Request, res: Response) {
-      const sites = await fishingService.listFishingSites();
+   async listFishingSites(req: Request, res: Response) {
+      /*
+       * The answer depends on who is asking: a signed-in angler gets their own
+       * private spots back with everyone's public ones. So it is never stored
+       * by anything between here and them, or one angler's list could be
+       * handed to the next.
+       */
+      res.setHeader('Cache-Control', 'private, no-store');
+      const sites = await fishingService.listFishingSites(getAuth(req).userId);
       return res.json({ sites });
    },
 

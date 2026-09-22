@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { canSeeSite, siteGateSelect } from '../lib/site-privacy';
 
 /*
  * How far an angler has come.
@@ -154,7 +155,11 @@ export const progressService = {
             weatherCurrentTime: true,
             weatherMoonSpringTide: true,
             weatherConditionText: true,
-            site: { select: { latitude: true, longitude: true } },
+            /* With the gate, so a spot kept private is not measured for a
+               reader it is hidden from (lib/site-privacy). */
+            site: {
+               select: { latitude: true, longitude: true, ...siteGateSelect },
+            },
             _count: { select: { images: true } },
          },
       });
@@ -199,11 +204,25 @@ export const progressService = {
        * Range: the two furthest-apart places fished. Every catch with a
        * position, its own pin or its spot's, and the greatest distance
        * between any two of them.
+       *
+       * Only the positions this reader may be told. A public fish off a
+       * private spot is counted, but its spot's position is not measured for
+       * anyone else, nor is the pin dropped on it: a distance to a known
+       * point is a circle the mark sits on.
        */
       const places = new Map<string, { lat: number; lng: number }>();
       for (const r of rows) {
-         const lat = r.latitude ?? r.site?.latitude ?? null;
-         const lng = r.longitude ?? r.site?.longitude ?? null;
+         const shown = !r.site || canSeeSite(r.site, viewerId);
+         const lat = shown
+            ? (r.latitude ?? r.site?.latitude ?? null)
+            : own
+              ? r.latitude
+              : null;
+         const lng = shown
+            ? (r.longitude ?? r.site?.longitude ?? null)
+            : own
+              ? r.longitude
+              : null;
          if (lat === null || lng === null) continue;
          places.set(`${lat.toFixed(3)},${lng.toFixed(3)}`, { lat, lng });
       }

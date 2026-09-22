@@ -142,7 +142,8 @@ router.get(
    attachApiAuth,
    fishingController.getCatchById
 );
-router.get('/api/sites', fishingController.listFishingSites);
+/* Public, and the reader's own private spots ride along when there is one. */
+router.get('/api/sites', attachApiAuth, fishingController.listFishingSites);
 
 /* Two pins on the same water, made one. Reading suggestions changes nothing;
    the merge itself moves catches and cannot undo itself, so it is a POST. */

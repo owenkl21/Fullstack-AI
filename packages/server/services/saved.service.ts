@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { canSeeSite, siteGateSelect } from '../lib/site-privacy';
 
 /*
  * Keeping somebody else's spot or piece of gear.
@@ -42,14 +43,28 @@ export const savedService = {
                         length: true,
                         weight: true,
                         species: { select: { commonName: true } },
-                        site: { select: { id: true, name: true } },
+                        site: {
+                           select: { id: true, name: true, ...siteGateSelect },
+                        },
                      },
                   },
-                  site: { select: { id: true, name: true } },
+                  site: { select: { id: true, name: true, ...siteGateSelect } },
                },
             },
          },
       });
+
+      /*
+       * A kept post names the spot its fish came from, and that spot can go
+       * private long after the post was kept. Asked now, like everything
+       * else here: the post stays, the spot's name and link do not.
+       */
+      const named = <T extends { id: string; name: string }>(
+         site: (T & Parameters<typeof canSeeSite>[0]) | null
+      ) =>
+         site && canSeeSite(site, userId)
+            ? { id: site.id, name: site.name }
+            : null;
 
       return rows
          .filter(
@@ -67,8 +82,10 @@ export const savedService = {
                content: row.post.content,
                createdAt: row.post.createdAt,
                author: row.post.author,
-               catch: row.post.catch,
-               site: row.post.site,
+               catch: row.post.catch
+                  ? { ...row.post.catch, site: named(row.post.catch.site) }
+                  : row.post.catch,
+               site: named(row.post.site),
             },
          }));
    },

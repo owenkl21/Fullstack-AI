@@ -1,4 +1,5 @@
 import { useLoadOnScroll } from '@/lib/load-on-scroll';
+import { PageHead } from '@/components/brand/PageHead';
 import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -150,6 +151,7 @@ function MySitesList() {
                        lastCatchAt: entry.lastCatchAt,
                        rating: entry.rating,
                        species: entry.species,
+                       visibility: entry.visibility,
                     },
                  ]
                : []
@@ -161,25 +163,31 @@ function MySitesList() {
    return (
       <section
          ref={root}
-         className="mx-auto w-[min(1680px,100%-32px)] py-10 md:py-14"
+         className="relative mx-auto w-[min(1680px,100%-32px)] pb-10 md:pb-14"
       >
+         {/* The same plate and waterline My catches opens on, so the three
+             pages of the log read as one set. The count and the way to add
+             a spot sit on the plate's right, where the catches page keeps
+             its count. */}
+         <PageHead
+            kicker="Your water"
+            title="My spots"
+            aside={
+               status === 'ready' ? (
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+                     <span className="lab num text-paper-2">{countLine}</span>
+                     {items.length > 0 ? (
+                        <Button asChild className="text-[18px]">
+                           <Link to="/sites/new">Add a spot</Link>
+                        </Button>
+                     ) : null}
+                  </div>
+               ) : null
+            }
+         />
          <header className="rv">
-            <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
-               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                  <h1 className="g text-[44px] md:text-[56px]">My spots</h1>
-                  {status === 'ready' ? (
-                     <p className="lab num">{countLine}</p>
-                  ) : null}
-               </div>
-               {status === 'ready' && items.length > 0 ? (
-                  <Button asChild>
-                     <Link to="/sites/new">Add a spot</Link>
-                  </Button>
-               ) : null}
-            </div>
-
             {onMap || status !== 'ready' || items.length === 0 ? null : (
-               <div className="mt-8">
+               <div>
                   <SearchField
                      id="spot-search"
                      label="Search your spots"

@@ -14,6 +14,13 @@ import { useDocumentTitle } from '@/lib/title';
 
 export type WaterType = 'FRESHWATER' | 'SALTWATER' | 'BRACKISH' | 'OTHER';
 
+/*
+ * Everyone, or only you. The table also knows GROUPS, but nothing resolves a
+ * group audience for a spot yet, so the form does not offer a choice that
+ * would read as private and mean it.
+ */
+export type SpotVisibility = 'PUBLIC' | 'PRIVATE';
+
 export type SpotValues = {
    name: string;
    description: string;
@@ -21,6 +28,7 @@ export type SpotValues = {
    accessNotes: string;
    latitude: string;
    longitude: string;
+   visibility: SpotVisibility;
 };
 
 type SpotImage = { storageKey: string; url: string };
@@ -44,7 +52,16 @@ const EMPTY_SPOT: SpotValues = {
    accessNotes: '',
    latitude: '',
    longitude: '',
+   visibility: 'PUBLIC',
 };
+
+/*
+ * How close the map opens on a spot. A spot is a gully or a ledge, not a bay,
+ * and z18 is the last step the satellite has real pictures for nearly
+ * everywhere in the country; the picker never goes past what the base on
+ * screen can draw.
+ */
+const SPOT_ZOOM = 18;
 
 const MESSAGES: Record<SpotFieldName, string> = {
    name: 'The name needs at least 2 characters.',
@@ -188,6 +205,7 @@ export function SpotForm({
          longitude: position ? position.lng : null,
          waterType: values.waterType || null,
          accessNotes: accessNotes || null,
+         visibility: values.visibility,
       };
 
       try {
@@ -277,10 +295,26 @@ export function SpotForm({
          </Group>
 
          <Group title="Where it is">
+            {/*
+             * The map is the job on this form, so it gets what a map inside a
+             * long form is otherwise denied: the wheel zooms it, it opens as
+             * close as the pictures go, and with no pin yet it opens on the
+             * best guess at where the angler is rather than on the country.
+             *
+             * It is tall on purpose. One finger drags the map, which is what
+             * anyone expects of a map, so the page has to be scrolled by what
+             * is around it: the heading above and the controls below are
+             * always on screen with it, and on a phone the map stops short of
+             * the viewport so there is always a strip of page to drag by.
+             */}
             <MapLocationPicker
                latitude={values.latitude}
                longitude={values.longitude}
                onChange={setCoordinates}
+               wheelZoom
+               seek
+               closeZoom={SPOT_ZOOM}
+               mapClassName="h-[min(460px,60svh)] md:h-[560px]"
             />
             {errors.position ? (
                <p className="text-[15px] text-destructive">{errors.position}</p>
@@ -341,13 +375,42 @@ export function SpotForm({
             )}
          </Group>
 
-         {/* TODO(api): a per-spot privacy switch, and a position shown exact,
-             at about 1 km, or hidden, appendix E item 8. */}
+         <Group title="Who sees it">
+            {/*
+             * The same two words the catch form uses. A spot is the thing an
+             * angler most wants to keep, and until now the form had no way to
+             * say so: every spot went on the public map with its pin. The
+             * server holds the line (lib/site-privacy): a private spot is not
+             * in the list, the map, the feed or a search, and a public catch
+             * logged there shows the fish and not the mark.
+             */}
+            <ChoiceGroup
+               label="Who can see this spot"
+               value={values.visibility}
+               onChange={(next) => change('visibility', next)}
+               options={[
+                  { value: 'PUBLIC', label: 'Everyone' },
+                  { value: 'PRIVATE', label: 'Only me' },
+               ]}
+               hint={
+                  values.visibility === 'PRIVATE'
+                     ? 'Only you can find it. Catches you log here show the fish, not the spot.'
+                     : 'Other anglers can find it on the map and log catches here.'
+               }
+            />
+         </Group>
+
+         {/* TODO(api): a position shown at about 1 km rather than exact or
+             hidden, appendix E item 8. */}
          <div className="grid gap-5">
             <p className="max-w-[56ch] text-[15px] text-ink-2">
-               {position
-                  ? 'When you save, this spot appears in the public feed with its position.'
-                  : 'When you save, this spot appears in the public feed. No position is recorded yet.'}
+               {values.visibility === 'PRIVATE'
+                  ? position
+                     ? 'When you save, this spot goes in your spots and nowhere else.'
+                     : 'When you save, this spot goes in your spots and nowhere else. No position is recorded yet.'
+                  : position
+                    ? 'When you save, this spot goes on the map with its position.'
+                    : 'When you save, this spot goes on the map. No position is recorded yet.'}
             </p>
             <div className="flex flex-wrap items-center gap-3">
                <Button type="submit" size="lg" disabled={isSaving}>

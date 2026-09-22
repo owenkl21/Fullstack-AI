@@ -3,6 +3,11 @@ import {
    weatherKitAvailable,
 } from '../clients/weatherkit.client';
 import { prisma } from '../lib/prisma';
+import {
+   siteGateSelect,
+   sitesVisibleTo,
+   withSiteShownTo,
+} from '../lib/site-privacy';
 import { entriesService } from './competition-entries.service';
 import { getCoordinates } from '../clients/geocoding.client';
 import {
@@ -179,17 +184,34 @@ type UpdateFishingSiteInput = Omit<CreateFishingSiteInput, 'images'>;
  * than failing the write. On update, `partial` keeps the difference between a
  * field the client did not send (leave it alone) and one it sent as null
  * (clear it), which is the same distinction the weather columns needed.
+ *
+ * A spot only resolves when the angler may see it: a public one, or their
+ * own. Any id used to do, so a catch could be filed under a spot somebody
+ * keeps to themselves and the answer came back carrying its name and its
+ * position. `keepSiteId` is the one exception, the spot an edited catch
+ * already stands on, so saving an old catch never quietly unfiles it.
  */
 const resolveOptionalRelationIds = async (
    input: { siteId?: string | null; speciesId?: string | null },
-   { partial = false }: { partial?: boolean } = {}
+   {
+      partial = false,
+      userId = null,
+      keepSiteId = null,
+   }: {
+      partial?: boolean;
+      userId?: string | null;
+      keepSiteId?: string | null;
+   } = {}
 ) => {
    const relations: { siteId?: string | null; speciesId?: string | null } = {};
 
    if (!partial || input.siteId !== undefined) {
       const site = input.siteId
-         ? await prisma.fishingSite.findUnique({
-              where: { id: input.siteId },
+         ? await prisma.fishingSite.findFirst({
+              where:
+                 input.siteId === keepSiteId
+                    ? { id: input.siteId }
+                    : { id: input.siteId, ...sitesVisibleTo(userId) },
               select: { id: true },
            })
          : null;
@@ -213,7 +235,19 @@ const resolveOptionalRelationIds = async (
 
 const catchDetailInclude = {
    createdBy: { select: { id: true, displayName: true, username: true } },
-   site: { select: { id: true, name: true, latitude: true, longitude: true } },
+   /*
+    * The gate rides along with the spot, so whoever hands this record to a
+    * reader can ask whether the spot is theirs to see (lib/site-privacy).
+    */
+   site: {
+      select: {
+         id: true,
+         name: true,
+         latitude: true,
+         longitude: true,
+         ...siteGateSelect,
+      },
+   },
    species: { select: { id: true, commonName: true, scientificName: true } },
    gears: {
       select: { id: true, name: true, brand: true, type: true, imageUrl: true },
@@ -252,11 +286,17 @@ const siteDetailInclude = {
       orderBy: { position: 'asc' as const },
    },
    catches: {
+      /* A deleted catch leaves the spot's page as well as the log. */
+      where: { deletedAt: null },
       orderBy: { caughtAt: 'desc' as const },
       select: {
          id: true,
          title: true,
          caughtAt: true,
+         /* Read by getFishingSiteById, which drops what is not the reader's
+            to see: a catch its angler kept to themselves. */
+         visibility: true,
+         createdById: true,
          images: {
             take: 1,
             orderBy: { position: 'asc' as const },
@@ -572,10 +612,16 @@ export const fishingService = {
     * It carries what makes a map worth reading: how many fish have come out of
     * each spot, and which species, so the map can be filtered by the fish you
     * are actually after.
+    *
+    * A signed-in angler gets their own spots in the same list whatever their
+    * visibility, because this is also the list the log forms file a catch
+    * under, and a spot kept private was otherwise a spot nothing could ever
+    * be logged at. Nobody else's private spot is ever in it: the where clause
+    * is the one rule in lib/site-privacy, not a filter applied afterwards.
     */
-   async listFishingSites() {
+   async listFishingSites(viewerId: string | null = null) {
       const sites = await prisma.fishingSite.findMany({
-         where: { deletedAt: null, visibility: 'PUBLIC' },
+         where: { deletedAt: null, ...sitesVisibleTo(viewerId) },
          orderBy: { name: 'asc' },
          take: 500,
          select: {
@@ -584,10 +630,19 @@ export const fishingService = {
             latitude: true,
             longitude: true,
             waterType: true,
+            visibility: true,
             createdById: true,
             createdBy: { select: { displayName: true } },
             catches: {
-               where: { deletedAt: null, visibility: 'PUBLIC' },
+               /* Public catches, and the reader's own so their private spot
+                  still counts the fish they took there. */
+               where: {
+                  deletedAt: null,
+                  OR: [
+                     { visibility: 'PUBLIC' },
+                     ...(viewerId ? [{ createdById: viewerId }] : []),
+                  ],
+               },
                select: {
                   speciesId: true,
                   species: { select: { commonName: true } },
@@ -620,6 +675,8 @@ export const fishingService = {
             latitude: site.latitude,
             longitude: site.longitude,
             waterType: site.waterType,
+            /* PUBLIC on every row but the reader's own private ones. */
+            visibility: site.visibility,
             createdById: site.createdById,
             createdByName: site.createdBy?.displayName ?? null,
             catchCount: site.catches.length,
@@ -746,10 +803,13 @@ export const fishingService = {
 
    async createCatch(userId: string, input: CreateCatchInput) {
       const user = await getUserById(userId);
-      const relations = await resolveOptionalRelationIds({
-         siteId: input.siteId,
-         speciesId: input.speciesId,
-      });
+      const relations = await resolveOptionalRelationIds(
+         {
+            siteId: input.siteId,
+            speciesId: input.speciesId,
+         },
+         { userId: user.id }
+      );
 
       const validGears = input.gearIds.length
          ? await prisma.gear.findMany({
@@ -939,10 +999,22 @@ export const fishingService = {
             const site = relations.siteId
                ? await tx.fishingSite.findUnique({
                     where: { id: relations.siteId },
-                    select: { latitude: true, longitude: true },
+                    select: {
+                       latitude: true,
+                       longitude: true,
+                       visibility: true,
+                    },
                  })
                : null;
-            const withhold = input.hideLocation ?? false;
+            /*
+             * A spot kept private withholds the position exactly as the
+             * angler's own switch does. The fish can be public while the mark
+             * is not, and the pin of a catch logged standing on a private
+             * spot is that spot, so neither the spot nor the pin travels.
+             */
+            const withhold =
+               (input.hideLocation ?? false) ||
+               (site !== null && site.visibility !== 'PUBLIC');
             const latitude = withhold
                ? null
                : (input.latitude ?? site?.latitude ?? null);
@@ -972,7 +1044,10 @@ export const fishingService = {
       });
 
       const withResolvedImages = await withResolvedImageUrls(created);
-      return withResolvedGearImageUrls(withResolvedImages);
+      return withSiteShownTo(
+         await withResolvedGearImageUrls(withResolvedImages),
+         user.id
+      );
    },
 
    async getCatchById(catchId: string, viewerId: string | null = null) {
@@ -985,8 +1060,30 @@ export const fishingService = {
          return null;
       }
 
+      /*
+       * A catch kept private is private by id as well as by list. It never
+       * reached the feed or a profile, but the page answered anyone who had
+       * its address, title, photographs and pin included. Not found rather
+       * than forbidden, the same answer a private spot gives. GROUPS is not
+       * PUBLIC: nothing resolves a group audience for a catch yet.
+       */
+      if (
+         catchRecord.visibility !== 'PUBLIC' &&
+         catchRecord.createdById !== viewerId
+      ) {
+         return null;
+      }
+
       const withResolvedImages = await withResolvedImageUrls(catchRecord);
-      const resolved = await withResolvedGearImageUrls(withResolvedImages);
+      /*
+       * A public catch can stand on a private spot. The fish is for everyone;
+       * the spot's name, its link and where it is are for its owner, so they
+       * are taken off here before anything else reads the record.
+       */
+      const resolved = withSiteShownTo(
+         await withResolvedGearImageUrls(withResolvedImages),
+         viewerId
+      );
 
       /*
        * A catch that hides its location hides it here as well as on the feed.
@@ -1056,6 +1153,7 @@ export const fishingService = {
                   name: true,
                   latitude: true,
                   longitude: true,
+                  ...siteGateSelect,
                },
             },
             gears: { select: { id: true, name: true, type: true } },
@@ -1080,17 +1178,41 @@ export const fishingService = {
          },
       });
 
-      return Promise.all(catches.map((entry) => withResolvedImageUrls(entry)));
+      /*
+       * Your own log can still point at somebody else's spot, one that was
+       * public the day you fished it and has been kept private since. The
+       * catch stays yours, pin and all; the spot's name and position do not.
+       */
+      return Promise.all(
+         catches.map(async (entry) =>
+            withSiteShownTo(
+               {
+                  ...(await withResolvedImageUrls(entry)),
+                  createdById: user.id,
+               },
+               user.id
+            )
+         )
+      );
    },
 
    async updateCatch(userId: string, catchId: string, input: UpdateCatchInput) {
       const user = await getUserById(userId);
+      /* The spot it already stands on, which saving it again never unfiles. */
+      const standing = await prisma.catch.findFirst({
+         where: { id: catchId, createdById: user.id, deletedAt: null },
+         select: { siteId: true },
+      });
       const relations = await resolveOptionalRelationIds(
          {
             siteId: input.siteId,
             speciesId: input.speciesId,
          },
-         { partial: true }
+         {
+            partial: true,
+            userId: user.id,
+            keepSiteId: standing?.siteId ?? null,
+         }
       );
 
       const validGears = input.gearIds.length
@@ -1171,7 +1293,10 @@ export const fishingService = {
          });
 
          const withResolvedImages = await withResolvedImageUrls(updated);
-         return withResolvedGearImageUrls(withResolvedImages);
+         return withSiteShownTo(
+            await withResolvedGearImageUrls(withResolvedImages),
+            user.id
+         );
       });
    },
 
@@ -1294,10 +1419,20 @@ export const fishingService = {
       }
 
       const siteWithResolvedImages = await withResolvedImageUrls(site);
+      /*
+       * Anyone can log at a public spot, and a catch its angler kept to
+       * themselves is not part of the spot's public record: it used to be
+       * listed here with its title, its photograph and their name. Public
+       * catches, and the reader's own.
+       */
       const catchesWithResolvedImages = await Promise.all(
-         siteWithResolvedImages.catches.map((entry) =>
-            withResolvedImageUrls(entry)
-         )
+         siteWithResolvedImages.catches
+            .filter(
+               (entry) =>
+                  entry.visibility === 'PUBLIC' ||
+                  entry.createdById === viewerId
+            )
+            .map((entry) => withResolvedImageUrls(entry))
       );
 
       return {
@@ -1322,6 +1457,8 @@ export const fishingService = {
             latitude: true,
             longitude: true,
             waterType: true,
+            /* So the list and the map can mark the ones only they can see. */
+            visibility: true,
             images: {
                take: 1,
                orderBy: { position: 'asc' },
@@ -1444,6 +1581,14 @@ export const fishingService = {
             latitude: input.latitude,
             longitude: input.longitude,
             waterType: input.waterType,
+            /*
+             * Undefined leaves it as it was. Nothing else has to be done when
+             * a spot goes private: every read that could carry it asks the
+             * gate in lib/site-privacy at the time, so posts, kept spots and
+             * catches logged here stop naming it on the next request, and
+             * start again if the owner opens it back up.
+             */
+            visibility: input.visibility,
             accessNotes: input.accessNotes,
          },
          include: siteDetailInclude,
