@@ -91,6 +91,12 @@ router.get('/api/health', (_req: Request, res: Response) => {
    res.json({
       deployment: process.env.RAILWAY_DEPLOYMENT_ID ?? null,
       mail: mailStatus,
+      /*
+       * Whether Claude can be reached at all, so a competition organiser
+       * wondering why nothing was judged can be answered without anybody
+       * reading Railway. Says only that a key is set, never a word of it.
+       */
+      claude: process.env.ANTHROPIC_API_KEY?.trim() ? 'ready' : 'off',
    });
 });
 
