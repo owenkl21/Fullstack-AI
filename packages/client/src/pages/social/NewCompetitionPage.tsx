@@ -901,7 +901,10 @@ function NewCompetition() {
             onOpenChange={setPickingSpot}
             title="Pick a spot"
          >
-            <div className="flex flex-col gap-3 p-4">
+            {/* Tall on purpose: the results open under the field, and a
+                sheet only as tall as the field cut them off at the bottom of
+                the screen. Held to a readable width on a desktop. */}
+            <div className="mx-auto flex h-[min(72vh,560px)] w-full max-w-[560px] flex-col gap-3 p-4">
                <h2 className="g text-[26px]">Pick a spot</h2>
                <PlaceSearch
                   showMine={false}

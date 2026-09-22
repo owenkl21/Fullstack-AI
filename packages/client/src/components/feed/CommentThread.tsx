@@ -47,7 +47,7 @@ import type { FeedComment, FeedPost } from '@/components/feed/types';
  * arrives holding five, so five is what shows before anything is read; the
  * press brings the rest, all of it, which is what the word promises.
  */
-const SHOWN_AT_FIRST = 5;
+const SHOWN_AT_FIRST = 3;
 /* Replies in view before the rest go behind View N more replies. */
 const REPLIES_SHOWN = 2;
 
@@ -1026,7 +1026,9 @@ export function CommentThread({
          ) : null}
 
          {shown.length > 0 ? (
-            <ul className="flex flex-col gap-4">
+            /* A long thread scrolls inside the card rather than stretching
+               the post down the feed. */
+            <ul className="thread-scroll -mr-2 flex max-h-[440px] flex-col gap-4 overflow-y-auto overscroll-contain pr-2">
                {shown.map((comment, i) => renderComment(comment, comment, i))}
             </ul>
          ) : (
