@@ -439,6 +439,36 @@ export const competitionsController = {
       return res.json(result);
    },
 
+   /* The organiser, or the team, takes the competition away. */
+   async remove(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) {
+         return res.status(401).json(unauthorized);
+      }
+      const id = asSingleParam(req.params.competitionId);
+      if (!id) {
+         return res.status(400).json({
+            code: 'competition_id_required',
+            message: 'A competition id is required.',
+         });
+      }
+      const result = await competitionsService.remove(auth.userId, id);
+      if ('error' in result) {
+         return result.error === 'not_found'
+            ? res
+                 .status(404)
+                 .json({
+                    code: 'not_found',
+                    message: 'That competition is not here.',
+                 })
+            : res.status(403).json({
+                 code: 'not_organiser',
+                 message: 'Only the organiser can delete a competition.',
+              });
+      }
+      return res.json(result);
+   },
+
    async leave(req: Request, res: Response) {
       const auth = getAuth(req);
       if (!auth.userId) {

@@ -10,11 +10,21 @@ import { Button } from '@/components/ui/button';
 import { Fold } from '@/components/ui/fold';
 import { Picker } from '@/components/ui/picker';
 import { Sheet } from '@/components/ui/sheet';
+import {
+   Dialog,
+   DialogContent,
+   DialogDescription,
+   DialogFooter,
+   DialogHeader,
+   DialogTitle,
+} from '@/components/ui/dialog';
+import { isAdminSession, useSession } from '@/lib/auth-client';
 import { FramedPhoto } from '@/components/FramedPhoto';
 import { toast } from '@/components/ui/use-toast';
 import {
    answerInvite,
    clockParts,
+   deleteCompetition,
    enterCompetition,
    fetchCompetition,
    fetchMyFollowers,
@@ -89,6 +99,10 @@ function CompetitionScreen() {
    const [busy, setBusy] = useState<string | null>(null);
    const [inviting, setInviting] = useState(false);
    const [picking, setPicking] = useState(false);
+   /* The organiser, and the Fisherfeed team, can take it away. */
+   const [deleting, setDeleting] = useState(false);
+   const { data: session } = useSession();
+   const isTeam = isAdminSession(session?.user);
    /* Which board the standings show when there are teams: the sides, or
       the anglers. */
    const [board, setBoard] = useState<'anglers' | 'teams'>('teams');
@@ -457,6 +471,74 @@ function CompetitionScreen() {
                </p>
             </div>
          )}
+
+         {c && you && (you.organise || isTeam) ? (
+            <div className="mt-14 border-t border-line pt-5">
+               <button
+                  type="button"
+                  onClick={() => setDeleting(true)}
+                  className="g-tracked inline-flex min-h-11 items-center text-[16px] text-destructive hover:opacity-80"
+               >
+                  Delete competition
+               </button>
+            </div>
+         ) : null}
+
+         {c ? (
+            <Dialog open={deleting} onOpenChange={setDeleting}>
+               {/* Black in both themes, as every dialog here, so the red is
+                   the one that reads on black. */}
+               <DialogContent className="gap-0 [--destructive:#f0716a] sm:max-w-[480px]">
+                  <DialogHeader className="text-left">
+                     <DialogTitle className="g pr-10 text-[32px] font-normal text-paper">
+                        Delete {c.name}?
+                     </DialogTitle>
+                     <DialogDescription className="text-[15px] text-paper-2">
+                        It goes for everybody: its entries, standings, teams and
+                        invitations. The catches entered stay in each
+                        angler&rsquo;s own log.
+                     </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter className="mt-6 flex-col gap-3 sm:flex-row">
+                     <Button
+                        type="button"
+                        size="lg"
+                        variant="ghost"
+                        className="text-paper-2 hover:bg-paper/10 hover:text-paper"
+                        onClick={() => setDeleting(false)}
+                     >
+                        Keep it
+                     </Button>
+                     <Button
+                        type="button"
+                        size="lg"
+                        variant="destructive"
+                        disabled={busy !== null}
+                        onClick={async () => {
+                           setBusy('delete');
+                           try {
+                              await deleteCompetition(c.id);
+                              toast({
+                                 title: 'Competition deleted.',
+                                 variant: 'success',
+                              });
+                              navigate('/competitions', { replace: true });
+                           } catch (error) {
+                              toast({
+                                 title: 'That did not go through.',
+                                 description: teamRefusal(error),
+                                 variant: 'error',
+                              });
+                              setBusy(null);
+                           }
+                        }}
+                     >
+                        Delete it
+                     </Button>
+                  </DialogFooter>
+               </DialogContent>
+            </Dialog>
+         ) : null}
 
          {c ? (
             <InviteSheet

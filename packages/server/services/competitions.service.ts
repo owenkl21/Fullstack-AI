@@ -324,6 +324,46 @@ export const competitionsService = {
       }));
    },
 
+   /**
+    * Take a competition away, for its organiser or the Fisherfeed team.
+    *
+    * Marked deleted rather than erased, the way a post is: every read of a
+    * competition already passes over a deleted one, so its page, its board,
+    * its entries and its teams are gone from the app at once, and a mistake
+    * can still be put right from the database. What would otherwise still
+    * point at it goes too: invitations nobody answered stop being offered,
+    * and the lines in anybody's inbox about it are cleared. The catches
+    * entered in it stay in each angler's own log: they are their fish.
+    */
+   async remove(userId: string, competitionId: string) {
+      const competition = await prisma.competition.findFirst({
+         where: { id: competitionId, deletedAt: null },
+         select: { id: true, createdById: true },
+      });
+      if (!competition) return { error: 'not_found' as const };
+      if (competition.createdById !== userId) {
+         const actor = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { role: true },
+         });
+         if (actor?.role !== 'ADMIN')
+            return { error: 'not_organiser' as const };
+      }
+      const now = new Date();
+      await prisma.$transaction([
+         prisma.competition.update({
+            where: { id: competitionId },
+            data: { deletedAt: now },
+         }),
+         prisma.competitionInvite.updateMany({
+            where: { competitionId, state: 'PENDING' },
+            data: { expiresAt: now },
+         }),
+         prisma.notification.deleteMany({ where: { competitionId } }),
+      ]);
+      return { removed: true as const };
+   },
+
    async answerInvite(userId: string, inviteId: string, accept: boolean) {
       const invite = await prisma.competitionInvite.findFirst({
          where: { id: inviteId, userId, state: 'PENDING' },

@@ -344,6 +344,10 @@ export const teamRefusal = (error: unknown) => {
       : 'That did not go through. Try again.';
 };
 
+/* The organiser, or the Fisherfeed team, deletes it for everybody. */
+export const deleteCompetition = (id: string) =>
+   axios.delete(`/api/competitions/${id}`);
+
 export const leaveCompetition = (id: string) =>
    axios.delete(`/api/competitions/${id}/join`);
 

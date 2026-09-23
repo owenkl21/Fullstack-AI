@@ -403,6 +403,12 @@ router.get(
    requireApiAuth,
    competitionsController.detail
 );
+/* The organiser, or the Fisherfeed team, deletes it. */
+router.delete(
+   '/api/competitions/:competitionId',
+   requireApiAuth,
+   competitionsController.remove
+);
 /* A catch entered, checked, and what the organiser and the others make of it. */
 router.post(
    '/api/competitions/:competitionId/entries',
