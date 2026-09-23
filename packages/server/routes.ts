@@ -127,6 +127,12 @@ router.get('/api/hello', (_req: Request, res: Response) => {
 router.get('/api/health', (_req: Request, res: Response) => {
    res.json({
       deployment: process.env.RAILWAY_DEPLOYMENT_ID ?? null,
+      /*
+       * Which commit is answering. Railway sets this on every build, and
+       * without it the only way to tell a deploy landed was to guess from a
+       * changed id, which says a build happened and not which one.
+       */
+      commit: (process.env.RAILWAY_GIT_COMMIT_SHA ?? '').slice(0, 7) || null,
       mail: mailStatus,
       /*
        * Whether Claude can be reached at all, so a competition organiser
