@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
+   ArrowsPointingInIcon,
+   ArrowsPointingOutIcon,
    MagnifyingGlassIcon,
    ViewfinderCircleIcon,
 } from '@heroicons/react/24/outline';
@@ -172,6 +174,12 @@ export function MapLocationPicker({
    const [note, setNote] = useState<string | null>(null);
    const [problem, setProblem] = useState<string | null>(null);
    const [searchOpen, setSearchOpen] = useState(false);
+   /*
+    * The whole screen, for putting a pin down with room to see the water. A
+    * 200 pixel map on a phone is a keyhole; this is the same map, the pin
+    * and everything on it kept, laid over the page until Done.
+    */
+   const [full, setFull] = useState(false);
    /* Where the pin is while it is in the hand, so the readout follows it. */
    const [dragAt, setDragAt] = useState<MapPosition | null>(null);
    /* Where the map is looking, so of two Kommetjies the near one is first. */
@@ -573,8 +581,103 @@ export function MapLocationPicker({
     * in the corner of the map above them. A round button here would be the one
     * circle on a page of squares.
     */
+   /* The map is told its new size once the box has it, and again when the
+      page has settled; the page under it does not scroll while it is open. */
+   const surfaceRef = useRef<HTMLDivElement | null>(null);
+   useEffect(() => {
+      const map = mapRef.current;
+      if (!map) return;
+      /*
+       * A parent that is moved or faded (a step sliding in, a reveal) makes
+       * itself the box a fixed element is fixed to, and the map filled that
+       * instead of the screen. Those parents are held still while it is
+       * open, and given back exactly as they were after.
+       */
+      const held: { node: HTMLElement; style: string }[] = [];
+      if (full) {
+         let node = surfaceRef.current?.parentElement ?? null;
+         while (node && node !== document.body) {
+            const s = getComputedStyle(node);
+            if (
+               s.transform !== 'none' ||
+               /* Tailwind's moves are these three, not transform. */
+               s.translate !== 'none' ||
+               s.scale !== 'none' ||
+               s.rotate !== 'none' ||
+               s.filter !== 'none' ||
+               s.perspective !== 'none' ||
+               /transform|filter/.test(s.willChange) ||
+               /paint|layout|strict|content/.test(s.contain)
+            ) {
+               held.push({ node, style: node.getAttribute('style') ?? '' });
+               node.style.transform = 'none';
+               node.style.translate = 'none';
+               node.style.scale = 'none';
+               node.style.rotate = 'none';
+               node.style.filter = 'none';
+               node.style.perspective = 'none';
+               node.style.willChange = 'auto';
+               node.style.contain = 'none';
+            }
+            node = node.parentElement;
+         }
+      }
+      const giveBack = () =>
+         held.forEach(({ node, style }) =>
+            style
+               ? node.setAttribute('style', style)
+               : node.removeAttribute('style')
+         );
+      const frame = requestAnimationFrame(() => map.invalidateSize());
+      const later = window.setTimeout(() => map.invalidateSize(), 260);
+      if (!full) {
+         return () => {
+            cancelAnimationFrame(frame);
+            window.clearTimeout(later);
+         };
+      }
+      const was = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      const onKey = (event: KeyboardEvent) => {
+         if (event.key === 'Escape') setFull(false);
+      };
+      window.addEventListener('keydown', onKey);
+      return () => {
+         cancelAnimationFrame(frame);
+         window.clearTimeout(later);
+         document.body.style.overflow = was;
+         window.removeEventListener('keydown', onKey);
+         giveBack();
+      };
+   }, [full]);
+
    const control =
       'grid h-11 place-items-center border border-line bg-background text-ink transition-[transform,background-color] duration-150 [transition-timing-function:var(--ease)] hover:bg-bg-2 active:scale-[0.96] disabled:opacity-50';
+
+   const fullButton = (
+      <button
+         type="button"
+         onClick={() => setFull((was) => !was)}
+         aria-pressed={full}
+         aria-label={full ? 'Leave full screen' : 'Full screen map'}
+         title={full ? 'Leave full screen' : 'Full screen map'}
+         className={cn(control, 'size-10')}
+      >
+         {full ? (
+            <ArrowsPointingInIcon
+               className="size-5"
+               strokeWidth={1.5}
+               aria-hidden="true"
+            />
+         ) : (
+            <ArrowsPointingOutIcon
+               className="size-5"
+               strokeWidth={1.5}
+               aria-hidden="true"
+            />
+         )}
+      </button>
+   );
 
    const guard = useCallback((element: HTMLElement | null) => {
       stopMapEvents(element);
@@ -629,6 +732,7 @@ export function MapLocationPicker({
          ref={guard}
          className="absolute top-2 right-2 z-[500] flex flex-row-reverse gap-2"
       >
+         {fullButton}
          <button
             type="button"
             onClick={() => {
@@ -741,13 +845,34 @@ export function MapLocationPicker({
                         : ''
                   }
                   data-source={source ?? ''}
+                  ref={surfaceRef}
                   className={cn(
                      'map-surface relative h-[280px] overflow-hidden border border-line md:h-[320px]',
-                     mapClassName
+                     mapClassName,
+                     full && 'fixed inset-0 z-[1100] h-auto border-0 md:h-auto'
                   )}
                >
                   <div ref={mapContainerRef} className="absolute inset-0" />
-                  {compact ? overlay : null}
+                  {compact || full ? overlay : null}
+                  {/* The full picker keeps its controls under the map, so
+                      its way to full screen sits on the map on its own. */}
+                  {!compact && !full ? (
+                     /* Top left: the zoom sits top right on this one. */
+                     <div className="absolute top-2 left-2 z-[500]">
+                        {fullButton}
+                     </div>
+                  ) : null}
+                  {full ? (
+                     <div className="absolute inset-x-0 bottom-0 z-[500] flex justify-center pb-[max(1rem,env(safe-area-inset-bottom))]">
+                        <Button
+                           type="button"
+                           className="min-w-[160px] text-[20px]"
+                           onClick={() => setFull(false)}
+                        >
+                           Done
+                        </Button>
+                     </div>
+                  ) : null}
                   {/*
                    * Said on the map itself while it is empty, where the eye
                    * already is, and gone the moment there is a pin: a pin

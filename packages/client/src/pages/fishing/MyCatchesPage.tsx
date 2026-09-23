@@ -205,7 +205,10 @@ function MyCatchesList() {
                ) : null
             }
          />
-         <PersonalBests className="rv mb-10" />
+         {/* Not a reveal: the row arrives after the page has set its reveals
+             going, and one that was never revealed held an empty gap the
+             height of the cards above the list. */}
+         <PersonalBests className="mb-10" />
 
          <header className="rv">
             <Drafts />

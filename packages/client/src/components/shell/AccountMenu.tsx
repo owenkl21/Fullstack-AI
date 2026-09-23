@@ -5,9 +5,7 @@ import { isAdminSession, signOut, useSession } from '@/lib/auth-client';
 import { forgetPushOnSignOut } from '@/lib/push';
 import { initialOf } from '@/components/profile/types';
 import { useMyAvatar } from '@/components/profile/avatar-api';
-import { useUnreadCount } from '@/components/social/notifications-api';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { CountBadge } from '@/components/ui/count-badge';
 import { Sheet } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 
@@ -34,18 +32,46 @@ import { cn } from '@/lib/utils';
  * who you are here, and this panel is the one place that is the same on a
  * phone and a desktop. It is marked only on the search itself, not on every
  * angler it leads to. */
-const rows: { to: string; label: string; end?: boolean }[] = [
-   { to: '/profile', label: 'Your profile' },
-   { to: '/anglers', label: 'Find anglers', end: true },
-   { to: '/insights', label: 'Your insights' },
-   { to: '/notifications', label: 'Notifications' },
-   { to: '/saved', label: 'Kept posts, spots and gear' },
-   { to: '/sites/me', label: 'Your spots' },
-   { to: '/gear/me', label: 'Your gear' },
-   { to: '/forecast', label: 'Forecast' },
-   { to: '/competitions', label: 'Competitions' },
-   { to: '/account', label: 'Account' },
+/*
+ * Only what is not already a tap away. Each row says where it is needed: a
+ * place the phone bar or the header already carries at that width is not
+ * repeated here. The phone bar has Feed, Catches, Map and Forecast; the
+ * header has every place from a desktop, the four wide words only from a
+ * wide one; the bell is in the header everywhere, so Notifications is not
+ * a row. `only` is the Tailwind that hides a row where it would repeat.
+ */
+type Row = { to: string; label: string; end?: boolean; only?: string };
+
+const groups: { title: string; rows: Row[] }[] = [
+   {
+      title: 'Yours',
+      rows: [
+         { to: '/profile', label: 'Your profile' },
+         { to: '/insights', label: 'Your insights' },
+         /* In the header from a wide screen. */
+         { to: '/sites/me', label: 'Your spots', only: 'xl:hidden' },
+         { to: '/gear/me', label: 'Your gear', only: 'xl:hidden' },
+         { to: '/saved', label: 'Kept posts, spots and gear' },
+      ],
+   },
+   {
+      title: 'Out there',
+      rows: [
+         /* On the phone bar; in the header from a wide screen. */
+         {
+            to: '/forecast',
+            label: 'Forecast',
+            only: 'max-md:hidden xl:hidden',
+         },
+         /* In the header from a tablet up. */
+         { to: '/boards', label: 'Boards', only: 'md:hidden' },
+         { to: '/competitions', label: 'Competitions', only: 'xl:hidden' },
+         { to: '/anglers', label: 'Find anglers', end: true },
+      ],
+   },
 ];
+
+const accountRow: Row = { to: '/account', label: 'Account' };
 
 /*
  * The one row not everybody gets. The session says whether this account is the
@@ -54,7 +80,7 @@ const rows: { to: string; label: string; end?: boolean }[] = [
  * answers for an address that is not there. So a flag that was somehow wrong
  * here would show a link to a page that still refuses.
  */
-const adminRow: { to: string; label: string; end?: boolean } = {
+const adminRow: Row = {
    to: '/admin',
    label: 'Admin',
 };
@@ -62,10 +88,6 @@ const adminRow: { to: string; label: string; end?: boolean } = {
 export function AccountMenu() {
    const { data } = useSession();
    const signedAvatar = useMyAvatar(Boolean(data?.user));
-   /* The count only, not a second poller: the bell stands beside this button
-    * in the header and is already asking every forty five seconds, and the
-    * hook hands every subscriber the same shared number. */
-   const unread = useUnreadCount(false);
    const navigate = useNavigate();
    const [open, setOpen] = useState(false);
 
@@ -102,6 +124,28 @@ export function AccountMenu() {
       ) : (
          initial
       );
+
+   const renderRow = (row: Row) => (
+      <NavLink
+         key={row.to}
+         to={row.to}
+         end={row.end}
+         onClick={() => setOpen(false)}
+         className={({ isActive }) =>
+            cn(
+               'flex min-h-[52px] items-center gap-3 border-l-[3px] px-4 transition-colors duration-100',
+               isActive
+                  ? 'border-teal bg-teal/10 text-ink'
+                  : 'border-transparent hover:bg-bg-2',
+               row.only
+            )
+         }
+      >
+         <span className="g-tracked flex-1 truncate text-[19px]">
+            {row.label}
+         </span>
+      </NavLink>
+   );
 
    return (
       <>
@@ -156,36 +200,20 @@ export function AccountMenu() {
                   aria-label="Your account"
                   className="thread-scroll min-h-0 flex-1 overflow-y-auto py-1"
                >
-                  {(isAdminSession(user) ? [...rows, adminRow] : rows).map(
-                     (row) => (
-                        <NavLink
-                           key={row.to}
-                           to={row.to}
-                           end={row.end}
-                           onClick={() => setOpen(false)}
-                           className={({ isActive }) =>
-                              cn(
-                                 'flex min-h-[52px] items-center gap-3 border-l-[3px] px-4 transition-colors duration-100',
-                                 isActive
-                                    ? 'border-teal bg-teal/10 text-ink'
-                                    : 'border-transparent hover:bg-bg-2'
-                              )
-                           }
-                        >
-                           <span className="g-tracked flex-1 truncate text-[19px]">
-                              {row.label}
-                           </span>
-                           {row.to === '/notifications' && unread > 0 ? (
-                              <>
-                                 <CountBadge count={unread} />
-                                 <span className="sr-only">
-                                    {unread} unread
-                                 </span>
-                              </>
-                           ) : null}
-                        </NavLink>
-                     )
-                  )}
+                  {groups.map((group) => (
+                     <div key={group.title} className="pb-2">
+                        <span className="lab block px-4 pt-3 pb-1 text-ink-3">
+                           {group.title}
+                        </span>
+                        {group.rows.map(renderRow)}
+                     </div>
+                  ))}
+                  <div className="border-t border-line pt-1">
+                     {(isAdminSession(user)
+                        ? [accountRow, adminRow]
+                        : [accountRow]
+                     ).map(renderRow)}
+                  </div>
                </nav>
 
                {/* Sign out sits away from the list, so a thumb running down the

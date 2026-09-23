@@ -23,9 +23,11 @@ const left: Slot[] = [
  * cabinet; the map is where anyone decides where to fish, and it carries the
  * spots anyway. Spots and gear are in the account menu.
  */
+/* Forecast takes the last slot: it is checked before every trip, the boards
+   now and then. Boards lives in the account panel on a phone. */
 const right: Slot[] = [
    { to: '/map', label: 'Map' },
-   { to: '/boards', label: 'Boards' },
+   { to: '/forecast', label: 'Forecast' },
 ];
 
 /*
@@ -68,7 +70,10 @@ export function BottomBar() {
    return (
       <nav
          aria-label="App"
-         className="fixed inset-x-0 bottom-0 z-30 h-[calc(64px+env(safe-area-inset-bottom))] bg-black-block pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
+         /* The hairline the header has along its foot, along this bar's
+            head: at night the page is near black too, and without it there
+            was no telling where the page stopped and the bar began. */
+         className="fixed inset-x-0 bottom-0 z-30 h-[calc(64px+env(safe-area-inset-bottom))] border-t border-paper/10 bg-black-block pb-[env(safe-area-inset-bottom)] text-paper md:hidden"
       >
          <SignedIn>
             <div className="relative grid h-16 grid-cols-[1fr_1fr_92px_1fr_1fr]">
