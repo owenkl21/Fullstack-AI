@@ -1,499 +1,239 @@
 import axios from 'axios';
-import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { FishingActionBar } from '@/components/fishing/FishingActionBar';
-import { LandingHeader } from '@/components/landing/LandingHeader';
-import { FishingBobberLoader } from '@/components/ui/fishing-bobber-loader';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { XMarkIcon } from '@heroicons/react/24/outline';
+import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/use-toast';
+import { useDocumentTitle } from '@/lib/title';
 import {
-   formatCardinal,
-   toMetricTemperature,
-   toMetricWindSpeed,
+   snapshotFromStoredConditions,
+   type StoredConditions,
 } from '@/lib/weather';
+import {
+   CatchForm,
+   type CatchFormInitial,
+   type GearOption,
+} from '@/pages/fishing/LogCatchPage';
 
-type CatchEdit = {
+type LoadedCatch = StoredConditions & {
+   /* The catch's own pin and its privacy, so an edit opens on both. */
+   latitude?: number | null;
+   longitude?: number | null;
+   visibility?: 'PRIVATE' | 'GROUPS' | 'PUBLIC';
+   hideLocation?: boolean;
+   id: string;
    title: string;
    notes: string | null;
    caughtAt: string;
-   site: {
-      id: string;
-      latitude: number | null;
-      longitude: number | null;
-   } | null;
-   weather: string | null;
-   gears: { id: string }[];
+   site: { id: string } | null;
+   gears: GearOption[];
+   images: {
+      image: {
+         id: string;
+         url: string;
+         cardUrl?: string | null;
+         storageKey: string;
+         /* How the angler framed it (lib/framing.ts), so Frame it opens on it. */
+         focusX?: number | null;
+         focusY?: number | null;
+         zoom?: number | null;
+      };
+   }[];
    length: number | null;
    weight: number | null;
-   weatherConditionText: string | null;
-   weatherConditionIconBaseUri: string | null;
-   weatherTemperatureDegrees: number | null;
-   weatherTemperatureUnit: string | null;
-   weatherPrecipitationProbability: number | null;
-   weatherWindDirectionCardinal: string | null;
-   weatherWindSpeedValue: number | null;
-   weatherWindSpeedUnit: string | null;
-   weatherWindGustValue: number | null;
-   weatherWindGustUnit: string | null;
-   weatherCloudCover: number | null;
+   count: number | null;
+   depth: number | null;
+   waterTemp: number | null;
+   /*
+    * How the fish was measured, whether it went back, and the competition it
+    * was entered in. The update route writes the whole record, so anything
+    * the form opens without is something saving would overwrite.
+    */
+   released?: boolean;
+   lengthSource?: 'EYE' | 'TAPE';
+   weightSource?: 'EYE' | 'SCALE';
+   competitionId?: string | null;
 };
 
-type SiteOption = {
-   id: string;
-   name: string;
-   latitude: number | null;
-   longitude: number | null;
-};
-type GearOption = {
-   id: string;
-   name: string;
-   brand: string;
-   type: string;
-   imageUrl: string | null;
-};
+type LoadState = 'loading' | 'ready' | 'missing' | 'failed';
 
-type WeatherSnapshot = {
-   weatherCondition: {
-      iconBaseUri: string;
-      description: { text: string };
-   };
-   temperature: { degrees: number; unit: string };
-   precipitation: { probability: { percent: number } };
-   wind: {
-      direction: { cardinal: string };
-      speed: { value: number; unit: string };
-      gust: { value: number; unit: string };
-   };
-   cloudCover: number;
-};
-
-const formatWeatherMetric = (
-   value: number | undefined,
-   unit?: string,
-   kind: 'temperature' | 'wind' = 'wind'
-) => {
-   if (kind === 'temperature') {
-      return toMetricTemperature(value, unit) ?? '';
-   }
-
-   return toMetricWindSpeed(value, unit) ?? '';
-};
+function EditSkeleton() {
+   return (
+      <div
+         role="status"
+         aria-label="Reading the catch"
+         className="flex flex-col gap-8"
+      >
+         <div className="h-10 w-2/5 bg-bg-2" />
+         <div className="aspect-[4/3] w-full max-w-[280px] bg-bg-2" />
+         <div className="flex flex-col gap-4">
+            <div className="h-5 w-1/3 bg-bg-2" />
+            <div className="h-5 w-4/5 bg-bg-2" />
+            <div className="h-5 w-3/5 bg-bg-2" />
+         </div>
+         <span className="sr-only">Reading the catch</span>
+      </div>
+   );
+}
 
 export function EditCatchPage() {
    const { catchId } = useParams();
-   const navigate = useNavigate();
-   const [item, setItem] = useState<CatchEdit | null>(null);
-   const [sites, setSites] = useState<SiteOption[]>([]);
-   const [gear, setGear] = useState<GearOption[]>([]);
-   const [selectedGearIds, setSelectedGearIds] = useState<string[]>([]);
-   const [weatherSnapshot, setWeatherSnapshot] =
-      useState<WeatherSnapshot | null>(null);
-   const [weatherOverview, setWeatherOverview] = useState('');
-   const [isWeatherLoading, setIsWeatherLoading] = useState(false);
-   const [currentCoords, setCurrentCoords] = useState<{
-      latitude: number;
-      longitude: number;
-   } | null>(null);
-   const [lengthValue, setLengthValue] = useState('');
-   const [weightValue, setWeightValue] = useState('');
-   const [lengthUnit, setLengthUnit] = useState<'cm' | 'ft'>('cm');
-   const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg');
+   const [record, setRecord] = useState<LoadedCatch | null>(null);
+   const [state, setState] = useState<LoadState>(
+      catchId ? 'loading' : 'missing'
+   );
+   const [attempt, setAttempt] = useState(0);
 
    useEffect(() => {
-      if (!navigator.geolocation) {
+      if (!catchId) {
          return;
       }
 
-      navigator.geolocation.getCurrentPosition(
-         (position) => {
-            setCurrentCoords({
-               latitude: position.coords.latitude,
-               longitude: position.coords.longitude,
-            });
-         },
-         () => {
-            setCurrentCoords(null);
-         }
-      );
-   }, []);
+      let cancelled = false;
 
-   useEffect(() => {
-      const load = async () => {
-         const [{ data: catchData }, { data: siteData }, { data: gearData }] =
-            await Promise.all([
-               axios.get(`/api/catches/${catchId}`),
-               axios.get('/api/sites'),
-               axios.get('/api/gear'),
-            ]);
-         setItem(catchData.catch);
-         setSites(siteData.sites ?? []);
-         setGear(gearData.gear ?? []);
-         setWeatherOverview(catchData.catch.weather ?? '');
-         if (catchData.catch.length !== null) {
-            setLengthValue(String(catchData.catch.length));
-         }
-         if (catchData.catch.weight !== null) {
-            setWeightValue(String(catchData.catch.weight));
-         }
-         setSelectedGearIds(
-            (catchData.catch.gears ?? []).map(
-               (entry: { id: string }) => entry.id
-            )
-         );
+      axios
+         .get(`/api/catches/${catchId}`)
+         .then((response) => {
+            if (cancelled) return;
+            if (!response.data?.catch) {
+               setState('missing');
+               return;
+            }
+            setRecord(response.data.catch);
+            setState('ready');
+         })
+         .catch((error: unknown) => {
+            if (cancelled) return;
+            if (axios.isAxiosError(error) && error.response?.status === 404) {
+               setState('missing');
+               return;
+            }
+            console.error('Unable to read the catch', error);
+            setState('failed');
+         });
 
-         if (catchData.catch.weatherConditionText) {
-            setWeatherSnapshot({
-               weatherCondition: {
-                  iconBaseUri:
-                     catchData.catch.weatherConditionIconBaseUri ?? '',
-                  description: { text: catchData.catch.weatherConditionText },
-               },
-               temperature: {
-                  degrees: catchData.catch.weatherTemperatureDegrees ?? 0,
-                  unit: catchData.catch.weatherTemperatureUnit ?? 'CELSIUS',
-               },
-               precipitation: {
-                  probability: {
-                     percent:
-                        catchData.catch.weatherPrecipitationProbability ?? 0,
-                  },
-               },
-               wind: {
-                  direction: {
-                     cardinal:
-                        catchData.catch.weatherWindDirectionCardinal ?? '',
-                  },
-                  speed: {
-                     value: catchData.catch.weatherWindSpeedValue ?? 0,
-                     unit:
-                        catchData.catch.weatherWindSpeedUnit ??
-                        'KILOMETERS_PER_HOUR',
-                  },
-                  gust: {
-                     value: catchData.catch.weatherWindGustValue ?? 0,
-                     unit:
-                        catchData.catch.weatherWindGustUnit ??
-                        'KILOMETERS_PER_HOUR',
-                  },
-               },
-               cloudCover: catchData.catch.weatherCloudCover ?? 0,
-            });
-         }
+      return () => {
+         cancelled = true;
       };
+   }, [catchId, attempt]);
 
-      void load();
-   }, [catchId]);
-
-   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      if (!catchId) return;
-      const formData = new FormData(event.currentTarget);
-
-      await axios.put(`/api/catches/${catchId}`, {
-         title: String(formData.get('title') ?? ''),
-         notes: String(formData.get('notes') ?? '') || null,
-         caughtAt: new Date(
-            String(formData.get('caughtAt') ?? '')
-         ).toISOString(),
-         siteId: String(formData.get('siteId') ?? '') || null,
-         weather: weatherOverview.trim() || null,
-         weatherSnapshot,
-         length:
-            Number(lengthValue) > 0
-               ? lengthUnit === 'ft'
-                  ? Number((Number(lengthValue) * 30.48).toFixed(2))
-                  : Number(lengthValue)
-               : null,
-         weight:
-            Number(weightValue) > 0
-               ? weightUnit === 'lbs'
-                  ? Number((Number(weightValue) * 0.453592).toFixed(2))
-                  : Number(weightValue)
-               : null,
-         gearIds: selectedGearIds,
-      });
-
-      toast({ title: 'Catch updated', variant: 'success' });
-      navigate(`/catches/${catchId}`);
+   const retry = () => {
+      setState('loading');
+      setAttempt((count) => count + 1);
    };
 
-   const toggleGearSelection = (gearId: string) => {
-      setSelectedGearIds((previous) =>
-         previous.includes(gearId)
-            ? previous.filter((id) => id !== gearId)
-            : [...previous, gearId]
-      );
-   };
-
-   const loadLatestConditions = async () => {
-      const selectedSite = sites.find((site) => site.id === item?.site?.id);
-      const latitude =
-         selectedSite?.latitude ??
-         item?.site?.latitude ??
-         currentCoords?.latitude;
-      const longitude =
-         selectedSite?.longitude ??
-         item?.site?.longitude ??
-         currentCoords?.longitude;
-
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-         toast({
-            title: 'No coordinates available',
-            description:
-               'Pick a site with coordinates or enable location access.',
-            variant: 'error',
-         });
+   /* A skeleton that never resolves becomes a sentence with a way forward. */
+   useEffect(() => {
+      if (state !== 'loading') {
          return;
       }
+      const timer = window.setTimeout(() => {
+         setState((current) => (current === 'loading' ? 'failed' : current));
+      }, 5000);
+      return () => window.clearTimeout(timer);
+   }, [state]);
 
-      try {
-         setIsWeatherLoading(true);
-         const { data } = await axios.get('/api/weather/current', {
-            params: { latitude, longitude },
-         });
-         setWeatherSnapshot(data.weather ?? null);
-         setWeatherOverview(
-            data.weather?.weatherCondition?.description?.text ?? ''
-         );
-         toast({ title: 'Conditions updated', variant: 'success' });
-      } catch (error) {
-         console.error('Unable to refresh weather conditions', error);
-         toast({
-            title: 'Unable to update conditions',
-            description: 'Please try again in a moment.',
-            variant: 'error',
-         });
-      } finally {
-         setIsWeatherLoading(false);
+   useDocumentTitle(record ? `Edit ${record.title}` : 'Edit a catch');
+
+   const initial = useMemo<CatchFormInitial | null>(() => {
+      if (!record) {
+         return null;
       }
-   };
+
+      return {
+         title: record.title,
+         notes: record.notes,
+         caughtAt: record.caughtAt,
+         siteId: record.site?.id ?? null,
+         latitude: record.latitude ?? null,
+         longitude: record.longitude ?? null,
+         visibility: record.visibility,
+         hideLocation: record.hideLocation ?? false,
+         length: record.length,
+         weight: record.weight,
+         count: record.count,
+         depth: record.depth,
+         waterTemp: record.waterTemp,
+         released: record.released ?? false,
+         lengthSource: record.lengthSource,
+         weightSource: record.weightSource,
+         competitionId: record.competitionId ?? null,
+         gearIds: (record.gears ?? []).map((entry) => entry.id),
+         gears: record.gears ?? [],
+         images: (record.images ?? []).map((entry) => ({
+            storageKey: entry.image.storageKey,
+            url: entry.image.url,
+            cardUrl: entry.image.cardUrl ?? null,
+            focusX: entry.image.focusX ?? null,
+            focusY: entry.image.focusY ?? null,
+            zoom: entry.image.zoom ?? null,
+         })),
+         snapshot: snapshotFromStoredConditions(record),
+         weather: record.weather ?? null,
+      };
+   }, [record]);
 
    return (
-      <div className="min-h-screen">
-         <LandingHeader />
-         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-            <FishingActionBar />
-            {!item ? (
-               <FishingBobberLoader label="Loading catch editor..." />
-            ) : (
-               <form
-                  onSubmit={onSubmit}
-                  className="grid gap-3 rounded-lg border p-4"
+      <RequireSignIn what="this catch">
+         <section className="mx-auto w-[min(1400px,100%-32px)] py-8 md:py-12">
+            {/* The phone's way out, as on the log form; the rail has Cancel. */}
+            <div className="flex items-start justify-between gap-4">
+               <h1 className="g text-[44px] md:text-[56px]">
+                  {record ? record.title : 'Edit a catch'}
+               </h1>
+               <Link
+                  to={catchId ? `/catches/${catchId}` : '/catches/me'}
+                  aria-label="Close without saving"
+                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-line text-ink hover:border-ink lg:hidden"
                >
-                  <h1 className="text-2xl font-semibold">Edit catch</h1>
-                  <input
-                     name="title"
-                     defaultValue={item.title}
-                     className="rounded border p-2"
-                     required
-                  />
-                  <input
-                     name="caughtAt"
-                     type="datetime-local"
-                     defaultValue={item.caughtAt.slice(0, 16)}
-                     className="rounded border p-2"
-                     required
-                  />
-                  <textarea
-                     name="notes"
-                     defaultValue={item.notes ?? ''}
-                     className="rounded border p-2"
-                  />
-                  <select
-                     name="siteId"
-                     defaultValue={item.site?.id ?? ''}
-                     className="rounded border p-2"
-                  >
-                     <option value="">No fishing spot selected</option>
-                     {sites.map((site) => (
-                        <option key={site.id} value={site.id}>
-                           {site.name}
-                        </option>
-                     ))}
-                  </select>
-                  <fieldset className="grid gap-2 rounded border p-3">
-                     <legend className="px-1 text-sm font-medium">
-                        Gear used
-                     </legend>
-                     {gear.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                           No gear found in the database yet.
-                        </p>
-                     ) : (
-                        <div className="grid gap-2">
-                           {gear.map((entry) => {
-                              const selected = selectedGearIds.includes(
-                                 entry.id
-                              );
+                  <XMarkIcon className="size-5" aria-hidden="true" />
+               </Link>
+            </div>
 
-                              return (
-                                 <label
-                                    key={entry.id}
-                                    className="flex cursor-pointer items-center gap-3 rounded border p-2"
-                                 >
-                                    <input
-                                       type="checkbox"
-                                       checked={selected}
-                                       onChange={() =>
-                                          toggleGearSelection(entry.id)
-                                       }
-                                    />
-                                    {entry.imageUrl ? (
-                                       <img
-                                          src={entry.imageUrl}
-                                          alt={entry.name}
-                                          className="h-10 w-10 rounded border object-cover"
-                                       />
-                                    ) : null}
-                                    <span className="text-sm">
-                                       <span className="font-medium">
-                                          {entry.name}
-                                       </span>{' '}
-                                       <span className="text-muted-foreground">
-                                          • {entry.brand} •{' '}
-                                          {entry.type.toLowerCase()}
-                                       </span>
-                                    </span>
-                                 </label>
-                              );
-                           })}
-                        </div>
-                     )}
-                  </fieldset>
-                  <fieldset className="grid gap-3 rounded border p-3">
-                     <legend className="px-1 text-sm font-medium">
-                        Conditions
-                     </legend>
-                     <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => void loadLatestConditions()}
-                        disabled={isWeatherLoading}
-                     >
-                        {isWeatherLoading
-                           ? 'Loading conditions...'
-                           : 'Load latest conditions'}
-                     </Button>
-                     <label className="grid gap-1 text-sm font-medium">
-                        <span>Overview</span>
-                        <input
-                           name="weather"
-                           value={weatherOverview}
-                           onChange={(event) =>
-                              setWeatherOverview(event.target.value)
-                           }
-                           className="rounded border p-2"
-                        />
-                     </label>
-                     <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="grid gap-1 text-sm font-medium">
-                           <span>Temperature</span>
-                           <input
-                              readOnly
-                              value={formatWeatherMetric(
-                                 weatherSnapshot?.temperature?.degrees,
-                                 weatherSnapshot?.temperature?.unit,
-                                 'temperature'
-                              )}
-                              className="rounded border p-2"
-                           />
-                        </label>
-                        <label className="grid gap-1 text-sm font-medium">
-                           <span>Cloud cover</span>
-                           <input
-                              readOnly
-                              value={
-                                 weatherSnapshot?.cloudCover !== undefined
-                                    ? `${weatherSnapshot.cloudCover}%`
-                                    : ''
-                              }
-                              className="rounded border p-2"
-                           />
-                        </label>
-                        <label className="grid gap-1 text-sm font-medium">
-                           <span>Wind</span>
-                           <input
-                              readOnly
-                              value={`${formatCardinal(weatherSnapshot?.wind?.direction?.cardinal)} ${formatWeatherMetric(weatherSnapshot?.wind?.speed?.value, weatherSnapshot?.wind?.speed?.unit)}`.trim()}
-                              className="rounded border p-2"
-                           />
-                        </label>
-                        <label className="grid gap-1 text-sm font-medium">
-                           <span>Wind gust</span>
-                           <input
-                              readOnly
-                              value={formatWeatherMetric(
-                                 weatherSnapshot?.wind?.gust?.value,
-                                 weatherSnapshot?.wind?.gust?.unit
-                              )}
-                              className="rounded border p-2"
-                           />
-                        </label>
-                     </div>
-                  </fieldset>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                     <label className="grid gap-1 text-sm font-medium">
-                        <span>Length</span>
-                        <div className="grid grid-cols-[1fr_auto] gap-2">
-                           <input
-                              name="length"
-                              value={lengthValue}
-                              onChange={(event) =>
-                                 setLengthValue(event.target.value)
-                              }
-                              type="number"
-                              inputMode="decimal"
-                              step="0.1"
-                              className="rounded border p-2"
-                           />
-                           <select
-                              value={lengthUnit}
-                              onChange={(event) =>
-                                 setLengthUnit(
-                                    event.target.value as 'cm' | 'ft'
-                                 )
-                              }
-                              className="rounded border p-2"
-                           >
-                              <option value="cm">cm</option>
-                              <option value="ft">ft</option>
-                           </select>
-                        </div>
-                     </label>
-                     <label className="grid gap-1 text-sm font-medium">
-                        <span>Weight</span>
-                        <div className="grid grid-cols-[1fr_auto] gap-2">
-                           <input
-                              name="weight"
-                              value={weightValue}
-                              onChange={(event) =>
-                                 setWeightValue(event.target.value)
-                              }
-                              type="number"
-                              inputMode="decimal"
-                              step="0.1"
-                              className="rounded border p-2"
-                           />
-                           <select
-                              value={weightUnit}
-                              onChange={(event) =>
-                                 setWeightUnit(
-                                    event.target.value as 'kg' | 'lbs'
-                                 )
-                              }
-                              className="rounded border p-2"
-                           >
-                              <option value="kg">kg</option>
-                              <option value="lbs">lbs</option>
-                           </select>
-                        </div>
-                     </label>
+            {state === 'loading' ? (
+               <div className="mt-10">
+                  <EditSkeleton />
+               </div>
+            ) : null}
+
+            {state === 'missing' ? (
+               <div className="mt-6 flex flex-col items-start gap-6">
+                  <p className="max-w-[52ch] text-ink-2">
+                     That catch is not here. It may have been deleted.
+                  </p>
+                  <Button asChild>
+                     <Link to="/catches/me">Back to catches</Link>
+                  </Button>
+               </div>
+            ) : null}
+
+            {state === 'failed' ? (
+               <div className="mt-6 flex flex-col items-start gap-6">
+                  <p className="max-w-[52ch] text-destructive">
+                     Could not read this catch.
+                  </p>
+                  <Button variant="outline" onClick={retry}>
+                     Try again
+                  </Button>
+               </div>
+            ) : null}
+
+            {state === 'ready' && initial && catchId ? (
+               <>
+                  <p className="mt-3 max-w-[52ch] text-ink-2">
+                     Everything you logged is here. Change what is wrong and
+                     leave the rest.
+                  </p>
+                  <div className="mt-10">
+                     <CatchForm
+                        mode="edit"
+                        catchId={catchId}
+                        initial={initial}
+                     />
                   </div>
-                  <Button type="submit">Save changes</Button>
-               </form>
-            )}
-         </main>
-      </div>
+               </>
+            ) : null}
+         </section>
+      </RequireSignIn>
    );
 }

@@ -1,0 +1,32 @@
+{
+   "$schema": "https://openapi.vercel.sh/vercel.json",
+   "rewrites": [
+      {
+         "source": "/api/:path*",
+         "destination": "https://server-production-a002.up.railway.app/api/:path*"
+      },
+      {
+         "source": "/((?!api/).*)",
+         "destination": "/index.html"
+      }
+   ],
+   "headers": [
+      {
+         "source": "/api/:path*",
+         "headers": [{ "key": "x-vercel-enable-rewrite-caching", "value": "0" }]
+      },
+      {
+         "source": "/sw.js",
+         "headers": [
+            { "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" },
+            { "key": "Service-Worker-Allowed", "value": "/" }
+         ]
+      },
+      {
+         "source": "/manifest.webmanifest",
+         "headers": [
+            { "key": "Content-Type", "value": "application/manifest+json" }
+         ]
+      }
+   ]
+}

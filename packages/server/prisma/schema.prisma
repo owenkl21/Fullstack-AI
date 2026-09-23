@@ -7,6 +7,123 @@ datasource db {
   provider = "mysql"
 }
 
+/**
+ * Who can see a record. PRIVATE is the floor a group feature has to respect:
+ * joining a group must never be the thing that publishes an angler's mark.
+ */
+enum Visibility {
+  PRIVATE
+  GROUPS
+  PUBLIC
+}
+
+enum GroupRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum GroupJoinMode {
+  OPEN
+  INVITE_ONLY
+  CODE
+}
+
+enum CompetitionRule {
+  SPECIES_POINTS
+  BIGGEST_FISH
+  SPECIES_VARIETY
+}
+
+/**
+ * What a fish is judged on. Separate from the rule, which decides how the
+ * judging becomes a position: "biggest fish" has to say biggest by what.
+ */
+/**
+ * Which units an angler reads in. South Africa is metric, so that is the
+ * default, but plenty of tackle and plenty of visiting anglers are not.
+ */
+/**
+ * What a waypoint is for. A mark on a map means nothing six months later
+ * without knowing why it was dropped.
+ */
+enum WaypointKind {
+  MARK
+  ACCESS
+  HAZARD
+  PARKING
+  BAIT
+}
+
+enum UnitSystem {
+  METRIC
+  IMPERIAL
+}
+
+/**
+ * What an account is allowed to do. ANGLER is everybody; ADMIN is the one
+ * account the app is run from, and it is granted by address in lib/admin.ts
+ * rather than set by hand, so no request can ask for it.
+ */
+enum UserRole {
+  ANGLER
+  ADMIN
+}
+
+enum CompetitionMeasure {
+  LENGTH
+  WEIGHT
+}
+
+/**
+ * Who can see and enter. A competition with no group is open to everyone and
+ * appears on the global list; GROUP keeps it to its group as before.
+ */
+enum CompetitionScope {
+  PUBLIC
+  GROUP
+  /**
+   * Invitation only: the organiser invites followers, who have a week to
+   * accept. Visible to nobody but the people in it.
+   */
+  PRIVATE
+}
+
+enum InviteState {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum CompetitionState {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+enum SizeClass {
+  EDIBLE
+  NON_EDIBLE
+}
+
+/**
+ * Where the mass on a catch came from. Changes the word on the record, not the
+ * arithmetic: scoring derives mass from length either way.
+ */
+enum WeightSource {
+  LENGTH
+  SCALE
+  EYE
+}
+
+/**
+ * How a length was taken: guessed, or read off a tape.
+ */
+enum LengthSource {
+  EYE
+  TAPE
+}
+
 enum WaterType {
   FRESHWATER
   SALTWATER
@@ -22,6 +139,7 @@ enum GearType {
   LINE
   HOOK
   WEIGHTS
+  RIG
 }
 
 enum FeedPostType {
@@ -34,30 +152,105 @@ enum FeedScope {
   NEARBY
 }
 
+enum NotificationKind {
+  FOLLOW
+  COMMENT
+  LIKE
+  INVITE
+  INVITE_ANSWER
+  // Somebody answered a comment of yours, or liked one. Added after the five
+  // above, so they sit at the end: the column is an enum and only grows.
+  COMMENT_REPLY
+  COMMENT_LIKE
+  /* The Fisherfeed team pinned a badge on one of your fish. */
+  BADGE
+}
+
 model User {
-  id           String        @id @default(cuid())
-  clerkId      String        @unique
-  email        String        @unique
-  username     String        @unique
-  displayName  String
-  bio          String?
-  avatarUrl    String?
-  catches      Catch[]
-  sites        FishingSite[]
-  reviews      Review[]
-  comments     Comment[]
-  uploaded     Image[]       @relation("UploadedImages")
-  following    Follow[]      @relation("FollowerRelation")
-  followers    Follow[]      @relation("FollowingRelation")
-  catchLikes   CatchLike[]
-  siteLikes    SiteLike[]
-  gear         Gear[]
-  feedPosts    FeedPost[]
-  feedLikes    FeedLike[]
-  feedComments FeedComment[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  deletedAt    DateTime?
+  id                         String               @id @default(cuid())
+  email                      String               @unique
+  emailVerified              Boolean              @default(false)
+  // The R2 key prefix. Objects are stored under users/<storagePrefixId>/, so
+  // this has to stay stable even though the auth id it used to be has gone.
+  storagePrefixId            String               @unique
+  // Nullable now: a new sign-up has no username until the angler picks one.
+  username                   String?              @unique
+  displayName                String
+  /**
+   * On the Fisherfeed team: the people who run the app. Drawn as a badge
+   * beside the name. Granted to the team's own addresses on sign-in, and by
+   * the admin panel to anyone else; nothing a request sends can set it.
+   */
+  team                       Boolean              @default(false)
+  bio                        String?              @db.Text
+  avatarUrl                  String?
+  /**
+   * Figures are shown in this: kilograms and centimetres, or pounds and inches.
+   */
+  unitSystem                 UnitSystem           @default(METRIC)
+  /**
+   * The photograph across the top of a profile, behind the name. Separate from
+   * the avatar: one is who you are, the other is where you fish.
+   */
+  bannerUrl                  String?
+  /**
+   * Which Terms and Privacy Policy the account agreed to at sign-up, by their
+   * date, and when. Null on accounts made before the box existed.
+   */
+  termsVersion               String?
+  termsAcceptedAt            DateTime?
+  /**
+   * What this account may do. Written by the server alone, from the address on
+   * a confirmed row, and never from anything a request carries.
+   */
+  role                       UserRole             @default(ANGLER)
+  /**
+   * The tick beside the name. One account in the app has it, the same one that
+   * holds ADMIN, so it is not a thing an angler can earn or ask for.
+   */
+  verified                   Boolean              @default(false)
+  catches                    Catch[]
+  sites                      FishingSite[]
+  reviews                    Review[]
+  comments                   Comment[]
+  uploaded                   Image[]              @relation("UploadedImages")
+  following                  Follow[]             @relation("FollowerRelation")
+  followers                  Follow[]             @relation("FollowingRelation")
+  catchLikes                 CatchLike[]
+  siteLikes                  SiteLike[]
+  gear                       Gear[]
+  feedPosts                  FeedPost[]
+  feedLikes                  FeedLike[]
+  feedComments               FeedComment[]
+  feedCommentLikes           FeedCommentLike[]
+  reportsMade                ContentReport[]      @relation("ReportsMade")
+  reportsResolved            ContentReport[]      @relation("ReportsResolved")
+  sessions                   Session[]
+  accounts                   Account[]
+  groupsCreated              Group[]              @relation("GroupsCreated")
+  groupMemberships           GroupMember[]
+  competitionsCreated        Competition[]        @relation("CompetitionsCreated")
+  competitionEntries         CompetitionEntrant[]
+  waypoints                  Waypoint[]
+  savedSpots                 SavedSpot[]          @relation("SavedSpots")
+  savedGear                  SavedGear[]          @relation("SavedGear")
+  savedPosts                 SavedPost[]          @relation("SavedPosts")
+  notifications              Notification[]       @relation("Notifications")
+  notificationsSent          Notification[]       @relation("NotificationsSent")
+  pushSubscriptions          PushSubscription[]   @relation("PushSubscriptions")
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  deletedAt                  DateTime?
+  competitionInvitesReceived CompetitionInvite[]  @relation("CompetitionInvitesReceived")
+  competitionInvitesSent     CompetitionInvite[]  @relation("CompetitionInvitesSent")
+
+  competitionCatchEntries CompetitionEntry[] @relation("CompetitionEntriesByUser")
+
+  /**
+   * Badges this account pinned on other anglers' fish. Only an ADMIN ever has
+   * a row here, so it is the team's own record of what it has marked.
+   */
+  badgesAwarded CatchBadge[] @relation("BadgesAwarded")
 
   @@map("users")
 }
@@ -67,11 +260,15 @@ model FishingSite {
   createdById String
   createdBy   User        @relation(fields: [createdById], references: [id])
   name        String
-  description String?
+  description String?     @db.Text
   latitude    Float?
   longitude   Float?
   waterType   WaterType?
-  accessNotes String?
+  /**
+   * A spot is the thing anglers most want to keep to themselves.
+   */
+  visibility  Visibility  @default(PUBLIC)
+  accessNotes String?     @db.Text
   likeCount   Int         @default(0)
   reviewCount Int         @default(0)
   catchCount  Int         @default(0)
@@ -80,6 +277,7 @@ model FishingSite {
   likes       SiteLike[]
   images      SiteImage[]
   feedPosts   FeedPost[]
+  savedBy     SavedSpot[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   deletedAt   DateTime?
@@ -88,30 +286,43 @@ model FishingSite {
 }
 
 model Gear {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdBy   User        @relation(fields: [createdById], references: [id])
   name        String
   brand       String
   type        GearType
   imageUrl    String?
   catches     Catch[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  savedBy     SavedGear[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   @@index([createdById])
   @@map("gear")
 }
 
 model Species {
-  id             String   @id @default(cuid())
+  id             String        @id @default(cuid())
   commonName     String
   scientificName String?
   aliases        Json?
   regionTags     Json?
+  // Scoring. All optional, so a species with no parameters still logs; it
+  // simply does not score, which is visible rather than guessed at.
+  lwA            Float? // FishBase a, total length in cm to grams
+  lwB            Float? // FishBase b
+  lwSource       String? // where a and b came from, printed in the interface
+  sizeClass      SizeClass     @default(EDIBLE)
+  minLegalCm     Int? // DFFE minimum size
+  closedFrom     String? // "10-15", MM-DD, no year
+  closedTo       String? // "02-28"
+  limitsSource   String? // the brochure and its date
   catches        Catch[]
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  competitions   Competition[]
+  competitionsAllowedIn CompetitionSpecies[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model Catch {
@@ -124,10 +335,32 @@ model Catch {
   species                                 Species?     @relation(fields: [speciesId], references: [id], onDelete: SetNull)
   gears                                   Gear[]
   title                                   String
-  notes                                   String?
+  notes                                   String?      @db.Text
   caughtAt                                DateTime
   weight                                  Float?
   length                                  Float?
+  // Appendix E gap B5. Until this existed the seed had to put "Released." in
+  // the notes text, which no query can read.
+  /**
+   * /**
+   * /* The last fish of a log that carries several, read from the photographs
+   * where they carry a time. Null when there was one fish or one photo.
+   */
+  caughtUntil                             DateTime?
+  released                                Boolean      @default(false)
+  weightSource                            WeightSource @default(LENGTH)
+  lengthSource                            LengthSource @default(EYE)
+  /**
+   * Logged for a competition. The figure was read off a photograph of the
+   * fish on a tape or a scale, so nobody has to take anyone's word for it.
+   */
+  competitionId                           String?
+  competition                             Competition? @relation(fields: [competitionId], references: [id], onDelete: SetNull)
+  readMeasure                             Float?
+  readMeasureUnit                         String?
+  readConfidence                          Float?
+  readNote                                String?      @db.VarChar(280)
+  visibility                              Visibility   @default(PUBLIC)
   count                                   Int          @default(1)
   weather                                 String?
   waterTemp                               Float?
@@ -154,19 +387,68 @@ model Catch {
   weatherVisibilityDistanceUnit           String?
   weatherIsDaytime                        Boolean?
   weatherRelativeHumidity                 Int?
-  weatherUvIndex                          Int?
-  weatherThunderstormProbability          Int?
-  weatherCloudCover                       Int?
-  depth                                   Float?
-  likeCount                               Int          @default(0)
-  commentCount                            Int          @default(0)
-  comments                                Comment[]
-  likes                                   CatchLike[]
-  images                                  CatchImage[]
-  feedPosts                               FeedPost[]
-  createdAt                               DateTime     @default(now())
-  updatedAt                               DateTime     @updatedAt
-  deletedAt                               DateTime?
+
+  /**
+   * The rest of the reading. These were being fetched and shown and then
+   * dropped on save, so a catch could tell you the air pressure at the time and
+   * not the water temperature, which is the one a shore angler would ask about
+   * first. A record that cannot answer that is not a record of the conditions.
+   */
+  weatherSeaSurfaceTemperatureC Float?
+  weatherWaveHeightM            Float?
+  weatherSwellHeightM           Float?
+  weatherSwellPeriodS           Float?
+  weatherSunrise                DateTime?
+  weatherSunset                 DateTime?
+  /**
+   * Worked out from the date rather than fetched, and kept so the record does
+   * not have to recompute it against a changing definition later.
+   */
+  weatherMoonPhase              String?
+  weatherMoonIllumination       Float?
+  weatherMoonSpringTide         Boolean?
+
+  /**
+   * Show the catch, hide where it came from.
+   * Separate from visibility on purpose. Visibility asks who may see the catch
+   * at all; this asks whether its position travels with it. An angler will
+   * happily show a fish and not the gully it came out of, and forcing that
+   * choice to be all or nothing is how a log stops being used.
+   * The position is still stored. It is withheld from other anglers, not
+   * discarded, so the record stays complete.
+   */
+  hideLocation Boolean @default(false)
+
+  /**
+   * Where exactly. A saved spot is a place you go back to; this is where this
+   * one fish came out, which can be along the ledge from the spot or nowhere
+   * near a saved spot at all when a catch is logged after the fact. Null when
+   * only the spot is known. Withheld from other anglers when hideLocation is
+   * set, never discarded.
+   */
+  latitude                       Float?
+  longitude                      Float?
+  weatherUvIndex                 Int?
+  weatherThunderstormProbability Int?
+  weatherCloudCover              Int?
+  depth                          Float?
+  likeCount                      Int          @default(0)
+  commentCount                   Int          @default(0)
+  comments                       Comment[]
+  likes                          CatchLike[]
+  /**
+   * What the Fisherfeed team has marked this fish as. It hangs on the catch
+   * and not on the post: one catch can be posted, opened on its own page and
+   * listed in a row, and the badge belongs to the fish in all three.
+   */
+  badges                         CatchBadge[]
+  images                         CatchImage[]
+  feedPosts                      FeedPost[]
+  createdAt                      DateTime     @default(now())
+  updatedAt                      DateTime     @updatedAt
+  deletedAt                      DateTime?
+
+  competitionEntries CompetitionEntry[]
 
   @@index([createdById, caughtAt(sort: Desc)])
   @@index([siteId, caughtAt(sort: Desc)])
@@ -179,7 +461,7 @@ model Review {
   userId    String
   user      User        @relation(fields: [userId], references: [id])
   rating    Int
-  body      String
+  body      String      @db.Text
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   deletedAt DateTime?
@@ -194,7 +476,7 @@ model Comment {
   catch     Catch     @relation(fields: [catchId], references: [id])
   userId    String
   user      User      @relation(fields: [userId], references: [id])
-  body      String
+  body      String    @db.Text
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -239,8 +521,21 @@ model SiteLike {
 
 model Image {
   id           String       @id @default(cuid())
-  url          String
-  storageKey   String       @unique
+  url          String       @db.VarChar(512)
+  storageKey   String       @unique @db.VarChar(512)
+  /**
+   * Where the eye should land when the picture is cropped to a frame, as
+   * fractions across and down. Null means the middle.
+   */
+  focusX       Float?
+  focusY       Float?
+  /**
+   * How far the angler pushed in when framing it, 1 to 3. The file is never
+   * cropped: this and the focus are applied where the picture is drawn. Null
+   * means it was never framed with the tool and reads as 1, which is also how
+   * a centre the old log wrote on every photo is told from a chosen one.
+   */
+  zoom         Float?
   uploadedById String
   uploadedBy   User         @relation("UploadedImages", fields: [uploadedById], references: [id])
   catchLinks   CatchImage[]
@@ -276,7 +571,10 @@ model FeedPost {
   author       User          @relation(fields: [authorId], references: [id])
   type         FeedPostType
   scope        FeedScope     @default(GLOBAL)
-  content      String?
+  visibility   Visibility    @default(PUBLIC)
+  groupId      String?
+  group        Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  content      String?       @db.Text
   catchId      String?
   catch        Catch?        @relation(fields: [catchId], references: [id], onDelete: SetNull)
   siteId       String?
@@ -287,9 +585,17 @@ model FeedPost {
   commentCount Int           @default(0)
   likes        FeedLike[]
   comments     FeedComment[]
+  saves        SavedPost[]
+  reports      ContentReport[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
+  /**
+   * Taken out of sight while the team looks at it: set when enough different
+   * people report it, cleared if the team keeps it. Unlike deletedAt it is not
+   * the author's doing and not final, so the author still sees their own post.
+   */
+  hiddenAt     DateTime?
 
   @@index([createdAt(sort: Desc)])
   @@index([scope, createdAt(sort: Desc)])
@@ -308,15 +614,659 @@ model FeedLike {
 }
 
 model FeedComment {
-  id        String    @id @default(cuid())
+  id        String            @id @default(cuid())
   postId    String
-  post      FeedPost  @relation(fields: [postId], references: [id])
+  post      FeedPost          @relation(fields: [postId], references: [id])
   userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  body      String
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  user      User              @relation(fields: [userId], references: [id])
+  body      String            @db.Text
+  /**
+   * A reply hangs off a top-level comment and never off another reply: the
+   * thread is one level deep, so a reply to a reply takes the same parent and
+   * names who it answers in its first word. Null is a top-level comment.
+   */
+  parentId  String?
+  parent    FeedComment?      @relation("FeedCommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   FeedComment[]     @relation("FeedCommentReplies")
+  /**
+   * Kept beside the join rows the way FeedPost keeps its own, so a thread is
+   * read without counting. A removed comment keeps its rows and its figure;
+   * neither is read again, because every read filters on deletedAt.
+   */
+  likeCount Int               @default(0)
+  likes     FeedCommentLike[]
+  /**
+   * Set when the author changes the words, and never by anything else:
+   * updatedAt also moves when a like is counted, so it cannot say "edited".
+   */
+  editedAt  DateTime?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
   deletedAt DateTime?
+  /* Out of sight while reported. See FeedPost.hiddenAt. */
+  hiddenAt  DateTime?
+  reports   ContentReport[]
 
   @@index([postId, createdAt(sort: Desc)])
+  @@index([parentId])
+}
+
+model FeedCommentLike {
+  id        String      @id @default(cuid())
+  commentId String
+  comment   FeedComment @relation(fields: [commentId], references: [id])
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  createdAt DateTime    @default(now())
+
+  @@unique([commentId, userId])
+  @@index([userId])
+}
+
+/**
+ * ---------- better-auth. Field names are its own, do not rename them. ----------
+ */
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?  @db.Text
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?   @db.Text
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String   @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verifications")
+}
+
+/**
+ * ---------- Groups and competitions ----------
+ */
+
+model Group {
+  id           String        @id @default(cuid())
+  name         String
+  blurb        String?       @db.VarChar(280)
+  createdById  String
+  createdBy    User          @relation("GroupsCreated", fields: [createdById], references: [id])
+  joinMode     GroupJoinMode @default(INVITE_ONLY)
+  joinCode     String?       @unique
+  memberCount  Int           @default(0)
+  members      GroupMember[]
+  competitions Competition[]
+  feedPosts    FeedPost[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+
+  @@index([createdById])
+  @@map("groups")
+}
+
+model GroupMember {
+  id       String    @id @default(cuid())
+  groupId  String
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  @@unique([groupId, userId])
+  @@index([userId, leftAt])
+  @@map("group_members")
+}
+
+model Competition {
+  id                  String               @id @default(cuid())
+  name                String
+  groupId             String?
+  group               Group?               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdById         String
+  createdBy           User                 @relation("CompetitionsCreated", fields: [createdById], references: [id])
+  rule                CompetitionRule      @default(SPECIES_POINTS)
+  measure             CompetitionMeasure   @default(LENGTH)
+  scope               CompetitionScope     @default(GROUP)
+  /**
+   * What the organiser wrote about it, shown on the listing.
+   */
+  blurb               String?              @db.VarChar(280)
+  entrants            CompetitionEntrant[]
+  invites             CompetitionInvite[]
+  /**
+   * Catches logged for this competition, with a reading off a photograph.
+   */
+  catches             Catch[]
+  /**
+   * Set, and it is a target-species competition rather than a fourth rule.
+   */
+  speciesId           String?
+  species             Species?             @relation(fields: [speciesId], references: [id], onDelete: SetNull)
+  /**
+   * The fish a competition is for, when it is for more than any fish. No rows
+   * means any species. speciesId above is the older single column: it is still
+   * written when exactly one fish is chosen, and a row that has it and no rows
+   * here is read as a list of one.
+   */
+  speciesAllowed      CompetitionSpecies[]
+  startsAt            DateTime
+  endsAt              DateTime
+  /**
+   * A South African competition that ends "on Sunday" ends at 23:59 in
+   * Africa/Johannesburg and nowhere else, so the zone travels with the dates.
+   */
+  timeZoneId          String               @default("Africa/Johannesburg")
+  state               CompetitionState     @default(DRAFT)
+  maxPerSpeciesPerDay Int                  @default(3)
+  /**
+   * Where a catch has to come from. Anywhere; a waterbody (a place with a
+   * radius around it); or a province. The exact spot is never shown.
+   */
+  areaType            CompetitionArea      @default(ANYWHERE)
+  areaName            String?              @db.VarChar(120)
+  areaLatitude        Float?
+  areaLongitude       Float?
+  areaRadiusKm        Float?
+  /**
+   * Casual: an entry counts as soon as its checks pass. Review: every entry
+   * waits for the organiser.
+   */
+  checks              CompetitionChecks    @default(CASUAL)
+  /**
+   * Teams: anglers join a side as well as the competition, and the board adds
+   * a table for the sides. Off by default, so every competition made before
+   * teams existed reads exactly as it did.
+   */
+  teamsEnabled        Boolean              @default(false)
+  /* How many one side may hold. Null is no limit. */
+  maxPerTeam          Int?
+  teams               CompetitionTeam[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  deletedAt           DateTime?
+
+  entries CompetitionEntry[]
+
+  @@index([groupId, startsAt(sort: Desc)])
+  @@index([scope, startsAt(sort: Desc)])
+  @@map("competitions")
+}
+
+/**
+ * Who entered. Standings are still worked out from the catches themselves, so
+ * this records intent to compete rather than any score: a derived board cannot
+ * drift from the records it describes, and this keeps that true.
+ */
+/**
+ * A private mark on the map.
+ * Never shared, with nobody, ever. There is no visibility column here on
+ * purpose: a spot has one because a spot can be shown to people, and the moment
+ * a waypoint grows one somebody will set it wrong. A fishing mark is the most
+ * closely held thing an angler has, and the promise the interface makes is that
+ * these are only ever yours.
+ */
+/**
+ * Somebody else's spot or piece of gear, kept.
+ * A reference rather than a copy. Copying would freeze a name and a position
+ * that the owner can still change, and would quietly turn a spot somebody later
+ * made private into one you still hold. Holding the id means the moment they
+ * withdraw it, it stops resolving, which is the behaviour anyone would expect.
+ */
+model SavedSpot {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation("SavedSpots", fields: [userId], references: [id], onDelete: Cascade)
+  siteId    String
+  site      FishingSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  note      String?     @db.VarChar(500)
+  createdAt DateTime    @default(now())
+
+  @@unique([userId, siteId])
+  @@index([userId])
+  @@map("saved_spots")
+}
+
+/**
+ * A post kept from the feed. A reference: the post's own visibility still rules.
+ */
+model SavedPost {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("SavedPosts", fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@map("saved_posts")
+}
+
+/**
+ * Something that happened to you: a follow, a reply, a like, an invitation.
+ * Read by polling; nothing here is pushed. The actor is optional so a
+ * notification survives the actor's account going.
+ */
+model Notification {
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation("Notifications", fields: [userId], references: [id], onDelete: Cascade)
+  actorId       String?
+  actor         User?            @relation("NotificationsSent", fields: [actorId], references: [id], onDelete: SetNull)
+  kind          NotificationKind
+  postId        String?
+  competitionId String?
+  /**
+   * The comment a COMMENT, COMMENT_REPLY or COMMENT_LIKE row is about. A plain
+   * id like postId, not a relation: it exists so the rows can be found and
+   * dropped in the same transaction that removes the comment, which keeps an
+   * inbox from quoting words their author took down.
+   */
+  commentId     String?
+  /**
+   * The catch a BADGE row is about, so tapping the line opens the fish. A
+   * plain id like postId: the notification survives whatever happens to the
+   * catch, and a tap on a row whose catch has gone lands on Not found.
+   */
+  catchId       String?
+  body          String?          @db.VarChar(300)
+  readAt        DateTime?
+  createdAt     DateTime         @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@index([commentId])
+  @@map("notifications")
+}
+
+model SavedGear {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("SavedGear", fields: [userId], references: [id], onDelete: Cascade)
+  gearId    String
+  gear      Gear     @relation(fields: [gearId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, gearId])
+  @@index([userId])
+  @@map("saved_gear")
+}
+
+model Waypoint {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String       @db.VarChar(120)
+  note      String?      @db.VarChar(500)
+  kind      WaypointKind @default(MARK)
+  latitude  Float
+  longitude Float
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId, deletedAt])
+  @@map("waypoints")
+}
+
+/**
+ * One fish a competition is for. A join rather than a list in a column, so a
+ * species that is deleted takes its row with it and the rest of the list stands.
+ */
+model CompetitionSpecies {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  speciesId     String
+  species       Species     @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+
+  @@unique([competitionId, speciesId])
+  @@index([speciesId])
+  @@map("competition_species")
+}
+
+model CompetitionEntrant {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /* The side they fish for, in a competition with teams. Null otherwise. */
+  teamId        String?
+  team          CompetitionTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  joinedAt      DateTime    @default(now())
+  leftAt        DateTime?
+
+  @@unique([competitionId, userId])
+  @@index([userId, leftAt])
+  @@map("competition_entrants")
+}
+
+model CompetitionInvite {
+  id            String      @id @default(cuid())
+  competitionId String
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation("CompetitionInvitesReceived", fields: [userId], references: [id], onDelete: Cascade)
+  invitedById   String
+  invitedBy     User        @relation("CompetitionInvitesSent", fields: [invitedById], references: [id], onDelete: Cascade)
+  state         InviteState @default(PENDING)
+  /**
+   * After this an unanswered invitation lapses.
+   */
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+  answeredAt    DateTime?
+
+  @@unique([competitionId, userId])
+  @@index([userId, state])
+  @@map("competition_invites")
+}
+
+enum CompetitionArea {
+  ANYWHERE
+  WATERBODY
+  REGION
+}
+
+enum CompetitionChecks {
+  CASUAL
+  REVIEW
+}
+
+enum EntryState {
+  /**
+   * Submitted, checks still running.
+   */
+  PENDING
+  /**
+   * On the board.
+   */
+  COUNTED
+  /**
+   * Something did not add up, or the competition reviews everything: waiting for the organiser.
+   */
+  HELD
+  /**
+   * Excluded by the organiser, or withdrawn.
+   */
+  EXCLUDED
+}
+
+/**
+ * A catch entered in a competition, frozen as it was when it was entered.
+ * Editing the catch later does not move a result; deleting it excludes the
+ * entry. The position is kept for the area check and never sent to a client.
+ */
+model CompetitionEntry {
+  id              String             @id @default(cuid())
+  competitionId   String
+  competition     Competition        @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  catchId         String
+  catch           Catch              @relation(fields: [catchId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User               @relation("CompetitionEntriesByUser", fields: [userId], references: [id])
+  state           EntryState         @default(PENDING)
+  measure         CompetitionMeasure
+  speciesId       String?
+  speciesName     String?            @db.VarChar(120)
+  /**
+   * What the angler typed, metric.
+   */
+  declaredValue   Float?
+  /**
+   * What the reader saw on the tape or scale, metric, and how sure it was.
+   */
+  readValue       Float?
+  readConfidence  Float?
+  readNote        String?            @db.VarChar(280)
+  /**
+   * What the board uses: the reading when there is one, else the typed figure.
+   */
+  value           Float?
+  caughtAt        DateTime
+  latitude        Float?
+  longitude       Float?
+  areaConfirmed   Boolean            @default(false)
+  photoTakenAt    DateTime?
+  /**
+   * The two photographs, each by what it is rather than by its place in a
+   * list: the fish, and the fish on the tape, board or scale.
+   */
+  heroImageKey    String?            @db.VarChar(512)
+  heroImageUrl    String?            @db.VarChar(512)
+  measureImageKey String?            @db.VarChar(512)
+  measureImageUrl String?            @db.VarChar(512)
+  /**
+   * What the camera wrote in the measure photograph, when it wrote a time.
+   * A fish and its weigh in are minutes apart; days apart is worth a look.
+   */
+  measureTakenAt  DateTime?
+  note            String?            @db.VarChar(280)
+  /**
+   * The judge's reading of both photographs against the rules, as it came
+   * back and was checked (services/competition-judge.service.ts), or why it
+   * did not run. Null on an entry made before the judge existed.
+   */
+  judge           Json?
+  judgeModel      String?            @db.VarChar(64)
+  judgedAt        DateTime?
+  /**
+   * The fish's embedding from the namer, for the duplicate check.
+   */
+  fingerprint     Json?
+  /**
+   * The six checks, one line each.
+   */
+  report          Json?
+  /**
+   * The codes of the checks that flagged.
+   */
+  flags           Json?
+  flaggedById     String?
+  flagReason      String?            @db.VarChar(280)
+  flaggedAt       DateTime?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  reviewNote      String?            @db.VarChar(280)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([competitionId, catchId])
+  @@index([competitionId, state])
+  @@index([userId])
+  @@map("competition_entries")
+}
+
+/**
+ * One browser on one device that has asked to be told when something happens.
+ *
+ * The endpoint is the push service's own address for that browser and can run
+ * to several hundred characters, past what MySQL will index whole, so the
+ * unique key is its SHA-256 and the address itself is only ever read. A
+ * browser belongs to whoever turned it on last: signing in as somebody else
+ * on the same phone and turning it on moves the row rather than adding one.
+ */
+model PushSubscription {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation("PushSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+  endpointHash  String    @unique @db.Char(64)
+  endpoint      String    @db.Text
+  p256dh        String    @db.VarChar(255)
+  auth          String    @db.VarChar(255)
+  userAgent     String?   @db.VarChar(300)
+  createdAt     DateTime  @default(now())
+  /**
+   * The last time a push service took a message for this browser. Null is a
+   * browser that has never been reached.
+   */
+  lastSuccessAt DateTime?
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+/**
+ * Small things the server has to remember across deploys and has nowhere else
+ * to keep. The first is the VAPID key pair web push signs with: made once when
+ * no pair is set in the environment, and kept here because a new pair would
+ * orphan every browser that subscribed under the old one.
+ */
+model ServerSetting {
+  key       String   @id @db.VarChar(64)
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+
+  @@map("server_settings")
+}
+
+/**
+ * What the Fisherfeed team can call a fish.
+ *
+ * An enum rather than a table of kinds: there are eight, they are written by
+ * us and not by anglers, and each one needs a mark drawn for it in the client
+ * anyway. Adding a ninth is a new value here and a new drawing there, which is
+ * the honest amount of work for a new badge.
+ */
+enum BadgeKind {
+  GREAT_CATCH
+  COOL_SPECIES
+  PERSONAL_BEST
+  RARE_VISITOR
+  RELEASED_WELL
+  YOUNG_ANGLER
+  CATCH_OF_THE_WEEK
+  TEAM_PICK
+}
+
+/**
+ * One badge on one fish.
+ *
+ * One of each kind per catch, which is what the unique pair says: a second
+ * Great catch on the same fish is the same fact twice. Several kinds may sit
+ * on one catch, and the feed card shows two of them with a "+1".
+ *
+ * The note is the team's own line about this fish, shown on the catch page
+ * under the badge. Short on purpose: it is a caption, not a comment.
+ */
+model CatchBadge {
+  id          String    @id @default(cuid())
+  catchId     String
+  catch       Catch     @relation(fields: [catchId], references: [id], onDelete: Cascade)
+  kind        BadgeKind
+  /* Who pinned it. Kept so the catch page can say the team did, and which of
+     us, and so taking it off can be told apart from never having awarded. */
+  awardedById String
+  awardedBy   User      @relation("BadgesAwarded", fields: [awardedById], references: [id])
+  note        String?   @db.VarChar(140)
+  createdAt   DateTime  @default(now())
+
+  @@unique([catchId, kind])
+  @@index([catchId])
+  @@index([awardedById])
+  @@map("catch_badges")
+}
+
+/**
+ * One side in a competition with teams. Named by the organiser, joined by the
+ * anglers, and added up on the board by the competition's own rule.
+ */
+model CompetitionTeam {
+  id            String               @id @default(cuid())
+  competitionId String
+  competition   Competition          @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  name          String               @db.VarChar(40)
+  /* The order the organiser put them in, so Team 1 stays first. */
+  position      Int                  @default(0)
+  members       CompetitionEntrant[]
+  createdAt     DateTime             @default(now())
+
+  @@index([competitionId, position])
+  @@map("competition_teams")
+}
+
+enum ReportReason {
+  SPAM
+  ABUSE
+  LANGUAGE
+  IMAGE
+  OTHER
+}
+
+enum ReportOutcome {
+  REMOVED
+  KEPT
+}
+
+/**
+ * Somebody telling the team a post or a comment is not right. One per person
+ * per thing, so pressing it twice is not two voices. Enough different people
+ * and the thing is taken out of sight until the team has looked.
+ */
+model ContentReport {
+  id           String         @id @default(cuid())
+  postId       String?
+  post         FeedPost?      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId    String?
+  comment      FeedComment?   @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  /*
+   * "post:<id>" or "comment:<id>". The one-per-person rule is kept on this
+   * rather than on the two ids, because MySQL lets any number of rows share a
+   * unique key that has a NULL in it, and one of the two ids is always NULL.
+   */
+  targetKey    String         @db.VarChar(80)
+  reporterId   String
+  reporter     User           @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reason       ReportReason
+  note         String?        @db.VarChar(280)
+  createdAt    DateTime       @default(now())
+  resolvedAt   DateTime?
+  resolvedById String?
+  resolvedBy   User?          @relation("ReportsResolved", fields: [resolvedById], references: [id], onDelete: SetNull)
+  outcome      ReportOutcome?
+
+  @@unique([reporterId, targetKey])
+  @@index([targetKey, resolvedAt])
+  @@index([resolvedAt, createdAt(sort: Desc)])
+  @@index([postId])
+  @@index([commentId])
+  @@map("content_reports")
 }

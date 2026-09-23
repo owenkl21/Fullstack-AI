@@ -1,14 +1,18 @@
 import type { Request, Response } from 'express';
-import { getAuth } from '@clerk/express';
+import { getAuth } from '../lib/auth-context';
+import { isOwnImageKey, notYourImage } from '../lib/image-owner';
 import {
    createCatchSchema,
    createFishingSiteSchema,
    fishingRequestSchema,
-   weatherLookupSchema,
+   speciesSearchSchema,
+   createSpeciesSchema,
    updateCatchSchema,
    updateFishingSiteSchema,
+   weatherLookupSchema,
 } from '../schemas/fishing.schema';
 import { fishingService } from '../services/fishing.service';
+import { visionService } from '../services/vision.service';
 
 const unauthorizedResponse = {
    code: 'unauthorized',
@@ -29,7 +33,8 @@ export const fishingController = {
       try {
          const weather = await fishingService.getCurrentWeatherByCoordinates(
             parseResult.data.latitude,
-            parseResult.data.longitude
+            parseResult.data.longitude,
+            parseResult.data.at
          );
 
          return res.json({ weather });
@@ -91,11 +96,22 @@ export const fishingController = {
          return res.status(400).json(parseResult.error.format());
       }
 
+      /* Only the angler's own photographs go on their catch. */
+      if (
+         parseResult.data.images.some(
+            (image) => !isOwnImageKey(auth, image.storageKey)
+         )
+      ) {
+         return res.status(400).json(notYourImage);
+      }
+
       try {
          const created = await fishingService.createCatch(
             auth.userId,
             parseResult.data
          );
+         /* The namer learns from what this fish turned out to be. */
+         void visionService.teachFromCatch(created.id);
          return res.status(201).json({ catch: created });
       } catch (error) {
          console.error('Failed to create catch', {
@@ -153,6 +169,7 @@ export const fishingController = {
          });
       }
 
+      void visionService.teachFromCatch(catchId);
       return res.json({ catch: updated });
    },
 
@@ -194,7 +211,10 @@ export const fishingController = {
          });
       }
 
-      const catchRecord = await fishingService.getCatchById(catchId);
+      const catchRecord = await fishingService.getCatchById(
+         catchId,
+         getAuth(req).userId
+      );
 
       if (!catchRecord) {
          return res.status(404).json({
@@ -219,6 +239,15 @@ export const fishingController = {
          return res.status(400).json(parseResult.error.format());
       }
 
+      /* Only the angler's own photographs go on their spot. */
+      if (
+         parseResult.data.images.some(
+            (image) => !isOwnImageKey(auth, image.storageKey)
+         )
+      ) {
+         return res.status(400).json(notYourImage);
+      }
+
       try {
          const created = await fishingService.createFishingSite(
             auth.userId,
@@ -230,6 +259,49 @@ export const fishingController = {
          return res.status(500).json({
             code: 'failed_to_create_site',
             message: 'Unable to save your fishing site right now.',
+         });
+      }
+   },
+
+   async createSpecies(req: Request, res: Response) {
+      const parsed = createSpeciesSchema.safeParse(req.body);
+      if (!parsed.success) {
+         return res.status(400).json(parsed.error.format());
+      }
+      try {
+         const result = await fishingService.createSpecies(
+            parsed.data.name,
+            parsed.data.scientificName ?? null
+         );
+         return res.status(result.created ? 201 : 200).json(result);
+      } catch (error) {
+         console.error('[species:create] failed', error);
+         return res.status(500).json({
+            code: 'failed_to_create_species',
+            message: 'Unable to add that species.',
+         });
+      }
+   },
+
+   async searchSpecies(req: Request, res: Response) {
+      const parsed = speciesSearchSchema.safeParse(req.query);
+
+      if (!parsed.success) {
+         return res.status(400).json(parsed.error.format());
+      }
+
+      try {
+         const species = await fishingService.searchSpecies(
+            parsed.data.q,
+            parsed.data.limit
+         );
+
+         return res.json(species);
+      } catch (error) {
+         console.error('[species:search] failed', error);
+         return res.status(500).json({
+            code: 'failed_to_search_species',
+            message: 'Unable to search species.',
          });
       }
    },
@@ -306,8 +378,15 @@ export const fishingController = {
       return res.status(204).send();
    },
 
-   async listFishingSites(_req: Request, res: Response) {
-      const sites = await fishingService.listFishingSites();
+   async listFishingSites(req: Request, res: Response) {
+      /*
+       * The answer depends on who is asking: a signed-in angler gets their own
+       * private spots back with everyone's public ones. So it is never stored
+       * by anything between here and them, or one angler's list could be
+       * handed to the next.
+       */
+      res.setHeader('Cache-Control', 'private, no-store');
+      const sites = await fishingService.listFishingSites(getAuth(req).userId);
       return res.json({ sites });
    },
 
@@ -322,7 +401,10 @@ export const fishingController = {
          });
       }
 
-      const site = await fishingService.getFishingSiteById(siteId);
+      const site = await fishingService.getFishingSiteById(
+         siteId,
+         getAuth(req).userId
+      );
 
       if (!site) {
          return res.status(404).json({

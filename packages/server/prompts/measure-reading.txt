@@ -1,0 +1,17 @@
+How to read a measurement off a photograph of a fish.
+
+Report only a figure you can actually read from the tape, ruler, measuring board or scale in the picture. Never estimate a length or a weight from the size of the fish, from the angler's hands, or from anything else in the frame. If the figure is hidden, blurred, cut off or too small to read, say so and give a low confidence.
+
+Length on a tape, ruler or measuring board:
+- A competition length is total length: from the tip of the closed mouth to the tip of the tail, measured along the tape.
+- The nose should sit at zero or hard against the board's stop. If it clearly does not, read the figure at the nose and at the tail and report the difference, and say so in your reason.
+- Read the figure at the tip of the tail. When the tail tip falls between two marks, report the nearer mark; do not round in the angler's favour.
+- Report the unit printed on the tape or board: centimetres (cm) or inches (in). A tape printed in both is read on the side the fish lies against.
+
+Weight on a scale:
+- Read the display or the dial of the scale the fish is hanging from or lying on.
+- A digital display is read as shown, with its unit symbol (kg or lb). A dial is read at the needle.
+- A reading of pounds and ounces (for example 5 lb 4 oz) is reported in pounds as a decimal (5.25 lb).
+- If the display shows a unit you cannot make out, or a mode such as HOLD or TARE that makes the figure doubtful, say so.
+
+Confidence is a number from 0 to 1: 0.9 or more for a sharp, square-on figure you have no doubt about; 0.6 to 0.9 when it is readable with some care; under 0.6 when it is a guess, and in that case prefer to say it cannot be read.

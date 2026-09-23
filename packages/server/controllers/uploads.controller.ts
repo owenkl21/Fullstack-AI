@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { getAuth } from '@clerk/express';
+import { getAuth } from '../lib/auth-context';
 import {
    directUploadQuerySchema,
    getReadUrlSchema,
@@ -56,7 +56,7 @@ export const uploadsController = {
 
       try {
          const signed = await uploadsService.signUpload({
-            clerkUserId: auth.userId,
+            storagePrefixId: auth.storagePrefixId ?? auth.userId,
             ...parsed.data,
          });
 
@@ -92,7 +92,7 @@ export const uploadsController = {
 
       try {
          const directUpload = await uploadsService.getDirectUploadData({
-            clerkUserId: auth.userId,
+            storagePrefixId: auth.storagePrefixId ?? auth.userId,
             ...parsed.data,
          });
 
@@ -135,9 +135,9 @@ export const uploadsController = {
 
       try {
          const proxiedUpload = await uploadsService.proxyUpload({
-            clerkUserId: auth.userId,
+            storagePrefixId: auth.storagePrefixId ?? auth.userId,
             scope: uploadsService.inferScopeFromStorageKey(
-               auth.userId,
+               auth.storagePrefixId ?? auth.userId,
                query.data.storageKey
             ),
             storageKey: query.data.storageKey,
@@ -168,6 +168,18 @@ export const uploadsController = {
 
       if (!parsed.success) {
          return res.status(400).json(parsed.error.format());
+      }
+
+      /* Not found rather than forbidden: a stranger learns nothing about the key. */
+      const { storagePrefixId } = getAuth(req);
+      if (
+         !storagePrefixId ||
+         !parsed.data.storageKey.startsWith(`users/${storagePrefixId}/`)
+      ) {
+         return res.status(404).json({
+            code: 'not_found',
+            message: 'No such image.',
+         });
       }
 
       try {

@@ -1,0 +1,249 @@
+import type { CSSProperties, ReactNode } from 'react';
+import type { WeatherSnapshot } from '@/components/fishing/record/api';
+import { thunderRisk } from '@/components/forecast/forecast-api';
+import {
+   BoltIcon,
+   CloudIcon,
+   EyeIcon,
+   SunIcon,
+} from '@heroicons/react/24/outline';
+import {
+   CloudRainIcon,
+   DaylightIcon,
+   DropIcon,
+   MoonPhaseIcon,
+   SwellIcon,
+   ThermometerIcon,
+   WaveIcon,
+   skyIcon,
+} from './ConditionIcons';
+
+/*
+ * The rest of the reading.
+ *
+ * Wind, pressure and air sit above this as the three figures anyone looks at
+ * first. Everything else we fetch used to be thrown away on the way to the
+ * screen: water temperature, swell, the moon, first and last light. A shore
+ * angler plans a session on exactly those.
+ *
+ * A reading that is missing is left out rather than shown as a dash, so an
+ * inland spot simply has no sea in it instead of a row of blanks.
+ */
+
+const clock = (iso: string | null | undefined) => {
+   if (!iso) return null;
+   const at = new Date(iso);
+   if (Number.isNaN(at.getTime())) return null;
+   /* Rendered in the reader's own zone, which is the zone they are fishing in. */
+   return at.toLocaleTimeString(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+   });
+};
+
+const one = (n: number | null | undefined) =>
+   typeof n === 'number' && Number.isFinite(n) ? Math.round(n * 10) / 10 : null;
+
+const whole = (n: number | null | undefined) =>
+   typeof n === 'number' && Number.isFinite(n) ? Math.round(n) : null;
+
+type Fact = { key: string; icon: ReactNode; label: string; value: string };
+
+export function ConditionsDetail({
+   snapshot,
+}: {
+   snapshot: WeatherSnapshot | null;
+}) {
+   if (!snapshot) {
+      return null;
+   }
+
+   const facts: Fact[] = [];
+   const push = (
+      key: string,
+      icon: ReactNode,
+      label: string,
+      value: string | null
+   ) => {
+      if (value) facts.push({ key, icon, label, value });
+   };
+
+   const Sky = skyIcon(snapshot.weatherCondition?.description?.text);
+   push(
+      'sky',
+      <Sky className="size-5" aria-hidden="true" />,
+      'Sky',
+      snapshot.weatherCondition?.description?.text || null
+   );
+
+   const water = one(snapshot.sea?.surfaceTemperatureC);
+   push(
+      'water',
+      <ThermometerIcon aria-hidden="true" />,
+      'Water',
+      water === null ? null : `${water} °C`
+   );
+
+   const swell = one(snapshot.sea?.swellHeightM);
+   const period = whole(snapshot.sea?.swellPeriodS);
+   push(
+      'swell',
+      <SwellIcon aria-hidden="true" />,
+      'Swell',
+      swell === null
+         ? null
+         : period
+           ? `${swell} m at ${period} s`
+           : `${swell} m`
+   );
+
+   const wave = one(snapshot.sea?.waveHeightM);
+   push(
+      'wave',
+      <WaveIcon aria-hidden="true" />,
+      'Sea',
+      wave === null ? null : `${wave} m`
+   );
+
+   const moon = snapshot.moon;
+   push(
+      'moon',
+      moon ? (
+         <MoonPhaseIcon fraction={moon.fraction} />
+      ) : (
+         <MoonPhaseIcon fraction={0} />
+      ),
+      moon?.spring ? 'Moon, spring tide' : 'Moon',
+      moon ? `${moon.name}, ${Math.round(moon.illumination * 100)}% lit` : null
+   );
+
+   const rise = clock(snapshot.sun?.rise);
+   const set = clock(snapshot.sun?.set);
+   push(
+      'sun',
+      <DaylightIcon aria-hidden="true" />,
+      'Light',
+      rise && set ? `${rise} to ${set}` : (rise ?? set)
+   );
+
+   const humidity = whole(snapshot.relativeHumidity);
+   push(
+      'humidity',
+      <DropIcon aria-hidden="true" />,
+      'Humidity',
+      humidity === null ? null : `${humidity}%`
+   );
+
+   /*
+    * The rest of what is fetched. These were stored on every catch and shown
+    * on none of the screens, which made the panel look as though it knew less
+    * than it did.
+    */
+   const rain = whole(snapshot.precipitation?.probability?.percent);
+   const fall = one(snapshot.precipitation?.amountMm);
+   push(
+      'rain',
+      <CloudRainIcon aria-hidden="true" />,
+      'Rain',
+      rain === null
+         ? null
+         : rain === 0
+           ? 'None expected'
+           : fall
+             ? `${rain}% chance, ${fall} mm`
+             : `${rain}% chance`
+   );
+
+   const feels = whole(snapshot.feelsLike?.degrees);
+   push(
+      'feels',
+      <ThermometerIcon aria-hidden="true" />,
+      'Feels like',
+      feels === null ? null : `${feels} °C`
+   );
+
+   const cloud = whole(snapshot.cloudCover);
+   push(
+      'cloud',
+      <CloudIcon aria-hidden="true" className="size-5" />,
+      'Cloud',
+      cloud === null ? null : `${cloud}%`
+   );
+
+   const uv = one(snapshot.uvIndex);
+   push(
+      'uv',
+      <SunIcon aria-hidden="true" className="size-5" />,
+      'UV',
+      uv === null
+         ? null
+         : `${uv}${uv >= 8 ? ', very high' : uv >= 6 ? ', high' : uv >= 3 ? ', moderate' : ', low'}`
+   );
+
+   const vis = snapshot.visibilityM;
+   push(
+      'visibility',
+      <EyeIcon aria-hidden="true" className="size-5" />,
+      'Visibility',
+      typeof vis === 'number' && Number.isFinite(vis)
+         ? vis >= 1000
+            ? `${Math.round(vis / 1000)} km`
+            : `${Math.round(vis)} m`
+         : null
+   );
+
+   /*
+    * Thunder. No free source publishes lightning strikes; what the forecast
+    * does carry is a thunderstorm in the sky reading, and that is worth its
+    * own line rather than a word buried in a sentence.
+    */
+   const sky = (
+      snapshot.weatherCondition?.description?.text ?? ''
+   ).toLowerCase();
+   const risk = thunderRisk(snapshot.thunder?.cape, sky);
+   push(
+      'thunder',
+      <BoltIcon aria-hidden="true" className="size-5" />,
+      'Thunder',
+      risk === 'storms'
+         ? sky.includes('hail')
+            ? 'Storms with hail'
+            : 'Storms about'
+         : risk === 'likely'
+           ? 'Likely later'
+           : risk === 'possible'
+             ? 'Possible'
+             : typeof snapshot.thunder?.cape === 'number'
+               ? 'None expected'
+               : null
+   );
+
+   if (!facts.length) {
+      return null;
+   }
+
+   /*
+    * Tiles, three across on a phone and up to six on a desktop, the mark
+    * over the figure over its name. Two columns of icon-and-two-lines ran to
+    * seven rows on a phone, which was most of a screen of scrolling before
+    * the log. Each tile arrives a beat after the last, so the panel reads as
+    * the readings landing rather than a wall appearing.
+    */
+   return (
+      <dl className="relative mt-5 grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-4 md:grid-cols-6">
+         {facts.map((fact, index) => (
+            <div
+               key={fact.key}
+               className="fact flex min-w-0 flex-col items-start gap-1 border-t border-line pt-2.5"
+               style={{ '--i': index } as CSSProperties}
+            >
+               <span className="text-ink-3">{fact.icon}</span>
+               <dd className="num order-2 text-[15px] leading-tight text-ink">
+                  {fact.value}
+               </dd>
+               <dt className="lab order-1 text-ink-3">{fact.label}</dt>
+            </div>
+         ))}
+      </dl>
+   );
+}

@@ -1,0 +1,15 @@
+{
+   "name": "fisherfeed-audit",
+   "private": true,
+   "type": "module",
+   "description": "Playwright checks against the live site. Run a script with `node audit/<name>.mjs` after `npm i` in this folder.",
+   "dependencies": {
+      "playwright": "^1.58.0",
+      "pngjs": "^7.0.0"
+   },
+   "//": "sharp and the S3 client belong to backfill-images.mjs alone. They are here rather than in the server so that nothing in the deployed container has to carry a native image library it never calls.",
+   "devDependencies": {
+      "@aws-sdk/client-s3": "^3.700.0",
+      "sharp": "^0.34.2"
+   }
+}

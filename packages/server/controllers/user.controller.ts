@@ -1,10 +1,57 @@
 import type { Request, Response } from 'express';
-import { getAuth } from '@clerk/express';
-import { Prisma } from '@prisma/client';
+import { getAuth } from '../lib/auth-context';
+import { isOwnImageKey, notYourImage } from '../lib/image-owner';
 import { updateProfileSchema } from '../schemas/user.schema';
 import { userService } from '../services/user.service';
 
+/* Express can hand back a repeated query or route value as an array. */
+const asSingleParam = (value: string | string[] | undefined) =>
+   Array.isArray(value) ? value[0] : value;
+
 export const userController = {
+   /*
+    * Another angler's profile. Behind auth, because the whole app is, but the
+    * shape it returns is the public one: no email, and only records the owner
+    * marked PUBLIC.
+    */
+   getPublicProfile: async (req: Request, res: Response) => {
+      const auth = getAuth(req);
+      const userId = asSingleParam(req.params.userId);
+
+      if (!userId) {
+         return res.status(400).json({
+            code: 'user_id_required',
+            message: 'A user id is required.',
+         });
+      }
+
+      /* Your own id here is your own profile, so send them to the owner view
+       * rather than showing someone a stripped copy of themselves. */
+      if (auth.userId === userId) {
+         const own = await userService.getProfile(userId);
+         return own?.profile
+            ? res.json({ profile: { ...own.profile, isYou: true } })
+            : res.status(404).json({
+                 code: 'profile_not_found',
+                 message: 'That angler could not be found.',
+              });
+      }
+
+      const result = await userService.getPublicProfile(
+         userId,
+         auth.userId ?? null
+      );
+
+      if (!result?.profile) {
+         return res.status(404).json({
+            code: 'profile_not_found',
+            message: 'That angler could not be found.',
+         });
+      }
+
+      return res.json({ profile: result.profile });
+   },
+
    getCurrentProfile: async (req: Request, res: Response) => {
       const auth = getAuth(req);
 
@@ -15,7 +62,7 @@ export const userController = {
          });
       }
 
-      const result = await userService.getProfileByClerkId(auth.userId);
+      const result = await userService.getProfile(auth.userId);
 
       if (!result?.profile) {
          return res.status(404).json({
@@ -26,7 +73,6 @@ export const userController = {
 
       return res.json({
          profile: result.profile,
-         storage: result.storage,
       });
    },
 
@@ -45,33 +91,71 @@ export const userController = {
          return res.status(400).json(parsed.error.format());
       }
 
+      /* An address somebody else hosts is still allowed; one of our own
+       * storage keys has to be one of the angler's own uploads. */
+      const pictures = [parsed.data.avatarUrl, parsed.data.bannerUrl];
+      if (
+         pictures.some(
+            (value) =>
+               typeof value === 'string' &&
+               value.startsWith('users/') &&
+               !isOwnImageKey(auth, value)
+         )
+      ) {
+         return res.status(400).json(notYourImage);
+      }
+
       try {
-         const result = await userService.updateProfileByClerkId(
+         const result = await userService.updateProfile(
             auth.userId,
             parsed.data
          );
 
-         return res.json({
-            profile: result.profile,
-            storage: result.storage,
-         });
-      } catch (error) {
-         const prismaErrorCode =
-            error instanceof Prisma.PrismaClientKnownRequestError
-               ? error.code
-               : typeof error === 'object' && error !== null && 'code' in error
-                 ? String((error as { code?: unknown }).code)
-                 : null;
+         /* The race on the unique index lands here too: the service turns
+          * the duplicate key into the same answer as a handle seen taken. */
+         if ('code' in result) {
+            if (result.code === 'username_taken') {
+               return res.status(409).json({
+                  code: 'username_already_exists',
+                  message: 'That username is already in use.',
+               });
+            }
 
-         if (prismaErrorCode === 'P2002') {
-            return res.status(409).json({
-               code: 'username_already_exists',
-               message: 'That username is already in use.',
+            /* The app's own name, in the line people read. Said plainly, so
+             * the field can repeat it rather than shrug. */
+            if (result.code === 'display_name_language') {
+               return res.status(400).json({
+                  code: 'display_name_language',
+                  message: 'Pick a name without bad language in it.',
+               });
+            }
+
+            if (result.code === 'username_language') {
+               return res.status(400).json({
+                  code: 'username_language',
+                  message: 'Pick a handle without bad language in it.',
+               });
+            }
+
+            if (result.code === 'display_name_reserved') {
+               return res.status(400).json({
+                  code: 'display_name_reserved',
+                  message: 'That display name is reserved.',
+               });
+            }
+
+            return res.status(400).json({
+               code: 'username_reserved',
+               message: 'That username is reserved.',
             });
          }
 
+         return res.json({
+            profile: result.profile,
+         });
+      } catch (error) {
          console.error('[user:updateCurrentProfile] failed to update profile', {
-            clerkId: auth.userId,
+            userId: auth.userId,
             error,
          });
 
@@ -80,6 +164,65 @@ export const userController = {
             message: 'Unexpected server error',
          });
       }
+   },
+
+   /*
+    * Whether a handle is free, asked while it is being typed. Answers what
+    * the handle becomes once normalised, so the page can show @owen for
+    * "@Owen" and the reader is never surprised by what gets saved.
+    */
+   checkHandle: async (req: Request, res: Response) => {
+      const auth = getAuth(req);
+
+      if (!auth.userId) {
+         return res.status(401).json({
+            code: 'unauthorized',
+            message: 'Authentication required.',
+         });
+      }
+
+      /* Cut well past the longest handle there can be: what is left is still
+       * refused as too long, and the answer never echoes a whole query string
+       * back. */
+      const raw =
+         typeof req.query.handle === 'string'
+            ? req.query.handle.trim().slice(0, 64)
+            : '';
+      const check = await userService.checkHandle(raw, auth.userId);
+
+      return res.json(
+         check.available
+            ? { available: true, normalised: check.handle }
+            : {
+                 available: false,
+                 reason: check.reason,
+                 normalised: check.handle,
+              }
+      );
+   },
+
+   /*
+    * Other anglers by name or handle. Behind auth like the profiles it links
+    * to, and the answer depends on who asks: the reader is left out, and each
+    * row says whether the reader already follows that angler.
+    */
+   searchAnglers: async (req: Request, res: Response) => {
+      const auth = getAuth(req);
+
+      if (!auth.userId) {
+         return res.status(401).json({
+            code: 'unauthorized',
+            message: 'Authentication required.',
+         });
+      }
+
+      const q = typeof req.query.q === 'string' ? req.query.q : '';
+      const cursor =
+         typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+
+      const result = await userService.searchAnglers(auth.userId, q, cursor);
+
+      return res.json(result);
    },
 
    followUser: async (req: Request, res: Response) => {
@@ -100,10 +243,7 @@ export const userController = {
          });
       }
 
-      const result = await userService.followByClerkId(
-         auth.userId,
-         targetUserId
-      );
+      const result = await userService.follow(auth.userId, targetUserId);
 
       if (!result) {
          return res.status(404).json({
@@ -148,7 +288,7 @@ export const userController = {
       }
 
       const search = String(req.query.search ?? '').trim();
-      const users = await userService.listConnectionsByClerkId(
+      const users = await userService.listConnections(
          auth.userId,
          type,
          search
@@ -175,10 +315,7 @@ export const userController = {
          });
       }
 
-      const result = await userService.unfollowByClerkId(
-         auth.userId,
-         targetUserId
-      );
+      const result = await userService.unfollow(auth.userId, targetUserId);
 
       if (!result) {
          return res.status(404).json({

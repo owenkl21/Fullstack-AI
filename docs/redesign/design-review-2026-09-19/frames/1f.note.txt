@@ -1,0 +1,1 @@
+1f Step 1 · opened from a competition CompetitionBanner names the competition once. CompetitionEntryFields adds the tape photo here; length becomes required in step 2, the area sentence is ticked in step 3, and the button reads Submit and update standings.

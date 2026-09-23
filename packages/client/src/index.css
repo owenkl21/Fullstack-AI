@@ -2,16 +2,20 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
-@custom-variant dark (&:is(.dark *));
+/* The theme is stamped on <html data-theme="day|night"> before first paint (see index.html). */
+@custom-variant dark (&:where([data-theme='night'], [data-theme='night'] *));
 
 @theme inline {
-   --radius-sm: calc(var(--radius) - 4px);
-   --radius-md: calc(var(--radius) - 2px);
-   --radius-lg: var(--radius);
-   --radius-xl: calc(var(--radius) + 4px);
-   --radius-2xl: calc(var(--radius) + 8px);
-   --radius-3xl: calc(var(--radius) + 12px);
-   --radius-4xl: calc(var(--radius) + 16px);
+   --font-sans: 'Jost', 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
+   --font-display:
+      'League Gothic', 'Oswald', 'Arial Narrow', Impact, sans-serif;
+   --radius-sm: 0px;
+   --radius-md: 0px;
+   --radius-lg: 0px;
+   --radius-xl: 0px;
+   --radius-2xl: 0px;
+   --radius-3xl: 0px;
+   --radius-4xl: 0px;
    --color-background: var(--background);
    --color-foreground: var(--foreground);
    --color-card: var(--card);
@@ -30,131 +34,2542 @@
    --color-border: var(--border);
    --color-input: var(--input);
    --color-ring: var(--ring);
-   --color-chart-1: var(--chart-1);
-   --color-chart-2: var(--chart-2);
-   --color-chart-3: var(--chart-3);
-   --color-chart-4: var(--chart-4);
-   --color-chart-5: var(--chart-5);
-   --color-sidebar: var(--sidebar);
-   --color-sidebar-foreground: var(--sidebar-foreground);
-   --color-sidebar-primary: var(--sidebar-primary);
-   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-   --color-sidebar-accent: var(--sidebar-accent);
-   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-   --color-sidebar-border: var(--sidebar-border);
-   --color-sidebar-ring: var(--sidebar-ring);
+   --color-teal: var(--teal);
+   --color-teal-ink: var(--teal-ink);
+   --color-teal-text: var(--teal-text);
+   --color-ink: var(--ink);
+   --color-ink-2: var(--ink-2);
+   --color-ink-3: var(--ink-3);
+   --color-bg-2: var(--bg-2);
+   --color-line: var(--line);
+   --color-line-2: var(--line-2);
+   --color-black-block: var(--black);
+   --color-black-block-2: var(--black-2);
+   --color-paper: var(--paper);
+   --color-paper-2: var(--paper-2);
+   --color-success: var(--success);
+   --color-warning: var(--warning);
+   --color-warning-foreground: var(--warning-foreground);
+   --color-cold: var(--cold);
+   --color-warm: var(--warm);
+   --color-green: var(--green);
+   --color-hot: var(--hot);
+   --color-wind-2: var(--wind-2);
+   --color-wind-3: var(--wind-3);
+   --color-rain: var(--rain);
+   --color-uv-1: var(--uv-1);
+   --color-uv-2: var(--uv-2);
+   --color-storm: var(--storm);
+   --color-storm-text: var(--storm-text);
+   --color-sun: var(--sun);
 }
 
+/* ---------- Day ---------- */
 :root {
-   --radius: 0.625rem;
-   --background: oklch(0.98 0.01 228);
-   --foreground: oklch(0.22 0.03 239);
-   --card: oklch(0.995 0.01 228);
-   --card-foreground: oklch(0.22 0.03 239);
-   --popover: oklch(0.995 0.01 228);
-   --popover-foreground: oklch(0.22 0.03 239);
-   --primary: oklch(0.59 0.17 244);
-   --primary-foreground: oklch(0.98 0.01 228);
-   --secondary: oklch(0.94 0.02 220);
-   --secondary-foreground: oklch(0.28 0.04 241);
-   --muted: oklch(0.95 0.015 228);
-   --muted-foreground: oklch(0.47 0.04 239);
-   --accent: oklch(0.79 0.12 181);
-   --accent-foreground: oklch(0.23 0.03 236);
-   --destructive: oklch(0.62 0.24 25);
-   --border: oklch(0.9 0.02 232);
-   --input: oklch(0.9 0.02 232);
-   --ring: oklch(0.59 0.17 244);
-   --chart-1: oklch(0.646 0.222 41.116);
-   --chart-2: oklch(0.6 0.118 184.704);
-   --chart-3: oklch(0.398 0.07 227.392);
-   --chart-4: oklch(0.828 0.189 84.429);
-   --chart-5: oklch(0.769 0.188 70.08);
-   --sidebar: oklch(0.985 0 0);
-   --sidebar-foreground: oklch(0.145 0 0);
-   --sidebar-primary: oklch(0.205 0 0);
-   --sidebar-primary-foreground: oklch(0.985 0 0);
-   --sidebar-accent: oklch(0.97 0 0);
-   --sidebar-accent-foreground: oklch(0.205 0 0);
-   --sidebar-border: oklch(0.922 0 0);
-   --sidebar-ring: oklch(0.708 0 0);
+   --radius: 0px;
+   --bg: #ffffff;
+   --bg-2: #f4f4f2;
+   --ink: #0b0909;
+   --ink-2: #4e4a46;
+   --ink-3: #8a8580;
+   --line: rgba(11, 9, 9, 0.14);
+   --line-2: rgba(11, 9, 9, 0.28);
+   --contour: rgba(11, 9, 9, 0.18);
+   --teal: #34adbd;
+   --teal-ink: #062a2f;
+   --teal-text: #17727f;
+   --black: #0b0909;
+   --black-2: #151212;
+   --paper: #f4f1ec;
+   --paper-2: #b9b3ac;
+   --success: #1f7a4d;
+   --warning: #34adbd;
+   --warning-foreground: #062a2f;
+   --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+   /*
+    * The signal colours: the only hues beside the accent, and they are only
+    * ever a reading. Cold, warm and hot carry temperature; green, wind two and
+    * wind three carry the wind as it builds, because band one is teal and a
+    * light wind is a plain ink figure; rain, UV and storm carry their own
+    * readings, and sun is a clear sky.
+    *
+    * Green exists for the wind ramp. Teal straight to an amber walked through
+    * the low-chroma middle of oklab and landed the speeds an angler actually
+    * reads, thirty to forty, in a grey olive. A green anchor holds the run out
+    * to the saturated side, so the bars go teal, green, yellow-green, yellow,
+    * orange, red, and each step is a colour rather than a shade of dishwater.
+    *
+    * Most of them appear as a color-mix tint over whichever ground the theme
+    * is using, so one value reads in day and night alike and ink on the tint
+    * keeps its contrast. Night lifts only the five that are never a solid
+    * band: the loud three stay this deep because a band of them is filled
+    * solid and carries paper text, which only holds at this depth.
+    */
+   --cold: #1f6fb2;
+   --warm: #c97b1c;
+   --green: #37a353;
+   --hot: #c0392b;
+   /* An orange, not a second amber: it has to be a step away from --sun or
+      the hard half of the wind ramp is one flat colour. */
+   --wind-2: #e0761c;
+   --wind-3: #c0392b;
+   --rain: #1f6fb2;
+   --uv-1: #d99a1a;
+   --uv-2: #e67e22;
+   --storm: #8e44ad;
+   /* Storm as text on the page ground; the solid band keeps --storm. */
+   --storm-text: #8e44ad;
+   --sun: #d99a1a;
+
+   --background: var(--bg);
+   --foreground: var(--ink);
+   --card: var(--bg-2);
+   --card-foreground: var(--ink);
+   --popover: var(--bg);
+   --popover-foreground: var(--ink);
+   --primary: var(--teal);
+   --primary-foreground: var(--teal-ink);
+   --secondary: var(--bg-2);
+   --secondary-foreground: var(--ink);
+   --muted: var(--bg-2);
+   --muted-foreground: var(--ink-2);
+   --accent: var(--bg-2);
+   --accent-foreground: var(--ink);
+   --destructive: #b3261e;
+   --border: var(--line);
+   --input: var(--line-2);
+   --ring: var(--teal);
+   color-scheme: light;
 }
 
-.dark {
-   --background: oklch(0.2 0.03 244);
-   --foreground: oklch(0.95 0.02 220);
-   --card: oklch(0.26 0.03 242);
-   --card-foreground: oklch(0.95 0.02 220);
-   --popover: oklch(0.26 0.03 242);
-   --popover-foreground: oklch(0.95 0.02 220);
-   --primary: oklch(0.75 0.14 214);
-   --primary-foreground: oklch(0.2 0.03 244);
-   --secondary: oklch(0.3 0.03 240);
-   --secondary-foreground: oklch(0.95 0.02 220);
-   --muted: oklch(0.3 0.03 240);
-   --muted-foreground: oklch(0.76 0.03 227);
-   --accent: oklch(0.74 0.1 181);
-   --accent-foreground: oklch(0.2 0.03 244);
-   --destructive: oklch(0.67 0.22 24);
-   --border: oklch(0.38 0.03 238);
-   --input: oklch(0.38 0.03 238);
-   --ring: oklch(0.75 0.14 214);
-   --chart-1: oklch(0.488 0.243 264.376);
-   --chart-2: oklch(0.696 0.17 162.48);
-   --chart-3: oklch(0.769 0.188 70.08);
-   --chart-4: oklch(0.627 0.265 303.9);
-   --chart-5: oklch(0.645 0.246 16.439);
-   --sidebar: oklch(0.205 0 0);
-   --sidebar-foreground: oklch(0.985 0 0);
-   --sidebar-primary: oklch(0.488 0.243 264.376);
-   --sidebar-primary-foreground: oklch(0.985 0 0);
-   --sidebar-accent: oklch(0.269 0 0);
-   --sidebar-accent-foreground: oklch(0.985 0 0);
-   --sidebar-border: oklch(1 0 0 / 10%);
-   --sidebar-ring: oklch(0.556 0 0);
+/* ---------- Night ---------- */
+:root[data-theme='night'] {
+   --bg: #0b0909;
+   --bg-2: #151212;
+   --ink: #f4f1ec;
+   --ink-2: #b9b3ac;
+   --ink-3: #7e7873;
+   --line: rgba(244, 241, 236, 0.14);
+   --line-2: rgba(244, 241, 236, 0.3);
+   --contour: rgba(244, 241, 236, 0.15);
+   --teal-text: #5fc6d3;
+   --success: #6fc79a;
+   --destructive: #f0716a;
+   --popover: #151212;
+
+   /*
+    * A tint, a bar or a figure in these sits on near-black, so they come up.
+    * The solid loud band is drawn in --hot, which never moves, so lifting the
+    * wind red here is free: it only ever paints a bar or a figure.
+    */
+   --cold: #2f86cf;
+   --warm: #d9902c;
+   --green: #4dbc6a;
+   --wind-2: #f08a2b;
+   --wind-3: #e3574a;
+   --uv-1: #e0a72c;
+   --uv-2: #ef8c33;
+   --sun: #e0a72c;
+   --storm-text: #b07cc9;
+   color-scheme: dark;
 }
 
 @layer base {
    * {
       @apply border-border outline-ring/50;
    }
+   html {
+      background: var(--bg);
+   }
    body {
-      @apply bg-background pb-24 text-foreground md:pb-0;
+      @apply bg-background text-foreground font-sans;
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+   }
+   :focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 3px;
+   }
+   img {
+      max-width: 100%;
    }
 }
 
-html {
-   scroll-behavior: smooth;
+@layer components {
+   /* Display type: League Gothic, always uppercase, tight leading */
+   .g {
+      font-family: var(--font-display);
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      line-height: 0.95;
+   }
+   .g-tracked {
+      font-family: var(--font-display);
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      line-height: 1;
+   }
+   /* Tracked uppercase label: the only small type in the product */
+   /*
+    * As a form label it has to be block. Inline, it baseline-aligns with the
+    * field that follows, which drops the label to the BOTTOM of a tall
+    * textarea and leaves it sitting inside the box. It stays inline elsewhere,
+    * where it is used as an eyebrow beside other text.
+    */
+   label.lab {
+      display: block;
+   }
+   .lab {
+      font-size: 12px;
+      line-height: 16px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 500;
+      color: var(--ink-3);
+   }
+   .lab-rule {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+   }
+   .lab-rule::after {
+      content: '';
+      width: 56px;
+      height: 1px;
+      background: var(--teal);
+   }
+   .num {
+      font-variant-numeric: tabular-nums;
+   }
+   /* Always-dark block with a teal corner tab (cards, the record, the signup box).
+      `.blk` is the name to use; `.block` remains as an alias because Tailwind also
+      owns `block` for display. Inside these surfaces (and every dialog) the ink,
+      line, ground and red tokens are remapped, so text-ink, border-line, ghost and
+      outline buttons and text-destructive all resolve for a black ground. */
+   .blk,
+   .on-black,
+   [data-slot='dialog-content'] {
+      --ink: var(--paper);
+      --ink-2: var(--paper-2);
+      --ink-3: #8d867f;
+      --bg: var(--black);
+      --bg-2: var(--black-2);
+      --line: rgba(244, 241, 236, 0.14);
+      --line-2: rgba(244, 241, 236, 0.3);
+      --destructive: #f0716a;
+      --teal-text: #5fc6d3;
+      --success: #6fc79a;
+      --foreground: var(--paper);
+      --background: var(--black);
+      --muted: var(--black-2);
+      --muted-foreground: var(--paper-2);
+      --border: rgba(244, 241, 236, 0.14);
+      --input: rgba(244, 241, 236, 0.3);
+      color-scheme: dark;
+   }
+   .blk {
+      position: relative;
+      background: var(--black);
+      color: var(--paper);
+   }
+
+   /*
+    * The black block is a light-mode device: a card cut out of dark against
+    * paper. At night the page ground is #0b0909 and so was the card, the same
+    * value byte for byte, so the feed was a column of invisible cards.
+    *
+    * The device inverts rather than being patched. A block that sat below the
+    * paper now sits above the dark: lifted a step, with an edge and a shadow to
+    * separate it. Same idea, read the other way up.
+    */
+   :root[data-theme='night'] .blk {
+      background: #161414;
+      border: 1px solid rgba(244, 241, 236, 0.1);
+      box-shadow: 0 1px 0 rgba(244, 241, 236, 0.04) inset;
+   }
+   :root[data-theme='night'] .blk {
+      --bg: #161414;
+      --bg-2: #201d1d;
+   }
+
+   /*
+    * The other way to read the same idea, and the one the review draws: the
+    * card stays black on a black page and takes a paper hairline so it still
+    * has an edge. Nothing is lifted, so the ground inside the card is the true
+    * black pair again and the tab steps out by the width of the border to meet
+    * the corner over it. Opt in with `blk blk-flat`; `.blk` on its own keeps
+    * the lift, so every page that is not being redrawn looks as it did.
+    */
+   :root[data-theme='night'] .blk-flat {
+      background: var(--black);
+      border: 1px solid rgba(244, 241, 236, 0.14);
+      box-shadow: none;
+      --bg: var(--black);
+      --bg-2: var(--black-2);
+   }
+   :root[data-theme='night'] .blk-flat::before {
+      top: -1px;
+      right: -1px;
+   }
+   /* The teal corner tab: 22px on every card in the product. */
+   .blk::before {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 0;
+      z-index: 1;
+      border-style: solid;
+      border-width: 0 22px 22px 0;
+      border-color: transparent var(--teal) transparent transparent;
+   }
+   .blk-plain::before {
+      display: none;
+   }
+   /* Dashed teal rules, the fishing line vocabulary */
+   .rule-dashed {
+      border-top: 1px dashed var(--teal);
+   }
+   .rule-dashed-left {
+      border-left: 2px dashed var(--teal);
+   }
+   .rule-dashed-v {
+      border-left: 1px dashed var(--teal);
+   }
+   /* Painted torn edge container (an SVG is drawn into it by <TornEdge/>) */
+   .torn {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -2px;
+      height: 120px;
+      z-index: 3;
+      pointer-events: none;
+   }
+   .torn svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      /* The shadow and the foam are allowed past the box, and the ground
+         under a cut edge closes a few pixels past its bottom, where the
+         section's own ground hides the edge. */
+      overflow: visible;
+   }
+   /*
+    * How far a cut edge hangs below its plate. One number, because the
+    * plate's art reaches the same depth: the survey lines run down to the
+    * crest rather than stopping at a ruled edge some way above it.
+    */
+   :root {
+      --hang: 118px;
+      /*
+       * How far under the hang a plate's own box runs. The waterline swings
+       * below the water's box in a deep trough, and a plate that stopped at
+       * the box cut every such trough flat. The water paints over the rest.
+       */
+      --trough: 44px;
+   }
+   @media (max-width: 640px) {
+      :root {
+         --hang: 78px;
+         --trough: 30px;
+      }
+   }
+   /*
+    * A cut edge hangs over the top of the section that follows, so the plate
+    * ends in a wave and that section shows through the troughs. The section
+    * underneath pads its top by the same amount so nothing sits under it.
+    */
+   .torn-hang {
+      bottom: calc(0px - var(--hang));
+      /* Above whatever the next section draws in its top padding. */
+      z-index: 6;
+   }
+   /*
+    * The plate under a hollow cut edge, and the art on it. It fills the
+    * plate's own box and the water hanging under it, clipped by this box
+    * rather than by the plate; the water paints the ground back over
+    * whatever spills below the crest. The caller gives it the plate colour.
+    */
+   .plate-art {
+      position: absolute;
+      inset: 0;
+      bottom: calc(0px - var(--hang) - var(--trough));
+      overflow: hidden;
+      pointer-events: none;
+   }
+
+   @media (max-width: 640px) {
+      .torn {
+         height: 80px;
+      }
+   }
+   /*
+    * Under the waterline.
+    *
+    * Decoration, so it never takes a pointer and never sits above the words.
+    * The global reduced-motion rule stops all of it for anyone who asked for
+    * stillness.
+    */
+   .underwater {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+   }
+
+   /* Light coming down through moving water. This is the part that actually
+    * says "under water"; the bubbles only confirm it. */
+   @keyframes caustics {
+      0% {
+         transform: translate3d(-6%, 0, 0) scale(1.15);
+         opacity: 0.5;
+      }
+      50% {
+         transform: translate3d(6%, 2%, 0) scale(1.28);
+         opacity: 0.85;
+      }
+      100% {
+         transform: translate3d(-6%, 0, 0) scale(1.15);
+         opacity: 0.5;
+      }
+   }
+   /*
+    * Light through water, tuned per theme.
+    *
+    * The first version was white on white: on paper it was invisible, which
+    * made the whole section read as an ordinary panel with some bubbles nobody
+    * could see. On a light ground the water has to be the darker thing, so the
+    * wash is a green blue shadow; at night it is light coming down from above.
+    */
+   .underwater-caustics {
+      position: absolute;
+      inset: -20%;
+      background:
+         radial-gradient(
+            60% 40% at 20% 0%,
+            rgba(23, 112, 124, 0.13),
+            transparent 70%
+         ),
+         radial-gradient(
+            50% 45% at 70% 10%,
+            rgba(23, 112, 124, 0.1),
+            transparent 70%
+         ),
+         radial-gradient(
+            40% 30% at 45% 0%,
+            rgba(23, 112, 124, 0.08),
+            transparent 70%
+         );
+      animation: caustics 14s ease-in-out infinite;
+      will-change: transform, opacity;
+   }
+   :root[data-theme='night'] .underwater-caustics {
+      background:
+         radial-gradient(
+            60% 40% at 20% 0%,
+            rgba(93, 198, 211, 0.16),
+            transparent 70%
+         ),
+         radial-gradient(
+            50% 45% at 70% 10%,
+            rgba(93, 198, 211, 0.12),
+            transparent 70%
+         ),
+         radial-gradient(
+            40% 30% at 45% 0%,
+            rgba(244, 241, 236, 0.1),
+            transparent 70%
+         );
+   }
+
+   @keyframes rise {
+      0% {
+         transform: translate3d(0, 0, 0) scale(0.7);
+         opacity: 0;
+      }
+      12% {
+         opacity: 0.75;
+      }
+      85% {
+         opacity: 0.55;
+      }
+      100% {
+         transform: translate3d(var(--drift, 0), -105%, 0) scale(1);
+         opacity: 0;
+      }
+   }
+   .bubble {
+      position: absolute;
+      bottom: -12px;
+      border-radius: 999px;
+      /* On paper a bubble is a ring of shadow with a light centre; at night it
+       * is the other way round. Same object, lit from the other side. */
+      border: 1px solid rgba(23, 112, 124, 0.38);
+      background: radial-gradient(
+         circle at 32% 28%,
+         rgba(255, 255, 255, 0.75),
+         rgba(23, 112, 124, 0.08) 60%,
+         transparent 72%
+      );
+      animation-name: rise;
+      animation-timing-function: ease-in;
+      animation-iteration-count: infinite;
+      will-change: transform, opacity;
+   }
+   :root[data-theme='night'] .bubble {
+      border-color: rgba(244, 241, 236, 0.5);
+      background: radial-gradient(
+         circle at 32% 28%,
+         rgba(244, 241, 236, 0.55),
+         rgba(93, 198, 211, 0.12) 60%,
+         transparent 72%
+      );
+   }
+
+   /* Contour line art (paths are generated by <Contours/>), fades before any edge */
+   .contour {
+      position: absolute;
+      pointer-events: none;
+      overflow: visible;
+      animation: contour-drift 26s ease-in-out infinite alternate;
+   }
+   .contour path {
+      fill: none;
+      stroke: var(--contour);
+      stroke-width: 1;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+      /* Drawn on slowly, once, when the sheet first comes into view. */
+      transition: stroke-dashoffset 4.2s cubic-bezier(0.2, 0, 0, 1);
+   }
+   .contour-fine path {
+      stroke-width: 0.7;
+   }
+   .contour-bold path {
+      stroke-width: 1.6;
+   }
+   /* Reveal on scroll: <Reveal/> adds .in when in view */
+   .rv {
+      opacity: 0;
+      transform: translateY(26px);
+      transition:
+         opacity 0.6s var(--ease),
+         transform 0.7s var(--ease);
+      transition-delay: calc(var(--i, 0) * 90ms);
+   }
+   .rv.in {
+      opacity: 1;
+      transform: none;
+   }
+   /* Photo scrims, the only gradients in the product */
+   .scrim-hero {
+      /*
+       * Holds a readable floor through the middle, which is where the headline
+       * sits. The old ramp fell to 5 per cent there and put white type straight
+       * onto a lit sunset.
+       *
+       * The floor under the standfirst is set from a measurement rather than by
+       * eye: the photograph reads about 0.45 luminance behind that line, and
+       * 16px body text needs 4.5:1, which takes roughly two thirds black. It
+       * measured 3.35:1 before this.
+       */
+      background: linear-gradient(
+         180deg,
+         rgba(11, 9, 9, 0.58) 0%,
+         rgba(11, 9, 9, 0.46) 22%,
+         rgba(11, 9, 9, 0.54) 48%,
+         rgba(11, 9, 9, 0.7) 64%,
+         rgba(11, 9, 9, 0.78) 80%,
+         rgba(11, 9, 9, 0.9) 100%
+      );
+   }
+   /*
+    * For a photograph nothing is read through. It only seats the picture
+    * against the ink plate below it, so the sky is left alone. The full
+    * .scrim-photo ramp was built to carry words and, with the words gone, its
+    * dark top and bright middle banded the sky for no one's benefit.
+    */
+   .scrim-seat {
+      background: linear-gradient(
+         180deg,
+         rgba(11, 9, 9, 0) 0%,
+         rgba(11, 9, 9, 0) 58%,
+         rgba(11, 9, 9, 0.16) 78%,
+         rgba(11, 9, 9, 0.42) 100%
+      );
+   }
+   .scrim-photo {
+      /*
+       * Dark enough where words go. The old ramp was still at 0.1 more than
+       * halfway down, so a teal overline landed on sunlit rock and neither the
+       * photograph nor the word won. It stays light through the middle, where
+       * the picture is doing the work, and commits below that.
+       */
+      background: linear-gradient(
+         180deg,
+         rgba(11, 9, 9, 0.45) 0%,
+         rgba(11, 9, 9, 0.05) 32%,
+         rgba(11, 9, 9, 0.34) 60%,
+         rgba(11, 9, 9, 0.72) 80%,
+         rgba(11, 9, 9, 0.92) 100%
+      );
+   }
+   /* Dashed underline inputs */
+   /*
+    * A link inside running prose still needs a 44px target, but making the link
+    * itself 44px tall puts a box in the middle of a sentence and opens gaps
+    * between the lines. The target is grown around the text instead, so the
+    * typography is untouched and the thumb still has something to hit.
+    */
+   .tap-inline {
+      position: relative;
+   }
+   .tap-inline::after {
+      content: '';
+      position: absolute;
+      inset: -0.7rem -0.2rem;
+   }
+   .input-line {
+      /*
+       * A field you can see the edges of. The old one was a dashed hairline on
+       * nothing, which read as decoration rather than somewhere to type.
+       * Radius stays 0 and every colour is a token.
+       */
+      background: var(--bg-2);
+      border: 1px solid var(--line);
+      border-bottom: 2px solid var(--line-2);
+      color: var(--foreground);
+      padding: 0.75rem 0.875rem;
+      /* 44px is the minimum target the brief asks for. */
+      min-height: 2.75rem;
+      outline: none;
+      width: 100%;
+      font: inherit;
+      transition:
+         border-color 150ms var(--ease),
+         background-color 150ms var(--ease);
+   }
+   .input-line:hover:not(:disabled) {
+      border-bottom-color: var(--ink-3);
+   }
+   .input-line:focus {
+      background: var(--bg);
+      border-color: var(--line-2);
+      border-bottom-color: var(--teal);
+      outline: none;
+   }
+   .input-line[aria-invalid='true'] {
+      border-bottom-color: var(--destructive);
+   }
+   .input-line:disabled {
+      opacity: 0.55;
+   }
+   .input-line::placeholder {
+      color: var(--ink-3);
+   }
+   textarea.input-line {
+      min-height: 7rem;
+      resize: vertical;
+   }
+   /*
+    * A single line field does not want the whole column. At 16px, 32rem is
+    * roughly sixty characters, which is past any name, title or handle anyone
+    * will type. A textarea is exempt: prose wants the full measure.
+    */
+   input.input-line {
+      max-width: 32rem;
+   }
+   /* The fix line inside the capture receipt */
+   .fixline {
+      height: 3px;
+      background: repeating-linear-gradient(
+         90deg,
+         var(--teal) 0 12px,
+         transparent 12px 22px
+      );
+      width: 0%;
+      transition: width 2.6s cubic-bezier(0.1, 0.6, 0.2, 1);
+   }
+   .fixline.go {
+      width: 100%;
+   }
+   .shutter {
+      animation: shutter 0.42s ease-out;
+   }
 }
 
-@keyframes bobber-float {
-   0%,
+@keyframes contour-drift {
+   from {
+      transform: translate3d(0, 0, 0);
+   }
+   to {
+      transform: translate3d(-22px, -14px, 0);
+   }
+}
+@keyframes shutter {
+   0% {
+      opacity: 0.85;
+   }
    100% {
-      transform: translate(-50%, 0px) rotate(-4deg);
+      opacity: 0;
    }
-   50% {
-      transform: translate(-50%, -4px) rotate(4deg);
+}
+@keyframes para-hero {
+   from {
+      transform: translate3d(0, -6%, 0);
+   }
+   to {
+      transform: translate3d(0, 8%, 0);
+   }
+}
+@keyframes para-band {
+   from {
+      transform: translate3d(0, -8%, 0);
+   }
+   to {
+      transform: translate3d(0, 6%, 0);
+   }
+}
+@property --draw {
+   syntax: '<number>';
+   initial-value: 1;
+   inherits: true;
+}
+@keyframes draw {
+   from {
+      --draw: 1;
+   }
+   to {
+      --draw: 0;
+   }
+}
+@supports (animation-timeline: view()) {
+   .parallax-hero {
+      animation: para-hero linear both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+   }
+   .parallax-band {
+      animation: para-band linear both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+   }
+   .thread {
+      animation: draw linear both;
+      animation-timeline: view();
+      animation-range: entry 10% cover 70%;
+   }
+}
+.thread .thread-mask {
+   stroke-dashoffset: var(--draw);
+}
+
+@media (prefers-reduced-motion: reduce) {
+   *,
+   *::before,
+   *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+   }
+   .parallax-hero,
+   .parallax-band,
+   .thread,
+   .contour {
+      animation: none !important;
+   }
+   .thread .thread-mask {
+      stroke-dashoffset: 0;
+   }
+   html {
+      scroll-behavior: auto;
    }
 }
 
-@keyframes bobber-ripple {
-   0%,
-   100% {
-      transform: translateX(-50%) scaleX(0.9);
-      opacity: 0.5;
+/*
+ * A feed card is never cut.
+ *
+ * The card's lower half carried a fixed height with the overflow hidden, so
+ * that stacked cards would line up. They were never in a row to line up with:
+ * the feed is one column at every width. What the height did instead was
+ * measure the card by the shortest caption and then clip whatever ran past it,
+ * and the first thing past it is the footer, so a card with three lines of
+ * writing ended with the like and comment line sliced through the middle.
+ *
+ * The rule is: the photograph is the only part of a card that may be told what
+ * height to be. Words and controls take the room they need. This selector is
+ * the feed post specifically, which is the one article that names its own
+ * heading, so the landing page's record card and the skeleton are untouched.
+ *
+ * It sits outside the layers on purpose: the height it undoes is a utility,
+ * and layered CSS cannot reach a utility.
+ */
+article.blk[aria-labelledby] > div:last-of-type {
+   block-size: auto;
+   overflow: visible;
+}
+
+/* And the footer gets its own room rather than being pushed against the fold. */
+article.blk[aria-labelledby] > div:last-of-type > .rule-dashed {
+   padding-block-start: 0.875rem;
+}
+
+/*
+ * Map. Raster tiles are pictures on someone else's server, so the basemap
+ * cannot take the tokens the way the rest of the product does. Night is a
+ * filter over the tile pane only, never over the whole map, so markers,
+ * controls and the seamark overlay keep their real colours.
+ */
+.map-surface {
+   background: var(--bg-2);
+   /*
+    * Leaflet lays its panes out from z-index 400 up, and the wrapper made no
+    * stacking context, so those panes were free to paint over the fixed
+    * navigation at z-30. The map covered the phone bar on Add a spot. Isolating
+    * here keeps Leaflet's whole ladder inside the map, whatever it does with it.
+    */
+   isolation: isolate;
+}
+.map-surface .leaflet-container {
+   background: var(--bg-2);
+   font: inherit;
+   outline-offset: 2px;
+}
+
+/*
+ * At night the plain and street rasters are inverted, which is the standard
+ * trick for turning a light map dark without a second tile set.
+ *
+ * It is scoped to those two on purpose. Inverting a photograph turns the sea
+ * orange and the veld blue, so satellite imagery is left exactly as it is: it
+ * is already dark, and it is a photograph of the world rather than a drawing
+ * of it.
+ */
+:root[data-theme='night'] .map-surface[data-base='plain'] .leaflet-tile-pane,
+:root[data-theme='night'] .map-surface[data-base='terrain'] .leaflet-tile-pane,
+:root[data-theme='night'] .map-surface[data-base='streets'] .leaflet-tile-pane {
+   filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9)
+      saturate(0.8);
+}
+
+/*
+ * Leaflet's own controls, in the product's vocabulary.
+ *
+ * The shipped ones are small rounded boxes with a hairline and a drop shadow,
+ * which is a different design language from every other control here and the
+ * thing that makes an otherwise good map look like a widget somebody embedded.
+ * Square, 44px, ink on paper, same as every other control.
+ */
+.map-surface .leaflet-bar {
+   border: 0;
+   border-radius: 0;
+   box-shadow: 0 2px 10px rgba(11, 9, 9, 0.22);
+   overflow: hidden;
+}
+.map-surface .leaflet-bar a,
+.map-surface .leaflet-bar a:link {
+   width: 44px;
+   height: 44px;
+   line-height: 44px;
+   border-radius: 0;
+   border: 0;
+   border-bottom: 1px solid var(--line);
+   background: var(--bg);
+   color: var(--ink);
+   font-family: var(--font-display), sans-serif;
+   font-size: 22px;
+   transition: background-color 140ms var(--ease);
+}
+.map-surface .leaflet-bar a:last-child {
+   border-bottom: 0;
+}
+.map-surface .leaflet-bar a:hover,
+.map-surface .leaflet-bar a:focus-visible {
+   background: var(--bg-2);
+   color: var(--ink);
+}
+.map-surface .leaflet-bar a.leaflet-disabled {
+   background: var(--bg-2);
+   color: var(--ink-3);
+}
+
+/*
+ * Attribution is a licence condition, so it never hides. It does not have to
+ * shout either: quiet, small, and out of the way of the imagery.
+ */
+.map-surface .leaflet-control-attribution {
+   border-radius: 0;
+   background: color-mix(in srgb, var(--bg) 88%, transparent);
+   color: var(--ink-3);
+   font-size: 0.625rem;
+   line-height: 1.5;
+   padding: 0.1rem 0.4rem;
+}
+.map-surface .leaflet-control-attribution a {
+   color: var(--ink-2);
+}
+.map-surface .leaflet-control-attribution a:hover {
+   color: var(--teal-text);
+}
+
+/*
+ * Popups. The shipped one is a white rounded card with a drop shadow and a
+ * serif close cross, which belongs to a different product.
+ */
+.map-surface .leaflet-popup-content-wrapper {
+   border-radius: 0;
+   background: var(--bg);
+   color: var(--ink);
+   box-shadow: 0 6px 22px rgba(11, 9, 9, 0.3);
+   border: 1px solid var(--line);
+}
+.map-surface .leaflet-popup-content {
+   margin: 0.85rem 1rem;
+   font: inherit;
+   line-height: 1.45;
+}
+.map-surface .leaflet-popup-tip {
+   background: var(--bg);
+   border: 1px solid var(--line);
+   box-shadow: none;
+}
+.map-surface .leaflet-popup-close-button {
+   width: 32px;
+   height: 32px;
+   font-size: 20px;
+   color: var(--ink-3);
+   padding: 0;
+   line-height: 30px;
+}
+.map-surface .leaflet-popup-close-button:hover {
+   color: var(--ink);
+   background: transparent;
+}
+
+/*
+ * The corners a control may stand in.
+ *
+ * The zoom used to sit top left, which is the corner the map toolbar reads
+ * from, so on a desktop the plus and minus were underneath Satellite and Fish.
+ * It moves to the top right, which leaves the toolbar its corner and keeps the
+ * zoom as far from the foot of a phone screen as a map control can be. The top
+ * left inset stays because .blk's teal corner tab would land there if a map
+ * ever sits inside a black block.
+ */
+.map-surface .leaflet-top.leaflet-left,
+.map-surface .leaflet-top.leaflet-right {
+   top: 0.75rem;
+}
+.map-surface .leaflet-top.leaflet-left {
+   left: 0.75rem;
+}
+.map-surface .leaflet-top.leaflet-right {
+   right: 0.75rem;
+}
+
+/*
+ * The map that is the whole screen.
+ *
+ * The search floats on its top edge and the row of controls on its bottom one,
+ * so Leaflet's own corners step inside both rather than sitting underneath
+ * them: the zoom clears the search field, and the attribution clears the bar.
+ */
+.map-surface[data-full] .leaflet-top {
+   top: 4.25rem;
+}
+.map-surface[data-full] .leaflet-bottom {
+   bottom: 5.25rem;
+}
+
+/*
+ * The pin being dropped, while it is being named.
+ *
+ * It stands above every other mark, so the one pin the angler is holding is
+ * never lost among the spots and slipways under it. The !important is not
+ * decoration: Leaflet writes a z-index into the marker's style attribute from
+ * its latitude, and there is no other way to outrank that.
+ *
+ * It lands rather than appearing, which is the one motion on this gesture.
+ */
+.map-pin-drop {
+   z-index: 650 !important;
+}
+.map-pin-drop .map-pin-svg {
+   animation: pin-land 320ms var(--ease) 1;
+}
+@keyframes pin-land {
+   from {
+      transform: translateY(-14px);
+      opacity: 0;
    }
+   to {
+      transform: translateY(0);
+      opacity: 1;
+   }
+}
+.map-pin-icon {
+   display: block;
+   color: var(--teal);
+}
+
+/*
+ * The pin vocabulary.
+ *
+ * Shape first, colour second. Six kinds of thing on the map and, before this,
+ * one silhouette in six ring colours, which nobody could tell apart at a glance.
+ * A spot is a disc, a private mark is a pennant, a slipway or a shop is a square
+ * plate. Every one carries a light ring on a dark or saturated body, because the
+ * base is a photograph and a photograph can be any colour underneath.
+ */
+.map-pin-kind {
+   position: relative;
+}
+.map-pin-kind .map-pin-stem {
+   position: absolute;
+   left: 50%;
+   transform: translateX(-50%);
+   width: 0;
+   height: 0;
+   border-left: 7px solid transparent;
+   border-right: 7px solid transparent;
+   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+}
+.map-pin-g {
+   width: 20px;
+   height: 20px;
+}
+
+/* ---- Spots: a disc ------------------------------------------------------ */
+.map-pin-kind .map-pin-disc {
+   position: absolute;
+   top: 0;
+   left: 50%;
+   transform: translateX(-50%);
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 40px;
+   height: 40px;
+   border-radius: 999px;
+   border: 3px solid var(--paper);
+   box-shadow:
+      0 3px 10px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(0, 0, 0, 0.35);
+   transition: transform 140ms var(--ease);
+}
+.map-pin-kind:hover .map-pin-disc {
+   transform: translateX(-50%) scale(1.1);
+}
+.map-pin-spot .map-pin-stem,
+.map-pin-other .map-pin-stem {
+   top: 35px;
+   border-top: 15px solid;
+}
+.map-pin-n {
+   font-family: var(--font-display), sans-serif;
+   font-size: 21px;
+   line-height: 1;
+   letter-spacing: 0.02em;
+   font-variant-numeric: tabular-nums;
+   padding-top: 2px;
+}
+/* Yours: teal, the loudest thing on your own map. */
+.map-pin-spot .map-pin-disc {
+   background: var(--teal);
+   color: #06232a;
+}
+.map-pin-spot .map-pin-stem {
+   border-top-color: var(--teal);
+}
+/* Somebody else's: dark, so yours stand out from theirs. */
+.map-pin-other .map-pin-disc {
+   background: #14110f;
+   color: var(--paper);
+}
+.map-pin-other .map-pin-stem {
+   border-top-color: #14110f;
+}
+
+/*
+ * The rows of controls under a map share one label column, so Base, Fish and
+ * Show line up and the chips start on the same vertical. Inline groups on
+ * their own each measured their label and started wherever it ended.
+ */
+.map-controls {
+   --map-label: 56px;
+}
+@media (min-width: 640px) {
+   .map-controls > * > .lab:first-child {
+      width: var(--map-label);
+   }
+}
+
+/* ---- The forecast instrument ----------------------------------------------- */
+/*
+ * The hours are drawn inside an always-black block, which is this product's
+ * word for the things that matter. That decides the colour rules here.
+ *
+ * Every tint in the instrument is a continuous mix of a signal token over the
+ * block's own ground, computed per hour in `forecast/tones.ts` rather than
+ * banded into classes: air moves a degree an hour and a stepped tint jumps
+ * between two cells a body could not tell apart. The classes left here are the
+ * two grounds no utility can name, because inside `.blk` the ink and surface
+ * tokens are already remapped.
+ */
+/*
+ * The block's OWN colour, for anything that has to sit on it and hide what
+ * runs underneath: the sticky rail the hours slide behind, and a label on a
+ * dashed rule. It asks for --bg, which is var(--black) by day and #161414 at
+ * night, where --background stays black and would show as a dark hole against
+ * a lifted night block.
+ */
+.fc-ground {
+   background: var(--bg);
+}
+/*
+ * The hour the reader is standing in, carried down every row as one band
+ * rather than a highlight per cell, so the eye drops straight through wind,
+ * tide and sky to the same minute. Translucent, so the tint and the bar in
+ * that hour still say what they were saying.
+ */
+.fc-now {
+   background: color-mix(in srgb, var(--teal) 14%, transparent);
+}
+/*
+ * A note from the rail: paper in both themes, inside a block whose ink is
+ * remapped for black, so it takes the day ink pair back.
+ */
+.fc-tip {
+   --ink: var(--black);
+   --ink-2: #4e4a46;
+   background: var(--paper);
+   color: var(--ink);
+}
+
+/* ---- Bars and curves in the hour grid -------------------------------------- */
+/*
+ * A wind bar grows from its foot, in step with the cell it stands in, so the
+ * row fills from the left like the figures under it. The curves and arcs draw
+ * themselves along their own length: the path carries pathLength="1", so one
+ * unit of dash is the whole line whatever its shape.
+ */
+.bar-grow {
+   transform-origin: bottom;
+   animation: bar-grow 380ms var(--ease) both;
+   animation-delay: calc(var(--i, 0) * 18ms);
+}
+@keyframes bar-grow {
+   from {
+      transform: scaleY(0);
+   }
+   to {
+      transform: scaleY(1);
+   }
+}
+.draw-on {
+   stroke-dasharray: 1;
+   stroke-dashoffset: 1;
+   animation: draw-on 900ms var(--ease) forwards;
+}
+@keyframes draw-on {
+   to {
+      stroke-dashoffset: 0;
+   }
+}
+/*
+ * The verdict's ring draws round to its score, the same ease and length as a
+ * curve drawing on.
+ */
+.ring-fill {
+   animation: ring-fill 900ms var(--ease) both;
+}
+@keyframes ring-fill {
+   from {
+      stroke-dasharray: 0 100;
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .bar-grow {
+      animation: none;
+   }
+   .draw-on {
+      animation: none;
+      stroke-dashoffset: 0;
+   }
+   .ring-fill {
+      animation: none;
+   }
+}
+
+/* ---- The four steps under the hero ------------------------------------------ */
+/*
+ * Each step is a button that runs the phone, and the teal rule over it is the
+ * phone's progress: it fills across a step for as long as that step is on the
+ * phone, stays full once it is done, and drains away when the phone is home.
+ *
+ * A pointer gets a taste of that before it presses. The rule wipes across,
+ * the number rolls over to teal a digit at a time the way the counters in the
+ * phone settle, and the title opens its tracking out towards the buttons'.
+ * The rule leaves the way it came in, off the far end, so a hand run along
+ * the row reads as one line passing through.
+ *
+ * Hover sits behind (hover: hover) so a tap on a phone does not leave a card
+ * lit after the finger has gone.
+ */
+.step-rule {
+   position: absolute;
+   inset-inline: 0.75rem;
+   top: -1px;
+   height: 2px;
+   background: var(--teal);
+   transform: scaleX(0);
+   transform-origin: right;
+   transition: transform 560ms var(--ease);
+}
+.step[data-state='done'] .step-rule,
+.step[data-state='on']:not([data-playing]) .step-rule,
+.step:focus-visible .step-rule {
+   transform: scaleX(1);
+   transform-origin: left;
+}
+.step[data-state='on'][data-playing] .step-rule {
+   transform-origin: left;
+   animation: step-run var(--run, 1s) linear both;
+}
+@keyframes step-run {
+   from {
+      transform: scaleX(0);
+   }
+   to {
+      transform: scaleX(1);
+   }
+}
+
+.step-num {
+   display: inline-flex;
+}
+.step-digit {
+   display: inline-grid;
+   overflow: hidden;
+}
+.step-digit > span {
+   grid-area: 1 / 1;
+   transition: transform 520ms cubic-bezier(0.7, 0, 0.2, 1);
+   transition-delay: calc(var(--k, 0) * 70ms);
+}
+.step-digit > span + span {
+   transform: translateY(105%);
+}
+.step[data-state='on'] .step-digit > span:first-child,
+.step[data-state='done'] .step-digit > span:first-child,
+.step:focus-visible .step-digit > span:first-child {
+   transform: translateY(-105%);
+}
+.step[data-state='on'] .step-digit > span + span,
+.step[data-state='done'] .step-digit > span + span,
+.step:focus-visible .step-digit > span + span {
+   transform: none;
+}
+
+.step-title {
+   transition: letter-spacing 420ms var(--ease);
+}
+.step:focus-visible .step-title {
+   letter-spacing: 0.07em;
+}
+
+/* "Watch it log" before a press, "On the phone" while its step runs. */
+.step-cue {
+   opacity: 0;
+   transform: translateX(-10px);
+   transition:
+      opacity 260ms var(--ease),
+      transform 420ms var(--ease);
+}
+.step[data-state='on'][data-playing] .step-cue,
+.step:not([data-playing]):focus-visible .step-cue {
+   opacity: 1;
+   transform: none;
+}
+/* A play mark, which turns into a live dot while the phone is on this step. */
+.step-cue-mark {
+   width: 7px;
+   height: 8px;
+   background: currentColor;
+   clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.step[data-state='on'][data-playing] .step-cue-mark {
+   height: 7px;
+   clip-path: circle(50%);
+   animation: step-live 1.1s ease-in-out infinite;
+}
+@keyframes step-live {
    50% {
-      transform: translateX(-50%) scaleX(1.1);
+      opacity: 0.25;
+   }
+}
+
+@media (hover: hover) {
+   .step:hover .step-rule {
+      transform: scaleX(1);
+      transform-origin: left;
+   }
+   .step:hover .step-digit > span:first-child {
+      transform: translateY(-105%);
+   }
+   .step:hover .step-digit > span + span {
+      transform: none;
+   }
+   .step:hover .step-title {
+      letter-spacing: 0.07em;
+   }
+   .step:not([data-playing]):hover .step-cue {
+      opacity: 1;
+      transform: none;
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .step[data-state='on'][data-playing] .step-rule {
+      animation: none;
+      transform: scaleX(1);
+   }
+   .step[data-state='on'][data-playing] .step-cue-mark {
+      animation: none;
+   }
+}
+
+/* ---- Page one, at the foot of the landing page ------------------------------ */
+/*
+ * A black page on a paper one, like the top of a stack. The paper page sits
+ * rotated off the corner; a pointer near the book fans it a little further
+ * and lifts the top page, which is the only invitation it needs to make.
+ */
+.join-under {
+   position: absolute;
+   inset: 0;
+   background: var(--paper);
+   transform: translate(10px, 12px) rotate(2.2deg);
+   transform-origin: 20% 100%;
+   transition: transform 560ms var(--ease);
+}
+.join-card {
+   box-shadow: 0 18px 40px -20px rgba(6, 42, 47, 0.6);
+   transition:
+      transform 560ms var(--ease),
+      box-shadow 560ms var(--ease);
+}
+.join-colon {
+   animation: join-blink 1s steps(1) infinite;
+}
+.join-caret {
+   display: inline-block;
+   width: 3px;
+   height: 22px;
+   background: var(--teal);
+   animation: join-blink 1.05s steps(1) infinite;
+}
+@keyframes join-blink {
+   50% {
+      opacity: 0.2;
+   }
+}
+.join-go-arrow {
+   display: inline-block;
+   margin-left: 0.45em;
+   transition: transform 360ms var(--ease);
+}
+@media (hover: hover) {
+   .join-page:hover .join-card {
+      transform: translateY(-6px) rotate(-0.6deg);
+      box-shadow: 0 30px 50px -22px rgba(6, 42, 47, 0.65);
+   }
+   .join-page:hover .join-under {
+      transform: translate(20px, 16px) rotate(4.5deg);
+   }
+   .join-go:hover .join-go-arrow {
+      transform: translateX(6px);
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .join-colon,
+   .join-caret {
+      animation: none;
+   }
+}
+
+/* ---- A shimmer for anything still loading ---------------------------------- */
+.shimmer {
+   position: relative;
+   overflow: hidden;
+}
+.shimmer::after {
+   content: '';
+   position: absolute;
+   inset: 0;
+   transform: translateX(-100%);
+   background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--background) 55%, transparent) 50%,
+      transparent 100%
+   );
+   animation: shimmer 1.4s var(--ease) infinite;
+}
+@keyframes shimmer {
+   to {
+      transform: translateX(100%);
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .shimmer::after {
+      animation: none;
+   }
+}
+
+/* ---- A reading landing ----------------------------------------------------- */
+.fact {
+   animation: fact-in 520ms var(--ease) both;
+   animation-delay: calc(var(--i, 0) * 55ms);
+}
+@keyframes fact-in {
+   from {
+      opacity: 0;
+      transform: translateY(10px);
+   }
+   to {
+      opacity: 1;
+      transform: none;
+   }
+}
+/* Twenty four hours across: a quicker step, or the last hour lands late. */
+td.fact {
+   animation-duration: 380ms;
+   animation-delay: calc(var(--i, 0) * 18ms);
+}
+@media (prefers-reduced-motion: reduce) {
+   .fact {
+      animation: none;
+   }
+}
+
+/* ---- The card on a pin ----------------------------------------------------- */
+.map-surface .leaflet-popup-content-wrapper {
+   padding: 0;
+   border-radius: 0;
+}
+.map-surface .leaflet-popup-content {
+   margin: 0;
+   min-width: 240px;
+   max-width: 300px;
+   line-height: 1.35;
+}
+.map-card {
+   position: relative;
+   padding: 14px 16px 14px 18px;
+   border-left: 3px solid var(--card-accent, var(--teal));
+   background: var(--background);
+   color: var(--ink);
+}
+.map-card-kicker {
+   font-size: 11px;
+   letter-spacing: 0.14em;
+   text-transform: uppercase;
+   color: var(--ink-3);
+}
+.map-card-title {
+   margin-top: 2px;
+   font-family: var(--font-display), 'League Gothic', sans-serif;
+   font-size: 28px;
+   line-height: 1;
+   letter-spacing: 0.01em;
+   text-transform: uppercase;
+}
+.map-card-facts {
+   margin-top: 10px;
+   display: flex;
+   flex-direction: column;
+   gap: 6px;
+   list-style: none;
+   padding: 0;
+}
+.map-card-fact {
+   display: flex;
+   align-items: center;
+   gap: 9px;
+   font-size: 15px;
+   color: var(--ink);
+}
+.map-card-fact.quiet {
+   color: var(--ink-2);
+}
+.map-card-mark {
+   width: 18px;
+   height: 18px;
+   flex: none;
+   fill: none;
+   stroke: var(--teal-text, var(--teal));
+   stroke-width: 1.7;
+   stroke-linecap: round;
+   stroke-linejoin: round;
+}
+.map-card-tags {
+   margin-top: 10px;
+   display: flex;
+   flex-wrap: wrap;
+   gap: 6px;
+   list-style: none;
+   padding: 0;
+}
+.map-card-tags li {
+   font-size: 12px;
+   letter-spacing: 0.08em;
+   text-transform: uppercase;
+   padding: 3px 7px;
+   border: 1px solid var(--line-2);
+   color: var(--ink-2);
+}
+.map-card-actions {
+   margin-top: 12px;
+   display: flex;
+   flex-wrap: wrap;
+   gap: 8px;
+}
+.map-card-act {
+   font-family: var(--font-display), 'League Gothic', sans-serif;
+   font-size: 17px;
+   letter-spacing: 0.06em;
+   text-transform: uppercase;
+   min-height: 38px;
+   padding: 0 14px;
+   border: 1px solid var(--ink);
+   color: var(--ink);
+   background: transparent;
+   cursor: pointer;
+   transition:
+      background-color 150ms var(--ease),
+      color 150ms var(--ease);
+}
+.map-card-act:hover {
+   background: var(--bg-2);
+}
+.map-card-act.primary {
+   background: var(--teal);
+   border-color: var(--teal);
+   color: #06232a;
+}
+.map-card-act.primary:hover {
+   filter: brightness(0.95);
+}
+.map-card-act.danger {
+   border-color: var(--destructive, #c0392b);
+   color: var(--destructive, #c0392b);
+}
+.map-card-act:disabled {
+   opacity: 0.5;
+   cursor: default;
+}
+
+/* ---- The clear cross in a search box ---------------------------------------- */
+input[type='search']::-webkit-search-cancel-button {
+   -webkit-appearance: none;
+   appearance: none;
+   width: 16px;
+   height: 16px;
+   margin-left: 6px;
+   cursor: pointer;
+   background-color: var(--teal);
+   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E")
+      center / 16px 16px no-repeat;
+   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E")
+      center / 16px 16px no-repeat;
+}
+input[type='search']::-webkit-search-cancel-button:hover {
+   filter: brightness(0.9);
+}
+
+/* ---- Maps under a finger ---------------------------------------------------- */
+/* Pinch zooms; the plus and minus only get in the way of a thumb. */
+@media (pointer: coarse) {
+   .map-surface .leaflet-control-zoom {
+      display: none;
+   }
+}
+
+/* ---- A sheet rising from the bottom of a phone ------------------------------ */
+.sheet {
+   animation: sheet-up 260ms var(--ease) both;
+}
+.sheet-overlay {
+   animation: fade-in 200ms var(--ease) both;
+}
+@keyframes fade-in {
+   from {
+      opacity: 0;
+   }
+   to {
+      opacity: 1;
+   }
+}
+@keyframes sheet-up {
+   from {
+      translate: 0 24px;
+      opacity: 0;
+   }
+   to {
+      translate: 0 0;
+      opacity: 1;
+   }
+}
+/* A native select, where one is used: the chevron gets its own room. */
+select {
+   border-radius: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+   .sheet,
+   .sheet-overlay {
+      animation: none;
+   }
+}
+
+/* ---- A section that folds -------------------------------------------------- */
+.fold-body {
+   display: grid;
+   grid-template-rows: 0fr;
+   transition: grid-template-rows 360ms var(--ease);
+}
+.fold-open .fold-body {
+   grid-template-rows: 1fr;
+}
+.fold-inner {
+   overflow: hidden;
+   opacity: 0;
+   transform: translateY(-4px);
+   transition:
+      opacity 240ms var(--ease),
+      transform 320ms var(--ease);
+}
+.fold-open .fold-inner {
+   opacity: 1;
+   transform: none;
+   transition-delay: 80ms;
+}
+@media (prefers-reduced-motion: reduce) {
+   .fold-body,
+   .fold-inner {
+      transition: none;
+   }
+}
+
+/* ---- The fader ------------------------------------------------------------- */
+.fader-track {
+   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.fader-grip {
+   box-shadow:
+      0 0 0 2px var(--background),
+      0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+/* ---- A thread that scrolls ------------------------------------------------- */
+/* Four replies high, then it scrolls, on a rail in the product's own colour. */
+.thread-scroll {
+   scrollbar-width: thin;
+   scrollbar-color: var(--teal)
+      color-mix(in srgb, var(--paper) 12%, transparent);
+   overscroll-behavior: contain;
+}
+.thread-scroll::-webkit-scrollbar {
+   width: 6px;
+}
+.thread-scroll::-webkit-scrollbar-track {
+   background: color-mix(in srgb, var(--paper) 12%, transparent);
+}
+.thread-scroll::-webkit-scrollbar-thumb {
+   background: var(--teal);
+}
+
+/* ---- A reply arriving ------------------------------------------------------ */
+.comment-in {
+   animation: comment-in 360ms var(--ease) both;
+   animation-delay: calc(var(--i, 0) * 40ms);
+}
+@keyframes comment-in {
+   from {
+      opacity: 0;
+      transform: translateY(6px);
+   }
+   to {
+      opacity: 1;
+      transform: none;
+   }
+}
+/* Rows of a table landing one after another. */
+tr.fact {
+   animation-duration: 420ms;
+   animation-delay: calc(var(--i, 0) * 45ms);
+}
+@media (prefers-reduced-motion: reduce) {
+   .comment-in {
+      animation: none;
+   }
+}
+
+/* ---- The rank bar --------------------------------------------------------- */
+.rank-bar {
+   position: relative;
+   height: 6px;
+   background: var(--line);
+}
+.rank-bar > span {
+   position: absolute;
+   inset: 0 auto 0 0;
+   background: var(--teal);
+   transition: width 900ms var(--ease);
+}
+
+/* ---- A distance, by dragging --------------------------------------------- */
+.range {
+   position: relative;
+   height: 44px;
+}
+/* The line: dashed, like the fishing line the product draws everywhere. */
+.range::before {
+   content: '';
+   position: absolute;
+   left: 0;
+   right: 0;
+   top: 50%;
+   border-top: 2px dashed var(--line-2, var(--line));
+   transform: translateY(-50%);
+}
+.range-fill {
+   position: absolute;
+   left: 0;
+   top: 50%;
+   height: 2px;
+   background: var(--teal);
+   transform: translateY(-50%);
+   pointer-events: none;
+}
+.range-tick {
+   position: absolute;
+   top: 50%;
+   width: 8px;
+   height: 8px;
+   background: var(--background);
+   border: 2px solid var(--line-2, var(--line));
+   transform: translate(-50%, -50%);
+   pointer-events: none;
+}
+.range-tick-on {
+   border-color: var(--teal);
+   background: var(--teal);
+}
+.range input[type='range'] {
+   position: absolute;
+   inset: 0;
+   width: 100%;
+   height: 100%;
+   margin: 0;
+   background: transparent;
+   appearance: none;
+   -webkit-appearance: none;
+   cursor: pointer;
+}
+.range input[type='range']:focus-visible {
+   outline: 2px solid var(--teal);
+   outline-offset: 2px;
+}
+.range input[type='range']::-webkit-slider-runnable-track {
+   height: 100%;
+   background: transparent;
+}
+.range input[type='range']::-moz-range-track {
+   height: 100%;
+   background: transparent;
+}
+/* The thumb: a square of ink with a paper ring, like a pin's head. */
+.range input[type='range']::-webkit-slider-thumb {
+   -webkit-appearance: none;
+   appearance: none;
+   width: 24px;
+   height: 24px;
+   margin-top: 10px;
+   background: var(--ink);
+   border: 3px solid var(--background);
+   box-shadow: 0 0 0 1px var(--ink);
+   transition: transform 120ms var(--ease);
+}
+.range input[type='range']::-moz-range-thumb {
+   width: 24px;
+   height: 24px;
+   border-radius: 0;
+   background: var(--ink);
+   border: 3px solid var(--background);
+   box-shadow: 0 0 0 1px var(--ink);
+}
+.range input[type='range']:active::-webkit-slider-thumb {
+   transform: scale(1.12);
+}
+
+/*
+ * The toolbar sits over the map's top left, where Leaflet puts its zoom
+ * control, so the zoom control moves down out from under it.
+ */
+.map-surface .leaflet-top.leaflet-left .leaflet-control-zoom {
+   margin-top: 62px;
+}
+@media (max-width: 640px) {
+   .map-surface .leaflet-top.leaflet-left .leaflet-control-zoom {
+      margin-top: 62px;
+   }
+}
+
+/* ---- The SVG pins ------------------------------------------------------- */
+.map-pin-svg {
+   display: block;
+   overflow: visible;
+   transform-origin: 50% 100%;
+   transition: transform 140ms var(--ease);
+}
+.map-pin-cluster .map-pin-svg {
+   transform-origin: 50% 50%;
+   cursor: pointer;
+}
+.map-pin-kind:hover .map-pin-svg {
+   transform: scale(1.08);
+}
+.map-pin-svg text {
+   font-variant-numeric: tabular-nums;
+   pointer-events: none;
+}
+
+/* ---- Several spots at once: a doubled disc -------------------------------- */
+.map-pin-cluster .map-pin-disc {
+   top: 3px;
+   left: calc(50% + 3px);
+   width: 40px;
+   height: 40px;
+   cursor: pointer;
+}
+/* The second disc behind and up-left, which is what says "more than one". */
+.map-pin-cluster .map-pin-disc-back {
+   top: -3px;
+   left: calc(50% - 3px);
+   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+   opacity: 0.9;
+}
+.map-pin-cluster:hover .map-pin-disc {
+   transform: translateX(-50%) scale(1.06);
+}
+.map-pin-cluster-spot .map-pin-disc {
+   background: var(--teal);
+   color: #06232a;
+}
+.map-pin-cluster-other .map-pin-disc {
+   background: #14110f;
+   color: var(--paper);
+}
+/* The plugin's own animation classes; the discs carry their own look. */
+.marker-cluster {
+   background: none;
+}
+
+/* ---- Private marks: a pennant on a pole ---------------------------------- */
+.map-pin-waypoint .map-pin-pole {
+   position: absolute;
+   left: 2px;
+   top: 0;
+   width: 4px;
+   height: 44px;
+   background: var(--paper);
+   box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.6);
+}
+.map-pin-waypoint .map-pin-flag {
+   position: absolute;
+   left: 6px;
+   top: 2px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 28px;
+   height: 22px;
+   background: var(--paper);
+   color: #14110f;
+   /* The trailing edge cut like a pennant, so it cannot be mistaken for a plate. */
+   clip-path: polygon(0 0, 100% 0, 82% 50%, 100% 100%, 0 100%);
+   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+}
+.map-pin-waypoint .map-pin-flag .map-pin-g {
+   width: 15px;
+   height: 15px;
+   margin-right: 4px;
+}
+
+/* ---- Places: a square plate, coloured by what it is ---------------------- */
+.map-pin-poi .map-pin-plate {
+   position: absolute;
+   top: 0;
+   left: 50%;
+   transform: translateX(-50%);
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 32px;
+   height: 32px;
+   border: 2.5px solid var(--paper);
+   color: var(--paper);
+   box-shadow:
+      0 3px 8px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.map-pin-poi .map-pin-stem {
+   top: 30px;
+   border-left-width: 6px;
+   border-right-width: 6px;
+   border-top: 11px solid;
+}
+.map-pin-poi .map-pin-g {
+   width: 19px;
+   height: 19px;
+}
+.map-pin-ramp .map-pin-plate {
+   background: #1f6fb2;
+}
+.map-pin-ramp .map-pin-stem {
+   border-top-color: #1f6fb2;
+}
+.map-pin-marina .map-pin-plate {
+   background: #1d3557;
+}
+.map-pin-marina .map-pin-stem {
+   border-top-color: #1d3557;
+}
+.map-pin-tackle .map-pin-plate {
+   background: #c97b1c;
+}
+.map-pin-tackle .map-pin-stem {
+   border-top-color: #c97b1c;
+}
+.map-pin-parking .map-pin-plate {
+   background: #4a4542;
+}
+.map-pin-parking .map-pin-stem {
+   border-top-color: #4a4542;
+}
+
+.map-pin-icon {
+   display: block;
+   color: var(--teal);
+}
+
+/*
+ * Headings are focused on navigation so a screen reader lands in the right
+ * place. That focus is not a user action, so it must not paint a ring. A real
+ * keyboard focus still does, through :focus-visible.
+ */
+h1[tabindex='-1']:focus:not(:focus-visible),
+[tabindex='-1']:focus:not(:focus-visible) {
+   outline: none;
+}
+
+/*
+ * Leaflet ships 30px controls against a brief that asks for 44px. Its stylesheet
+ * is imported by the map module, which is in a lazily loaded chunk, so it lands
+ * after this file and wins on order. Hence the doubled selector: specificity
+ * rather than !important.
+ */
+.map-surface .map-surface .leaflet-bar a,
+.map-surface .leaflet-bar a.leaflet-control-zoom-in,
+.map-surface .leaflet-bar a.leaflet-control-zoom-out {
+   width: 2.75rem;
+   height: 2.75rem;
+   line-height: 2.75rem;
+   font-size: 1.125rem;
+}
+
+/*
+ * Arrival is motion too, so it has to answer the same preference. Without this
+ * the reveal still slides for someone who asked it not to: the transition is
+ * shortened by the global rule, but the element still starts 26px low.
+ */
+@media (prefers-reduced-motion: reduce) {
+   .rv {
+      opacity: 1;
+      transform: none;
+      transition: none;
+   }
+}
+
+/* ---- A field under a thumb never zooms the page ----------------------------- */
+/*
+ * iOS zooms the whole page when a form control smaller than 16px takes focus,
+ * and it never zooms back out. A route change inside the app is not a document
+ * load, so the scale carries on to the next screen: tap the 14px measure select
+ * on the log, walk to the map, and the map is drawn magnified. The viewport meta
+ * keeps pinch zoom on purpose (no maximum-scale, no user-scalable), so the floor
+ * belongs on the controls.
+ *
+ * These rules sit outside @layer on purpose. Tailwind v4 puts every utility in
+ * @layer utilities, and unlayered CSS beats layered CSS whatever the specificity,
+ * so this wins over text-[14px] with no !important anywhere in the file. It is
+ * also why one blanket `input { font-size: 16px }` would be wrong: it would beat
+ * text-[28px] just as easily and shrink the measure box to a caption. Hence two
+ * narrow rules, one for controls that ask for less than 16px and one for controls
+ * that ask for nothing at all. Neither can lower a size that was asked for.
+ *
+ * Coarse pointer only. A mouse never triggers the zoom, so the desktop keeps
+ * every size the design chose.
+ */
+@media (pointer: coarse) {
+   /*
+    * Controls that name a size below 16px, named by token so the next field
+    * written with text-sm or text-[13px] is covered the day it lands.
+    */
+   :is(input, select, textarea, [role='combobox']):is(
+      [class*='text-[10px]'],
+      [class*='text-[11px]'],
+      [class*='text-[12px]'],
+      [class*='text-[13px]'],
+      [class*='text-[14px]'],
+      [class*='text-[15px]'],
+      [class*='text-xs'],
+      [class*='text-sm']
+   ) {
+      font-size: 16px;
+   }
+
+   /*
+    * Controls that name no size at all, which includes one inheriting a small
+    * size from whatever it sits in. Every control that does name a size steps
+    * out of the way, so this can only raise.
+    */
+   :is(input, select, textarea, [role='combobox']):not(
+      [class*='text-['],
+      [class*='text-xs'],
+      [class*='text-sm'],
+      [class*='text-base'],
+      [class*='text-lg'],
+      [class*='text-xl'],
+      [class*='text-2xl'],
+      [class*='text-3xl'],
+      [class*='text-4xl'],
+      [class*='text-5xl'],
+      [class*='text-6xl'],
+      [class*='text-7xl']
+   ) {
+      font-size: 16px;
+   }
+}
+
+/* ---- Two taps on a control are two taps, not a zoom ------------------------- */
+/*
+ * Safari zooms on a double tap, and it does that over the map's own furniture
+ * too: two quick taps on the search bar or the Mark control magnify the page,
+ * which reads as the map zooming under your finger. manipulation keeps pan and
+ * pinch and drops only the double tap, along with the wait that Safari holds a
+ * tap for while it watches for the second one, so every control answers sooner.
+ *
+ * Anything that states its own touch behaviour is left alone: the fader, the
+ * carousel, the scrollbar thumb and the drag to crop photo all depend on
+ * touch-none or touch-pan-y, and an unlayered rule would beat those utilities.
+ * Leaflet's own container and panes are untouched; they are divs, and Leaflet
+ * sets touch-action on them itself.
+ */
+@media (pointer: coarse) {
+   :is(
+      button,
+      a[href],
+      label,
+      summary,
+      input,
+      select,
+      textarea,
+      [role='button'],
+      [role='tab'],
+      [role='switch'],
+      [role='combobox'],
+      [role='option']
+   ):not([class*='touch-']) {
+      touch-action: manipulation;
+   }
+}
+
+/* ---- Competitions: the picker's panel, and the date and time field ---------- */
+/*
+ * The picker's sheet is measured in the part of the screen that is showing.
+ * vh is the screen with the browser's bars tucked away, so 85vh of a phone
+ * with its bars out can be more than there is; dvh is what is there now. The
+ * vh line stays for a browser that has never heard of dvh. A searched list
+ * keeps the full height so the sheet does not jump as rows are filtered out.
+ */
+.picker-sheet {
+   max-height: 85vh;
+   max-height: 85dvh;
+}
+.picker-sheet-tall {
+   height: 85vh;
+   height: 85dvh;
+}
+/* Never taller than the room Radix found for it, so no row is off the screen. */
+.picker-panel {
+   max-height: min(var(--radix-popover-content-available-height, 440px), 440px);
+}
+/*
+ * A searched panel keeps one height, as the sheet does. A panel that shrank
+ * to the rows a search left would fit under its button again and hop back
+ * down there, and then grow into that strip when the search was cleared.
+ */
+.picker-panel-tall {
+   height: min(var(--radix-popover-content-available-height, 440px), 440px);
+}
+/*
+ * The one part of a picker that scrolls. Contained, so reaching the end of
+ * the list does not start dragging the page or the sheet, and pan-y so a
+ * finger that lands on a row still scrolls the list it is in.
+ */
+.picker-list {
+   overscroll-behavior: contain;
+   -webkit-overflow-scrolling: touch;
+   touch-action: pan-y;
+}
+/* The search field has its own cross; WebKit's second one is removed. */
+.picker-search::-webkit-search-cancel-button {
+   -webkit-appearance: none;
+   appearance: none;
+}
+/*
+ * A date or a time input drawn like every other field. iOS centres the value,
+ * gives an empty one no height and paints its own bezel; Chromium adds a
+ * calendar glyph where the field's own button already stands.
+ */
+.when-input {
+   -webkit-appearance: none;
+   appearance: none;
+   display: block;
+   line-height: 1.5;
+}
+.when-input::-webkit-date-and-time-value {
+   min-height: 1.5em;
+   text-align: left;
+}
+.when-input::-webkit-calendar-picker-indicator {
+   display: none;
+}
+.when-input::-webkit-datetime-edit {
+   padding: 0;
+}
+
+/* ---- Map: the point a tap asks about (map-page) ------------------------------
+ *
+ * The sight that stands on a tapped point while its menu is open, and the
+ * menu's entrance on a desktop. The sight is paper over a dark keyline with a
+ * teal centre, the same in both themes, because what is under it is a
+ * photograph and not a ground either theme controls; the menu beside it is
+ * drawn in tokens and turns with the theme on its own. It lands rather than
+ * appearing, and one ring runs out from the centre so the eye finds it; both
+ * are decoration, so both go under reduced motion and the sight is simply
+ * there. It never takes a pointer: a tap on it is a tap on the map.
+ */
+/*
+ * Every pin out of the flow, where Leaflet means it to be. Leaflet places a
+ * marker with a transform from the corner of its pane and pulls it back by
+ * its anchor with a negative margin, and that lands the tip on the point only
+ * for an element that takes no room. The pin vocabulary above makes
+ * .map-pin-kind relative, for the stem and the disc it once held, and that
+ * won over Leaflet's absolute: each pin then stood below the ones before it
+ * in the pane, a pixel for every pin and half a disc for every cluster. With
+ * a country's worth of spots they drew out at sea, and a cluster opened onto
+ * pins that were not where its spots are. Absolute is still a containing
+ * block for anything placed inside a pin.
+ */
+.leaflet-marker-icon.map-pin-kind {
+   position: absolute;
+}
+.map-here {
+   /* Over every pin. Leaflet writes a z-index from the latitude into the
+      style attribute, and nothing short of this outranks that. */
+   z-index: 660 !important;
+   pointer-events: none !important;
+}
+.map-here-svg {
+   display: block;
+   overflow: visible;
+   filter: drop-shadow(0 1px 2px rgba(11, 9, 9, 0.5));
+   transform-origin: 50% 50%;
+   animation: map-here-land 260ms var(--ease) both;
+}
+.map-here-ring {
+   position: absolute;
+   inset: 8px;
+   border: 2px solid var(--teal);
+   border-radius: 50%;
+   opacity: 0;
+   animation: map-here-ring 1600ms var(--ease) 200ms 2 both;
+}
+@keyframes map-here-land {
+   from {
+      opacity: 0;
+      transform: scale(1.5);
+   }
+   to {
+      opacity: 1;
+      transform: scale(1);
+   }
+}
+@keyframes map-here-ring {
+   from {
       opacity: 0.9;
+      transform: scale(0.6);
+   }
+   to {
+      opacity: 0;
+      transform: scale(2.4);
+   }
+}
+/* The menu steps in from the side of its point. The outer box is the one the
+   map moves by hand, so the entrance lives on the inner one. */
+.map-point-menu-in {
+   animation: map-point-menu-in 180ms var(--ease) both;
+}
+.map-point-menu[data-side='left'] .map-point-menu-in {
+   --from: 8px;
+}
+@keyframes map-point-menu-in {
+   from {
+      opacity: 0;
+      translate: var(--from, -8px) 0;
+   }
+   to {
+      opacity: 1;
+      translate: 0 0;
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .map-here-svg,
+   .map-point-menu-in {
+      animation: none;
+   }
+   .map-here-ring {
+      display: none;
    }
 }
 
-@layer utilities {
-   .bobber-float {
-      animation: bobber-float 1.3s ease-in-out infinite;
+/* ---- Comments: a like landing, and a comment a link pointed at ------------
+   One block for the thread (components/feed/CommentThread.tsx). A row's
+   arrival is still `.comment-in` above; these two are the only other motion
+   in it, and both stand still for a reader who asked for less. */
+.heart-pop {
+   animation: heart-pop 320ms var(--ease) both;
+   transform-origin: 50% 60%;
+}
+@keyframes heart-pop {
+   0% {
+      transform: scale(0.6);
    }
+   55% {
+      transform: scale(1.22);
+   }
+   100% {
+      transform: scale(1);
+   }
+}
+/* Drawn outside the row with a shadow and a negative inset, so marking a
+   comment never moves it or the ones around it. */
+.comment-flash {
+   position: relative;
+}
+.comment-flash::before {
+   content: '';
+   position: absolute;
+   inset: -6px -8px;
+   pointer-events: none;
+   background: color-mix(in srgb, var(--teal) 16%, transparent);
+   box-shadow: inset 2px 0 0 var(--teal);
+   animation: comment-flash 2600ms var(--ease) 500ms both;
+}
+@keyframes comment-flash {
+   from {
+      opacity: 1;
+   }
+   to {
+      opacity: 0;
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .heart-pop {
+      animation: none;
+   }
+   /* No fade to watch: the mark is simply there, a quiet bar and no wash. */
+   .comment-flash::before {
+      animation: none;
+      background: none;
+   }
+}
 
-   .bobber-ripple {
-      animation: bobber-ripple 1.3s ease-in-out infinite;
+/* ---- The pin picker in a form (MapLocationPicker) --------------------------
+   On the full picker, Add a spot and Log a catch, the plus and minus stay
+   under a finger as well: choosing the point is the job there, the map has
+   room for them, and a reader who does not pinch still has a way in. The
+   compact picker in the fast log keeps the rule above and hides them. The
+   hint on the empty map rises in once, and stands still for a reader who
+   asked for less motion. */
+@media (pointer: coarse) {
+   .map-surface[data-picker='full'] .leaflet-control-zoom {
+      display: block;
+   }
+}
+.picker-hint {
+   animation: picker-hint-in 360ms var(--ease) 200ms both;
+}
+/* Only the rise is transform: the centring is Tailwind's own `translate`
+   property and is left to it. */
+@keyframes picker-hint-in {
+   from {
+      opacity: 0;
+      transform: translateY(8px);
+   }
+   to {
+      opacity: 1;
+      transform: none;
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .picker-hint {
+      animation: none;
+   }
+}
+
+/* ---- Notifications: the inbox rows and the popups ---------------------------
+   One block for pages/NotificationsPage.tsx and components/notifications/.
+   The row's ground is a variable as well as a colour, so the ring around the
+   mark on a face (NotificationFace) always matches what it sits on: the paper
+   grey of a read row, the teal tint of an unread one, or either on hover.
+   Read rows have a ground too, so a long list is a stack of soft tiles and not
+   loose lines floating on the page. */
+.note-row {
+   --note-ground: var(--bg-2);
+   background: var(--note-ground);
+   transition: background-color 150ms var(--ease);
+}
+.note-row[data-fresh] {
+   --note-ground: color-mix(in srgb, var(--teal) 12%, var(--bg));
+}
+.note-row-link:hover {
+   --note-ground: color-mix(in srgb, var(--ink) 7%, var(--bg-2));
+}
+.note-row-link[data-fresh]:hover {
+   --note-ground: color-mix(in srgb, var(--teal) 19%, var(--bg));
+}
+/* A popup arrives from the edge it sits against: up from the bottom bar on a
+   phone, in from the right on a desktop. */
+.note-pop {
+   animation: note-pop-in 320ms var(--ease) both;
+}
+@keyframes note-pop-in {
+   from {
+      opacity: 0;
+      transform: translateY(12px);
+   }
+   to {
+      opacity: 1;
+      transform: none;
+   }
+}
+@media (min-width: 768px) {
+   @keyframes note-pop-in {
+      from {
+         opacity: 0;
+         transform: translateX(16px);
+      }
+      to {
+         opacity: 1;
+         transform: none;
+      }
+   }
+}
+/* How long a popup has left, as a teal line running out along its foot. The
+   duration is set inline from the same number the timer uses. The line
+   stops while the popup is held under a pointer or holds the focus, because
+   the timer does. */
+.note-pop-life {
+   animation: note-pop-life linear both;
+}
+.note-pop[data-held] .note-pop-life {
+   animation-play-state: paused;
+}
+@keyframes note-pop-life {
+   from {
+      transform: scaleX(1);
+   }
+   to {
+      transform: scaleX(0);
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .note-row {
+      transition: none;
+   }
+   .note-pop {
+      animation: none;
+   }
+   /* A line shrinking for seven seconds is motion too: the popup simply sits
+      and then goes. */
+   .note-pop-life {
+      display: none;
+   }
+}
+/* ---------- Competition entry: the two photo steps ----------
+   Step two opens once the fish photo is in: its block rises into place
+   rather than appearing, so the eye follows the order the steps ask for.
+   Reduced motion gets it at once, through the global rule above and the
+   line below. */
+.entry-step-open {
+   animation: entry-step-open 420ms var(--ease) both;
+}
+@keyframes entry-step-open {
+   from {
+      opacity: 0;
+      transform: translateY(8px);
+   }
+   to {
+      opacity: 1;
+      transform: none;
+   }
+}
+@media (prefers-reduced-motion: reduce) {
+   .entry-step-open {
+      animation: none;
+   }
+}
+
+/* ---- A hand over anything pressable ------------------------------------------ */
+/*
+ * Tailwind 4 dropped the pointer cursor from buttons, so every button in the
+ * app showed an arrow. Put back for real buttons and button-like controls,
+ * and never for a disabled one.
+ */
+@layer base {
+   button:not(:disabled),
+   [role='button']:not([aria-disabled='true']),
+   [type='button']:not(:disabled),
+   [type='submit']:not(:disabled),
+   label[for],
+   summary {
+      cursor: pointer;
+   }
+}
+
+/* ---- Badges: what the Fisherfeed team calls a fish ---------------------------
+   A chip is a square of the kind's colour carrying the kind's mark, drawn in
+   the ink that reads on it (components/badges/kinds.ts sets both). Solid and
+   square, because the same chip has to hold on a black feed card, on the paper
+   record and in a list row without being restyled for each. Three sizes only:
+   eighteen in a row, twenty on a card, sixty four on the record. */
+.badge-chip {
+   display: inline-grid;
+   place-items: center;
+   flex: none;
+   width: var(--badge-size, 20px);
+   height: var(--badge-size, 20px);
+   background: var(--badge, var(--teal));
+   color: var(--badge-ink, #0b0909);
+}
+.badge-mark {
+   display: block;
+   width: 76%;
+   height: 76%;
+}
+/* The card's line of badges: the chip, its name, and a plain count for the
+   rest. It wraps at 390px rather than squeezing the names. */
+.badge-strip {
+   display: flex;
+   flex-wrap: wrap;
+   align-items: center;
+   gap: 6px 14px;
+}
+.badge-tag {
+   display: inline-flex;
+   align-items: center;
+   gap: 7px;
+   min-width: 0;
+}
+.badge-tag-name {
+   font-size: 15px;
+   line-height: 1;
+}
+.badge-more {
+   font-size: 13px;
+   letter-spacing: 0.06em;
+   opacity: 0.75;
+}
+/* A row carries the marks alone: one line of type, and the colour says the
+   team has been here. */
+.badge-marks {
+   display: inline-flex;
+   align-items: center;
+   gap: 4px;
+   vertical-align: -3px;
+}
+/* The mark on the control that opens the picker: a badge in outline, so the
+   word beside it reads as a badge control and not as another action. */
+.badge-cue {
+   position: relative;
+   width: 15px;
+   height: 15px;
+   border: 1.6px solid currentColor;
+}
+/* Drawn in the control's own ink, not in teal of its own: the control is teal
+   while the fish carries a badge and quiet while it does not, and a fixed teal
+   centre made it shout on every fish the team had not marked yet. */
+.badge-cue::after {
+   content: '';
+   position: absolute;
+   inset: 3px;
+   background: currentColor;
+}
+/* In the card's action row it stands beside 22px icons, so it is drawn at
+   their weight rather than at the weight of a word. */
+.badge-cue-lg {
+   width: 21px;
+   height: 21px;
+   border-width: 1.8px;
+}
+.badge-cue-lg::after {
+   inset: 4px;
+}
+/* A badge that was just pinned lands, once. Anything already on the card was
+   there before the reader arrived and simply is there. */
+.badge-landed {
+   animation: badge-land 420ms var(--ease) both;
+}
+@keyframes badge-land {
+   from {
+      opacity: 0;
+      transform: scale(0.55) translateY(-6px);
+   }
+   to {
+      opacity: 1;
+      transform: none;
+   }
+}
+/* The picker: the pickers' own panel and sheet heights, so it opens the way
+   every other chooser in the app opens. */
+/* Tall enough for the head, the note and all eight kinds when the window has
+   the room, and no taller than the room Radix says there is. */
+.badge-panel {
+   max-height: min(540px, var(--radix-popover-content-available-height, 540px));
+}
+.badge-sheet {
+   height: min(78vh, 560px);
+}
+@media (prefers-reduced-motion: reduce) {
+   .badge-landed {
+      animation: none;
    }
 }

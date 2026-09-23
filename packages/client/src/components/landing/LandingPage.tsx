@@ -1,18 +1,43 @@
-import { LandingFaq } from '@/components/landing/LandingFaq';
-import { LandingFeatures } from '@/components/landing/LandingFeatures';
-import { LandingFooter } from '@/components/landing/LandingFooter';
-import { LandingHeader } from '@/components/landing/LandingHeader';
-import { LandingHero } from '@/components/landing/LandingHero';
+import { useRef } from 'react';
+import { useRevealIn } from '@/components/brand/Reveal';
+import { useDocumentTitle } from '@/lib/title';
+import { LandingBoards } from './LandingBoards';
+import { LandingFooter } from './LandingFooter';
+import { LandingForecast } from './LandingForecast';
+import { LandingHero } from './LandingHero';
+import { LandingInsights } from './LandingInsights';
+import { LandingJoin } from './LandingJoin';
+import { LandingMap } from './LandingMap';
+import { LandingRecord } from './LandingRecord';
 
+/*
+ * The signed-out page. The black header and the phone bar come from the app
+ * shell, so this renders the bands only.
+ *
+ * The order walks the app the way an angler meets it: the promise with the app
+ * running beside it, the forecast you read before you drive, the map you stand
+ * on, the fish you photograph, what the log counts back to you, the boards, and
+ * then the signup.
+ *
+ * The grounds alternate black, white, black, off white, white, off white, teal.
+ * A waterline only goes where a black plate meets paper, which is the hero into
+ * the forecast and either side of the map. Two light grounds meeting need no
+ * edge at all, and drawing one there would be decoration.
+ */
 export function LandingPage() {
+   useDocumentTitle();
+   const root = useRef<HTMLDivElement>(null);
+   useRevealIn(root);
+
    return (
-      <div className="min-h-screen bg-background text-foreground [background-image:radial-gradient(circle_at_top,rgba(56,189,248,0.12),transparent_36%)]">
-         <LandingHeader />
-         <main>
-            <LandingHero />
-            <LandingFeatures />
-            <LandingFaq />
-         </main>
+      <div ref={root} className="bg-background text-foreground">
+         <LandingHero />
+         <LandingForecast />
+         <LandingMap />
+         <LandingRecord />
+         <LandingInsights />
+         <LandingBoards />
+         <LandingJoin />
          <LandingFooter />
       </div>
    );

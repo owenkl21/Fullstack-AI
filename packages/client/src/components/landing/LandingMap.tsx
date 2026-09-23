@@ -1,0 +1,316 @@
+import { useRef, useState } from 'react';
+import { TornEdge } from '@/components/brand/TornEdge';
+import { cn } from '@/lib/utils';
+import { LandingSpotsMap } from './LandingSpotsMap';
+import { ANCHOR, WRAP, stagger } from './layout';
+import { photos } from './photos';
+import { useParallaxFallback } from './useParallaxFallback';
+
+/*
+ * At the spot: the map, and who gets to see what is on it.
+ *
+ * The plate under the pins is drawn rather than loaded. A live Leaflet map on
+ * the signed-out page would pull tiles, a library and an attribution bar for a
+ * picture nobody pans, and a photograph of a coast dressed up as a map is a
+ * lie about the product. So the geography is a flat sheet in the house
+ * language: cool water, warm land, a coast hairline, the contour art the rest
+ * of the page already uses, and the product's own pins standing on it.
+ *
+ * The pins are the app's, not a drawing of them. The teardrop, the small drop
+ * and the kind colours are copied out of `src/lib/leaflet.ts`, where the map
+ * builds its markers, so the vocabulary a reader learns here is the one they
+ * meet the first time they open the map.
+ */
+
+/*
+ * One pin shape, 36 wide and 46 tall, the tip standing on the position. Lifted
+ * verbatim from `kindPin` in `src/lib/leaflet.ts`; if that shape ever changes,
+ * this changes with it.
+ */
+const TEARDROP =
+   'M18 45C18 45 3.5 28.6 3.5 18a14.5 14.5 0 1 1 29 0C32.5 28.6 18 45 18 45Z';
+
+/* The quieter drop a private mark wears, 28 by 36. Also from leaflet.ts. */
+const SMALL_DROP =
+   'M14 35C14 35 3 22.4 3 14a11 11 0 1 1 22 0C25 22.4 14 35 14 35Z';
+
+/*
+ * The body colour of each kind, matching `BODY` in leaflet.ts kind for kind.
+ *
+ * Teal and paper are the tokens the product already names. The other four are
+ * the map's own fixed inks: a pin sits on satellite imagery and has to hold
+ * its colour whatever the page theme does, so the map does not let them move
+ * and neither does this.
+ */
+const FILL = {
+   spot: 'var(--teal)',
+   other: '#14110f',
+   waypoint: 'var(--paper)',
+   ramp: '#1f6fb2',
+   marina: '#1d3557',
+   tackle: '#c97b1c',
+} as const;
+
+type PinKind = keyof typeof FILL;
+
+function Pin({
+   kind,
+   count,
+   stroke = 'var(--paper)',
+   className,
+}: {
+   kind: PinKind;
+   count?: number;
+   stroke?: string;
+   className?: string;
+}) {
+   const small = kind === 'waypoint';
+   const w = small ? 28 : 36;
+   const h = small ? 36 : 46;
+   return (
+      <svg
+         viewBox={`0 0 ${w} ${h}`}
+         aria-hidden="true"
+         className={cn('block shrink-0', className)}
+         style={{ aspectRatio: `${w} / ${h}` }}
+      >
+         <path
+            d={small ? SMALL_DROP : TEARDROP}
+            fill={FILL[kind]}
+            stroke={stroke}
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+         />
+         {count ? (
+            <text
+               x="18"
+               y="18"
+               textAnchor="middle"
+               dominantBaseline="central"
+               fontSize="20"
+               fill="var(--teal-ink)"
+               className="g num"
+            >
+               {count}
+            </text>
+         ) : null}
+      </svg>
+   );
+}
+
+/* Several spots at once: the doubled disc the map draws when pins collide. */
+function ClusterPin({
+   stroke = 'var(--paper)',
+   className,
+}: {
+   stroke?: string;
+   className?: string;
+}) {
+   return (
+      <svg
+         viewBox="0 0 48 48"
+         aria-hidden="true"
+         className={cn('block shrink-0', className)}
+         style={{ aspectRatio: '1 / 1' }}
+      >
+         <circle
+            cx="24"
+            cy="24"
+            r="22"
+            fill="none"
+            stroke={stroke}
+            strokeWidth="2"
+         />
+         <circle
+            cx="24"
+            cy="24"
+            r="17"
+            fill="var(--teal)"
+            stroke="var(--paper)"
+            strokeWidth="3"
+         />
+      </svg>
+   );
+}
+
+/* What the pins mean, in the order the map's own legend lists them. */
+const legend: { key: string; kind: PinKind | 'cluster'; label: string }[] = [
+   { key: 'spot', kind: 'spot', label: 'Your spot, with its catch count' },
+   { key: 'other', kind: 'other', label: "Another angler's public spot" },
+   { key: 'waypoint', kind: 'waypoint', label: 'Your private mark' },
+   { key: 'ramp', kind: 'ramp', label: 'Slipway' },
+   { key: 'marina', kind: 'marina', label: 'Harbour or marina' },
+   { key: 'tackle', kind: 'tackle', label: 'Tackle or bait shop' },
+   { key: 'cluster', kind: 'cluster', label: 'Several spots, zoom in' },
+];
+
+/* How much of a mark anyone else is given. The whole argument of the section. */
+const disclosures = [
+   { value: 'exact', label: 'Exact' },
+   { value: 'km', label: 'Within a km' },
+   { value: 'off', label: 'Off the map' },
+] as const;
+
+type Disclosure = (typeof disclosures)[number]['value'];
+
+export function LandingMap() {
+   const band = useRef<HTMLDivElement>(null);
+   useParallaxFallback(band, 0.18);
+   const [shown, setShown] = useState<Disclosure>('exact');
+
+   return (
+      <section
+         id="map"
+         className={cn(
+            'relative bg-black-block pt-[84px] pb-11 text-paper md:pt-[112px] md:pb-14',
+            ANCHOR
+         )}
+      >
+         <TornEdge fill="bg" flip seed={22} />
+         {/* Its own clipping box, so the waterline at the foot can hang. */}
+         <div className="absolute inset-0 overflow-hidden">
+            <div
+               ref={band}
+               className="parallax-band absolute inset-x-0 top-[-14%] bottom-0"
+            >
+               <img
+                  src={photos.rockOcean}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+               />
+               <div className="absolute inset-0 bg-black-block/88" />
+            </div>
+         </div>
+
+         <div className={cn(WRAP, 'relative')}>
+            <div className="grid items-start gap-10 md:grid-cols-2 md:gap-12">
+               <div className="flex min-w-0 flex-col gap-[18px]">
+                  <span className="rv flex items-baseline gap-3.5">
+                     <span className="g num text-[52px] leading-[0.8] text-teal">
+                        02
+                     </span>
+                     <span className="lab text-paper-2">At the spot</span>
+                     <span
+                        aria-hidden="true"
+                        className="block h-px flex-1 bg-paper/20"
+                     />
+                  </span>
+
+                  <h2
+                     className="g rv max-w-[14ch] text-[clamp(42px,5.4vw,76px)] [text-shadow:0_2px_20px_rgba(0,0,0,0.4)]"
+                     style={stagger(1)}
+                  >
+                     Your marks stay yours
+                  </h2>
+
+                  <p
+                     className="rv max-w-[48ch] text-[17px] text-pretty"
+                     style={stagger(2)}
+                  >
+                     The map is where anyone decides where to fish, so it opens
+                     on water corner to corner: your spots, the ones other
+                     anglers have made public, your own private marks, and every
+                     slipway, harbour and tackle shop around wherever you are
+                     looking.
+                  </p>
+
+                  <p
+                     className="rv max-w-[48ch] text-[17px] text-paper-2 text-pretty"
+                     style={stagger(3)}
+                  >
+                     A mark you worked for is exact for you, blurred to about a
+                     kilometre for everyone else, or off the map entirely. I am
+                     not in the business of giving your spots away.
+                  </p>
+
+                  <div
+                     role="radiogroup"
+                     aria-label="Shown to others"
+                     className="rv mt-1 flex flex-wrap self-start border border-paper"
+                     style={stagger(3)}
+                  >
+                     {disclosures.map((option, i) => (
+                        <button
+                           key={option.value}
+                           type="button"
+                           role="radio"
+                           aria-checked={shown === option.value}
+                           onClick={() => setShown(option.value)}
+                           className={cn(
+                              'g-tracked flex h-11 items-center px-[18px] text-[17px] transition-colors duration-150 [transition-timing-function:var(--ease)]',
+                              i > 0 && 'border-l border-paper/30',
+                              shown === option.value
+                                 ? 'bg-paper text-black-block'
+                                 : 'text-paper-2 hover:text-paper'
+                           )}
+                        >
+                           {option.label}
+                        </button>
+                     ))}
+                  </div>
+               </div>
+
+               <div
+                  className="blk blk-flat rv min-w-0 border border-paper/20 px-[22px] pt-6 pb-[26px]"
+                  style={stagger(2)}
+               >
+                  <span className="lab text-paper-2">The pins</span>
+                  <ul className="mt-3.5 flex flex-col">
+                     {legend.map((row) => (
+                        <li
+                           key={row.key}
+                           className="flex items-center gap-3.5 border-t border-paper/20 py-[9px]"
+                        >
+                           {row.kind === 'cluster' ? (
+                              <ClusterPin
+                                 stroke="var(--paper-2)"
+                                 className="w-7"
+                              />
+                           ) : (
+                              <Pin
+                                 kind={row.kind}
+                                 stroke="var(--paper-2)"
+                                 className="w-6"
+                              />
+                           )}
+                           <span className="text-[15px]">{row.label}</span>
+                        </li>
+                     ))}
+                  </ul>
+               </div>
+            </div>
+
+            <div
+               className="blk blk-flat blk-plain rv mt-10 border border-paper/20 md:mt-14"
+               style={stagger(2)}
+            >
+               <LandingSpotsMap shown={shown} />
+
+               <div className="flex flex-wrap gap-2 border-t border-paper/20 px-[18px] py-4 md:px-[22px]">
+                  <span className="g-tracked inline-flex h-11 items-center border border-paper/20 bg-black-block-2 px-3.5 text-[15px]">
+                     Satellite
+                     <span className="num ml-1.5 text-paper-2">3 on</span>
+                  </span>
+                  <span className="g-tracked inline-flex h-11 items-center border border-teal bg-teal px-3.5 text-[15px] text-black-block">
+                     Drop a mark
+                  </span>
+                  <span className="g-tracked inline-flex h-11 items-center border border-paper/20 bg-black-block-2 px-3.5 text-[15px]">
+                     Locate
+                  </span>
+                  <span className="g-tracked inline-flex h-11 items-center border border-paper/20 bg-black-block-2 px-3.5 text-[15px]">
+                     Log here
+                  </span>
+               </div>
+
+               <p className="px-[18px] pb-[18px] text-[13px] text-paper-2 md:px-[22px]">
+                  Tap a pin for what is there. Press and hold anywhere to drop a
+                  mark of your own.
+               </p>
+            </div>
+         </div>
+
+         <TornEdge fill="black" cut />
+      </section>
+   );
+}
