@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import axios from 'axios';
 import { prisma } from '../lib/prisma';
+import { hubUrl } from '../lib/hub';
 import { stripLocation } from '../lib/strip-location';
 import { uploadsService } from './uploads.service';
 import {
@@ -225,7 +226,7 @@ ${MEASURE_READING_RULES}`,
     * caller's job, because only the caller knows the table.
     */
    async identify(imageUrl: string): Promise<NamerGuess[] | null> {
-      const base = process.env.FISHIAL_URL;
+      const base = await hubUrl();
       if (!base) return null;
       const image = await fetchImage(imageUrl);
       const response = await axios.post<{
@@ -276,7 +277,7 @@ ${MEASURE_READING_RULES}`,
       fishCount: number;
       embedding: number[] | null;
    } | null> {
-      const base = process.env.FISHIAL_URL;
+      const base = await hubUrl();
       if (!base) return null;
       const image = await fetchImage(imageUrl);
       const { data } = await axios.post<{
@@ -333,7 +334,7 @@ ${MEASURE_READING_RULES}`,
     * changes the species replaces the earlier lesson.
     */
    async teachFromCatch(catchId: string): Promise<void> {
-      const base = process.env.FISHIAL_URL;
+      const base = await hubUrl();
       if (!base) return;
       try {
          const record = await prisma.catch.findUnique({

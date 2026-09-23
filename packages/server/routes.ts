@@ -12,6 +12,7 @@ import { competitionsController } from './controllers/competitions.controller';
 import { placesController } from './controllers/places.controller';
 import { forecastController } from './controllers/forecast.controller';
 import { visionController } from './controllers/vision.controller';
+import { hubController } from './controllers/hub.controller';
 import { savedController } from './controllers/saved.controller';
 import { notificationsController } from './controllers/notifications.controller';
 import { pushController } from './controllers/push.controller';
@@ -280,6 +281,8 @@ router.get('/api/places/name', placesController.name);
 /* Reading a photograph: a figure off a tape or a scale, or the fish's name. */
 router.post('/api/vision/read', requireApiAuth, visionController.readMeasure);
 router.post('/api/vision/identify', requireApiAuth, visionController.identify);
+/* The hub telling the server where the fish namer is now. Its own token. */
+router.post('/api/hub/announce', hubController.announce);
 
 /* The week ahead at a place. Public, like the places. */
 /*
