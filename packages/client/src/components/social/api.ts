@@ -11,6 +11,10 @@ export type Standing = {
    totalMassKg: number;
    distinctSpecies: number;
    longestCm: number;
+   /* On a species board: the angler's heaviest fish, null for one never
+      weighed nor measured against figures, and whether it was estimated. */
+   bestMassKg?: number | null;
+   bestEstimated?: boolean;
 };
 
 export type SpeciesBoard = {
@@ -20,6 +24,10 @@ export type SpeciesBoard = {
    longestCm: number;
    longestBy: string | null;
    longestByName: string | null;
+   /* The heaviest fish on the board, and who caught it. */
+   heaviestKg?: number | null;
+   heaviestEstimated?: boolean;
+   heaviestByName?: string | null;
    anglers: number;
    /*
     * A board can be empty for two different reasons and the screen has to be

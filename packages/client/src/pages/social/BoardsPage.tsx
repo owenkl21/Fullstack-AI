@@ -18,10 +18,13 @@ import {
 } from '@/components/social/api';
 import { useIsSignedIn } from '@/lib/auth-client';
 import { useDocumentTitle } from '@/lib/title';
+import { formatMeasure, useUnits } from '@/lib/units';
 import { TrophyIcon } from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom';
 
 const LOAD_FAILED = 'Could not load the boards.';
+/* How many boards show before a species is picked. */
+const BUSIEST = 6;
 
 /*
  * Two views of the same fish. Species is the default because "who has the best
@@ -48,7 +51,8 @@ export function BoardsPage() {
    }, [isSignedIn]);
    const [view, setView] = useState<'species' | 'rivals'>('species');
    const [chosenSpecies, setChosenSpecies] = useState<string[]>([]);
-   const [rankBy, setRankBy] = useState<RankBy>('points');
+   /* Weight first, as everywhere a fish is compared. */
+   const [rankBy, setRankBy] = useState<RankBy>('weight');
    const [boards, setBoards] = useState<SpeciesBoard[] | null>(null);
    const [rivals, setRivals] = useState<RivalStanding[] | null>(null);
    const [mutualCount, setMutualCount] = useState(0);
@@ -98,7 +102,7 @@ export function BoardsPage() {
             column="w-[min(1320px,100%-32px)]"
             kicker="Boards"
             title="Who is catching what"
-            lede="Length becomes mass with published figures, and points are awarded per kilogram. The fish never has to be weighed, or kept."
+            lede="Every species, heaviest fish first. A weight you log counts as it is, and a fish you only measured is weighed from its length where the species has published figures."
          />
 
          {/*
@@ -141,7 +145,7 @@ export function BoardsPage() {
                   size="sm"
                   multiple
                   label="Fish"
-                  allLabel="Pick a species"
+                  allLabel="Busiest species"
                   value={chosenSpecies}
                   onChange={(next) => setChosenSpecies(next as string[])}
                   options={(boards ?? []).map((b) => ({
@@ -160,10 +164,10 @@ export function BoardsPage() {
                value={rankBy}
                onChange={setRankBy}
                options={[
-                  { value: 'points', label: 'Points' },
                   { value: 'weight', label: 'Weight' },
                   { value: 'length', label: 'Longest' },
                   { value: 'bag', label: 'Bag' },
+                  { value: 'points', label: 'Points' },
                ]}
             />
          </div>
@@ -190,11 +194,15 @@ export function BoardsPage() {
                />
             ) : (
                <SpeciesView
-                  boards={(boards ?? []).filter((b) =>
+                  boards={
+                     /* Nothing picked: the busiest boards, live, rather than
+                        an empty page asking for a choice. */
                      chosenSpecies.length === 0
-                        ? false
-                        : chosenSpecies.includes(b.speciesId)
-                  )}
+                        ? (boards ?? []).slice(0, BUSIEST)
+                        : (boards ?? []).filter((b) =>
+                             chosenSpecies.includes(b.speciesId)
+                          )
+                  }
                   none={(boards ?? []).length === 0}
                   rankBy={rankBy}
                   youId={youId}
@@ -260,6 +268,7 @@ function SpeciesView({
    rankBy: RankBy;
    youId: string | null;
 }) {
+   const units = useUnits();
    if (none) {
       return (
          <NoData icon={TrophyIcon} title="No data yet">
@@ -281,11 +290,20 @@ function SpeciesView({
             <section key={board.speciesId} className="min-w-0">
                <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
                   <h2 className="g text-[30px]">{board.commonName}</h2>
-                  {board.longestCm && board.longestByName ? (
+                  {board.heaviestKg && board.heaviestByName ? (
                      <p className="text-[15px] text-ink-2">
-                        Biggest:{' '}
+                        Heaviest:{' '}
                         <span className="num text-ink">
-                           {board.longestCm} cm
+                           {formatMeasure(board.heaviestKg, 'WEIGHT', units)}
+                           {board.heaviestEstimated ? ' est.' : ''}
+                        </span>{' '}
+                        by {board.heaviestByName}
+                     </p>
+                  ) : board.longestCm && board.longestByName ? (
+                     <p className="text-[15px] text-ink-2">
+                        Longest:{' '}
+                        <span className="num text-ink">
+                           {formatMeasure(board.longestCm, 'LENGTH', units)}
                         </span>{' '}
                         by {board.longestByName}
                      </p>
@@ -297,18 +315,19 @@ function SpeciesView({
                      standings={board.standings}
                      rankBy={rankBy}
                      youId={youId}
-                     emptyLine={
-                        board.unscoredReason ??
-                        'Nobody has a qualifying catch of this yet.'
-                     }
+                     emptyLine="Nobody has logged one of these yet."
                   />
                </div>
 
-               {board.loggedButUnscored && board.standings.length ? (
+               {board.loggedButUnscored ? (
                   <p className="mt-2 text-[14px] text-ink-3">
                      {board.loggedButUnscored}{' '}
-                     {board.loggedButUnscored === 1 ? 'catch' : 'catches'} of
-                     this did not score. {board.unscoredReason}
+                     {board.loggedButUnscored === 1
+                        ? 'catch was'
+                        : 'catches were'}{' '}
+                     logged with no weight or length, so{' '}
+                     {board.loggedButUnscored === 1 ? 'it is' : 'they are'}{' '}
+                     counted but not ranked.
                   </p>
                ) : null}
             </section>

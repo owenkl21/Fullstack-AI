@@ -2,7 +2,6 @@ import { maybeResolveAvatarReadUrl } from './user.service';
 import { prisma } from '../lib/prisma';
 import { canSeeSite, siteGateSelect, type SiteGate } from '../lib/site-privacy';
 import {
-   buildSpeciesBoards,
    buildStandings,
    scoreCatch,
    type ScoredEntry,
@@ -392,32 +391,135 @@ export const statsService = {
     * "Who has the best kob" is a different question from "who has the most
     * points", and usually the more interesting one on a shore.
     */
+   /**
+    * One live board per species: who has the heaviest.
+    *
+    * Every public catch of the species counts, however it was logged. A
+    * weight typed in is taken as it is, whether it came off a scale, by eye
+    * or from the length, and a fish logged with only a length is given the
+    * weight its length means where the species has published figures, marked
+    * as estimated. A species nobody has weighed is still ranked, by length.
+    * None of the competition rules (a minimum weight, a legal size, a closed
+    * season) keeps a fish off: this is the record of what was caught, and the
+    * points are still worked out for the Points order.
+    *
+    * Private catches stay off, so a fish kept to yourself is not a figure on
+    * a public board.
+    */
    async speciesBoards(anglerIds?: string[]) {
       const rows = (await prisma.catch.findMany({
          where: {
             deletedAt: null,
             speciesId: { not: null },
+            visibility: 'PUBLIC',
             ...(anglerIds ? { createdById: { in: anglerIds } } : {}),
          },
          select: CATCH_FOR_SCORING,
       })) as RawCatch[];
 
-      const names = new Map<string, string>();
+      const positive = (n: number | null | undefined): n is number =>
+         typeof n === 'number' && Number.isFinite(n) && n > 0;
+
+      type Row = {
+         anglerId: string;
+         points: number;
+         qualifyingCount: number;
+         totalMassKg: number;
+         distinctSpecies: number;
+         longestCm: number;
+         /* The heaviest fish, and whether its weight was estimated. */
+         bestMassKg: number | null;
+         bestEstimated: boolean;
+         bestCatchId: string | null;
+         bestAt: number;
+      };
+
+      type Board = {
+         speciesId: string;
+         commonName: string;
+         rows: Map<string, Row>;
+         unmeasured: number;
+      };
+      const boards = new Map<string, Board>();
+
       for (const row of rows) {
-         if (row.speciesId && row.species) {
-            names.set(row.speciesId, row.species.commonName);
+         if (!row.speciesId || !row.species) continue;
+         const board =
+            boards.get(row.speciesId) ??
+            ({
+               speciesId: row.speciesId,
+               commonName: row.species.commonName,
+               rows: new Map(),
+               unmeasured: 0,
+            } as Board);
+         boards.set(row.speciesId, board);
+
+         /* The weight: as logged, or what the length means. */
+         let massKg: number | null = null;
+         let estimated = false;
+         if (positive(row.weight)) {
+            massKg = row.weight;
+            estimated = row.weightSource !== 'SCALE';
+         } else if (
+            positive(row.length) &&
+            row.species.lwA != null &&
+            row.species.lwB != null
+         ) {
+            massKg =
+               (row.species.lwA *
+                  Math.pow(Math.floor(row.length), row.species.lwB)) /
+               1000;
+            estimated = true;
+         }
+         if (massKg == null && !positive(row.length)) board.unmeasured += 1;
+
+         const entry =
+            board.rows.get(row.createdById) ??
+            ({
+               anglerId: row.createdById,
+               points: 0,
+               qualifyingCount: 0,
+               totalMassKg: 0,
+               distinctSpecies: 1,
+               longestCm: 0,
+               bestMassKg: null,
+               bestEstimated: false,
+               bestCatchId: null,
+               bestAt: Number.POSITIVE_INFINITY,
+            } as Row);
+         board.rows.set(row.createdById, entry);
+
+         entry.qualifyingCount += 1;
+         if (massKg != null) {
+            entry.totalMassKg =
+               Math.round((entry.totalMassKg + massKg) * 1000) / 1000;
+         }
+         if (positive(row.length) && row.length > entry.longestCm) {
+            entry.longestCm = Math.floor(row.length);
+         }
+         const scored = score(row);
+         if (scored.qualifies) {
+            entry.points = Math.round((entry.points + scored.points) * 10) / 10;
+         }
+         /* Heaviest wins; a tie goes to the earlier fish. */
+         const at = row.caughtAt.getTime();
+         if (
+            massKg != null &&
+            (entry.bestMassKg == null ||
+               massKg > entry.bestMassKg ||
+               (massKg === entry.bestMassKg && at < entry.bestAt))
+         ) {
+            entry.bestMassKg = Math.round(massKg * 1000) / 1000;
+            entry.bestEstimated = estimated;
+            entry.bestCatchId = row.id;
+            entry.bestAt = at;
          }
       }
 
-      const boards = buildSpeciesBoards(rows.map(score), names);
-
-      /* Attach display names, since a board of ids is no use to a screen. */
-      const ids = new Set(
-         boards.flatMap((b) => [
-            ...b.standings.map((s) => s.anglerId),
-            ...(b.longestBy ? [b.longestBy] : []),
-         ])
-      );
+      const ids = new Set<string>();
+      for (const board of boards.values()) {
+         for (const id of board.rows.keys()) ids.add(id);
+      }
       const people = await prisma.user.findMany({
          where: { id: { in: [...ids] } },
          select: { id: true, displayName: true, username: true },
@@ -426,14 +528,50 @@ export const statsService = {
       const name = (id: string | null) =>
          id ? (byId.get(id)?.displayName ?? 'Unknown angler') : null;
 
-      return boards.map((board) => ({
-         ...board,
-         longestByName: name(board.longestBy),
-         standings: board.standings.map((s) => ({
-            ...s,
-            displayName: name(s.anglerId) ?? 'Unknown angler',
-            username: byId.get(s.anglerId)?.username ?? null,
-         })),
-      }));
+      const out = [...boards.values()].map((board) => {
+         const standings = [...board.rows.values()]
+            .sort(
+               (a, b) =>
+                  (b.bestMassKg ?? -1) - (a.bestMassKg ?? -1) ||
+                  b.longestCm - a.longestCm ||
+                  a.bestAt - b.bestAt
+            )
+            .map(({ bestAt: _bestAt, ...row }) => ({
+               ...row,
+               displayName: name(row.anglerId) ?? 'Unknown angler',
+               username: byId.get(row.anglerId)?.username ?? null,
+            }));
+         const heaviest = standings.find((s) => s.bestMassKg != null) ?? null;
+         const longest = [...standings].sort(
+            (a, b) => b.longestCm - a.longestCm
+         )[0];
+         return {
+            speciesId: board.speciesId,
+            commonName: board.commonName,
+            standings,
+            heaviestKg: heaviest?.bestMassKg ?? null,
+            heaviestEstimated: heaviest?.bestEstimated ?? false,
+            heaviestBy: heaviest?.anglerId ?? null,
+            heaviestByName: name(heaviest?.anglerId ?? null),
+            longestCm: longest?.longestCm ?? 0,
+            longestBy: longest?.longestCm ? longest.anglerId : null,
+            longestByName: longest?.longestCm ? name(longest.anglerId) : null,
+            anglers: standings.length,
+            /* Kept for the screen: fish logged with neither a weight nor a
+               length, which the board can only count. */
+            loggedButUnscored: board.unmeasured,
+            unscoredReason: board.unmeasured
+               ? 'Logged with no weight or length, so it is counted but not ranked.'
+               : null,
+         };
+      });
+
+      /* The busiest board first, then by name, so the order holds still. */
+      return out.sort(
+         (a, b) =>
+            b.anglers - a.anglers ||
+            b.standings.length - a.standings.length ||
+            a.commonName.localeCompare(b.commonName)
+      );
    },
 };

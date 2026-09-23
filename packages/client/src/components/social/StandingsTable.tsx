@@ -25,7 +25,7 @@ export type RankBy = 'points' | 'weight' | 'length' | 'bag';
 
 const RANKS: { value: RankBy; label: string; head: string }[] = [
    { value: 'points', label: 'Points', head: 'Points' },
-   { value: 'weight', label: 'Weight', head: 'Total' },
+   { value: 'weight', label: 'Weight', head: 'Weight' },
    { value: 'length', label: 'Longest', head: 'Longest' },
    { value: 'bag', label: 'Bag', head: 'Fish' },
 ];
@@ -47,7 +47,8 @@ export function StandingsTable({
    /* The reader, so their row is pinned under the page when it is off it. */
    youId?: string | null;
 }) {
-   const [ownRankBy, setRankBy] = useState<RankBy>('points');
+   /* Weight first, as everywhere a fish is compared. */
+   const [ownRankBy, setRankBy] = useState<RankBy>('weight');
    const rankBy = rankByProp ?? ownRankBy;
    /* The reader's own cm or in, kg or lb, the same as on a competition. */
    const units = useUnits();
@@ -63,7 +64,10 @@ export function StandingsTable({
 
    const valueOf = (s: (typeof standings)[number]) =>
       rankBy === 'weight'
-         ? s.totalMassKg
+         ? 'bestMassKg' in s && s.bestMassKg !== undefined
+            ? /* A species board ranks the heaviest fish; nobody weighed goes last. */
+              (s.bestMassKg ?? -1)
+            : s.totalMassKg
          : rankBy === 'length'
            ? s.longestCm
            : rankBy === 'bag'
@@ -73,6 +77,13 @@ export function StandingsTable({
    /* Written the way the figure is actually measured. */
    const written = (s: (typeof standings)[number]) => {
       if (rankBy === 'weight') {
+         if ('bestMassKg' in s && s.bestMassKg !== undefined) {
+            if (s.bestMassKg == null) return 'Not weighed';
+            const figure = formatMeasure(s.bestMassKg, 'WEIGHT', units);
+            return s.bestEstimated
+               ? `${figure} est.`
+               : (figure ?? 'Not weighed');
+         }
          return formatMeasure(s.totalMassKg, 'WEIGHT', units) ?? 'Nothing yet';
       }
       if (rankBy === 'length') {
@@ -110,7 +121,17 @@ export function StandingsTable({
       return ordered.indexOf(tiedWith(row)[0] ?? row) + 1;
    };
 
-   const head = RANKS.find((r) => r.value === rankBy)?.head ?? 'Points';
+   /* A species board's weight is the heaviest fish; a rivals board's is the
+      whole bag. */
+   const heaviest = standings.some(
+      (s) => 'bestMassKg' in s && s.bestMassKg !== undefined
+   );
+   const head =
+      rankBy === 'weight'
+         ? heaviest
+            ? 'Heaviest'
+            : 'Total weight'
+         : (RANKS.find((r) => r.value === rankBy)?.head ?? 'Points');
 
    const pages = Math.max(1, Math.ceil(ordered.length / pageSize));
    const current = Math.min(page, pages - 1);
