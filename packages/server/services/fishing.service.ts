@@ -3,6 +3,7 @@ import {
    weatherKitAvailable,
 } from '../clients/weatherkit.client';
 import { prisma } from '../lib/prisma';
+import { checkedWeightSource } from '../lib/scale-proof';
 import {
    siteGateSelect,
    sitesVisibleTo,
@@ -177,6 +178,7 @@ type CreateCatchInput = {
    readMeasureUnit?: 'cm' | 'in' | 'kg' | 'lb' | null;
    readConfidence?: number | null;
    readNote?: string | null;
+   readProof?: string | null;
    weightSource?: 'LENGTH' | 'SCALE' | 'EYE';
    siteId?: string | null;
    speciesId?: string | null;
@@ -845,6 +847,15 @@ export const fishingService = {
 
    async createCatch(userId: string, input: CreateCatchInput) {
       const user = await getUserById(userId);
+      /* A weight keeps the scale mark only with a good reading behind it.
+         A competition entry is the exception: its measure photograph goes
+         to the judge, who reads the figure off it. */
+      if (!input.competitionId) {
+         input = {
+            ...input,
+            weightSource: checkedWeightSource(user.id, input),
+         };
+      }
       const relations = await resolveOptionalRelationIds(
          {
             siteId: input.siteId,
@@ -1281,8 +1292,25 @@ export const fishingService = {
       /* The spot it already stands on, which saving it again never unfiles. */
       const standing = await prisma.catch.findFirst({
          where: { id: catchId, createdById: user.id, deletedAt: null },
-         select: { siteId: true },
+         select: { siteId: true, weight: true, weightSource: true },
       });
+      /*
+       * A scale weight saved again unchanged keeps its mark; a new one, or
+       * one newly marked as off a scale, needs a reading like a new catch.
+       */
+      if (input.weightSource === 'SCALE') {
+         const unchanged =
+            standing?.weightSource === 'SCALE' &&
+            standing.weight != null &&
+            input.weight != null &&
+            Math.abs(standing.weight - input.weight) < 0.0005;
+         if (!unchanged) {
+            input = {
+               ...input,
+               weightSource: checkedWeightSource(user.id, input),
+            };
+         }
+      }
       const relations = await resolveOptionalRelationIds(
          {
             siteId: input.siteId,

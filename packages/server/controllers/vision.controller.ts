@@ -2,6 +2,8 @@ import type { Request, Response } from 'express';
 import z from 'zod';
 import { prisma } from '../lib/prisma';
 import { visionService } from '../services/vision.service';
+import { getAuth } from '../lib/auth-context';
+import { scaleProof } from '../lib/scale-proof';
 
 const readSchema = z.object({
    imageUrl: z.string().url().max(2048),
@@ -37,7 +39,23 @@ export const visionController = {
             parsed.data.imageUrl,
             parsed.data.measure
          );
-         return res.json({ reading });
+         /*
+          * A weight clearly read off a scale comes back with a proof, which
+          * the catch carries when it is saved so its weight can keep the
+          * scale mark (lib/scale-proof.ts).
+          */
+         const userId = getAuth(req).userId;
+         const proof =
+            userId &&
+            reading &&
+            parsed.data.measure === 'WEIGHT' &&
+            reading.seen === 'scale' &&
+            reading.confidence >= 0.6 &&
+            typeof reading.value === 'number' &&
+            (reading.unit === 'kg' || reading.unit === 'lb')
+               ? scaleProof(userId, reading.value, reading.unit)
+               : null;
+         return res.json({ reading, proof });
       } catch (error) {
          console.warn('[vision:read] failed', String(error));
          return res.status(502).json({

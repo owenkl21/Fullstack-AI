@@ -173,6 +173,8 @@ const catchPayloadSchema = z.object({
    readMeasureUnit: z.enum(['cm', 'in', 'kg', 'lb']).optional().nullable(),
    readConfidence: z.number().min(0).max(1).optional().nullable(),
    readNote: z.string().trim().max(280).optional().nullable(),
+   /* The server's own signature over a scale reading (lib/scale-proof.ts). */
+   readProof: z.string().trim().max(200).optional().nullable(),
    weightSource: z.enum(['LENGTH', 'SCALE', 'EYE']).optional(),
    siteId: z.string().trim().min(1).optional().nullable(),
    speciesId: z.string().trim().min(1).optional().nullable(),

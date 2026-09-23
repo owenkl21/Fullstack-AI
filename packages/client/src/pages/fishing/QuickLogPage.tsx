@@ -67,6 +67,7 @@ import { SpeciesCombobox } from '@/components/fishing/SpeciesCombobox';
 import type { GearOption } from '@/pages/fishing/LogCatchPage';
 import { readDraft, removeDraft, saveDraft } from '@/lib/drafts';
 import {
+   convertTyped,
    toMetricValue,
    type MeasureUnit,
 } from '@/components/fishing/quicklog/measure';
@@ -375,6 +376,26 @@ function QuickLog() {
       () => readUnits().mass
    );
    const [weightSource, setWeightSource] = useState<'EYE' | 'SCALE'>('EYE');
+   /*
+    * On a scale, the scale is photographed and the figure read off it (Claude,
+    * /api/vision/read). The reading comes back with the server's proof, which
+    * the catch carries, and only a weight that matches it is saved as off a
+    * scale. A weight that does not is said so before it is saved.
+    */
+   const [scalePhoto, setScalePhoto] = useState<UploadedPhoto | null>(null);
+   const [scaleBusy, setScaleBusy] = useState(false);
+   const [scaleRead, setScaleRead] = useState<
+      | { status: 'idle' | 'reading' | 'off' | 'failed' }
+      | { status: 'unread'; note: string }
+      | {
+           status: 'read';
+           value: number;
+           unit: 'kg' | 'lb';
+           confidence: number;
+           note: string;
+           proof: string;
+        }
+   >({ status: 'idle' });
    /* The photographs, the first of them the cover. */
    const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
    const photo = photos[0] ?? null;
@@ -717,6 +738,31 @@ function QuickLog() {
          }
       }
 
+      /*
+       * Off a scale, the scale is shown and says the same weight. Not when the
+       * reader is off: then the weight is kept, as by eye, by the server.
+       */
+      if (!competition && weightSource === 'SCALE' && weightKg !== null) {
+         const problem = !scalePhoto
+            ? 'Add a photo of the scale, or switch the weight to By eye.'
+            : scaleRead.status === 'reading'
+              ? 'The scale is still being read. Give it a moment.'
+              : scaleRead.status === 'unread' || scaleRead.status === 'failed'
+                ? 'The scale photo could not be read. Take it again, or switch the weight to By eye.'
+                : scaleRead.status === 'read' && !scaleMatches
+                  ? `The scale reads ${scaleWords}. Use that weight, or switch to By eye.`
+                  : null;
+         if (problem) {
+            toast({
+               title: 'Not saved yet.',
+               description: problem,
+               variant: 'error',
+            });
+            if (phone) setStep(2);
+            return;
+         }
+      }
+
       try {
          setIsSaving(true);
 
@@ -783,7 +829,25 @@ function QuickLog() {
                competition?.measure === 'WEIGHT' && declaredValue !== null
                   ? 'SCALE'
                   : weightSource,
-            images: photos,
+            /* Named, so the server knows the scale mark comes from the judge. */
+            competitionId: competition?.id ?? null,
+            /* The scale reading and the server's proof of it. */
+            ...(!competition &&
+            weightSource === 'SCALE' &&
+            scaleRead.status === 'read'
+               ? {
+                    readMeasure: scaleRead.value,
+                    readMeasureUnit: scaleRead.unit,
+                    readConfidence: scaleRead.confidence,
+                    readNote: scaleRead.note.slice(0, 280) || null,
+                    readProof: scaleRead.proof,
+                 }
+               : {}),
+            /* The scale photograph goes with the catch, after the others. */
+            images:
+               !competition && weightSource === 'SCALE' && scalePhoto
+                  ? [...photos, scalePhoto]
+                  : photos,
             gearIds,
             released: released === 'RELEASED',
          };
@@ -1233,6 +1297,130 @@ function QuickLog() {
       </div>
    );
 
+   const readScale = async (uploaded: UploadedPhoto) => {
+      setScaleRead({ status: 'reading' });
+      try {
+         const { data } = await axios.post<{
+            reading: {
+               value: number | null;
+               unit: 'cm' | 'in' | 'kg' | 'lb' | null;
+               confidence: number;
+               note: string;
+               seen: 'tape' | 'scale' | 'none';
+            } | null;
+            proof: string | null;
+         }>('/api/vision/read', { imageUrl: uploaded.url, measure: 'WEIGHT' });
+         const reading = data.reading;
+         if (
+            reading &&
+            data.proof &&
+            typeof reading.value === 'number' &&
+            (reading.unit === 'kg' || reading.unit === 'lb')
+         ) {
+            setScaleRead({
+               status: 'read',
+               value: reading.value,
+               unit: reading.unit,
+               confidence: reading.confidence,
+               note: reading.note,
+               proof: data.proof,
+            });
+            /* Nothing typed yet: the scale says it. */
+            if (!weight.trim()) {
+               setWeight(
+                  convertTyped(String(reading.value), reading.unit, weightUnit)
+               );
+            }
+            return;
+         }
+         setScaleRead({
+            status: 'unread',
+            note: reading?.note ?? '',
+         });
+      } catch (failure) {
+         setScaleRead({
+            status:
+               axios.isAxiosError(failure) && failure.response?.status === 503
+                  ? 'off'
+                  : 'failed',
+         });
+      }
+   };
+
+   /* What the scale read, in the angler's unit, and whether it is the weight. */
+   const scaleKg =
+      scaleRead.status === 'read'
+         ? scaleRead.unit === 'lb'
+            ? scaleRead.value * 0.45359237
+            : scaleRead.value
+         : null;
+   const typedKg = toMetricValue(weight, weightUnit);
+   const scaleMatches =
+      scaleKg !== null &&
+      typedKg !== null &&
+      Math.abs(typedKg - scaleKg) <= Math.max(0.02, scaleKg * 0.02);
+   const scaleWords =
+      scaleKg !== null
+         ? `${convertTyped(String(scaleKg), 'kg', weightUnit)} ${weightUnit}`
+         : null;
+
+   const scaleBlock =
+      weightSource === 'SCALE' && !competition ? (
+         <div className="flex flex-col gap-2">
+            <span className="lab">Photo of the scale</span>
+            <PhotoBlock
+               variant="cell"
+               idPrefix="scale-photo"
+               initial={scalePhoto}
+               onChange={(next) => {
+                  setScalePhoto(next);
+                  if (next) void readScale(next);
+                  else setScaleRead({ status: 'idle' });
+               }}
+               onBusyChange={setScaleBusy}
+               title={phone ? 'Photograph the scale' : 'Choose the scale photo'}
+               second={phone ? 'Choose one instead' : ''}
+               retake
+            />
+            <p
+               role="status"
+               className={cn(
+                  'text-[14px]',
+                  scaleRead.status === 'read' && scaleMatches
+                     ? 'text-teal-text'
+                     : 'text-ink-2'
+               )}
+            >
+               {scaleRead.status === 'reading'
+                  ? 'Reading the scale.'
+                  : scaleRead.status === 'read'
+                    ? typedKg === null || scaleMatches
+                       ? `The scale reads ${scaleWords}. That is the weight.`
+                       : `The scale reads ${scaleWords}, not ${weight.trim()} ${weightUnit}.`
+                    : scaleRead.status === 'unread'
+                      ? 'No scale reading in that photo. Take it again with the display in the middle, or weigh it by eye.'
+                      : scaleRead.status === 'off'
+                        ? 'The photo reader is off right now, so this weight is kept as by eye.'
+                        : scaleRead.status === 'failed'
+                          ? 'The scale could not be read just now. Take it again, or weigh it by eye.'
+                          : 'A photo of the scale with the figure showing. It is read to check the weight.'}
+            </p>
+            {scaleRead.status === 'read' &&
+            typedKg !== null &&
+            !scaleMatches ? (
+               <button
+                  type="button"
+                  onClick={() =>
+                     setWeight(convertTyped(String(scaleKg), 'kg', weightUnit))
+                  }
+                  className="g-tracked inline-flex min-h-11 items-center self-start text-[16px] text-teal-text hover:opacity-80"
+               >
+                  Use {scaleWords}
+               </button>
+            ) : null}
+         </div>
+      ) : null;
+
    const keptBlock = (
       <div className="flex flex-col gap-2">
          <span className="lab">Kept or released</span>
@@ -1472,7 +1660,7 @@ function QuickLog() {
 
    const saveWord = isSaving
       ? 'Saving'
-      : photoBusy || measureBusy || stripBusy
+      : photoBusy || measureBusy || stripBusy || scaleBusy
         ? 'Sending the photo'
         : competition
           ? competition.checks === 'REVIEW'
@@ -1484,7 +1672,9 @@ function QuickLog() {
       <button
          type="button"
          onClick={() => void save()}
-         disabled={photoBusy || measureBusy || stripBusy || isSaving}
+         disabled={
+            photoBusy || measureBusy || stripBusy || scaleBusy || isSaving
+         }
          className={cn(
             'g-tracked flex h-[52px] items-center justify-center bg-teal px-6 text-[22px] text-teal-ink transition-[filter] duration-150 hover:brightness-95 disabled:opacity-60',
             phone ? 'flex-1' : 'w-[280px]'
@@ -1594,6 +1784,7 @@ function QuickLog() {
                   <>
                      {heading('Size and gear')}
                      {measureBlock}
+                     {scaleBlock}
                      {keptBlock}
                      {gearBlock}
                      {notesBlock}
@@ -1658,6 +1849,7 @@ function QuickLog() {
                {photos.length && !competition ? photoStrip : null}
                {speciesBlock}
                {measureBlock}
+               {scaleBlock}
                <div className="grid grid-cols-2 items-end gap-6">
                   {keptBlock}
                   {countBlock}
