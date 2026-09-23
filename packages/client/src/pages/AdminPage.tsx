@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { PageHead } from '@/components/brand/PageHead';
+import { Backups } from '@/components/admin/Backups';
 import { StartFresh } from '@/components/admin/StartFresh';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { CountIn } from '@/components/fishing/record/CountIn';
@@ -71,6 +72,7 @@ function Panels({ onRefused }: { onRefused: () => void }) {
          <WaterPanel />
          <PeoplePanel />
          <HealthPanel />
+         <Backups />
          {/* Last on the page on purpose: the one thing here that destroys. */}
          <StartFresh />
       </>

@@ -20,6 +20,7 @@ import { feedController } from './controllers/feed.controller';
 import { reviewsController } from './controllers/reviews.controller';
 import { adminController } from './controllers/admin.controller';
 import { resetController } from './controllers/reset.controller';
+import { backupController } from './controllers/backup.controller';
 import { badgesController } from './controllers/badges.controller';
 /*
  * The role guard: it reads the role off the row behind the session and drops
@@ -566,6 +567,11 @@ router.delete(
  */
 router.get('/api/admin/reset', requireAdminRole, resetController.preview);
 router.post('/api/admin/reset', requireAdminRole, resetController.startFresh);
+/* Copies of the log, taken and fetched by the team alone. */
+router.get('/api/admin/backups', requireAdminRole, backupController.list);
+router.post('/api/admin/backups', requireAdminRole, backupController.take);
+router.get('/api/admin/backups/link', requireAdminRole, backupController.link);
+
 /* The tick, given or taken from the people section. */
 router.post(
    '/api/admin/users/:userId/verified',

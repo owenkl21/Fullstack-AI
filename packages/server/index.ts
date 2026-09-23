@@ -5,6 +5,7 @@ import router from './routes';
 import { auth } from './lib/auth';
 import { requestScope } from './lib/auth-context';
 import { prisma } from './lib/prisma';
+import { startNightlyBackups } from './services/backup.service';
 
 //reads variables from .env file and adds them to process.env
 dotenv.config();
@@ -96,6 +97,9 @@ const port = process.env.PORT || 3000;
 const server = app.listen(port, () => {
    console.log(`Server is running on port http://localhost:${port}`);
 });
+
+/* A copy of the log every night, kept in the same bucket as the photographs. */
+startNightlyBackups();
 
 const shutdown = async () => {
    await prisma.$disconnect();
