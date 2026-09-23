@@ -21,6 +21,7 @@ import { useShowMore } from '@/components/states/useShowMore';
 import { RequireSignIn } from '@/components/shell/RequireSignIn';
 import { useDocumentTitle } from '@/lib/title';
 import { SearchField } from '@/components/fishing/rows/SearchField';
+import { PersonalBests } from '@/components/fishing/PersonalBests';
 
 /*
  * The angler's own log. One column of rows with a hairline between them, the count
@@ -204,6 +205,8 @@ function MyCatchesList() {
                ) : null
             }
          />
+         <PersonalBests className="rv mb-10" />
+
          <header className="rv">
             <Drafts />
 

@@ -9,6 +9,8 @@ import { CountIn } from '@/components/fishing/record/CountIn';
 import { formatDay, plural } from '@/components/fishing/record/format';
 import { Link } from 'react-router-dom';
 import { fetchMyStats, type PersonalBest, type ProfileStats } from './api';
+import { bestFigure } from '@/components/fishing/personal-best';
+import { useUnits } from '@/lib/units';
 
 /*
  * The numbers a profile can stand behind. Every one is counted, and anything
@@ -19,6 +21,7 @@ export function ProfileStatsPanel() {
    const [stats, setStats] = useState<ProfileStats | null>(null);
    const [bests, setBests] = useState<PersonalBest[]>([]);
    const [failed, setFailed] = useState(false);
+   const units = useUnits();
 
    useEffect(() => {
       const controller = new AbortController();
@@ -192,7 +195,9 @@ export function ProfileStatsPanel() {
                         >
                            {b.commonName}
                         </Link>
-                        <span className="num text-[17px]">{b.lengthCm} cm</span>
+                        <span className="num text-[17px]">
+                           {bestFigure(b, units)}
+                        </span>
                      </li>
                   ))}
                </ul>

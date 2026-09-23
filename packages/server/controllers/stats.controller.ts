@@ -48,6 +48,30 @@ export const statsController = {
       }
    },
 
+   /* The personal bests on their own, for the log and the insights, which
+      want the row of bests and none of the heavier profile figures. */
+   async myBests(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) {
+         return res.status(401).json({
+            code: 'unauthorized',
+            message: 'Authentication required.',
+         });
+      }
+      try {
+         return res.json({
+            personalBests: await statsService.personalBests(auth.userId),
+         });
+      } catch (error) {
+         console.error('[stats:bests] failed', error);
+         return fail(
+            res,
+            'failed_to_load_bests',
+            'Unable to load your personal bests.'
+         );
+      }
+   },
+
    async rivals(req: Request, res: Response) {
       const auth = getAuth(req);
 

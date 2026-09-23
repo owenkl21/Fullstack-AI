@@ -100,55 +100,103 @@ const score = (row: RawCatch): ScoredEntry => ({
 export type PersonalBest = {
    speciesId: string;
    commonName: string;
-   lengthCm: number;
+   /* What made it the best: its weight, or its length for a species this
+      angler has never weighed. */
+   by: 'WEIGHT' | 'LENGTH';
+   weightKg: number | null;
+   /* How the weight was had: on a scale, by eye, or worked out from the
+      length. Only a scale weight is a weighed fish. */
+   weightSource: 'SCALE' | 'EYE' | 'LENGTH' | null;
+   lengthCm: number | null;
    caughtAt: Date;
    catchId: string;
    title: string;
+   /* How many of this species the angler has logged. */
+   count: number;
 };
 
 export const statsService = {
    /**
-    * A personal best per species: the longest fish, earliest wins a tie.
+    * A personal best per species: the heaviest fish, weight first.
     *
-    * Length rather than points, because a personal best is about the fish
-    * rather than the arithmetic, and length is recorded far more often than a
-    * scale weight.
+    * An angler asks "what is my biggest carp" and means the weight, so a
+    * species with any weight on record is judged on weight alone: the
+    * heaviest, then the longer of two the same weight, then the earlier. A
+    * species that has only ever been measured is judged on length, so a fish
+    * nobody weighed still has a best. Weighed species come first, heaviest
+    * first, then the measured ones, longest first.
     */
    async personalBests(userId: string): Promise<PersonalBest[]> {
-      const rows = (await prisma.catch.findMany({
+      const rows = await prisma.catch.findMany({
          where: {
             createdById: userId,
             deletedAt: null,
             speciesId: { not: null },
-            length: { not: null },
+            OR: [{ weight: { not: null } }, { length: { not: null } }],
          },
-         select: CATCH_FOR_SCORING,
-         orderBy: [{ length: 'desc' }, { caughtAt: 'asc' }],
-      })) as RawCatch[];
+         select: {
+            id: true,
+            speciesId: true,
+            weight: true,
+            weightSource: true,
+            length: true,
+            caughtAt: true,
+            title: true,
+            species: { select: { commonName: true } },
+         },
+      });
 
-      const best = new Map<string, PersonalBest>();
-
+      const counts = new Map<string, number>();
+      const bySpecies = new Map<string, (typeof rows)[number][]>();
       for (const row of rows) {
-         if (!row.speciesId || !row.species || row.length == null) {
-            continue;
-         }
+         if (!row.speciesId || !row.species) continue;
+         counts.set(row.speciesId, (counts.get(row.speciesId) ?? 0) + 1);
+         const list = bySpecies.get(row.speciesId) ?? [];
+         list.push(row);
+         bySpecies.set(row.speciesId, list);
+      }
 
-         /* Ordered longest first, so the first of each species is the best. */
-         if (best.has(row.speciesId)) {
-            continue;
-         }
+      const positive = (n: number | null): n is number =>
+         typeof n === 'number' && Number.isFinite(n) && n > 0;
 
-         best.set(row.speciesId, {
-            speciesId: row.speciesId,
-            commonName: row.species.commonName,
-            lengthCm: Math.floor(row.length),
-            caughtAt: row.caughtAt,
-            catchId: row.id,
-            title: row.title,
+      const bests: PersonalBest[] = [];
+      for (const [speciesId, list] of bySpecies) {
+         const weighed = list.filter((row) => positive(row.weight));
+         const pool = weighed.length
+            ? weighed
+            : list.filter((row) => positive(row.length));
+         if (!pool.length) continue;
+         const by = weighed.length ? 'WEIGHT' : 'LENGTH';
+         pool.sort(
+            (a, b) =>
+               (by === 'WEIGHT' ? (b.weight ?? 0) - (a.weight ?? 0) : 0) ||
+               (b.length ?? 0) - (a.length ?? 0) ||
+               a.caughtAt.getTime() - b.caughtAt.getTime()
+         );
+         const top = pool[0]!;
+         bests.push({
+            speciesId,
+            commonName: top.species!.commonName,
+            by,
+            weightKg: positive(top.weight) ? top.weight : null,
+            weightSource: positive(top.weight)
+               ? (top.weightSource as PersonalBest['weightSource'])
+               : null,
+            lengthCm: positive(top.length) ? top.length : null,
+            caughtAt: top.caughtAt,
+            catchId: top.id,
+            title: top.title,
+            count: counts.get(speciesId) ?? 1,
          });
       }
 
-      return [...best.values()].sort((a, b) => b.lengthCm - a.lengthCm);
+      return bests.sort(
+         (a, b) =>
+            (a.by === b.by ? 0 : a.by === 'WEIGHT' ? -1 : 1) ||
+            (b.weightKg ?? 0) - (a.weightKg ?? 0) ||
+            (b.lengthCm ?? 0) - (a.lengthCm ?? 0) ||
+            a.commonName.localeCompare(b.commonName)
+      );
    },
 
    /**

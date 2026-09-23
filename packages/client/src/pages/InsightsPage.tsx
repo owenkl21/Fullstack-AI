@@ -34,6 +34,7 @@ import {
    type UnitSystem,
 } from '@/lib/units';
 import { cn } from '@/lib/utils';
+import { PersonalBests } from '@/components/fishing/PersonalBests';
 
 /*
  * Everything the log adds up to.
@@ -550,6 +551,10 @@ function Insights() {
                   </li>
                ))}
             </ul>
+         </Section>
+
+         <Section title="Personal bests">
+            <PersonalBests heading="none" />
          </Section>
 
          {/* ---- Headline figures ---- */}

@@ -53,11 +53,26 @@ export type ProfileStats = {
 export type PersonalBest = {
    speciesId: string;
    commonName: string;
-   lengthCm: number;
+   /* Judged on its weight, or on its length for a species never weighed. */
+   by: 'WEIGHT' | 'LENGTH';
+   weightKg: number | null;
+   /* Only SCALE is a weighed fish; the others are estimates. */
+   weightSource: 'SCALE' | 'EYE' | 'LENGTH' | null;
+   lengthCm: number | null;
    caughtAt: string;
    catchId: string;
    title: string;
+   count: number;
 };
+
+/** Your best fish of each species, weight first. */
+export async function fetchPersonalBests(signal?: AbortSignal) {
+   const { data } = await axios.get<{ personalBests: PersonalBest[] }>(
+      '/api/stats/bests',
+      { signal }
+   );
+   return data.personalBests;
+}
 
 export async function fetchSpeciesBoards(signal?: AbortSignal) {
    const { data } = await axios.get<{ boards: SpeciesBoard[] }>(

@@ -261,6 +261,7 @@ router.post('/api/species', requireApiAuth, fishingController.createSpecies);
 
 /* The social layer. Boards are public; your own numbers are not. */
 router.get('/api/stats/me', requireApiAuth, statsController.myStats);
+router.get('/api/stats/bests', requireApiAuth, statsController.myBests);
 router.get('/api/stats/rivals', requireApiAuth, statsController.rivals);
 router.get('/api/stats/progress', requireApiAuth, statsController.myProgress);
 router.get(
