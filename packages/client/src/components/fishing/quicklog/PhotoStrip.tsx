@@ -109,8 +109,16 @@ export function PhotoStrip({
       : null;
 
    return (
-      <div className={cn('flex flex-col gap-2', className)}>
-         <div className="flex items-center gap-2">
+      <div className={cn('flex min-w-0 flex-col gap-2', className)}>
+         <div className="flex items-baseline justify-between gap-3">
+            <span className="lab">Photos</span>
+            <span className="text-[13px] text-ink-3">
+               Tap one to make it the cover
+            </span>
+         </div>
+         {/* Up to eight, so on a phone the row slides rather than pushing
+             the page sideways. */}
+         <div className="flex items-center gap-2 overflow-x-auto overscroll-x-contain pt-2 pb-1">
             {photos.map((photo, i) => (
                <div
                   key={photo.storageKey}
@@ -130,7 +138,9 @@ export function PhotoStrip({
                         src={sourceOf(photo, i)}
                         alt=""
                         framing={photo}
-                        className="size-full"
+                        /* The feed's dark ground, so a photograph pulled out
+                           to show whole has the same border here. */
+                        className="size-full bg-black-block-2"
                      />
                      {i === 0 ? (
                         <span className="lab absolute top-0 left-0 bg-teal px-1.5 py-1 text-[11px] tracking-[0.14em] text-teal-ink">

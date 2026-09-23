@@ -6,7 +6,7 @@ import { CameraIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 import { usePhone } from '@/lib/media';
 import { framingStyle } from '@/lib/framing';
-import { FrameTool, type FramingResult } from '@/components/FrameTool';
+import { InlineFramer, type FramingResult } from '@/components/FrameTool';
 
 /*
  * The photo, taken and sent while the rest of the catch is being filled in. It uses
@@ -104,14 +104,14 @@ export function PhotoBlock({
     * The feed shows every photograph in a four by three frame. This is that
     * frame with the picture inside it, held where the angler framed it. The
     * framing is three numbers kept with the photo; the file is sent exactly
-    * as it was picked. Frame it opens the tool, and it works on the picture
-    * the browser already holds, so it does not wait for the upload.
+    * as it was picked. It is framed right where it lies: drag it, pinch it or
+    * use the slider under it, on the picture the browser already holds, so
+    * framing does not wait for the upload.
     */
    const [framing, setFraming] = useState<FramingResult | null>(
       initial ? framingOf(initial) : null
    );
    const framingRef = useRef(framing);
-   const [isFraming, setIsFraming] = useState(false);
    const uploadedRef = useRef<UploadedPhoto | null>(initial);
    const cell = variant === 'cell';
 
@@ -320,6 +320,76 @@ export function PhotoBlock({
       </>
    );
 
+   /*
+    * The catch's own photograph, once there is one, is framed where it lies:
+    * the framer is the frame, and the buttons and the upload bar sit on it.
+    * The tape cell's photograph is read whole, so it has no framing to do.
+    */
+   if (preview && !cell) {
+      return (
+         <div className={cn('flex flex-col', className)}>
+            {inputs}
+            <InlineFramer
+               src={preview}
+               framing={framing}
+               onChange={commitFraming}
+               alt="The catch you just photographed, as the feed will show it"
+               overlay={
+                  <>
+                     {flash ? (
+                        <span
+                           className="shutter pointer-events-none absolute inset-0 bg-paper"
+                           aria-hidden="true"
+                        />
+                     ) : null}
+                     <div className="absolute right-0 bottom-0 z-[1] flex bg-black-block text-paper">
+                        {retake && phone ? (
+                           <button
+                              type="button"
+                              className="g-tracked grid h-11 place-items-center border-r border-paper/20 px-3.5 text-[15px] hover:text-teal"
+                              onClick={() => inputRef.current?.click()}
+                           >
+                              Retake
+                           </button>
+                        ) : null}
+                        <button
+                           type="button"
+                           className="g-tracked grid h-11 place-items-center px-3.5 text-[15px] hover:text-teal md:px-4"
+                           onClick={() => pickRef.current?.click()}
+                        >
+                           Change
+                        </button>
+                        <button
+                           type="button"
+                           className="g-tracked grid h-11 place-items-center border-l border-paper/20 px-3.5 text-[15px] hover:text-teal md:px-4"
+                           onClick={clear}
+                        >
+                           Remove
+                        </button>
+                     </div>
+                     {isUploading ? (
+                        <span
+                           style={{ width: `${progress}%` }}
+                           className="absolute bottom-0 left-0 z-[2] h-[2px] bg-teal transition-[width] duration-150"
+                           aria-hidden="true"
+                        />
+                     ) : null}
+                  </>
+               }
+            />
+            <span className="sr-only" aria-live="polite">
+               {isUploading ? `Sending the photo, ${progress}%.` : ''}
+            </span>
+            {children}
+            {error ? (
+               <p className="mt-2 text-[13px] text-destructive" role="alert">
+                  {error}
+               </p>
+            ) : null}
+         </div>
+      );
+   }
+
    return (
       <div className={cn('flex flex-col', className)}>
          <div
@@ -415,18 +485,6 @@ export function PhotoBlock({
                </>
             ) : (
                <div className="absolute right-0 bottom-0 z-[1] flex bg-black-block text-paper">
-                  {/* The catch's own photograph is cropped wherever it is
-                      shown; the tape cell's is read whole, so it has no
-                      framing to do. */}
-                  {!cell ? (
-                     <button
-                        type="button"
-                        className="g-tracked grid h-11 place-items-center border-r border-paper/20 px-3.5 text-[15px] hover:text-teal md:px-4"
-                        onClick={() => setIsFraming(true)}
-                     >
-                        Frame it
-                     </button>
-                  ) : null}
                   {retake && phone ? (
                      <button
                         type="button"
@@ -466,15 +524,6 @@ export function PhotoBlock({
             </span>
          </div>
          {children}
-         {!cell ? (
-            <FrameTool
-               open={isFraming}
-               onOpenChange={setIsFraming}
-               src={preview}
-               framing={framing}
-               onDone={commitFraming}
-            />
-         ) : null}
          {error ? (
             <p className="mt-2 text-[13px] text-destructive" role="alert">
                {error}

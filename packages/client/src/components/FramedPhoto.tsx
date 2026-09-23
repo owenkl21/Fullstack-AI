@@ -1,6 +1,12 @@
 import type { ImgHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
-import { framingStyle, type Framing } from '@/lib/framing';
+import {
+   applyFraming,
+   framedOnLoad,
+   framingStyle,
+   resolveFraming,
+   type Framing,
+} from '@/lib/framing';
 
 /*
  * A catch photograph cropped to a box, the way the angler framed it.
@@ -34,6 +40,18 @@ export function FramedPhoto({
             {...img}
             alt={alt}
             draggable={false}
+            /* A picture already here is redrawn when its framing changes: the
+               fit a pulled out one is drawn with is written by hand, and
+               nothing else would take it back. */
+            ref={(node) => {
+               if (node?.complete && node.naturalWidth > 0) {
+                  applyFraming(node, resolveFraming(framing));
+               }
+            }}
+            onLoad={(event) => {
+               framedOnLoad(framing)?.(event);
+               img.onLoad?.(event);
+            }}
             style={framingStyle(framing)}
             className={cn('block h-full w-full object-cover', imgClassName)}
          />

@@ -43,10 +43,15 @@ const pinned = (min: number, max: number) =>
  * (the time, the place) is still there to read. Absent or null means the
  * photograph was never framed and the screens use their own default.
  */
+/* How far a photograph can be pulled out: far enough for a tall phone photo
+   to sit whole in the feed's four by three frame. */
+const ZOOM_FLOOR = 0.3;
+
 const framingFields = {
    focusX: pinned(0, 1),
    focusY: pinned(0, 1),
-   zoom: pinned(1, 3),
+   /* Under 1 is pulled out, so the whole photograph shows with a border. */
+   zoom: pinned(ZOOM_FLOOR, 3),
 };
 
 const imageInputSchema = z.object({

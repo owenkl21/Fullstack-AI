@@ -89,6 +89,8 @@ export type FeedPost = {
    catch: {
       id: string;
       title: string;
+      /* When the fish came out, as the angler logged it. */
+      caughtAt?: string | null;
       images: FeedImage[];
       /* The species and both measurements now come down with the post. B5 of
          appendix E (both units on the record) is still open, so the source of a

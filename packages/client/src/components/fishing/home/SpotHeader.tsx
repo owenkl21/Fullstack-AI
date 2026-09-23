@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TornEdge } from '@/components/brand/TornEdge';
-import { framingStyle, type Framing } from '@/lib/framing';
+import { framedOnLoad, framingStyle, type Framing } from '@/lib/framing';
 import { cn } from '@/lib/utils';
 
 /*
@@ -69,6 +69,11 @@ export function SpotHeader({
                style={
                   photoFraming !== undefined
                      ? framingStyle(photoFraming)
+                     : undefined
+               }
+               onLoad={
+                  photoFraming !== undefined
+                     ? framedOnLoad(photoFraming)
                      : undefined
                }
                className={cn(

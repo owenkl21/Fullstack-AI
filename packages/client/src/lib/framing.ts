@@ -18,6 +18,21 @@ import type { CSSProperties } from 'react';
  * the zoom at 1 or more, no edge of the photograph can come inside the frame
  * at any aspect ratio: the scale only ever grows the picture away from a point
  * that is inside the frame.
+ *
+ * Under 1 is pulled out: the photograph sits inside the frame with a border
+ * where it no longer reaches, placed by the same two figures. That is how a
+ * fish held up in a tall phone photo is shown whole in a wide frame. It is
+ * measured against the feed's frame, from the cover (1) to the whole
+ * photograph (containZoom), and every other frame goes the same share of
+ * its own way there, so "the whole photograph" in the feed is the whole
+ * photograph in a square row and a tall tile too.
+ *
+ * A cover fit cannot draw that: object-fit crops the picture to its box
+ * before any scale is applied, so shrinking the box only shrinks the crop.
+ * Pulled out, the picture is drawn with a contain fit instead and scaled up
+ * from there, which needs the photograph's own shape. So it is drawn once the
+ * picture has loaded (applyFraming, reached through framedOnLoad), and until
+ * then it is drawn as a plain cover.
  */
 
 export type Framing = {
@@ -28,8 +43,22 @@ export type Framing = {
 
 export type ResolvedFraming = { x: number; y: number; zoom: number };
 
-export const ZOOM_MIN = 1;
+/* The floor for any saved zoom. The tool stops sooner, at the zoom where the
+   whole photograph just shows in the feed's frame (containZoom). */
+export const ZOOM_MIN = 0.3;
 export const ZOOM_MAX = 3;
+
+/* The feed's frame, four by three, which the framing tool works in. */
+export const FEED_RATIO = 4 / 3;
+
+/**
+ * The zoom at which the whole photograph just fits a frame of the given
+ * shape: 1 when the two are the same shape, less the more they differ.
+ */
+export function containZoom(ratio: number, frameRatio = FEED_RATIO) {
+   if (!(ratio > 0) || !(frameRatio > 0)) return 1;
+   return Math.max(ZOOM_MIN, Math.min(frameRatio / ratio, ratio / frameRatio));
+}
 
 /*
  * Where an unframed photograph is held. Half way across, and a little over a
@@ -101,13 +130,58 @@ export function framingStyle(framing?: Framing | null): CSSProperties {
       : { objectPosition: at };
 }
 
-/* The same, written straight onto an element, for the tool's drag loop. */
+/*
+ * The same, written straight onto a picture: for the tool's drag loop, and
+ * for a pulled out photograph once it has loaded. The picture is measured
+ * where it stands, its own shape from its pixels and the frame's from its
+ * box, so the one call is right in the feed, a row or a tile.
+ */
 export function applyFraming(node: HTMLElement, framing: ResolvedFraming) {
    const at = `${percent(framing.x)} ${percent(framing.y)}`;
    node.style.objectPosition = at;
    node.style.transformOrigin = at;
+
+   const image = node instanceof HTMLImageElement ? node : null;
+   const ratio =
+      image && image.naturalWidth > 0 && image.naturalHeight > 0
+         ? image.naturalWidth / image.naturalHeight
+         : null;
+   const frameRatio =
+      node.clientWidth > 0 && node.clientHeight > 0
+         ? node.clientWidth / node.clientHeight
+         : null;
+
+   if (framing.zoom < 1 && ratio && frameRatio) {
+      /* How far from the cover towards the whole photograph, in the feed. */
+      const feedWhole = containZoom(ratio, FEED_RATIO);
+      const share =
+         feedWhole < 0.999
+            ? pin((1 - framing.zoom) / (1 - feedWhole), 0, 1)
+            : 0;
+      /* The same share of the way in this frame. */
+      const whole = containZoom(ratio, frameRatio);
+      const zoom = 1 - share * (1 - whole);
+      const scale = zoom / whole;
+      node.style.objectFit = 'contain';
+      node.style.transform =
+         Math.abs(scale - 1) > 0.0005 ? `scale(${+scale.toFixed(4)})` : '';
+      return;
+   }
+
+   node.style.objectFit = '';
    node.style.transform =
       framing.zoom > 1 ? `scale(${+framing.zoom.toFixed(4)})` : '';
+}
+
+/**
+ * For a photograph drawn with framingStyle: a pulled out one is only right
+ * once its shape is known, so its load finishes the drawing.
+ */
+export function framedOnLoad(framing?: Framing | null) {
+   const resolved = resolveFraming(framing);
+   if (resolved.zoom >= 1) return undefined;
+   return (event: { currentTarget: HTMLElement }) =>
+      applyFraming(event.currentTarget, resolved);
 }
 
 /*
@@ -128,7 +202,8 @@ function coverSize(frame: Box, ratio: number): Box {
  * Drag the photograph by a number of pixels. The focus is the point that stays
  * put, so moving the picture right means the held point moves left along it.
  * An axis with nothing spare (the photograph fits it exactly at this zoom)
- * does not move, and its figure is left alone.
+ * does not move, and its figure is left alone. Pulled out, the spare is
+ * negative, a border, and the same sum slides the photograph within it.
  */
 export function panFraming(
    from: ResolvedFraming,
@@ -141,8 +216,8 @@ export function panFraming(
    const spareX = base.width * from.zoom - frame.width;
    const spareY = base.height * from.zoom - frame.height;
    return {
-      x: spareX > 0.5 ? pin(from.x - dx / spareX, 0, 1) : from.x,
-      y: spareY > 0.5 ? pin(from.y - dy / spareY, 0, 1) : from.y,
+      x: Math.abs(spareX) > 0.5 ? pin(from.x - dx / spareX, 0, 1) : from.x,
+      y: Math.abs(spareY) > 0.5 ? pin(from.y - dy / spareY, 0, 1) : from.y,
       zoom: from.zoom,
    };
 }
@@ -161,9 +236,11 @@ export function zoomFraming(
    anchor: { x: number; y: number } = {
       x: frame.width / 2,
       y: frame.height / 2,
-   }
+   },
+   /* How far out this photograph may go: until it shows whole. */
+   floor: number = ZOOM_MIN
 ): ResolvedFraming {
-   const zoom = pin(nextZoom, ZOOM_MIN, ZOOM_MAX);
+   const zoom = pin(nextZoom, Math.max(ZOOM_MIN, floor), ZOOM_MAX);
    const base = coverSize(frame, ratio);
 
    const axis = (

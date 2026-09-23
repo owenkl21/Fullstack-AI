@@ -62,6 +62,9 @@ const feedInclude = {
       select: {
          id: true,
          title: true,
+         /* When the fish came out, which the card says beside when it was
+            posted: a fish logged that evening was not caught then. */
+         caughtAt: true,
          /*
           * The facts about the fish. Without these the feed sent a title and a
           * photograph and nothing else, so the card's measurement line could

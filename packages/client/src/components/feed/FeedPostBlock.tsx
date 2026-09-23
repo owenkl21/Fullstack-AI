@@ -59,10 +59,18 @@ const word =
 /** One action in the row: a 44px target holding a 22px icon and its count. */
 const action = `${word} h-11 gap-1.5`;
 
-/** `Caught at Kalk Bay, Tue 15 Sep, 06:42 · 4 h ago`, built from what the post carries. */
+/*
+ * `Caught at Kalk Bay, Tue 15 Sep, 06:42 · Posted 4 h ago`, built from what the
+ * post carries. Two times, each named: when the fish came out, as the angler
+ * logged it, and when it went on the feed. A fish logged that evening was not
+ * caught at supper, and the card used to say it was.
+ */
 function contextSentence(post: FeedPostInView, showDistance: boolean) {
-   const stamp = formatStamp(post.createdAt);
-   const relative = formatRelative(post.createdAt);
+   const stamp = formatStamp(post.catch?.caughtAt ?? post.createdAt);
+   /* Recent posts say how long ago; older ones give the day. */
+   const postedWhen =
+      formatRelative(post.createdAt) ?? formatStamp(post.createdAt);
+   const relative = postedWhen ? `Posted ${postedWhen}` : null;
    const distance = showDistance ? formatDistance(post.distanceKm) : null;
    /*
     * The spot rides on the post as well as on the catch, and the post's copy is

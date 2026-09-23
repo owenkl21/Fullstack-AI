@@ -950,7 +950,8 @@ function QuickLog() {
       </PhotoBlock>
    );
 
-   /* The catch's other photographs, on a desktop, under the cover. */
+   /* The catch's other photographs, under the cover, on a phone as on a
+      desktop: a catch can carry up to eight, and the feed swipes through them. */
    const photoStrip = (
       <PhotoStrip
          photos={photos}
@@ -1582,6 +1583,7 @@ function QuickLog() {
                            {photoNote}
                         </p>
                      ) : null}
+                     {photos.length && !competition ? photoStrip : null}
                      {speciesBlock}
                      {caughtAtBlock}
                      {mapBlock}

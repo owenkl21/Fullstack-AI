@@ -7,6 +7,7 @@ import {
    useState,
    type KeyboardEvent as ReactKeyboardEvent,
    type PointerEvent as ReactPointerEvent,
+   type ReactNode,
 } from 'react';
 import * as RadixSlider from '@radix-ui/react-slider';
 import { cn } from '@/lib/utils';
@@ -21,8 +22,8 @@ import {
 import {
    DEFAULT_FRAMING,
    ZOOM_MAX,
-   ZOOM_MIN,
    applyFraming,
+   containZoom,
    framingPayload,
    panFraming,
    resolveFraming,
@@ -188,6 +189,45 @@ export function FrameTool({
    );
 }
 
+/*
+ * The same tool without the dialog, drawn where the photograph already is.
+ *
+ * On the log the photograph is framed where it lies: a finger drags it into
+ * place, two push in or pull out, and the slider under it does the same. Each
+ * change is handed back a moment after the photograph stops moving, so the
+ * catch always carries what is on screen and there is nothing to confirm.
+ * Whatever the page lays over the photograph (its buttons, the upload bar)
+ * comes in as `overlay` and stays pressable.
+ */
+export function InlineFramer({
+   src,
+   framing,
+   onChange,
+   overlay,
+   alt,
+}: {
+   src: string;
+   framing?: Framing | null;
+   onChange: (next: FramingResult) => void;
+   overlay?: ReactNode;
+   alt: string;
+}) {
+   const stageRef = useRef<HTMLDivElement>(null);
+   return (
+      <Framer
+         /* A new photograph starts fresh; the same one keeps its hand. */
+         key={src}
+         src={src}
+         initial={framing}
+         stageRef={stageRef}
+         mode="inline"
+         onChange={onChange}
+         overlay={overlay}
+         alt={alt}
+      />
+   );
+}
+
 type Point = { x: number; y: number };
 
 function Framer({
@@ -196,13 +236,22 @@ function Framer({
    stageRef,
    onDone,
    onCancel,
+   mode = 'dialog',
+   onChange,
+   overlay,
+   alt = 'The photograph being framed',
 }: {
    src: string;
    initial?: Framing | null;
    stageRef: React.RefObject<HTMLDivElement | null>;
-   onDone: (next: FramingResult) => void;
-   onCancel: () => void;
+   onDone?: (next: FramingResult) => void;
+   onCancel?: () => void;
+   mode?: 'dialog' | 'inline';
+   onChange?: (next: FramingResult) => void;
+   overlay?: ReactNode;
+   alt?: string;
 }) {
+   const inline = mode === 'inline';
    const hintId = useId();
    const zoomId = useId();
 
@@ -224,12 +273,37 @@ function Framer({
    const [moving, setMoving] = useState(false);
    const restTimer = useRef(0);
 
+   /* Inline, the page is told a moment after the photograph stops, not on
+      every frame of a drag. */
+   const emitTimer = useRef(0);
+   const emitted = useRef(framingPayload(resolveFraming(initial)));
+   const onChangeRef = useRef(onChange);
+   useEffect(() => {
+      onChangeRef.current = onChange;
+   }, [onChange]);
+
    const paint = useCallback(() => {
       frame.current = 0;
       for (const node of images.current) {
          if (node) applyFraming(node, current.current);
       }
       setView(current.current);
+      if (onChangeRef.current) {
+         window.clearTimeout(emitTimer.current);
+         emitTimer.current = window.setTimeout(() => {
+            const next = framingPayload(current.current);
+            const was = emitted.current;
+            if (
+               next.focusX === was.focusX &&
+               next.focusY === was.focusY &&
+               next.zoom === was.zoom
+            ) {
+               return;
+            }
+            emitted.current = next;
+            onChangeRef.current?.(next);
+         }, 220);
+      }
    }, []);
 
    const commit = useCallback(
@@ -276,9 +350,29 @@ function Framer({
       () => () => {
          if (frame.current) cancelAnimationFrame(frame.current);
          window.clearTimeout(restTimer.current);
+         /* A change still waiting when the framer goes is handed over now. */
+         if (emitTimer.current) {
+            window.clearTimeout(emitTimer.current);
+            const next = framingPayload(current.current);
+            const was = emitted.current;
+            if (
+               next.focusX !== was.focusX ||
+               next.focusY !== was.focusY ||
+               next.zoom !== was.zoom
+            ) {
+               onChangeRef.current?.(next);
+            }
+         }
       },
       []
    );
+
+   /*
+    * How far out this photograph can be pulled: until the whole of it shows
+    * in the feed's frame. A tall phone photo in a wide frame goes out a long
+    * way; one already the frame's shape does not go out at all.
+    */
+   const floor = ratio === null ? 1 : containZoom(ratio);
 
    const box = () => {
       const rect = stageRef.current?.getBoundingClientRect();
@@ -320,6 +414,10 @@ function Framer({
 
    const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
       if (ratio === null) return;
+      /* A button laid over the photograph is pressed, not dragged. */
+      if ((event.target as HTMLElement).closest('button, a, input, label')) {
+         return;
+      }
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       event.currentTarget.setPointerCapture(event.pointerId);
       pointers.current.set(event.pointerId, {
@@ -369,7 +467,8 @@ function Framer({
          rect,
          ratio,
          current.current.zoom * (after.distance / before.distance),
-         { x: after.middle.x - rect.left, y: after.middle.y - rect.top }
+         { x: after.middle.x - rect.left, y: after.middle.y - rect.top },
+         floor
       );
       commit(
          panFraming(
@@ -454,14 +553,15 @@ function Framer({
                rect,
                ratio,
                current.current.zoom * factor,
-               { x: event.clientX - rect.left, y: event.clientY - rect.top }
+               { x: event.clientX - rect.left, y: event.clientY - rect.top },
+               floor
             )
          );
          stir();
       };
       node.addEventListener('wheel', onWheel, { passive: false });
       return () => node.removeEventListener('wheel', onWheel);
-   }, [stageRef, ratio, commit, stir]);
+   }, [stageRef, ratio, commit, stir, floor]);
 
    /* ---- The keys --------------------------------------------------------- */
 
@@ -489,7 +589,9 @@ function Framer({
                current.current,
                rect,
                ratio,
-               current.current.zoom + 0.1
+               current.current.zoom + 0.1,
+               undefined,
+               floor
             )
          );
       } else if (event.key === '-' || event.key === '_') {
@@ -498,7 +600,9 @@ function Framer({
                current.current,
                rect,
                ratio,
-               current.current.zoom - 0.1
+               current.current.zoom - 0.1,
+               undefined,
+               floor
             )
          );
       } else if (event.key === '0') {
@@ -512,29 +616,202 @@ function Framer({
 
    const atRest = sameFraming(view, DEFAULT_FRAMING);
    const zoomText = `${view.zoom.toFixed(1)} times`;
+   /* The whole photograph, centred, pulled out until none of it is cut. */
+   const whole: ResolvedFraming = { x: 0.5, y: 0.5, zoom: floor };
+   const atWhole = ratio !== null && sameFraming(view, whole);
+   const canPullOut = ratio !== null && floor < 0.995;
 
-   const picture = (index: number, alt: string) => (
+   const picture = (index: number, label: string) => (
       <img
          ref={(node) => {
             images.current[index] = node;
          }}
          src={src}
-         alt={alt}
+         alt={label}
          draggable={false}
-         onLoad={
-            index === 0
-               ? (event) => {
-                    const { naturalWidth, naturalHeight } = event.currentTarget;
-                    if (naturalWidth > 0 && naturalHeight > 0) {
-                       setRatio(naturalWidth / naturalHeight);
-                    }
-                 }
-               : undefined
-         }
+         onLoad={(event) => {
+            /* Pulled out, a picture is drawn from its own shape, which is
+               only known now. */
+            applyFraming(event.currentTarget, current.current);
+            if (index !== 0) return;
+            const { naturalWidth, naturalHeight } = event.currentTarget;
+            if (naturalWidth > 0 && naturalHeight > 0) {
+               setRatio(naturalWidth / naturalHeight);
+            }
+         }}
          onError={index === 0 ? () => setFailed(true) : undefined}
          className="pointer-events-none absolute inset-0 h-full w-full object-cover select-none"
       />
    );
+
+   const slider = (
+      <div className="flex items-center gap-4">
+         <span
+            id={zoomId}
+            className={cn(
+               'lab shrink-0',
+               inline ? 'text-ink-2' : 'text-paper-2'
+            )}
+         >
+            Zoom
+         </span>
+         <RadixSlider.Root
+            className="fader relative flex h-11 min-w-0 flex-1 touch-none items-center select-none"
+            min={floor}
+            max={ZOOM_MAX}
+            step={0.01}
+            value={[Math.max(floor, view.zoom)]}
+            disabled={ratio === null}
+            aria-labelledby={zoomId}
+            onValueChange={([next]) => {
+               const rect = box();
+               if (!rect || ratio === null || typeof next !== 'number') {
+                  return;
+               }
+               commitNow(
+                  zoomFraming(
+                     current.current,
+                     rect,
+                     ratio,
+                     next,
+                     undefined,
+                     floor
+                  )
+               );
+               stir();
+            }}
+         >
+            <RadixSlider.Track className="fader-track relative h-2 w-full grow bg-line-2">
+               <RadixSlider.Range className="absolute h-full bg-teal" />
+            </RadixSlider.Track>
+            <RadixSlider.Thumb
+               aria-valuetext={zoomText}
+               /* A 20px grip inside a 44px reach, as the distance fader. */
+               className="fader-grip relative block h-8 w-5 cursor-grab bg-ink outline-none before:absolute before:-inset-x-3 before:-inset-y-1.5 before:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal active:cursor-grabbing"
+            >
+               <span
+                  aria-hidden="true"
+                  className="absolute top-1/2 left-1/2 block h-3.5 w-[2px] -translate-x-1/2 -translate-y-1/2 bg-background"
+               />
+            </RadixSlider.Thumb>
+         </RadixSlider.Root>
+         {/* For the eye only. The slider already says its value aloud,
+             and an output is a live region that read out every step. */}
+         <span
+            aria-hidden="true"
+            className={cn(
+               'g num w-[52px] shrink-0 text-right text-[26px] leading-none',
+               inline ? 'text-ink' : 'text-paper'
+            )}
+         >
+            {view.zoom.toFixed(1)}x
+         </span>
+      </div>
+   );
+
+   const wholeButton = canPullOut ? (
+      <Button
+         type="button"
+         variant="ghost"
+         className="-ml-3 px-3"
+         disabled={atWhole}
+         onClick={() => {
+            easeTo(whole);
+            stageRef.current?.focus({ preventScroll: true });
+         }}
+      >
+         Whole photo
+      </Button>
+   ) : null;
+
+   const thirds = (
+      <span
+         aria-hidden="true"
+         className={cn(
+            'pointer-events-none absolute inset-0 transition-opacity duration-200 [transition-timing-function:var(--ease)] motion-reduce:transition-none',
+            moving ? 'opacity-100' : 'opacity-0'
+         )}
+      >
+         {['33.333%', '66.666%'].map((at) => (
+            <span key={at}>
+               <span
+                  style={{ left: at }}
+                  className="absolute inset-y-0 w-px bg-paper/55 shadow-[0_0_0_0.5px_rgba(11,9,9,0.35)]"
+               />
+               <span
+                  style={{ top: at }}
+                  className="absolute inset-x-0 h-px bg-paper/55 shadow-[0_0_0_0.5px_rgba(11,9,9,0.35)]"
+               />
+            </span>
+         ))}
+      </span>
+   );
+
+   if (inline) {
+      return (
+         <div className="flex flex-col">
+            <div
+               ref={stageRef}
+               tabIndex={0}
+               role="group"
+               aria-roledescription="photo framing"
+               aria-label="Your photo in the feed's frame. Drag to move it, pinch to zoom."
+               aria-describedby={hintId}
+               data-frame-stage=""
+               onPointerDown={onPointerDown}
+               onPointerMove={onPointerMove}
+               onPointerUp={onPointerUp}
+               onPointerCancel={onPointerUp}
+               onKeyDown={onKeyDown}
+               className={cn(
+                  'relative aspect-[4/3] w-full touch-none overflow-hidden bg-black-block-2 outline-offset-2 select-none',
+                  ratio === null
+                     ? 'cursor-progress'
+                     : 'cursor-grab active:cursor-grabbing'
+               )}
+            >
+               {picture(0, alt)}
+               {thirds}
+               {failed ? (
+                  <p
+                     role="alert"
+                     className="absolute inset-0 grid place-items-center px-6 text-center text-[15px] text-paper-2"
+                  >
+                     The photo could not be shown here.
+                  </p>
+               ) : null}
+               {overlay}
+            </div>
+            <div className="mt-2">{slider}</div>
+            <div className="flex flex-wrap items-center gap-x-3">
+               {wholeButton}
+               <Button
+                  type="button"
+                  variant="ghost"
+                  className={cn('px-3', wholeButton ? '' : '-ml-3')}
+                  disabled={atRest}
+                  onClick={() => {
+                     easeTo(DEFAULT_FRAMING);
+                     stageRef.current?.focus({ preventScroll: true });
+                  }}
+               >
+                  Reset
+               </Button>
+               <p
+                  id={hintId}
+                  className="min-w-0 flex-1 text-right text-[13px] leading-snug text-ink-3"
+               >
+                  <span className="pointer-fine:hidden">
+                     Drag to move it. Pinch to zoom.
+                  </span>
+                  <span className="hidden pointer-fine:inline">
+                     Drag to move it. Scroll to zoom.
+                  </span>
+               </p>
+            </div>
+         </div>
+      );
+   }
 
    return (
       <div className="mt-5 flex flex-col gap-5 max-md:[@media(max-height:760px)]:mt-3 max-md:[@media(max-height:760px)]:gap-3">
@@ -569,28 +846,9 @@ function Framer({
                            : 'cursor-grab active:cursor-grabbing'
                      )}
                   >
-                     {picture(0, 'The photograph being framed')}
+                     {picture(0, alt)}
                      {/* The thirds: two rules each way, only while it moves. */}
-                     <span
-                        aria-hidden="true"
-                        className={cn(
-                           'pointer-events-none absolute inset-0 transition-opacity duration-200 [transition-timing-function:var(--ease)] motion-reduce:transition-none',
-                           moving ? 'opacity-100' : 'opacity-0'
-                        )}
-                     >
-                        {['33.333%', '66.666%'].map((at) => (
-                           <span key={at}>
-                              <span
-                                 style={{ left: at }}
-                                 className="absolute inset-y-0 w-px bg-paper/55 shadow-[0_0_0_0.5px_rgba(11,9,9,0.35)]"
-                              />
-                              <span
-                                 style={{ top: at }}
-                                 className="absolute inset-x-0 h-px bg-paper/55 shadow-[0_0_0_0.5px_rgba(11,9,9,0.35)]"
-                              />
-                           </span>
-                        ))}
-                     </span>
+                     {thirds}
                      {failed ? (
                         <p
                            role="alert"
@@ -628,56 +886,14 @@ function Framer({
             </div>
          </div>
 
-         <div className="flex items-center gap-4">
-            <span id={zoomId} className="lab shrink-0 text-paper-2">
-               Zoom
-            </span>
-            <RadixSlider.Root
-               className="fader relative flex h-11 min-w-0 flex-1 touch-none items-center select-none"
-               min={ZOOM_MIN}
-               max={ZOOM_MAX}
-               step={0.02}
-               value={[view.zoom]}
-               disabled={ratio === null}
-               aria-labelledby={zoomId}
-               onValueChange={([next]) => {
-                  const rect = box();
-                  if (!rect || ratio === null || typeof next !== 'number') {
-                     return;
-                  }
-                  commitNow(zoomFraming(current.current, rect, ratio, next));
-                  stir();
-               }}
-            >
-               <RadixSlider.Track className="fader-track relative h-2 w-full grow bg-line-2">
-                  <RadixSlider.Range className="absolute h-full bg-teal" />
-               </RadixSlider.Track>
-               <RadixSlider.Thumb
-                  aria-valuetext={zoomText}
-                  /* A 20px grip inside a 44px reach, as the distance fader. */
-                  className="fader-grip relative block h-8 w-5 cursor-grab bg-ink outline-none before:absolute before:-inset-x-3 before:-inset-y-1.5 before:content-[''] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal active:cursor-grabbing"
-               >
-                  <span
-                     aria-hidden="true"
-                     className="absolute top-1/2 left-1/2 block h-3.5 w-[2px] -translate-x-1/2 -translate-y-1/2 bg-background"
-                  />
-               </RadixSlider.Thumb>
-            </RadixSlider.Root>
-            {/* For the eye only. The slider already says its value aloud,
-                and an output is a live region that read out every step. */}
-            <span
-               aria-hidden="true"
-               className="g num w-[52px] shrink-0 text-right text-[26px] leading-none text-paper"
-            >
-               {view.zoom.toFixed(1)}x
-            </span>
-         </div>
+         {slider}
 
          <div className="flex items-center gap-3">
+            {wholeButton}
             <Button
                type="button"
                variant="ghost"
-               className="-ml-3 px-3"
+               className={cn('px-3', wholeButton ? '' : '-ml-3')}
                disabled={atRest}
                onClick={() => {
                   easeTo(DEFAULT_FRAMING);
@@ -700,13 +916,13 @@ function Framer({
                type="button"
                variant="outline"
                className="ml-auto"
-               onClick={onCancel}
+               onClick={() => onCancel?.()}
             >
                Cancel
             </Button>
             <Button
                type="button"
-               onClick={() => onDone(framingPayload(current.current))}
+               onClick={() => onDone?.(framingPayload(current.current))}
             >
                Done
             </Button>

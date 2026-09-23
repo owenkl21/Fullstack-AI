@@ -1,6 +1,12 @@
 import { useState, type CSSProperties } from 'react';
 import { cn } from '@/lib/utils';
-import { framingStyle, type Framing } from '@/lib/framing';
+import {
+   applyFraming,
+   framedOnLoad,
+   framingStyle,
+   resolveFraming,
+   type Framing,
+} from '@/lib/framing';
 import { FishMark } from '@/components/brand/FishMark';
 
 /*
@@ -198,6 +204,16 @@ export function Img({
                    * that is actually a change.
                    */
                   if (!node || !node.complete) return;
+                  /* A framing that changed after the picture arrived is
+                     drawn again: a pulled out one is written by hand. */
+                  if (
+                     node.naturalWidth > 0 &&
+                     framing !== undefined &&
+                     fit === 'cover' &&
+                     (ratio || fill)
+                  ) {
+                     applyFraming(node, resolveFraming(framing));
+                  }
                   if (node.naturalWidth > 0) {
                      setSettled((was) =>
                         was && was.url === chosen && was.ok
@@ -215,13 +231,21 @@ export function Img({
                loading={priority ? 'eager' : 'lazy'}
                decoding={priority ? 'sync' : 'async'}
                fetchPriority={priority ? 'high' : undefined}
-               onLoad={() =>
+               onLoad={(event) => {
+                  /* A pulled out photograph is drawn once its shape is known. */
+                  if (
+                     framing !== undefined &&
+                     fit === 'cover' &&
+                     (ratio || fill)
+                  ) {
+                     framedOnLoad(framing)?.(event);
+                  }
                   setSettled((was) =>
                      was && was.url === chosen && was.ok
                         ? was
                         : { url: chosen, ok: true }
-                  )
-               }
+                  );
+               }}
                onError={(event) =>
                   onFailed(event.currentTarget.currentSrc || chosen)
                }

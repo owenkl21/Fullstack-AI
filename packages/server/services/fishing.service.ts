@@ -52,7 +52,8 @@ const framingColumns = (input: {
    return {
       focusX: focused ? pin(x, 0, 1) : null,
       focusY: focused ? pin(y, 0, 1) : null,
-      zoom: zoom === null ? null : pin(zoom, 1, 3),
+      /* Under 1 is pulled out: the whole photograph, with a border. */
+      zoom: zoom === null ? null : pin(zoom, 0.3, 3),
    };
 };
 
