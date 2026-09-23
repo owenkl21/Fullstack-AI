@@ -751,11 +751,13 @@ function PeoplePanel() {
             )}
          >
             {tickOf(row) ? (
-               <VerifiedMark label="Verified" />
+               <VerifiedMark className="ml-0 size-[17px]" label="" />
             ) : (
+               /* An empty seal: the same shape waiting to be filled, so the
+                  column reads as one thing in two states. */
                <span
                   aria-hidden="true"
-                  className="size-4 rounded-full border border-current"
+                  className="grid size-[17px] place-items-center rounded-full border border-dashed border-current"
                />
             )}
             {tickOf(row) ? 'Verified' : 'Verify'}
