@@ -176,6 +176,12 @@ model User {
   // Nullable now: a new sign-up has no username until the angler picks one.
   username                   String?              @unique
   displayName                String
+  /**
+   * On the Fisherfeed team: the people who run the app. Drawn as a badge
+   * beside the name. Granted to the team's own addresses on sign-in, and by
+   * the admin panel to anyone else; nothing a request sends can set it.
+   */
+  team                       Boolean              @default(false)
   bio                        String?              @db.Text
   avatarUrl                  String?
   /**

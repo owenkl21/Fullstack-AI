@@ -31,6 +31,7 @@ type ProfileShape = {
    bannerUrl: string | null;
    /* The tick beside the name. True on one account in the app. */
    verified: boolean;
+   team: boolean;
    createdAt: Date;
    updatedAt: Date;
 };
@@ -74,6 +75,7 @@ type ConnectionUser = {
    avatarUrl: string | null;
    avatarThumbUrl: string | null;
    verified: boolean;
+   team: boolean;
 };
 
 /* One row of the angler search. No email: this is a list of other people. */
@@ -297,6 +299,7 @@ const anglerSelect = {
    displayName: true,
    avatarUrl: true,
    verified: true,
+   team: true,
    _count: { select: { followers: true } },
 } satisfies Prisma.UserSelect;
 
@@ -355,6 +358,7 @@ const buildProfileView = async (userId: string) => {
          avatarUrl: true,
          bannerUrl: true,
          verified: true,
+         team: true,
          createdAt: true,
          updatedAt: true,
          _count: {
@@ -455,6 +459,7 @@ const buildProfileView = async (userId: string) => {
       avatarUrl: profile.avatarUrl,
       bannerUrl: profile.bannerUrl,
       verified: profile.verified,
+      team: profile.team,
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
    });
@@ -492,6 +497,7 @@ const buildPublicProfileView = async (
          avatarUrl: true,
          bannerUrl: true,
          verified: true,
+         team: true,
          createdAt: true,
          /* No email. This page is public. */
          _count: { select: { followers: true, following: true } },
@@ -613,6 +619,7 @@ const buildPublicProfileView = async (
       bannerUrl: banner.url,
       bannerCardUrl: banner.cardUrl,
       verified: profile.verified,
+      team: profile.team,
       createdAt: profile.createdAt,
       followersCount: profile._count.followers,
       followingCount: profile._count.following,
@@ -841,6 +848,7 @@ export const userService = {
                           displayName: true,
                           avatarUrl: true,
                           verified: true,
+                          team: true,
                        },
                     },
                  }
@@ -852,6 +860,7 @@ export const userService = {
                           displayName: true,
                           avatarUrl: true,
                           verified: true,
+                          team: true,
                        },
                     },
                  },
@@ -874,6 +883,7 @@ export const userService = {
                avatarUrl: resolvedAvatar.url,
                avatarThumbUrl: resolvedAvatar.thumbUrl,
                verified: Boolean(target.verified),
+               team: Boolean(target.team),
             };
          })
       );
@@ -986,6 +996,7 @@ export const userService = {
                avatarUrl: avatar.url,
                avatarThumbUrl: avatar.thumbUrl,
                verified: row.verified,
+               team: row.team,
                followersCount: row._count.followers,
                followedByMe: followed.has(row.id),
             };

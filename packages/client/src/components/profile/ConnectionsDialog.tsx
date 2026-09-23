@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { VerifiedMark } from '@/components/profile/VerifiedMark';
+import { TeamBadge } from '@/components/profile/TeamBadge';
 import {
    type ConnectionUser,
    initialOf,
@@ -231,11 +232,14 @@ function Connections({
                               </span>
                            )}
                            <span className="min-w-0">
-                              <span className="block truncate text-[15px] text-paper">
-                                 {person.displayName}
+                              <span className="flex min-w-0 items-baseline text-[15px] text-paper">
+                                 <span className="truncate">
+                                    {person.displayName}
+                                 </span>
                                  {person.verified ? (
-                                    <VerifiedMark className="size-[13px]" />
+                                    <VerifiedMark className="relative top-[0.16em] size-[13px]" />
                                  ) : null}
+                                 {person.team ? <TeamBadge /> : null}
                               </span>
                               <span className="block truncate text-sm text-paper-2">
                                  {person.username ? `@${person.username}` : ''}

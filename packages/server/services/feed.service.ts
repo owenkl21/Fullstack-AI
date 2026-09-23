@@ -24,7 +24,13 @@ type FeedType = 'CATCH';
    verified carries the tick beside the name; it is one boolean the server
    alone writes, so the thread never has to work out who is who. */
 const commentAuthor = {
-   select: { id: true, username: true, displayName: true, verified: true },
+   select: {
+      id: true,
+      username: true,
+      displayName: true,
+      verified: true,
+      team: true,
+   },
 };
 
 /*
@@ -49,6 +55,7 @@ const feedInclude = {
          displayName: true,
          avatarUrl: true,
          verified: true,
+         team: true,
       },
    },
    catch: {
@@ -150,6 +157,7 @@ type CommentRow = {
       username: string | null;
       displayName: string;
       verified: boolean;
+      team: boolean;
    };
    replies?: CommentRow[];
    _count?: { replies: number };

@@ -101,6 +101,7 @@ export const teamsService = {
                      displayName: true,
                      username: true,
                      verified: true,
+                     team: true,
                   },
                },
             },

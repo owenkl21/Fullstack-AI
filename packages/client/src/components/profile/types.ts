@@ -33,6 +33,8 @@ export type UserProfile = {
    bannerCardUrl?: string | null;
    /* The tick beside the name, written by the server alone. */
    verified?: boolean;
+   /* On the Fisherfeed team: the badge beside the name. */
+   team?: boolean;
    followersCount: number;
    followingCount: number;
    galleryImages: GalleryImage[];
@@ -52,6 +54,8 @@ export type ConnectionUser = {
    avatarUrl: string | null;
    avatarThumbUrl?: string | null;
    verified?: boolean;
+   /* On the Fisherfeed team: the badge beside the name. */
+   team?: boolean;
 };
 
 /** One row of the angler search: a person, how followed they are, and by you. */

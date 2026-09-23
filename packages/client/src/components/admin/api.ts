@@ -92,6 +92,8 @@ export type ActiveAngler = {
    username: string | null;
    email: string;
    verified: boolean;
+   /* On the Fisherfeed team: the badge beside the name. */
+   team: boolean;
    joinedAt: string;
    catches: number;
    spots: number;
@@ -188,5 +190,16 @@ export async function setVerified(userId: string, verified: boolean) {
       displayName: string;
       fromAddress: boolean;
    }>(`/api/admin/users/${userId}/verified`, { verified });
+   return data;
+}
+
+/* The team badge, the same way. */
+export async function setTeam(userId: string, team: boolean) {
+   const { data } = await axios.post<{
+      id: string;
+      team: boolean;
+      displayName: string;
+      fromAddress: boolean;
+   }>(`/api/admin/users/${userId}/team`, { team });
    return data;
 }

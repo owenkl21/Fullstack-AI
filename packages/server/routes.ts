@@ -31,6 +31,7 @@ import { badgesController } from './controllers/badges.controller';
  */
 import {
    isAdminEmail,
+   isTeamEmail,
    isVerifiedEmail,
    requireAdmin as requireAdminRole,
    settleAdminRole,
@@ -103,10 +104,12 @@ async function settleIfTheTeam(user: {
    email?: string | null;
    role?: unknown;
    verified?: unknown;
+   team?: unknown;
 }) {
    const owesRole = isAdminEmail(user.email) && user.role !== 'ADMIN';
    const owesTick = isVerifiedEmail(user.email) && user.verified !== true;
-   if (!owesRole && !owesTick) return;
+   const owesTeam = isTeamEmail(user.email) && user.team !== true;
+   if (!owesRole && !owesTick && !owesTeam) return;
    await settleAdminRole(user.id).catch(() => undefined);
 }
 
@@ -638,6 +641,12 @@ router.post(
    '/api/admin/users/:userId/verified',
    requireAdminRole,
    adminController.setVerified
+);
+/* The team badge, the same way. */
+router.post(
+   '/api/admin/users/:userId/team',
+   requireAdminRole,
+   adminController.setTeam
 );
 /*
  * Moderation: the team's queue of reports, its decisions, taking anything

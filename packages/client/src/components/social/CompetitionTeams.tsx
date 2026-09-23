@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { toast } from '@/components/ui/use-toast';
 import { VerifiedMark } from '@/components/profile/VerifiedMark';
+import { TeamBadge } from '@/components/profile/TeamBadge';
 import {
    addTeam,
    assignTeam,
@@ -363,10 +364,15 @@ export function TeamRoster({
                            >
                               <Link
                                  to={`/anglers/${member.id}`}
-                                 className="inline-flex min-h-11 min-w-0 items-center truncate hover:text-teal-text"
+                                 className="flex min-h-11 min-w-0 items-center hover:text-teal-text"
                               >
-                                 {member.displayName}
-                                 {member.verified ? <VerifiedMark /> : null}
+                                 <span className="truncate">
+                                    {member.displayName}
+                                 </span>
+                                 {member.verified ? (
+                                    <VerifiedMark className="shrink-0" />
+                                 ) : null}
+                                 {member.team ? <TeamBadge /> : null}
                               </Link>
                            </li>
                         ))

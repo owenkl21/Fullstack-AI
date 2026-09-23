@@ -9,6 +9,7 @@ import { Img } from '@/components/Img';
 import { useRevealIn } from '@/components/brand/Reveal';
 import type { ConnectionsKind } from '@/components/profile/ConnectionsDialog';
 import { VerifiedMark } from '@/components/profile/VerifiedMark';
+import { TeamBadge } from '@/components/profile/TeamBadge';
 import {
    initialOf,
    monthAndYear,
@@ -81,12 +82,17 @@ export function ProfileView({
                   </span>
                )}
                <div className="min-w-0">
-                  <h1 className="g text-[44px] leading-none break-words hyphens-auto md:text-[56px]">
-                     {profile.displayName}
-                     {/* Bigger here than on a card, because the name is, and
-                         the mark has to read as part of the same line. */}
-                     {profile.verified ? (
-                        <VerifiedMark className="ml-2 size-[22px] align-[0.16em] md:size-[26px]" />
+                  <h1 className="g flex flex-wrap items-baseline gap-x-3 gap-y-2 text-[44px] leading-none md:text-[56px]">
+                     <span className="min-w-0 break-words hyphens-auto">
+                        {profile.displayName}
+                        {/* Bigger here than on a card, because the name is,
+                            and the mark has to read as part of the same line. */}
+                        {profile.verified ? (
+                           <VerifiedMark className="ml-2 size-[22px] align-[0.16em] md:size-[26px]" />
+                        ) : null}
+                     </span>
+                     {profile.team ? (
+                        <TeamBadge size="lg" className="ml-0" />
                      ) : null}
                   </h1>
                   {profile.username ? (

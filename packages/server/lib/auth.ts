@@ -425,6 +425,7 @@ export const auth = betterAuth({
           */
          role: { type: 'string', required: false, input: false },
          verified: { type: 'boolean', required: false, input: false },
+         team: { type: 'boolean', required: false, input: false },
       },
    },
 

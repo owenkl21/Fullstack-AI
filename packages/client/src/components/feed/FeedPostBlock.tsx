@@ -16,6 +16,7 @@ import type { BadgeKind } from '@/components/badges/kinds';
 import { FishMark } from '@/components/brand/FishMark';
 import { Img } from '@/components/Img';
 import { VerifiedMark } from '@/components/profile/VerifiedMark';
+import { TeamBadge } from '@/components/profile/TeamBadge';
 import { Link } from 'react-router-dom';
 import { isAdminSession, useSession } from '@/lib/auth-client';
 import { RemoveDialog, ReportSheet } from '@/components/feed/moderation';
@@ -290,9 +291,17 @@ export function FeedPostBlock({
                   </span>
                )}
                <span className="min-w-0 leading-tight">
-                  <span className="line-clamp-2 block text-[16px] font-semibold text-paper underline-offset-4 group-hover:underline">
-                     {post.author.displayName}
-                     {post.author.verified ? <VerifiedMark /> : null}
+                  {/* The name is its own truncating box and the marks come
+                      after it, so a long name gives way and the seal and the
+                      team label never do. */}
+                  <span className="flex min-w-0 items-baseline text-[16px] font-semibold text-paper">
+                     <span className="truncate underline-offset-4 group-hover:underline">
+                        {post.author.displayName}
+                     </span>
+                     {post.author.verified ? (
+                        <VerifiedMark className="relative top-[0.16em]" />
+                     ) : null}
+                     {post.author.team ? <TeamBadge /> : null}
                   </span>
                   {/*
                    * A username is optional now: better-auth creates an account

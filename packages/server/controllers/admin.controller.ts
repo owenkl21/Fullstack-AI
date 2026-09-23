@@ -39,6 +39,25 @@ export const adminController = {
       return res.json(answer);
    },
 
+   /* The team badge, from the same place. */
+   async setTeam(req: Request, res: Response) {
+      const userId = String(req.params.userId ?? '').trim();
+      const body = req.body as { team?: unknown } | undefined;
+      if (!userId || typeof body?.team !== 'boolean') {
+         return res.status(400).json({
+            code: 'bad_request',
+            message: 'Say which angler, and whether the badge goes on or off.',
+         });
+      }
+      const answer = await adminService.setTeam(userId, body.team);
+      if (!answer) {
+         return res
+            .status(404)
+            .json({ code: 'not_found', message: 'No such angler.' });
+      }
+      return res.json(answer);
+   },
+
    async section(req: Request, res: Response) {
       const section = String(req.params.section ?? '');
 

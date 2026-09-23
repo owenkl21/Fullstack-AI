@@ -10,6 +10,7 @@ import { Img } from '@/components/Img';
 import { PageHead } from '@/components/brand/PageHead';
 import { SearchField } from '@/components/fishing/rows/SearchField';
 import { VerifiedMark } from '@/components/profile/VerifiedMark';
+import { TeamBadge } from '@/components/profile/TeamBadge';
 import {
    initialOf,
    plural,
@@ -407,11 +408,12 @@ function AnglerRow({
                to={`/anglers/${person.id}`}
                className="g block text-[22px] tracking-[0.04em] text-ink after:absolute after:inset-0"
             >
-               <span className="block truncate">
-                  {person.displayName}
+               <span className="flex min-w-0 items-baseline">
+                  <span className="truncate">{person.displayName}</span>
                   {person.verified ? (
-                     <VerifiedMark className="size-[15px] align-[-0.05em]" />
+                     <VerifiedMark className="relative top-[0.05em] size-[15px]" />
                   ) : null}
+                  {person.team ? <TeamBadge /> : null}
                </span>
             </Link>
             <p className="num truncate text-sm text-ink-2">{subline}</p>

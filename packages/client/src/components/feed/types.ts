@@ -52,6 +52,8 @@ export type FeedComment = {
       displayName: string;
       username?: string | null;
       verified?: boolean;
+      /* On the Fisherfeed team: the badge beside the name. */
+      team?: boolean;
    };
    replies?: FeedComment[];
    replyCount?: number;
@@ -68,6 +70,8 @@ export type FeedAuthor = {
    avatarThumbUrl?: string | null;
    /* The app's own account. One in the whole product carries it. */
    verified?: boolean;
+   /* On the Fisherfeed team: the badge beside the name. */
+   team?: boolean;
 };
 
 export type FeedPost = {

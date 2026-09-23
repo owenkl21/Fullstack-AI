@@ -7,6 +7,7 @@ import { Banner } from '@/components/profile/Banner';
 import { RankCard } from '@/components/profile/RankCard';
 import { FollowCounts } from '@/components/profile/FollowCounts';
 import { VerifiedMark } from '@/components/profile/VerifiedMark';
+import { TeamBadge } from '@/components/profile/TeamBadge';
 import {
    initialOf,
    monthAndYear,
@@ -195,10 +196,15 @@ function AnglerScreen() {
                 * basis back to zero.
                 */}
                <div className="min-w-0 grow basis-[14rem]">
-                  <h1 className="g text-[40px] break-words md:text-[52px]">
-                     {profile.displayName}
-                     {profile.verified ? (
-                        <VerifiedMark className="ml-2 size-[20px] align-[0.16em] md:size-[24px]" />
+                  <h1 className="g flex flex-wrap items-baseline gap-x-3 gap-y-2 text-[40px] md:text-[52px]">
+                     <span className="min-w-0 break-words">
+                        {profile.displayName}
+                        {profile.verified ? (
+                           <VerifiedMark className="ml-2 size-[20px] align-[0.16em] md:size-[24px]" />
+                        ) : null}
+                     </span>
+                     {profile.team ? (
+                        <TeamBadge size="lg" className="ml-0" />
                      ) : null}
                   </h1>
                   {profile.username ? (

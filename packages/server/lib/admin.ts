@@ -59,6 +59,23 @@ export const isVerifiedEmail = (email: string | null | undefined): boolean =>
    Boolean(email) && VERIFIED_EMAILS.includes(email!.trim().toLowerCase());
 
 /*
+ * The addresses that wear the team badge: the people who run Fisherfeed. The
+ * same three as the tick to begin with, but a list of its own, because the two
+ * say different things. The tick says "this is really them", which the team
+ * can give a well known angler; the badge says "this person works on
+ * Fisherfeed". Anyone else the team takes on is given the badge in the panel.
+ */
+export const TEAM_EMAILS: readonly string[] = (
+   process.env.TEAM_EMAILS?.trim() || DEFAULT_VERIFIED_EMAILS.join(',')
+)
+   .split(',')
+   .map((address) => address.trim().toLowerCase())
+   .filter(Boolean);
+
+export const isTeamEmail = (email: string | null | undefined): boolean =>
+   Boolean(email) && TEAM_EMAILS.includes(email!.trim().toLowerCase());
+
+/*
  * The accounts a reset keeps. The same three that wear the tick: the people
  * behind the app. Everything else about a reset is decided in
  * services/reset.service.ts; this is only the list, kept here so that who the
@@ -127,24 +144,26 @@ export async function settleAdminRole(
             emailVerified: true,
             role: true,
             verified: true,
+            team: true,
             username: true,
          },
       });
       if (!user) return;
 
-      /* Two claims, settled apart: the role, and the tick. */
+      /* Three claims, settled apart: the role, the tick and the badge. */
       const owedRole = isAdminEmail(user.email) && user.emailVerified;
       const owedTick = isVerifiedEmail(user.email) && user.emailVerified;
-      const owed = owedRole || owedTick;
+      const owedTeam = isTeamEmail(user.email) && user.emailVerified;
+      const owed = owedRole || owedTick || owedTeam;
 
       if (!owed) {
          if (!options?.withdraw) return;
          /* Nothing to undo on an ordinary angler, which is almost every row
             that reaches this, so it costs a read and no write. */
-         if (user.role === 'ANGLER' && !user.verified) return;
+         if (user.role === 'ANGLER' && !user.verified && !user.team) return;
          await prisma.user.update({
             where: { id: user.id },
-            data: { role: 'ANGLER', verified: false },
+            data: { role: 'ANGLER', verified: false, team: false },
          });
          return;
       }
@@ -166,9 +185,15 @@ export async function settleAdminRole(
 
       const role = owedRole ? 'ADMIN' : user.role;
       const verified = owedTick ? true : user.verified;
+      const team = owedTeam ? true : user.team;
       /* The handle is the admin account's alone, whoever else wears a tick. */
       const claimHandle = owedRole && takeHandle;
-      if (role === user.role && verified === user.verified && !claimHandle)
+      if (
+         role === user.role &&
+         verified === user.verified &&
+         team === user.team &&
+         !claimHandle
+      )
          return;
 
       try {
@@ -177,6 +202,7 @@ export async function settleAdminRole(
             data: {
                role,
                verified,
+               team,
                ...(claimHandle ? { username: TEAM_HANDLE } : {}),
             },
          });
@@ -187,7 +213,7 @@ export async function settleAdminRole(
          if (!claimHandle) throw error;
          await prisma.user.update({
             where: { id: user.id },
-            data: { role, verified },
+            data: { role, verified, team },
          });
       }
    } catch (error) {

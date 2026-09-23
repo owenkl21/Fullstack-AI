@@ -11,6 +11,7 @@ import { AdminTable, type Column } from '@/components/admin/AdminTable';
 import { Area, Bars, HeatGrid, Spread } from '@/components/insights/Charts';
 import {
    fetchSection,
+   setTeam,
    setVerified,
    NotForYou,
    type Fish,
@@ -27,6 +28,7 @@ import {
    type Water,
 } from '@/components/admin/api';
 import { VerifiedMark } from '@/components/profile/VerifiedMark';
+import { TeamBadge } from '@/components/profile/TeamBadge';
 import { useDocumentTitle } from '@/lib/title';
 import { formatLength, formatMass, readUnitSystem } from '@/lib/units';
 import { cn } from '@/lib/utils';
@@ -740,6 +742,52 @@ function PeoplePanel() {
          setTicking(null);
       }
    };
+   /*
+    * The team label, the same way as the tick: optimistic, and put back if
+    * the server refuses.
+    */
+   const [onTeam, setOnTeam] = useState<Record<string, boolean>>({});
+   const [teaming, setTeaming] = useState<string | null>(null);
+   const teamOf = (row: { id: string; team: boolean }) =>
+      onTeam[row.id] ?? row.team;
+   const toggleTeam = async (row: { id: string; team: boolean }) => {
+      const next = !teamOf(row);
+      setOnTeam((was) => ({ ...was, [row.id]: next }));
+      setTeaming(row.id);
+      try {
+         const answer = await setTeam(row.id, next);
+         setOnTeam((was) => ({ ...was, [row.id]: answer.team }));
+      } catch {
+         setOnTeam((was) => ({ ...was, [row.id]: !next }));
+      } finally {
+         setTeaming(null);
+      }
+   };
+   const teamColumn: Column<ActiveAngler> = {
+      key: 'team',
+      head: 'Team',
+      value: (row) => (teamOf(row) ? 1 : 0),
+      cell: (row) => (
+         <button
+            type="button"
+            onClick={() => void toggleTeam(row)}
+            disabled={teaming === row.id}
+            aria-pressed={teamOf(row)}
+            aria-label={
+               teamOf(row)
+                  ? `Take ${row.displayName} off the team`
+                  : `Put ${row.displayName} on the team`
+            }
+            className={cn(
+               'g-tracked inline-flex min-h-11 items-center text-[15px] transition-colors disabled:opacity-50',
+               teamOf(row) ? '' : 'text-ink-3 hover:text-ink'
+            )}
+         >
+            {teamOf(row) ? <TeamBadge className="ml-0" /> : 'Add to team'}
+         </button>
+      ),
+   };
+
    const verifiedColumn: Column<ActiveAngler> = {
       key: 'verified',
       head: 'Verified',
@@ -820,6 +868,7 @@ function PeoplePanel() {
          small: true,
       },
       verifiedColumn,
+      teamColumn,
    ];
 
    const joinedColumns: Column<JoinedAngler>[] = [

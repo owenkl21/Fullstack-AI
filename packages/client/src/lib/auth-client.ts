@@ -44,6 +44,8 @@ export type SessionUser = {
    username?: string | null;
    role?: string | null;
    verified?: boolean | null;
+   /* On the Fisherfeed team: the badge beside the name. */
+   team?: boolean | null;
 };
 
 /** Whether the signed-in account may be shown the admin panel's link. */

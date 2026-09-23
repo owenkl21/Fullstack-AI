@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma';
-import { isVerifiedEmail } from '../lib/admin';
+import { isTeamEmail, isVerifiedEmail } from '../lib/admin';
 import { recentMail } from '../lib/mailer';
 import { mailStatus } from '../lib/mailer';
 
@@ -608,6 +608,7 @@ async function people() {
             email: string;
             createdAt: Date;
             verified: unknown;
+            team: unknown;
             catches: unknown;
             spots: unknown;
             comments: unknown;
@@ -616,7 +617,7 @@ async function people() {
          }[]
       >`
          SELECT u.id, u.displayName, u.username, u.email, u.createdAt,
-                u.verified,
+                u.verified, u.team,
                 (SELECT COUNT(*) FROM \`Catch\` c
                   WHERE c.createdById = u.id AND c.deletedAt IS NULL) AS catches,
                 (SELECT COUNT(*) FROM \`FishingSite\` s
@@ -696,6 +697,7 @@ async function people() {
          username: row.username,
          email: row.email,
          verified: Boolean(num(row.verified)),
+         team: Boolean(num(row.team)),
          joinedAt: row.createdAt,
          catches: num(row.catches),
          spots: num(row.spots),
@@ -925,6 +927,26 @@ export const adminService = {
             come back the next time that account is used. */
          fromAddress: settled,
       };
+   },
+
+   /*
+    * The team badge, given or taken. The same caveat as the tick: the team's
+    * own addresses are settled on every request, so taking the badge off one
+    * of them lasts until that account next opens the app, and the answer says
+    * so.
+    */
+   async setTeam(userId: string, team: boolean) {
+      const user = await prisma.user.findUnique({
+         where: { id: userId },
+         select: { id: true, email: true },
+      });
+      if (!user) return null;
+      const updated = await prisma.user.update({
+         where: { id: user.id },
+         data: { team },
+         select: { id: true, team: true, displayName: true },
+      });
+      return { ...updated, fromAddress: isTeamEmail(user.email) };
    },
 
    /*

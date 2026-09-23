@@ -13,6 +13,7 @@ import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid';
 import { Link } from 'react-router-dom';
 
 import { VerifiedMark } from '@/components/profile/VerifiedMark';
+import { TeamBadge } from '@/components/profile/TeamBadge';
 import { isAdminSession, useSession } from '@/lib/auth-client';
 import { RemoveDialog, ReportSheet } from '@/components/feed/moderation';
 import { refusalWords, removeAsTeam } from '@/components/feed/moderation-api';
@@ -63,6 +64,8 @@ export type ThreadViewer = {
    /* So a comment the reader has only just written carries the same mark it
       will have once the server answers, rather than growing one on reload. */
    verified?: boolean;
+   /* On the Fisherfeed team: the badge beside the name. */
+   team?: boolean;
 };
 
 const initialOf = (name: string) => (name.trim()[0] ?? '?').toUpperCase();
@@ -825,6 +828,7 @@ export function CommentThread({
                      {comment.user.verified ? (
                         <VerifiedMark className="size-[12px]" />
                      ) : null}
+                     {comment.user.team ? <TeamBadge /> : null}
                      {age ? (
                         <span className="font-normal text-paper-2">
                            {' '}

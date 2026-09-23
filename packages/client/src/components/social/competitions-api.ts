@@ -74,6 +74,8 @@ export type TeamMember = {
    displayName: string;
    username: string | null;
    verified?: boolean;
+   /* On the Fisherfeed team: the badge beside the name. */
+   team?: boolean;
 };
 
 export type CompetitionTeam = {
