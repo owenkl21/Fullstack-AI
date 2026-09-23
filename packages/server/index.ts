@@ -6,6 +6,7 @@ import { auth } from './lib/auth';
 import { requestScope } from './lib/auth-context';
 import { prisma } from './lib/prisma';
 import { startNightlyBackups } from './services/backup.service';
+import { entriesService } from './services/competition-entries.service';
 import { moderationWords } from './lib/moderation';
 
 //reads variables from .env file and adds them to process.env
@@ -105,7 +106,20 @@ startNightlyBackups();
 /* The team's word lists, if it has saved any. Until then the built-in lists. */
 void moderationWords.load();
 
+/*
+ * Competition entries whose checks a restart cut off are checked again: soon
+ * after the start, and every few minutes, so none is left saying "Checking".
+ */
+const resume = () =>
+   void entriesService
+      .resumeStuck()
+      .catch((error) => console.warn('[entry:resume]', String(error)));
+setTimeout(resume, 20_000);
+setInterval(resume, 3 * 60_000).unref();
+
 const shutdown = async () => {
+   /* Checks already running are let finish before the database goes. */
+   await entriesService.settle(20_000);
    await prisma.$disconnect();
    server.close(() => process.exit(0));
 };

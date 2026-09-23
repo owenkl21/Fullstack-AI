@@ -436,6 +436,23 @@ export function speciesProblem(
       : `This competition is for ${wanted}; the catch has no species.`;
 }
 
+/*
+ * The checks run after the entry is answered, so they belong to nothing that
+ * waits for them. A restart (every deploy is one) that lands while the judge is
+ * looking killed them outright and left the entry saying "Checking" for good.
+ * So the running ones are kept here, for a shutdown to let finish, and any
+ * entry still pending a minute on is picked up again (resumeStuck).
+ */
+const running = new Map<string, Promise<unknown>>();
+const track = (entryId: string, work: Promise<unknown>) => {
+   const held = work.finally(() => running.delete(entryId));
+   running.set(entryId, held);
+   return held;
+};
+/* Past this an entry the checks cannot finish goes to the organiser. */
+const GIVE_UP_MS = 15 * 60 * 1000;
+const STALE_MS = 60 * 1000;
+
 export const entriesService = {
    /** The competition as the checks read it, `species` already a list. */
    async competitionFor(
@@ -573,10 +590,64 @@ export const entriesService = {
          select: ENTRY_SELECT,
       });
 
-      void this.verify(entry.id).catch((error) =>
-         console.warn('[entry:verify] failed', entry.id, String(error))
+      void track(
+         entry.id,
+         this.verify(entry.id).catch((error) =>
+            console.warn('[entry:verify] failed', entry.id, String(error))
+         )
       );
       return { entry };
+   },
+
+   /**
+    * Pick up entries whose checks never finished: cut off by a restart, or
+    * broken part way. Each is checked again; one that still cannot be after a
+    * quarter of an hour is held for the organiser, so no entry says
+    * "Checking" for ever.
+    */
+   async resumeStuck() {
+      const stale = await prisma.competitionEntry.findMany({
+         where: {
+            state: 'PENDING',
+            createdAt: { lt: new Date(Date.now() - STALE_MS) },
+         },
+         orderBy: { createdAt: 'asc' },
+         take: 20,
+         select: { id: true },
+      });
+      for (const { id } of stale) {
+         if (running.has(id)) continue;
+         console.info('[entry:resume] checking again', id);
+         await track(
+            id,
+            this.verify(id).catch((error) =>
+               console.warn('[entry:resume] failed', id, String(error))
+            )
+         );
+      }
+      const given = await prisma.competitionEntry.updateMany({
+         where: {
+            state: 'PENDING',
+            createdAt: { lt: new Date(Date.now() - GIVE_UP_MS) },
+         },
+         data: {
+            state: 'HELD',
+            readNote:
+               'The checks could not finish, so the organiser looks at this one.',
+         },
+      });
+      if (given.count) {
+         console.warn('[entry:resume] held for the organiser', given.count);
+      }
+   },
+
+   /** Let checks already running finish, for up to `ms`, before a shutdown. */
+   async settle(ms: number) {
+      if (!running.size) return;
+      await Promise.race([
+         Promise.allSettled([...running.values()]),
+         new Promise((resolve) => setTimeout(resolve, ms)),
+      ]);
    },
 
    /** The six checks. Never throws: a check that breaks is written as not checked. */
