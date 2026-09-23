@@ -47,9 +47,14 @@ export const resetController = {
          );
       } catch (error) {
          console.error('[reset] The reset failed.', error);
+         /*
+          * The reason goes to the screen, not only to a log nobody here can
+          * open. Admin only, so it tells a stranger nothing.
+          */
          return res.status(500).json({
             code: 'reset_failed',
-            message: 'Nothing was emptied. Try again.',
+            message: 'Nothing was emptied. The log is as it was.',
+            why: error instanceof Error ? error.message : String(error),
          });
       } finally {
          running = false;

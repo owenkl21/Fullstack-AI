@@ -147,6 +147,19 @@ export const resetService = {
       const count = (table: string, result: { count: number }) => {
          removed[table] = result.count;
       };
+      /*
+       * Which table was being emptied when it went wrong. A reset that fails
+       * says so plainly, because the person reading it cannot open the server
+       * log and "it did not work" is not something anybody can act on.
+       */
+      let at = 'reading the photographs';
+      const step = async (
+         table: string,
+         run: () => Promise<{ count: number }>
+      ) => {
+         at = table;
+         count(table, await run());
+      };
 
       /* Read the keys before the rows go, or the bucket can never be told. */
       const images = await prisma.image.findMany({
@@ -162,91 +175,97 @@ export const resetService = {
        * deleting a file for a row that then survived would be the one mistake
        * with nothing to undo it.
        */
-      await prisma.$transaction(
-         async (tx) => {
-            /* Competitions, from the entries up. */
-            count('catchBadges', await tx.catchBadge.deleteMany({}));
-            count(
-               'competitionEntries',
-               await tx.competitionEntry.deleteMany({})
-            );
-            count(
-               'competitionInvites',
-               await tx.competitionInvite.deleteMany({})
-            );
-            count(
-               'competitionEntrants',
-               await tx.competitionEntrant.deleteMany({})
-            );
-            count(
-               'competitionSpecies',
-               await tx.competitionSpecies.deleteMany({})
-            );
-            count('competitions', await tx.competition.deleteMany({}));
+      try {
+         await prisma.$transaction(
+            async (tx) => {
+               /* Competitions, from the entries up. */
+               await step('catchBadges', () => tx.catchBadge.deleteMany({}));
+               await step('competitionEntries', () =>
+                  tx.competitionEntry.deleteMany({})
+               );
+               await step('competitionInvites', () =>
+                  tx.competitionInvite.deleteMany({})
+               );
+               await step('competitionEntrants', () =>
+                  tx.competitionEntrant.deleteMany({})
+               );
+               await step('competitionSpecies', () =>
+                  tx.competitionSpecies.deleteMany({})
+               );
+               await step('competitions', () => tx.competition.deleteMany({}));
 
-            /* The feed and everything said on it. */
-            count('feedCommentLikes', await tx.feedCommentLike.deleteMany({}));
-            /*
-             * Replies before the comments they answer. A comment points at
-             * its parent, and MySQL checks that key row by row, so asking for
-             * the lot in one statement trips over an answer whose question
-             * has just gone.
-             */
-            count(
-               'feedReplies',
-               await tx.feedComment.deleteMany({
-                  where: { NOT: { parentId: null } },
-               })
-            );
-            count('feedComments', await tx.feedComment.deleteMany({}));
-            count('feedLikes', await tx.feedLike.deleteMany({}));
-            count('savedPosts', await tx.savedPost.deleteMany({}));
-            count('feedPosts', await tx.feedPost.deleteMany({}));
+               /* The feed and everything said on it. */
+               await step('feedCommentLikes', () =>
+                  tx.feedCommentLike.deleteMany({})
+               );
+               /*
+                * Replies before the comments they answer. A comment points at
+                * its parent, and MySQL checks that key row by row, so asking for
+                * the lot in one statement trips over an answer whose question
+                * has just gone.
+                */
+               await step('feedReplies', () =>
+                  tx.feedComment.deleteMany({
+                     where: { NOT: { parentId: null } },
+                  })
+               );
+               await step('feedComments', () => tx.feedComment.deleteMany({}));
+               await step('feedLikes', () => tx.feedLike.deleteMany({}));
+               await step('savedPosts', () => tx.savedPost.deleteMany({}));
+               await step('feedPosts', () => tx.feedPost.deleteMany({}));
 
-            /* What was said and kept about fish and spots. */
-            /* Catch comments have no replies of their own, so one pass. */
-            count('comments', await tx.comment.deleteMany({}));
-            count('catchLikes', await tx.catchLike.deleteMany({}));
-            count('siteLikes', await tx.siteLike.deleteMany({}));
-            count('reviews', await tx.review.deleteMany({}));
-            count('savedSpots', await tx.savedSpot.deleteMany({}));
-            count('savedGear', await tx.savedGear.deleteMany({}));
+               /* What was said and kept about fish and spots. */
+               /* Catch comments have no replies of their own, so one pass. */
+               await step('comments', () => tx.comment.deleteMany({}));
+               await step('catchLikes', () => tx.catchLike.deleteMany({}));
+               await step('siteLikes', () => tx.siteLike.deleteMany({}));
+               await step('reviews', () => tx.review.deleteMany({}));
+               await step('savedSpots', () => tx.savedSpot.deleteMany({}));
+               await step('savedGear', () => tx.savedGear.deleteMany({}));
 
-            /* The photographs' rows, then the fish they were of. */
-            count('catchImages', await tx.catchImage.deleteMany({}));
-            count('siteImages', await tx.siteImage.deleteMany({}));
-            count('images', await tx.image.deleteMany({}));
-            count('catches', await tx.catch.deleteMany({}));
+               /* The photographs' rows, then the fish they were of. */
+               await step('catchImages', () => tx.catchImage.deleteMany({}));
+               await step('siteImages', () => tx.siteImage.deleteMany({}));
+               await step('images', () => tx.image.deleteMany({}));
+               await step('catches', () => tx.catch.deleteMany({}));
 
-            /* Places and tackle. */
-            count('waypoints', await tx.waypoint.deleteMany({}));
-            count('gear', await tx.gear.deleteMany({}));
-            count('sites', await tx.fishingSite.deleteMany({}));
+               /* Places and tackle. */
+               await step('waypoints', () => tx.waypoint.deleteMany({}));
+               await step('gear', () => tx.gear.deleteMany({}));
+               await step('sites', () => tx.fishingSite.deleteMany({}));
 
-            /* Groups, then who followed whom, then the inbox. */
-            count('groupMembers', await tx.groupMember.deleteMany({}));
-            count('groups', await tx.group.deleteMany({}));
-            count('follows', await tx.follow.deleteMany({}));
-            count('notifications', await tx.notification.deleteMany({}));
+               /* Groups, then who followed whom, then the inbox. */
+               await step('groupMembers', () => tx.groupMember.deleteMany({}));
+               await step('groups', () => tx.group.deleteMany({}));
+               await step('follows', () => tx.follow.deleteMany({}));
+               await step('notifications', () =>
+                  tx.notification.deleteMany({})
+               );
 
-            /*
-             * The accounts. Sessions, sign-ins, push subscriptions and
-             * anything else hanging off a user cascade with the row, so the
-             * kept accounts stay signed in on their phones and nobody else
-             * holds a session to a user that is gone.
-             */
-            count(
-               'anglers',
-               await tx.user.deleteMany({
-                  where: { email: { notIn: [...KEEP_EMAILS] } },
-               })
-            );
+               /*
+                * The accounts. Sessions, sign-ins, push subscriptions and
+                * anything else hanging off a user cascade with the row, so the
+                * kept accounts stay signed in on their phones and nobody else
+                * holds a session to a user that is gone.
+                */
+               await step('anglers', () =>
+                  tx.user.deleteMany({
+                     where: { email: { notIn: [...KEEP_EMAILS] } },
+                  })
+               );
 
-            /* Half-finished sign-ups and password resets belong to nobody now. */
-            count('verifications', await tx.verification.deleteMany({}));
-         },
-         { timeout: 120_000 }
-      );
+               /* Half-finished sign-ups and password resets belong to nobody now. */
+               await step('verifications', () =>
+                  tx.verification.deleteMany({})
+               );
+            },
+            { timeout: 120_000, maxWait: 30_000 }
+         );
+      } catch (error) {
+         const why = error instanceof Error ? error.message : String(error);
+         const short = why.split(/\r?\n/).slice(0, 4).join(' ').trim();
+         throw new Error(`while emptying ${at}: ${short}`);
+      }
 
       const photos = await forgetPhotos(keys);
       const kept = await prisma.user.findMany({

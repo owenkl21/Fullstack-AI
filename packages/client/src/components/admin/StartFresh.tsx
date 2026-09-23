@@ -57,8 +57,19 @@ export function StartFresh() {
          setDone(data);
          setAsking(false);
          setSaid('');
-      } catch {
-         setError('Nothing was emptied. Try again.');
+      } catch (thrown) {
+         /* The server's own words, so a failure can be acted on rather than
+            guessed at. Nothing was removed when this shows. */
+         const said =
+            axios.isAxiosError(thrown) &&
+            typeof thrown.response?.data?.why === 'string'
+               ? thrown.response.data.why
+               : null;
+         setError(
+            said
+               ? `Nothing was emptied. The log is as it was. ${said}`
+               : 'Nothing was emptied. The log is as it was.'
+         );
       } finally {
          setBusy(false);
       }
@@ -123,7 +134,10 @@ export function StartFresh() {
          </label>
 
          {error ? (
-            <p role="alert" className="mt-3 text-[15px] text-destructive">
+            <p
+               role="alert"
+               className="mt-3 max-w-[62ch] text-[15px] break-words text-destructive"
+            >
                {error}
             </p>
          ) : null}
