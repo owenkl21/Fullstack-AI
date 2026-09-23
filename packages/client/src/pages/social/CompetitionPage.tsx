@@ -26,6 +26,7 @@ import {
    ruleSentence,
    scopeLabel,
    statusLabel,
+   teamRefusal,
    whenSentence,
    whereSentence,
    withdrawEntry,
@@ -34,6 +35,11 @@ import {
    type Follower,
 } from '@/components/social/competitions-api';
 import { EntryRow } from '@/components/social/EntryRow';
+import {
+   TeamBoard,
+   TeamPicker,
+   TeamRoster,
+} from '@/components/social/CompetitionTeams';
 import { RulesTable } from '@/components/social/RulesTable';
 import { StandingsRows } from '@/components/social/StandingsRows';
 import { WinnerCard } from '@/components/social/WinnerCard';
@@ -82,6 +88,10 @@ function CompetitionScreen() {
    const units = useUnits();
    const [busy, setBusy] = useState<string | null>(null);
    const [inviting, setInviting] = useState(false);
+   const [picking, setPicking] = useState(false);
+   /* Which board the standings show when there are teams: the sides, or
+      the anglers. */
+   const [board, setBoard] = useState<'anglers' | 'teams'>('teams');
    useDocumentTitle(detail?.competition.name ?? 'Competition');
 
    const load = useCallback(
@@ -133,12 +143,18 @@ function CompetitionScreen() {
       try {
          await run();
          await load();
-      } catch {
+      } catch (error) {
+         /* The server's own words when it has some: with teams a refusal
+            says why (full, settled at the start), which "try again" would
+            not. */
          toast({
             title: 'That did not go through.',
-            description: 'Try again in a moment.',
+            description: teamRefusal(error),
             variant: 'error',
          });
+         /* Whatever was refused (a side filled, the start came), the page
+            says how things stand now. */
+         void load();
       } finally {
          setBusy(null);
       }
@@ -150,6 +166,12 @@ function CompetitionScreen() {
    const you = detail?.you ?? null;
    const finished = c?.status === 'finished';
    const clock = c && !finished ? clockParts(c, now) : null;
+   const teams = detail?.teams ?? null;
+   const yourTeamId = c?.yourTeamId ?? null;
+   const yourTeam = teams?.teams.find((t) => t.id === yourTeamId) ?? null;
+   /* In it but on no side: an invitation accepted, or the organiser, who
+      starts a competition without picking one. */
+   const needsTeam = Boolean(teams && you?.entered && !yourTeamId);
 
    const answer = (accept: boolean) =>
       void act('invite', async () => {
@@ -186,9 +208,27 @@ function CompetitionScreen() {
                      Decline
                   </Button>
                </>
+            ) : needsTeam ? (
+               <Button
+                  type="button"
+                  className="text-[18px]"
+                  disabled={busy !== null}
+                  onClick={() => setPicking(true)}
+               >
+                  Pick a team
+               </Button>
             ) : you.entered && c.status === 'running' ? (
                <Button asChild className="text-[18px]">
                   <Link to={`/log?competition=${c.id}`}>Submit a catch</Link>
+               </Button>
+            ) : you.entered && teams && c.status === 'upcoming' ? (
+               <Button
+                  type="button"
+                  className="text-[18px]"
+                  disabled={busy !== null}
+                  onClick={() => setPicking(true)}
+               >
+                  Change team
                </Button>
             ) : !you.entered && c.scope === 'PUBLIC' ? (
                <Button
@@ -196,10 +236,12 @@ function CompetitionScreen() {
                   className="text-[18px]"
                   disabled={busy !== null}
                   onClick={() =>
-                     void act('enter', () => enterCompetition(c.id))
+                     teams
+                        ? setPicking(true)
+                        : void act('enter', () => enterCompetition(c.id))
                   }
                >
-                  Enter
+                  {teams ? 'Pick a team' : 'Enter'}
                </Button>
             ) : null}
 
@@ -283,7 +325,12 @@ function CompetitionScreen() {
                }}
             />
          ) : finished ? (
-            <Results detail={detail} units={units} />
+            <Results
+               detail={detail}
+               units={units}
+               board={board}
+               onBoard={setBoard}
+            />
          ) : (
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-16">
                <div className="flex flex-col gap-8 lg:gap-9">
@@ -328,6 +375,19 @@ function CompetitionScreen() {
                            label: 'Anglers',
                            value: `${c.entrantCount} entered${you.organise ? ' · you organise' : ''}`,
                         },
+                        ...(teams
+                           ? [
+                                {
+                                   label: 'Teams',
+                                   value: teamsSentence(
+                                      teams.teams.length,
+                                      c.maxPerTeam ?? null,
+                                      yourTeam?.name ?? null,
+                                      you.entered
+                                   ),
+                                },
+                             ]
+                           : []),
                      ]}
                   />
 
@@ -343,8 +403,18 @@ function CompetitionScreen() {
                            <UnitToggle measure={c.measure} />
                         ) : null}
                      </div>
+                     {detail.teamStandings ? (
+                        <BoardSwitch value={board} onChange={setBoard} />
+                     ) : null}
                      <div className="mt-3">
-                        {detail.standings.length ? (
+                        {detail.teamStandings && board === 'teams' ? (
+                           <TeamBoard
+                              competition={c}
+                              standings={detail.teamStandings}
+                              units={units}
+                              yourTeamId={yourTeamId}
+                           />
+                        ) : detail.standings.length ? (
                            <StandingsRows
                               competition={c}
                               standings={detail.standings}
@@ -358,6 +428,16 @@ function CompetitionScreen() {
                         )}
                      </div>
                   </section>
+
+                  {teams ? (
+                     <TeamRoster
+                        competition={c}
+                        teams={teams.teams}
+                        unassigned={teams.unassigned}
+                        organise={you.organise}
+                        onChanged={() => load()}
+                     />
+                  ) : null}
 
                   <p className="hidden text-[14px] text-ink-3 lg:block">
                      Your exact fishing spot is never shown on these boards.
@@ -385,6 +465,34 @@ function CompetitionScreen() {
                competitionId={c.id}
             />
          ) : null}
+         {c && teams ? (
+            <TeamPicker
+               open={picking}
+               onOpenChange={setPicking}
+               competition={c}
+               teams={teams.teams}
+               current={yourTeamId}
+               onPick={async (teamId) => {
+                  /* Refused, the sheet stays open on the fresh counts so
+                     another side can be picked. */
+                  setBusy('team');
+                  try {
+                     await enterCompetition(c.id, teamId);
+                     await load();
+                  } catch (error) {
+                     toast({
+                        title: 'That did not go through.',
+                        description: teamRefusal(error),
+                        variant: 'error',
+                     });
+                     await load();
+                     throw error;
+                  } finally {
+                     setBusy(null);
+                  }
+               }}
+            />
+         ) : null}
       </section>
    );
 }
@@ -402,6 +510,50 @@ function rankedWords(measure: 'LENGTH' | 'WEIGHT', units: Units) {
    return shownWord
       ? `Ranked in ${own}, shown here in ${shownWord}.`
       : `Ranked in ${own}.`;
+}
+
+/* The teams row of the rules table: how many, how big, and yours. */
+function teamsSentence(
+   count: number,
+   cap: number | null,
+   yours: string | null,
+   entered: boolean
+) {
+   const size = cap ? `${count} teams of up to ${cap}.` : `${count} teams.`;
+   if (yours) return `${size} You fish for ${yours}.`;
+   return entered ? `${size} Pick yours.` : size;
+}
+
+/*
+ * The sides or the anglers. Two words in the manner of the unit toggle, so a
+ * reader sees at once which board they are reading.
+ */
+function BoardSwitch({
+   value,
+   onChange,
+}: {
+   value: 'anglers' | 'teams';
+   onChange: (value: 'anglers' | 'teams') => void;
+}) {
+   return (
+      <div role="group" aria-label="Board" className="mt-2 flex gap-5">
+         {(['teams', 'anglers'] as const).map((option) => (
+            <button
+               key={option}
+               type="button"
+               aria-pressed={value === option}
+               onClick={() => onChange(option)}
+               className={`g-tracked inline-flex min-h-11 items-center border-b-2 text-[16px] transition-colors ${
+                  value === option
+                     ? 'border-teal text-ink'
+                     : 'border-transparent text-ink-3 hover:text-ink'
+               }`}
+            >
+               {option === 'teams' ? 'Teams' : 'Anglers'}
+            </button>
+         ))}
+      </div>
+   );
 }
 
 /* What happens to an entry here, in the words the rules table prints. */
@@ -507,9 +659,13 @@ function Entries({
 function Results({
    detail,
    units,
+   board,
+   onBoard,
 }: {
    detail: CompetitionDetail;
    units: Units;
+   board: 'anglers' | 'teams';
+   onBoard: (board: 'anglers' | 'teams') => void;
 }) {
    const c = detail.competition;
    const winner =
@@ -538,8 +694,18 @@ function Results({
                   <UnitToggle measure={c.measure} />
                ) : null}
             </div>
+            {detail.teamStandings ? (
+               <BoardSwitch value={board} onChange={onBoard} />
+            ) : null}
             <div className="mt-3">
-               {detail.standings.length ? (
+               {detail.teamStandings && board === 'teams' ? (
+                  <TeamBoard
+                     competition={c}
+                     standings={detail.teamStandings}
+                     units={units}
+                     yourTeamId={c.yourTeamId ?? null}
+                  />
+               ) : detail.standings.length ? (
                   <StandingsRows
                      competition={c}
                      standings={detail.standings}

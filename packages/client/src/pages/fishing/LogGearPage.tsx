@@ -56,6 +56,11 @@ const EMPTY_GEAR: GearValues = {
    imageUrl: null,
 };
 
+/* A word that is not allowed is said as the server says it; any other
+   refusal of the field keeps the form's own sentence. */
+const refusal = (field: { _errors?: string[] } | undefined) =>
+   field?._errors?.find((text) => text.includes('not allowed on Fisherfeed'));
+
 const refusedFields = (
    error: unknown
 ): Partial<Record<GearFieldName, string>> => {
@@ -74,7 +79,7 @@ const refusedFields = (
    const refused: Partial<Record<GearFieldName, string>> = {};
 
    if (body.name?._errors?.length) {
-      refused.name = MESSAGES.name;
+      refused.name = refusal(body.name) ?? MESSAGES.name;
    }
    if (body.brand?._errors?.length) {
       refused.brand = MESSAGES.brand;

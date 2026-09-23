@@ -106,18 +106,20 @@ const feedInclude = {
     * the card does not hold, with nothing to hang them from.
     */
    comments: {
-      where: { deletedAt: null, parentId: null },
+      where: { deletedAt: null, hiddenAt: null, parentId: null },
       orderBy: { createdAt: 'desc' as const },
       take: EMBEDDED_COMMENTS,
       include: {
          user: commentAuthor,
          replies: {
-            where: { deletedAt: null },
+            where: { deletedAt: null, hiddenAt: null },
             orderBy: { createdAt: 'asc' as const },
             take: EMBEDDED_REPLIES,
             include: { user: commentAuthor },
          },
-         _count: { select: { replies: { where: { deletedAt: null } } } },
+         _count: {
+            select: { replies: { where: { deletedAt: null, hiddenAt: null } } },
+         },
       },
    },
    /*
@@ -127,7 +129,11 @@ const feedInclude = {
     * to know how many it has not shown yet.
     */
    _count: {
-      select: { comments: { where: { deletedAt: null, parentId: null } } },
+      select: {
+         comments: {
+            where: { deletedAt: null, hiddenAt: null, parentId: null },
+         },
+      },
    },
 };
 
@@ -251,7 +257,13 @@ const withSpotShownTo = <
  */
 const readablePost = (postId: string) =>
    prisma.feedPost.findFirst({
-      where: { id: postId, deletedAt: null, visibility: { not: 'PRIVATE' } },
+      where: {
+         id: postId,
+         deletedAt: null,
+         /* Out of sight while the team looks at a report. */
+         hiddenAt: null,
+         visibility: { not: 'PRIVATE' },
+      },
       select: { id: true, authorId: true },
    });
 
@@ -400,6 +412,8 @@ export const feedService = {
       const posts = await prisma.feedPost.findMany({
          where: {
             deletedAt: null,
+            /* Reported by enough people: out of sight until the team has looked. */
+            hiddenAt: null,
             /* Belt and braces: a private post should never have been created. */
             visibility: { not: 'PRIVATE' },
             /*
@@ -584,10 +598,23 @@ export const feedService = {
       );
    },
 
-   async deleteFeedPost(userId: string, postId: string) {
+   /*
+    * The author takes their post down, or the team does. asAdmin is only ever
+    * passed by the moderation service, behind the admin guard: it skips the
+    * question of whose post it is and nothing else.
+    */
+   async deleteFeedPost(
+      userId: string,
+      postId: string,
+      options: { asAdmin?: boolean } = {}
+   ) {
       await getUserId(userId); // throws if the user is gone
       const existing = await prisma.feedPost.findFirst({
-         where: { id: postId, authorId: userId, deletedAt: null },
+         where: {
+            id: postId,
+            deletedAt: null,
+            ...(options.asAdmin ? {} : { authorId: userId }),
+         },
          select: { id: true },
       });
 
@@ -606,7 +633,7 @@ export const feedService = {
    async toggleLike(userId: string, postId: string) {
       await getUserId(userId); // throws if the user is gone
       const post = await prisma.feedPost.findFirst({
-         where: { id: postId, deletedAt: null },
+         where: { id: postId, deletedAt: null, hiddenAt: null },
          select: { id: true, authorId: true },
       });
 
@@ -689,7 +716,7 @@ export const feedService = {
       if (!post) return null;
 
       const rows: CommentRow[] = await prisma.feedComment.findMany({
-         where: { postId, deletedAt: null },
+         where: { postId, deletedAt: null, hiddenAt: null },
          include: { user: commentAuthor },
          orderBy: { createdAt: 'asc' },
          take: THREAD_CAP,
@@ -740,7 +767,7 @@ export const feedService = {
       let topLevelId: string | null = null;
       if (parentId) {
          const target = await prisma.feedComment.findFirst({
-            where: { id: parentId, deletedAt: null },
+            where: { id: parentId, deletedAt: null, hiddenAt: null },
             select: {
                id: true,
                postId: true,
@@ -910,7 +937,12 @@ export const feedService = {
     * deleted, like everything else here; the likes stay in their table and
     * stop counting because nothing reads a removed comment again.
     */
-   async deleteComment(userId: string, commentId: string) {
+   async deleteComment(
+      userId: string,
+      commentId: string,
+      /* The team, behind the admin guard: whose comment it is does not matter. */
+      options: { asAdmin?: boolean } = {}
+   ) {
       await getUserId(userId); // throws if the user is gone
       const existing = await prisma.feedComment.findFirst({
          where: { id: commentId, deletedAt: null },
@@ -925,7 +957,9 @@ export const feedService = {
       /* Not found and not yours read the same from outside. */
       if (
          !existing ||
-         (existing.userId !== userId && existing.post.authorId !== userId)
+         (!options.asAdmin &&
+            existing.userId !== userId &&
+            existing.post.authorId !== userId)
       ) {
          return null;
       }
@@ -1001,7 +1035,12 @@ export const feedService = {
          where: {
             id: commentId,
             deletedAt: null,
-            post: { deletedAt: null, visibility: { not: 'PRIVATE' } },
+            hiddenAt: null,
+            post: {
+               deletedAt: null,
+               hiddenAt: null,
+               visibility: { not: 'PRIVATE' },
+            },
          },
          select: { id: true, userId: true, postId: true, body: true },
       });

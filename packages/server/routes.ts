@@ -19,6 +19,7 @@ import { waypointsController } from './controllers/waypoints.controller';
 import { gearController } from './controllers/gear.controller';
 import { feedController } from './controllers/feed.controller';
 import { reviewsController } from './controllers/reviews.controller';
+import { moderationController } from './controllers/moderation.controller';
 import { adminController } from './controllers/admin.controller';
 import { resetController } from './controllers/reset.controller';
 import { backupController } from './controllers/backup.controller';
@@ -426,6 +427,28 @@ router.post(
    requireApiAuth,
    competitionsController.join
 );
+/* Teams, by the organiser: add a side, rename one, take an empty one away,
+   and move somebody. The service checks it is the organiser, every time. */
+router.post(
+   '/api/competitions/:competitionId/teams',
+   requireApiAuth,
+   competitionsController.addTeam
+);
+router.post(
+   '/api/competitions/:competitionId/teams/assign',
+   requireApiAuth,
+   competitionsController.assignTeam
+);
+router.patch(
+   '/api/competitions/:competitionId/teams/:teamId',
+   requireApiAuth,
+   competitionsController.renameTeam
+);
+router.delete(
+   '/api/competitions/:competitionId/teams/:teamId',
+   requireApiAuth,
+   competitionsController.removeTeam
+);
 router.delete(
    '/api/competitions/:competitionId/join',
    requireApiAuth,
@@ -498,6 +521,17 @@ router.post(
    '/api/feed/:postId/likes',
    requireApiAuth,
    feedController.toggleLike
+);
+/* Telling the team something is not right. One report per person per thing. */
+router.post(
+   '/api/feed/:postId/report',
+   requireApiAuth,
+   moderationController.reportPost
+);
+router.post(
+   '/api/feed/comments/:commentId/report',
+   requireApiAuth,
+   moderationController.reportComment
 );
 router.get(
    '/api/feed/:postId/comments',
@@ -605,6 +639,48 @@ router.post(
    requireAdminRole,
    adminController.setVerified
 );
+/*
+ * Moderation: the team's queue of reports, its decisions, taking anything
+ * down directly, and the word lists the language filter reads. All behind the
+ * same guard as the panel, and declared before the section route so that
+ * "moderation" is never read as the name of a panel section.
+ */
+router.get(
+   '/api/admin/moderation/reports',
+   requireAdminRole,
+   moderationController.queue
+);
+router.post(
+   '/api/admin/moderation/reports/resolve',
+   requireAdminRole,
+   moderationController.resolve
+);
+router.delete(
+   '/api/admin/moderation/posts/:postId',
+   requireAdminRole,
+   moderationController.removePost
+);
+router.delete(
+   '/api/admin/moderation/comments/:commentId',
+   requireAdminRole,
+   moderationController.removeComment
+);
+router.get(
+   '/api/admin/moderation/words',
+   requireAdminRole,
+   moderationController.words
+);
+router.put(
+   '/api/admin/moderation/words',
+   requireAdminRole,
+   moderationController.saveWords
+);
+router.delete(
+   '/api/admin/moderation/words',
+   requireAdminRole,
+   moderationController.resetWords
+);
+
 router.get('/api/admin/:section', requireAdminRole, adminController.section);
 
 export default router;

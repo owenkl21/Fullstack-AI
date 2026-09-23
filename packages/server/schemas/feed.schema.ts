@@ -1,4 +1,5 @@
 import z from 'zod';
+import { cleanOptional, cleanTransform } from '../lib/moderation';
 
 export const feedScopeSchema = z.enum(['GLOBAL', 'NEARBY']);
 /*
@@ -21,7 +22,14 @@ export const listFeedSchema = z.object({
 export const createFeedPostSchema = z.object({
    type: feedTypeSchema.optional().default('CATCH'),
    scope: feedScopeSchema.optional().default('GLOBAL'),
-   content: z.string().trim().min(1).max(2000).optional().nullable(),
+   content: z
+      .string()
+      .trim()
+      .min(1)
+      .max(2000)
+      .optional()
+      .nullable()
+      .transform(cleanOptional),
    /* A post without its catch is a headline and nothing else, so the catch is
     * required rather than checked afterwards. The spot rides along with it. */
    catchId: z.string().trim().min(1),
@@ -32,14 +40,26 @@ export const createFeedPostSchema = z.object({
 
 export const updateFeedPostSchema = z.object({
    scope: feedScopeSchema.optional(),
-   content: z.string().trim().min(1).max(2000).optional().nullable(),
+   content: z
+      .string()
+      .trim()
+      .min(1)
+      .max(2000)
+      .optional()
+      .nullable()
+      .transform(cleanOptional),
 });
 
 /*
  * One bound for the words, shared by writing a comment and editing one, so an
  * edit can never make a comment longer than a new one was allowed to be.
  */
-const feedCommentBody = z.string().trim().min(1).max(1000);
+const feedCommentBody = z
+   .string()
+   .trim()
+   .min(1)
+   .max(1000)
+   .transform(cleanTransform);
 
 export const createFeedCommentSchema = z.object({
    body: feedCommentBody,

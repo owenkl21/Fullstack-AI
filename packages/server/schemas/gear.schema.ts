@@ -1,4 +1,5 @@
 import z from 'zod';
+import { cleanTransform } from '../lib/moderation';
 
 const gearTypes = [
    'ROD',
@@ -17,7 +18,7 @@ const imageInputSchema = z.object({
 });
 
 export const createGearSchema = z.object({
-   name: z.string().trim().min(1).max(120),
+   name: z.string().trim().min(1).max(120).transform(cleanTransform),
    brand: z.string().trim().min(1).max(120),
    type: z.enum(gearTypes),
    image: imageInputSchema.optional().nullable(),

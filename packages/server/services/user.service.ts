@@ -4,6 +4,7 @@ import { requireEmailVerification } from '../lib/auth';
 import { prisma } from '../lib/prisma';
 import {
    handleProblemOf,
+   nameHasBadLanguage,
    nameIsBrand,
    normaliseHandle,
    type HandleProblem,
@@ -87,7 +88,14 @@ export type HandleCheck =
 
 type UpdateProfileResult =
    | ProfileResult
-   | { code: 'username_taken' | 'username_reserved' | 'display_name_reserved' };
+   | {
+        code:
+           | 'username_taken'
+           | 'username_reserved'
+           | 'username_language'
+           | 'display_name_reserved'
+           | 'display_name_language';
+     };
 
 const SEARCH_PAGE = 20;
 /* Far enough to page through any real search, short of letting one request
@@ -488,7 +496,14 @@ const buildPublicProfileView = async (
          /* No email. This page is public. */
          _count: { select: { followers: true, following: true } },
          catches: {
-            where: { deletedAt: null, visibility: 'PUBLIC' },
+            /* Not one whose post is hidden while the team looks at it. */
+            where: {
+               deletedAt: null,
+               visibility: 'PUBLIC',
+               feedPosts: {
+                  none: { hiddenAt: { not: null }, deletedAt: null },
+               },
+            },
             orderBy: { caughtAt: 'desc' },
             take: 8,
             select: {
@@ -655,17 +670,39 @@ export const userService = {
          if (!isAdmin(actor)) return { code: 'display_name_reserved' };
       }
 
+      /*
+       * Bad language in a name is refused when the name changes, not when a
+       * form sends the one the angler already has: somebody whose surname is
+       * on the list, or whose name was chosen before a word was added to it,
+       * can still save everything else.
+       */
+      if (
+         input.displayName !== undefined &&
+         nameHasBadLanguage(input.displayName)
+      ) {
+         const current = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { displayName: true },
+         });
+         if (current?.displayName?.trim() !== input.displayName.trim()) {
+            return { code: 'display_name_language' };
+         }
+      }
+
       if (input.username !== undefined) {
          const check = await checkHandleFor(input.username, userId);
 
          if (!check.available) {
             /* The schema has already refused anything malformed, so the only
-             * refusals left to say are these two. */
+             * refusals left to say are these. The handle an angler already
+             * holds is let through by checkHandleFor before any of them. */
             return {
                code:
                   check.reason === 'reserved'
                      ? 'username_reserved'
-                     : 'username_taken',
+                     : check.reason === 'language'
+                       ? 'username_language'
+                       : 'username_taken',
             };
          }
 

@@ -70,6 +70,11 @@ const MESSAGES: Record<SpotFieldName, string> = {
    position: 'That position is off the map. Place the pin again.',
 };
 
+/* A word that is not allowed is said as the server says it; any other
+   refusal of the field keeps the form's own sentence. */
+const refusal = (field: { _errors?: string[] } | undefined) =>
+   field?._errors?.find((text) => text.includes('not allowed on Fisherfeed'));
+
 /* The server answers a bad save with the fields it refused; say each one plainly. */
 const refusedFields = (
    error: unknown
@@ -89,13 +94,13 @@ const refusedFields = (
    const refused: Partial<Record<SpotFieldName, string>> = {};
 
    if (body.name?._errors?.length) {
-      refused.name = MESSAGES.name;
+      refused.name = refusal(body.name) ?? MESSAGES.name;
    }
    if (body.description?._errors?.length) {
-      refused.description = MESSAGES.description;
+      refused.description = refusal(body.description) ?? MESSAGES.description;
    }
    if (body.accessNotes?._errors?.length) {
-      refused.accessNotes = MESSAGES.accessNotes;
+      refused.accessNotes = refusal(body.accessNotes) ?? MESSAGES.accessNotes;
    }
    if (body.latitude?._errors?.length || body.longitude?._errors?.length) {
       refused.position = MESSAGES.position;

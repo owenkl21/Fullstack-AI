@@ -82,6 +82,7 @@ import {
 import { usePositionFix } from '@/components/fishing/quicklog/useFix';
 import { useSession } from '@/lib/auth-client';
 import { useMyAvatar } from '@/components/profile/avatar-api';
+import { refusalWords } from '@/components/feed/moderation-api';
 
 /*
  * The log. There is one.
@@ -325,6 +326,22 @@ function QuickLog() {
       const controller = new AbortController();
       fetchCompetition(competitionId, controller.signal)
          .then((detail) => {
+            /* With teams an entry counts for a side, and the side is picked
+               on the competition's page, so that is where this goes first.
+               Sent back now, before a fish is photographed, not after. */
+            if (
+               detail.competition.teamsEnabled &&
+               !detail.competition.yourTeamId
+            ) {
+               toast({
+                  title: 'Pick a team first.',
+                  description: 'Your catches count for the team you fish for.',
+               });
+               navigate(`/competitions/${detail.competition.id}`, {
+                  replace: true,
+               });
+               return;
+            }
             setCompetition(detail.competition);
             setCompetitionEntered(detail.you.entered);
             const fish = onlyFish(detail.competition);
@@ -344,7 +361,7 @@ function QuickLog() {
             });
          });
       return () => controller.abort();
-   }, [competitionId]);
+   }, [competitionId, navigate]);
 
    const [length, setLength] = useState('');
    /* The reader's own units to begin with (lib/units.ts), the same ones a
@@ -833,11 +850,16 @@ function QuickLog() {
          navigate(`/catches/${data.catch.id}`, { replace: true });
       } catch (error) {
          setIsSaving(false);
+         /* A word that is not allowed is named as such, not blamed on the
+            figures. */
+         const refused = refusalWords(error);
          const message =
             axios.isAxiosError(error) &&
             typeof error.response?.data?.message === 'string'
                ? error.response.data.message
-               : 'Check the length and weight, then try again.';
+               : refused?.includes('not allowed')
+                 ? refused
+                 : 'Check the length and weight, then try again.';
          toast({ title: 'Not saved.', description: message, variant: 'error' });
       }
    };

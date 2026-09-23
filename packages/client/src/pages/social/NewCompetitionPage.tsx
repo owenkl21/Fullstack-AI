@@ -63,6 +63,8 @@ import { cn } from '@/lib/utils';
 type StepKey = 'what' | 'where' | 'who' | 'invite' | 'look';
 
 const STEPS: StepKey[] = ['what', 'where', 'who', 'invite', 'look'];
+/* As the server holds it: two sides at least, eight at most. */
+const MAX_TEAMS = 8;
 
 const STEP_TITLES: Record<StepKey, string> = {
    what: 'The competition',
@@ -142,6 +144,14 @@ function NewCompetition() {
    const [endsAt, setEndsAt] = useState(weekend.end);
    const [scope, setScope] = useState<'PUBLIC' | 'PRIVATE'>('PUBLIC');
    const [checks, setChecks] = useState<CompetitionChecks>('CASUAL');
+   /* Teams: off unless asked for. Names left blank are "Team 1", "Team 2"
+      in the order they stand, which the server fills in. */
+   const [teamsOn, setTeamsOn] = useState(false);
+   const [teamCount, setTeamCount] = useState(2);
+   const [teamNames, setTeamNames] = useState<string[]>(() =>
+      Array.from({ length: MAX_TEAMS }, () => '')
+   );
+   const [maxPerTeam, setMaxPerTeam] = useState('');
    const [followers, setFollowers] = useState<Follower[] | null>(null);
    const [search, setSearch] = useState('');
    const [invitees, setInvitees] = useState<string[]>([]);
@@ -184,6 +194,10 @@ function NewCompetition() {
       startsAt,
       endsAt,
       radiusKm,
+      teamsOn,
+      teamCount,
+      teamNames,
+      maxPerTeam,
    ]);
    const error = complaint?.about === about ? complaint.text : null;
    const setError = (text: string | null) =>
@@ -264,6 +278,19 @@ function NewCompetition() {
          )
             return 'How far from the spot still counts, in kilometres, up to 500.';
       }
+      if (key === 'who' && teamsOn) {
+         const named = teamNames
+            .slice(0, teamCount)
+            .map((n) => n.trim().toLowerCase())
+            .filter(Boolean);
+         if (new Set(named).size !== named.length)
+            return 'Two teams have the same name. Give each its own.';
+         if (
+            maxPerTeam.trim() &&
+            !(Number.isInteger(Number(maxPerTeam)) && Number(maxPerTeam) >= 1)
+         )
+            return 'The most on a team is a whole number, 1 or more. Or leave it empty for no limit.';
+      }
       return null;
    };
 
@@ -326,6 +353,18 @@ function NewCompetition() {
              * already turned both away if either was not a date. */
             startsAt: (from as Date).toISOString(),
             endsAt: (to as Date).toISOString(),
+            ...(teamsOn
+               ? {
+                    teamsEnabled: true,
+                    teamCount,
+                    /* Blank names stay blank here, in their places, so the
+                       server's "Team 2" is the second team. */
+                    teamNames: teamNames
+                       .slice(0, teamCount)
+                       .map((n) => n.trim()),
+                    maxPerTeam: maxPerTeam.trim() ? Number(maxPerTeam) : null,
+                 }
+               : {}),
          });
          toast({
             title: 'Competition started.',
@@ -353,7 +392,9 @@ function NewCompetition() {
                   ? 'what'
                   : /^(startsAt|endsAt|area)/.test(field)
                     ? 'where'
-                    : step
+                    : /^(team|maxPerTeam)/.test(field)
+                      ? 'who'
+                      : step
             );
             setError(refused.message);
          } else {
@@ -387,12 +428,16 @@ function NewCompetition() {
          ? 'Six checks and the judge, then you review'
          : 'Six checks and the judge, then it counts';
 
+   const teamsSummary = teamsOn
+      ? `${teamCount} teams${maxPerTeam.trim() ? ` of up to ${maxPerTeam.trim()}` : ''}`
+      : 'No teams';
+
    const answers: Record<StepKey, string> = {
       what: name.trim()
          ? `${name.trim()}, ${ruleSentence(rule, measure).toLowerCase()}, ${speciesWords(chosenSpecies) || 'any species'}`
          : '',
       where: `${whereSummary} · ${dayOf(startsAt)} to ${dayOf(endsAt)}`,
-      who: `${entrySummary} · ${checksSummary.toLowerCase()}`,
+      who: `${entrySummary}${teamsOn ? ` · ${teamsSummary.toLowerCase()}` : ''} · ${checksSummary.toLowerCase()}`,
       invite: invitees.length ? `${invitees.length} invited` : '',
       look: '',
    };
@@ -574,6 +619,88 @@ function NewCompetition() {
             className="[&_button]:text-[16px]"
          />
 
+         <div className="flex flex-col gap-3">
+            <span className="lab">Teams</span>
+            <Segment
+               label="Teams"
+               value={teamsOn ? 'on' : 'off'}
+               onChange={(v) => setTeamsOn(v === 'on')}
+               options={[
+                  { value: 'off', label: 'Every angler alone' },
+                  { value: 'on', label: 'In teams' },
+               ]}
+               className="[&_button]:text-[16px]"
+            />
+            {teamsOn ? (
+               <div className="flex flex-col gap-5 pt-1">
+                  <div className="flex flex-col gap-2">
+                     <span className="lab" id="team-count-label">
+                        How many teams
+                     </span>
+                     <div
+                        role="group"
+                        aria-labelledby="team-count-label"
+                        className="flex flex-wrap gap-2"
+                     >
+                        {Array.from(
+                           { length: MAX_TEAMS - 1 },
+                           (_, i) => i + 2
+                        ).map((n) => (
+                           <button
+                              key={n}
+                              type="button"
+                              aria-pressed={teamCount === n}
+                              onClick={() => setTeamCount(n)}
+                              className={cn(
+                                 'num grid size-11 place-items-center border text-[16px] transition-colors',
+                                 teamCount === n
+                                    ? 'border-teal bg-teal text-paper'
+                                    : 'border-line-2 text-ink hover:border-ink'
+                              )}
+                           >
+                              {n}
+                           </button>
+                        ))}
+                     </div>
+                  </div>
+
+                  <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                     {Array.from({ length: teamCount }, (_, i) => (
+                        <LineField
+                           key={i}
+                           id={`team-name-${i}`}
+                           label={`Team ${i + 1}`}
+                           value={teamNames[i] ?? ''}
+                           onChange={(value) =>
+                              setTeamNames((was) =>
+                                 was.map((n, j) => (j === i ? value : n))
+                              )
+                           }
+                           placeholder={`Team ${i + 1}`}
+                           maxLength={40}
+                        />
+                     ))}
+                  </div>
+
+                  <div className="max-w-[240px]">
+                     <MeasureBox
+                        id="max-per-team"
+                        label="Most on a team"
+                        value={maxPerTeam}
+                        onChange={(v) => setMaxPerTeam(v.replace(/\D/g, ''))}
+                        unit="anglers"
+                        units={['anglers'] as const}
+                        placeholder="No limit"
+                     />
+                  </div>
+                  <p className="text-[14px] text-ink-3">
+                     Anglers pick their team when they enter. Teams are settled
+                     once it starts.
+                  </p>
+               </div>
+            ) : null}
+         </div>
+
          <div className="flex flex-col gap-2">
             <span className="lab">Every entry is checked for</span>
             <div className="flex flex-col">
@@ -716,6 +843,18 @@ function NewCompetition() {
             onEdit={() => go('who')}
             rows={[
                { label: 'Entry', value: entrySummary },
+               {
+                  label: 'Teams',
+                  value: teamsOn
+                     ? `${teamsSummary}: ${listWords(
+                          Array.from(
+                             { length: teamCount },
+                             (_, i) => teamNames[i]?.trim() || `Team ${i + 1}`
+                          ),
+                          'and'
+                       )}`
+                     : teamsSummary,
+               },
                { label: 'Checks', value: checksSummary },
             ]}
          />

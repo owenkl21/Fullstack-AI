@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { PageHead } from '@/components/brand/PageHead';
 import { Backups } from '@/components/admin/Backups';
+import { Reports, WordLists } from '@/components/admin/Moderation';
 import { StartFresh } from '@/components/admin/StartFresh';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { CountIn } from '@/components/fishing/record/CountIn';
@@ -67,11 +68,15 @@ function Panels({ onRefused }: { onRefused: () => void }) {
    return (
       <>
          <OverviewPanel onRefused={onRefused} />
+         {/* Straight under the headline: the one list here that asks the
+             team to do something. */}
+         <Reports />
          <GrowthPanel />
          <FishPanel />
          <WaterPanel />
          <PeoplePanel />
          <HealthPanel />
+         <WordLists />
          <Backups />
          {/* Last on the page on purpose: the one thing here that destroys. */}
          <StartFresh />

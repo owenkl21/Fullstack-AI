@@ -1127,6 +1127,28 @@ export const fishingService = {
          return null;
       }
 
+      /*
+       * A catch whose post enough people reported is out of sight here too,
+       * until the team decides: hiding the feed card and leaving the same
+       * photographs one tap away would hide nothing. The angler still has
+       * their own catch, and the team can open it to judge the report.
+       */
+      if (catchRecord.createdById !== viewerId) {
+         const hidden = await prisma.feedPost.findFirst({
+            where: { catchId, hiddenAt: { not: null }, deletedAt: null },
+            select: { id: true },
+         });
+         if (hidden) {
+            const viewer = viewerId
+               ? await prisma.user.findUnique({
+                    where: { id: viewerId },
+                    select: { role: true },
+                 })
+               : null;
+            if (viewer?.role !== 'ADMIN') return null;
+         }
+      }
+
       const withResolvedImages = await withResolvedImageUrls(catchRecord);
       /*
        * A public catch can stand on a private spot. The fish is for everyone;

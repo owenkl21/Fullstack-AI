@@ -62,6 +62,41 @@ export type Competition = {
    } | null;
    /* The viewer's own pending invitation, when there is one. */
    invite?: { id: string; expiresAt: string } | null;
+   /* Teams: on or off, how many a side may hold, and the viewer's side. */
+   teamsEnabled?: boolean;
+   maxPerTeam?: number | null;
+   yourTeamId?: string | null;
+};
+
+/* Somebody on a side, as the roster names them. */
+export type TeamMember = {
+   id: string;
+   displayName: string;
+   username: string | null;
+   verified?: boolean;
+};
+
+export type CompetitionTeam = {
+   id: string;
+   name: string;
+   position: number;
+   members: TeamMember[];
+};
+
+export type TeamStanding = {
+   teamId: string;
+   name: string;
+   place: number;
+   joint: boolean;
+   score: number;
+   members: number;
+   scoring: number;
+   best: {
+      value: number;
+      displayName: string;
+      speciesName: string | null;
+   } | null;
+   distinctSpecies: number;
 };
 
 /* One fish a competition is for. */
@@ -175,6 +210,9 @@ export type JudgeView =
 export type CompetitionDetail = {
    competition: Competition;
    standings: CompetitionStanding[];
+   /* Null for a competition without teams. */
+   teams?: { teams: CompetitionTeam[]; unassigned: TeamMember[] } | null;
+   teamStandings?: TeamStanding[] | null;
    entries: CompetitionEntry[];
    you: {
       entered: boolean;
@@ -256,6 +294,11 @@ export type NewCompetition = {
    startsAt: string;
    endsAt: string;
    maxPerSpeciesPerDay?: number;
+   /* Teams: how many, their names in order, and how many a side may hold. */
+   teamsEnabled?: boolean;
+   teamCount?: number | null;
+   teamNames?: string[];
+   maxPerTeam?: number | null;
 };
 
 export async function createCompetition(input: NewCompetition) {
@@ -272,8 +315,32 @@ export async function createCompetition(input: NewCompetition) {
    return readCompetition(data.competition);
 }
 
-export const enterCompetition = (id: string) =>
-   axios.post(`/api/competitions/${id}/join`);
+/* Joining, and with teams, joining a side. The same call changes side before
+   the start. */
+export const enterCompetition = (id: string, teamId?: string | null) =>
+   axios.post(`/api/competitions/${id}/join`, teamId ? { teamId } : {});
+
+/* The organiser's hand on the teams. */
+export const addTeam = (id: string, name: string) =>
+   axios.post<{ id: string; name: string; position: number }>(
+      `/api/competitions/${id}/teams`,
+      { name }
+   );
+export const renameTeam = (id: string, teamId: string, name: string) =>
+   axios.patch(`/api/competitions/${id}/teams/${teamId}`, { name });
+export const removeTeam = (id: string, teamId: string) =>
+   axios.delete(`/api/competitions/${id}/teams/${teamId}`);
+export const assignTeam = (id: string, userId: string, teamId: string) =>
+   axios.post(`/api/competitions/${id}/teams/assign`, { userId, teamId });
+
+/* A team rule the server turned down, in its own words. */
+export const teamRefusal = (error: unknown) => {
+   const data = (error as { response?: { data?: { message?: unknown } } })
+      ?.response?.data;
+   return typeof data?.message === 'string'
+      ? data.message
+      : 'That did not go through. Try again.';
+};
 
 export const leaveCompetition = (id: string) =>
    axios.delete(`/api/competitions/${id}/join`);

@@ -13,6 +13,9 @@ import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid';
 import { Link } from 'react-router-dom';
 
 import { VerifiedMark } from '@/components/profile/VerifiedMark';
+import { isAdminSession, useSession } from '@/lib/auth-client';
+import { RemoveDialog, ReportSheet } from '@/components/feed/moderation';
+import { refusalWords, removeAsTeam } from '@/components/feed/moderation-api';
 import { Button } from '@/components/ui/button';
 import {
    Dialog,
@@ -281,6 +284,12 @@ export function CommentThread({
 }) {
    const signInHref = `/sign-in?next=${encodeURIComponent(`/feed?post=${postId}`)}`;
 
+   /* Somebody else's words are reported; the team takes them down. */
+   const { data: session } = useSession();
+   const isTeam = isAdminSession(session?.user);
+   const [reported, setReported] = useState<FeedComment | null>(null);
+   const [teamRemove, setTeamRemove] = useState<FeedComment | null>(null);
+
    const [error, setError] = useState<string | null>(null);
    /* Said to a screen reader when something the eye can simply see happens. */
    const [said, setSaid] = useState('');
@@ -436,10 +445,12 @@ export function CommentThread({
          wrote();
          onPatch((post) => settleComment(post, pendingId, saved));
          setSaid('Comment posted.');
-      } catch {
+      } catch (failure) {
          onPatch((post) => dropComments(post, [pendingId]));
          onDraftChange(body);
-         setError('That comment did not send. Try again.');
+         setError(
+            refusalWords(failure) ?? 'That comment did not send. Try again.'
+         );
       }
    };
 
@@ -503,7 +514,9 @@ export function CommentThread({
             return;
          }
          setReply(draftReply);
-         setError('That reply did not send. Try again.');
+         setError(
+            refusalWords(failure) ?? 'That reply did not send. Try again.'
+         );
       }
    };
 
@@ -552,7 +565,7 @@ export function CommentThread({
             }))
          );
          setSaid('Comment saved.');
-      } catch {
+      } catch (failure) {
          onPatch((post) =>
             patchComment(post, draftEdit.id, (entry) => ({
                ...entry,
@@ -561,7 +574,9 @@ export function CommentThread({
             }))
          );
          setEdit(draftEdit);
-         setError('That edit was not kept. Try again.');
+         setError(
+            refusalWords(failure) ?? 'That edit was not kept. Try again.'
+         );
       }
    };
 
@@ -636,6 +651,44 @@ export function CommentThread({
          } else {
             setError('That comment was not deleted. Try again.');
          }
+      } finally {
+         setRemoving((was) => {
+            const next = { ...was };
+            delete next[target.id];
+            return next;
+         });
+      }
+   };
+
+   /* The team's removal: the same drop from the thread as a delete. */
+   const takeDownAsTeam = async () => {
+      const target = teamRemove;
+      if (!target) return;
+      setTeamRemove(null);
+      setError(null);
+      setRemoving((was) => ({ ...was, [target.id]: true }));
+      if (
+         reply &&
+         (reply.topId === target.id || reply.targetId === target.id)
+      ) {
+         setReply(null);
+      }
+      if (edit?.id === target.id) setEdit(null);
+      try {
+         const result = await removeAsTeam('comment', target.id);
+         /* A read of the thread already on its way must not put it back. */
+         wrote();
+         onPatch((post) =>
+            dropComments(
+               post,
+               result.removedIds ?? [target.id],
+               result.commentCount ?? undefined
+            )
+         );
+         setSaid('Comment taken down.');
+         window.setTimeout(() => root.current?.focus(), 0);
+      } catch {
+         setError('That comment is still up. Try again.');
       } finally {
          setRemoving((was) => {
             const next = { ...was };
@@ -919,6 +972,28 @@ export function CommentThread({
                               Delete
                            </button>
                         ) : null}
+
+                        {!mine && viewer && !isTeam && !waiting ? (
+                           <button
+                              type="button"
+                              aria-label={`Report the ${isReply ? 'reply' : 'comment'} by ${name}`}
+                              onClick={() => setReported(comment)}
+                              className={`${rowAction} text-paper-2 hover:text-paper`}
+                           >
+                              Report
+                           </button>
+                        ) : null}
+
+                        {!mine && isTeam && !waiting ? (
+                           <button
+                              type="button"
+                              aria-label={`Take down the ${isReply ? 'reply' : 'comment'} by ${name}`}
+                              onClick={() => setTeamRemove(comment)}
+                              className={`${rowAction} text-paper-2 hover:text-[#f0716a]`}
+                           >
+                              Take down
+                           </button>
+                        ) : null}
                      </div>
                   )}
 
@@ -1074,6 +1149,30 @@ export function CommentThread({
                </Link>
             </p>
          )}
+
+         {reported ? (
+            <ReportSheet
+               open
+               onOpenChange={(open) => {
+                  if (!open) setReported(null);
+               }}
+               kind="comment"
+               id={reported.id}
+               author={reported.user.displayName}
+            />
+         ) : null}
+         {teamRemove ? (
+            <RemoveDialog
+               open
+               onOpenChange={(open) => {
+                  if (!open) setTeamRemove(null);
+               }}
+               kind="comment"
+               author={teamRemove.user.displayName}
+               excerpt={teamRemove.body}
+               onConfirm={() => void takeDownAsTeam()}
+            />
+         ) : null}
 
          <Dialog open={confirming} onOpenChange={setConfirming}>
             {/* The sheet is black in both themes, so the red is the one that

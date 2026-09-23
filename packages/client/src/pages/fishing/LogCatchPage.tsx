@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { refusalWords } from '@/components/feed/moderation-api';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -1148,11 +1149,14 @@ export function CatchForm({
          navigate(`/catches/${data.catch.id}`, { replace: true });
       } catch (error) {
          console.error('Unable to save the catch', error);
+         const refused = refusalWords(error);
          const message =
             axios.isAxiosError(error) &&
             typeof error.response?.data?.message === 'string'
                ? error.response.data.message
-               : 'Nothing was saved. Check the fields above and try again.';
+               : refused?.includes('not allowed')
+                 ? refused
+                 : 'Nothing was saved. Check the fields above and try again.';
          toast({ title: 'Not saved', description: message, variant: 'error' });
       } finally {
          setIsSaving(false);

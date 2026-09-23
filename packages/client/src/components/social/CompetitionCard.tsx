@@ -83,7 +83,7 @@ export function CompetitionCard({
          className="px-4 text-[15px]"
          onClick={onEnter}
       >
-         Enter
+         {competition.teamsEnabled ? 'Pick a team' : 'Enter'}
       </Button>
    ) : (
       <Button asChild variant="outline" size="sm" className="px-4 text-[15px]">

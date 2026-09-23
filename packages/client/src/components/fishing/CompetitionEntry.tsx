@@ -61,6 +61,8 @@ export function CompetitionEntry({
                result.items.filter(
                   (c) =>
                      c.youEntered &&
+                     /* With teams, only once they are on a side. */
+                     !(c.teamsEnabled && !c.yourTeamId) &&
                      (c.status === 'running' || c.id === competitionId)
                )
             )

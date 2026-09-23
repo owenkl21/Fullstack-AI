@@ -2,6 +2,8 @@ import {
    ChatBubbleOvalLeftIcon,
    HeartIcon,
    BookmarkIcon,
+   FlagIcon,
+   TrashIcon,
 } from '@heroicons/react/24/outline';
 import {
    HeartIcon as HeartSolid,
@@ -15,6 +17,10 @@ import { FishMark } from '@/components/brand/FishMark';
 import { Img } from '@/components/Img';
 import { VerifiedMark } from '@/components/profile/VerifiedMark';
 import { Link } from 'react-router-dom';
+import { isAdminSession, useSession } from '@/lib/auth-client';
+import { RemoveDialog, ReportSheet } from '@/components/feed/moderation';
+import { removeAsTeam } from '@/components/feed/moderation-api';
+import { toast } from '@/components/ui/use-toast';
 
 import {
    Carousel,
@@ -117,6 +123,7 @@ export function FeedPostBlock({
    onDraftChange,
    onPatch,
    focusCommentId,
+   onRemoved,
 }: {
    post: FeedPostInView;
    isSignedIn: boolean;
@@ -138,6 +145,8 @@ export function FeedPostBlock({
    onPatch: (update: (post: FeedPost) => FeedPost) => void;
    /* A comment a link pointed at, for the thread to open to. */
    focusCommentId?: string | null;
+   /* The team took the post down: the page drops the card. */
+   onRemoved?: () => void;
 }) {
    const images = post.catch?.images ?? [];
    /*
@@ -158,6 +167,31 @@ export function FeedPostBlock({
    const measurement = measurementLine(post);
    const threadId = `comments-${post.id}`;
    const canFollow = isSignedIn && post.authorIsMe !== true;
+
+   /*
+    * Reporting is for a post that is somebody else's; the team takes posts
+    * down instead of reporting them. The author has neither: their own post
+    * is deleted from the catch.
+    */
+   const { data: session } = useSession();
+   const isTeam = isAdminSession(session?.user);
+   const canReport = isSignedIn && post.authorIsMe !== true && !isTeam;
+   const [reporting, setReporting] = useState(false);
+   const [takingDown, setTakingDown] = useState(false);
+   const takeDown = async () => {
+      setTakingDown(false);
+      try {
+         await removeAsTeam('post', post.id);
+         toast({ title: 'Post taken down.', variant: 'success' });
+         onRemoved?.();
+      } catch {
+         toast({
+            title: 'That did not go through.',
+            description: 'The post is still up. Try again.',
+            variant: 'error',
+         });
+      }
+   };
 
    /*
     * The badges live on the post the page holds, so a badge pinned here is
@@ -444,7 +478,12 @@ export function FeedPostBlock({
              * counting the likes said again, in words, what the figures beside
              * the hearts already say.
              */}
-            <div className="mt-4 flex items-center gap-[22px] border-t border-dashed border-line-2 pt-3 lg:mt-auto">
+            {/* The team has two more controls in the row (badges, take down), so
+                the row closes up for them rather than folding See the catch
+                onto two lines. */}
+            <div
+               className={`mt-4 flex items-center border-t border-dashed border-line-2 pt-3 lg:mt-auto ${isTeam ? 'gap-[14px]' : 'gap-[22px]'}`}
+            >
                {isSignedIn ? (
                   <button
                      type="button"
@@ -543,12 +582,40 @@ export function FeedPostBlock({
                   />
                ) : null}
 
+               {canReport ? (
+                  <button
+                     type="button"
+                     aria-label="Report this post"
+                     onClick={() => setReporting(true)}
+                     className={`${action} text-paper-2 hover:text-paper`}
+                  >
+                     <FlagIcon
+                        aria-hidden="true"
+                        className="size-[22px]"
+                        strokeWidth={1.5}
+                     />
+                  </button>
+               ) : isTeam ? (
+                  <button
+                     type="button"
+                     aria-label="Take this post down"
+                     onClick={() => setTakingDown(true)}
+                     className={`${action} text-paper-2 hover:text-[#f0716a]`}
+                  >
+                     <TrashIcon
+                        aria-hidden="true"
+                        className="size-[22px]"
+                        strokeWidth={1.5}
+                     />
+                  </button>
+               ) : null}
+
                {recordHref ? (
                   /* The card's one primary action, and the only thing on the
                      right of the row. */
                   <Link
                      to={recordHref}
-                     className={`${word} ml-auto h-11 text-[16px] text-paper hover:opacity-80`}
+                     className={`${word} ml-auto h-11 shrink-0 text-[16px] whitespace-nowrap text-paper hover:opacity-80`}
                   >
                      See the catch
                   </Link>
@@ -576,6 +643,26 @@ export function FeedPostBlock({
                <div id={threadId} hidden />
             )}
          </div>
+
+         {canReport ? (
+            <ReportSheet
+               open={reporting}
+               onOpenChange={setReporting}
+               kind="post"
+               id={post.id}
+               author={post.author.displayName}
+            />
+         ) : null}
+         {isTeam ? (
+            <RemoveDialog
+               open={takingDown}
+               onOpenChange={setTakingDown}
+               kind="post"
+               author={post.author.displayName}
+               excerpt={heading}
+               onConfirm={() => void takeDown()}
+            />
+         ) : null}
       </article>
    );
 }

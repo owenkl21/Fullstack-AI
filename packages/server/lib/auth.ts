@@ -8,7 +8,11 @@ import {
 import { isAdmin, isAdminEmail, settleAdminRole } from './admin';
 import { LEGAL_VERSION } from './legal';
 import { prisma } from './prisma';
-import { nameHasTick, nameIsBrand } from '../schemas/user.schema';
+import {
+   nameHasBadLanguage,
+   nameHasTick,
+   nameIsBrand,
+} from '../schemas/user.schema';
 import {
    sendChangeEmailConfirmation,
    sendPasswordChanged,
@@ -177,6 +181,15 @@ export const auth = betterAuth({
                   message: 'A display name cannot use a tick mark.',
                });
             }
+            if (
+               typeof body.name === 'string' &&
+               nameHasBadLanguage(body.name)
+            ) {
+               throw new APIError('BAD_REQUEST', {
+                  code: 'DISPLAY_NAME_LANGUAGE',
+                  message: 'Pick a name without bad language in it.',
+               });
+            }
             /*
              * Only the admin address may sign up as Fisherfeed anything, and
              * even then the tick waits on the confirmation link.
@@ -207,6 +220,20 @@ export const auth = betterAuth({
                   code: 'DISPLAY_NAME_TICK',
                   message: 'A display name cannot use a tick mark.',
                });
+            }
+            /* A new name only: the one already held is left alone, as the
+               profile endpoint leaves it. */
+            if (
+               typeof body?.name === 'string' &&
+               nameHasBadLanguage(body.name)
+            ) {
+               const session = await getSessionFromCtx(ctx);
+               if (session?.user?.name?.trim() !== body.name.trim()) {
+                  throw new APIError('BAD_REQUEST', {
+                     code: 'DISPLAY_NAME_LANGUAGE',
+                     message: 'Pick a name without bad language in it.',
+                  });
+               }
             }
             if (typeof body?.name === 'string' && nameIsBrand(body.name)) {
                const session = await getSessionFromCtx(ctx);

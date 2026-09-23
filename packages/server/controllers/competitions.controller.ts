@@ -1,8 +1,12 @@
 import type { Request, Response } from 'express';
 import { getAuth } from '../lib/auth-context';
 import {
+   addTeamSchema,
+   assignTeamSchema,
    createCompetitionSchema,
    flagEntrySchema,
+   joinCompetitionSchema,
+   renameTeamSchema,
    inviteSchema,
    listCompetitionsSchema,
    reviewEntrySchema,
@@ -13,6 +17,38 @@ import {
    competitionsService,
 } from '../services/competitions.service';
 import { entriesService } from '../services/competition-entries.service';
+import { TeamError, teamsService } from '../services/competition-teams.service';
+
+/*
+ * A team rule broken, told in the app's words. A side that is full or teams
+ * that are settled is a conflict with the state of things (409); anything
+ * else is a request that cannot be right (400).
+ */
+const teamProblem = (res: Response, error: unknown) => {
+   if (!(error instanceof TeamError)) throw error;
+   const conflict = [
+      'team_full',
+      'teams_locked',
+      'team_not_empty',
+      'name_taken',
+   ];
+   return res
+      .status(
+         error.code === 'not_organiser'
+            ? 403
+            : conflict.includes(error.code)
+              ? 409
+              : 400
+      )
+      .json({ code: error.code, message: error.message });
+};
+
+/* A team body that failed its schema: the first message, as the form shows it. */
+const badTeam = (res: Response, issues: { message: string }[]) =>
+   res.status(400).json({
+      code: 'bad_team',
+      message: issues[0]?.message ?? 'Check the team name.',
+   });
 
 /* Express can hand back a repeated route value as an array. */
 const asSingleParam = (value: string | string[] | undefined) =>
@@ -227,6 +263,7 @@ export const competitionsController = {
             const messages: Record<typeof result.error, [number, string]> = {
                not_found: [404, 'That competition could not be found.'],
                not_entered: [403, 'Enter the competition first.'],
+               pick_team: [409, 'Pick a team first.'],
                not_open: [409, 'The competition has not started yet.'],
                closed: [409, 'The competition has closed.'],
                catch_not_found: [404, 'That catch could not be found.'],
@@ -378,7 +415,17 @@ export const competitionsController = {
          });
       }
 
-      const result = await competitionsService.join(auth.userId, id);
+      const body = joinCompetitionSchema.safeParse(req.body ?? {});
+      let result;
+      try {
+         result = await competitionsService.join(
+            auth.userId,
+            id,
+            body.success ? (body.data.teamId ?? null) : null
+         );
+      } catch (error) {
+         return teamProblem(res, error);
+      }
       if (!result) {
          /* Either it is gone, or it belongs to a group this angler is not in.
           * Both are "you cannot enter this", and saying which would leak
@@ -407,5 +454,76 @@ export const competitionsController = {
       }
 
       return res.json(await competitionsService.leave(auth.userId, id));
+   },
+
+   /* The organiser's hand on the teams. */
+
+   async addTeam(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const id = asSingleParam(req.params.competitionId);
+      const body = addTeamSchema.safeParse(req.body ?? {});
+      if (!id) return res.status(400).json({ code: 'competition_id_required' });
+      if (!body.success) return badTeam(res, body.error.issues);
+      try {
+         return res.json(
+            await teamsService.add(id, auth.userId, body.data.name)
+         );
+      } catch (error) {
+         return teamProblem(res, error);
+      }
+   },
+
+   async renameTeam(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const id = asSingleParam(req.params.competitionId);
+      const teamId = asSingleParam(req.params.teamId);
+      const body = renameTeamSchema.safeParse(req.body ?? {});
+      if (!id || !teamId)
+         return res.status(400).json({ code: 'team_id_required' });
+      if (!body.success) return badTeam(res, body.error.issues);
+      try {
+         return res.json(
+            await teamsService.rename(id, auth.userId, teamId, body.data.name)
+         );
+      } catch (error) {
+         return teamProblem(res, error);
+      }
+   },
+
+   async removeTeam(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const id = asSingleParam(req.params.competitionId);
+      const teamId = asSingleParam(req.params.teamId);
+      if (!id || !teamId)
+         return res.status(400).json({ code: 'team_id_required' });
+      try {
+         return res.json(await teamsService.remove(id, auth.userId, teamId));
+      } catch (error) {
+         return teamProblem(res, error);
+      }
+   },
+
+   async assignTeam(req: Request, res: Response) {
+      const auth = getAuth(req);
+      if (!auth.userId) return res.status(401).json(unauthorized);
+      const id = asSingleParam(req.params.competitionId);
+      const body = assignTeamSchema.safeParse(req.body ?? {});
+      if (!id) return res.status(400).json({ code: 'competition_id_required' });
+      if (!body.success) return badTeam(res, body.error.issues);
+      try {
+         return res.json(
+            await teamsService.assign(
+               id,
+               auth.userId,
+               body.data.userId,
+               body.data.teamId
+            )
+         );
+      } catch (error) {
+         return teamProblem(res, error);
+      }
    },
 };

@@ -1,4 +1,5 @@
 import z from 'zod';
+import { cleanOptional, cleanTransform } from '../lib/moderation';
 
 export const fishingRequestSchema = z.object({
    locationName: z.string().trim().min(1).max(50),
@@ -149,8 +150,15 @@ const weatherSnapshotSchema = z
    .nullable();
 
 const catchPayloadSchema = z.object({
-   title: z.string().trim().min(2).max(120),
-   notes: z.string().trim().min(1).max(2000).optional().nullable(),
+   title: z.string().trim().min(2).max(120).transform(cleanTransform),
+   notes: z
+      .string()
+      .trim()
+      .min(1)
+      .max(2000)
+      .optional()
+      .nullable()
+      .transform(cleanOptional),
    caughtAt: z.coerce.date(),
    caughtUntil: z.coerce.date().optional().nullable(),
    lengthSource: z.enum(['EYE', 'TAPE']).optional(),
@@ -194,16 +202,30 @@ export const updateCatchSchema = catchPayloadSchema.extend({
 });
 
 const fishingSitePayloadSchema = z.object({
-   name: z.string().trim().min(2).max(120),
+   name: z.string().trim().min(2).max(120).transform(cleanTransform),
    visibility: z.enum(['PRIVATE', 'GROUPS', 'PUBLIC']).optional(),
-   description: z.string().trim().min(1).max(2000).optional().nullable(),
+   description: z
+      .string()
+      .trim()
+      .min(1)
+      .max(2000)
+      .optional()
+      .nullable()
+      .transform(cleanOptional),
    latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
    longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
    waterType: z
       .enum(['FRESHWATER', 'SALTWATER', 'BRACKISH', 'OTHER'])
       .optional()
       .nullable(),
-   accessNotes: z.string().trim().min(1).max(500).optional().nullable(),
+   accessNotes: z
+      .string()
+      .trim()
+      .min(1)
+      .max(500)
+      .optional()
+      .nullable()
+      .transform(cleanOptional),
 });
 
 export const createFishingSiteSchema = fishingSitePayloadSchema.extend({
@@ -218,7 +240,7 @@ export const speciesSearchSchema = z.object({
 });
 
 export const createSpeciesSchema = z.object({
-   name: z.string().trim().min(2).max(80),
+   name: z.string().trim().min(2).max(80).transform(cleanTransform),
    /* From the fish namer, which speaks in scientific names. */
    scientificName: z.string().trim().min(3).max(120).nullish(),
 });

@@ -35,12 +35,13 @@ export type HandleCheck =
    | { kind: 'free'; handle: string }
    | { kind: 'taken'; handle: string }
    | { kind: 'reserved'; handle: string }
+   | { kind: 'language'; handle: string }
    /* The check itself failed. Saving is still allowed: the server decides. */
    | { kind: 'unknown'; handle: string };
 
 type Answer = {
    available: boolean;
-   reason?: 'taken' | 'reserved' | 'invalid';
+   reason?: 'taken' | 'reserved' | 'invalid' | 'language';
    normalised: string;
 };
 
@@ -57,7 +58,7 @@ export function useHandleCheck(
 ): HandleCheck {
    const [answer, setAnswer] = useState<{
       handle: string;
-      kind: 'free' | 'taken' | 'reserved' | 'unknown' | 'chars';
+      kind: 'free' | 'taken' | 'reserved' | 'language' | 'unknown' | 'chars';
    } | null>(null);
 
    const problem = handle ? localProblemOf(handle) : null;
@@ -111,10 +112,12 @@ export const blocksSave = (check: HandleCheck) =>
    check.kind === 'empty' ||
    check.kind === 'problem' ||
    check.kind === 'taken' ||
-   check.kind === 'reserved';
+   check.kind === 'reserved' ||
+   check.kind === 'language';
 
 export const TAKEN = 'That handle is already taken. Try another one.';
 export const RESERVED = 'That handle is reserved. Try another one.';
+export const LANGUAGE = 'Pick a handle without bad language in it.';
 export const NOT_VALID =
    'A handle can use letters, numbers and underscores only.';
 
@@ -159,6 +162,8 @@ export function describeHandle(
          return { tone: 'bad', text: TAKEN };
       case 'reserved':
          return { tone: 'bad', text: RESERVED };
+      case 'language':
+         return { tone: 'bad', text: LANGUAGE };
       case 'unknown':
          return {
             tone: 'quiet',
@@ -178,6 +183,7 @@ export function handleSaveProblem(error: unknown): string | null {
 
    if (status === 409) return TAKEN;
    if (status === 400 && data?.code === 'username_reserved') return RESERVED;
+   if (status === 400 && data?.code === 'username_language') return LANGUAGE;
    /* The schema's own refusal, keyed by field. */
    if (status === 400 && data?.username) return NOT_VALID;
    return null;

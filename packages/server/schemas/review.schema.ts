@@ -1,4 +1,5 @@
 import z from 'zod';
+import { cleanTransform } from '../lib/moderation';
 
 /*
  * What an angler makes of a spot: a figure out of five, and optionally the
@@ -15,7 +16,13 @@ export const RATING_MAX = 5;
 
 export const writeReviewSchema = z.object({
    rating: z.coerce.number().int().min(RATING_MIN).max(RATING_MAX),
-   body: z.string().trim().max(2000).optional().default(''),
+   body: z
+      .string()
+      .trim()
+      .max(2000)
+      .optional()
+      .default('')
+      .transform(cleanTransform),
 });
 
 export const listReviewsSchema = z.object({

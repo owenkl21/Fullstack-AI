@@ -102,6 +102,12 @@ function CompetitionsScreen() {
       );
 
    const enter = async (competition: Competition) => {
+      /* With teams, entering is picking a side, and the sides are on the
+         competition's page. */
+      if (competition.teamsEnabled) {
+         navigate(`/competitions/${competition.id}`);
+         return;
+      }
       patch(competition.id, {
          youEntered: true,
          entrantCount: competition.entrantCount + 1,

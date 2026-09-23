@@ -1,4 +1,18 @@
 import z from 'zod';
+import { cleanOptional, cleanTransform } from '../lib/moderation';
+
+/*
+ * Teams: at least two sides, and eight is past any weekend a club would run.
+ * A team name is short, because it sits in a board column and on a button.
+ */
+export const MIN_TEAMS = 2;
+export const MAX_TEAMS = 8;
+const teamName = z
+   .string()
+   .trim()
+   .min(1, 'Give the team a name.')
+   .max(40, 'A team name is forty letters at most.')
+   .transform(cleanTransform);
 
 /* How many fish one competition can be for. */
 export const MAX_COMPETITION_SPECIES = 12;
@@ -23,8 +37,15 @@ const speciesOf = (value: {
  */
 export const createCompetitionSchema = z
    .object({
-      name: z.string().trim().min(2).max(120),
-      blurb: z.string().trim().min(1).max(280).optional().nullable(),
+      name: z.string().trim().min(2).max(120).transform(cleanTransform),
+      blurb: z
+         .string()
+         .trim()
+         .min(1)
+         .max(280)
+         .optional()
+         .nullable()
+         .transform(cleanOptional),
       rule: z
          .enum(['SPECIES_POINTS', 'BIGGEST_FISH', 'SPECIES_VARIETY'])
          .default('SPECIES_POINTS'),
@@ -62,6 +83,41 @@ export const createCompetitionSchema = z
       areaRadiusKm: z.coerce.number().min(1).max(500).optional().nullable(),
       /* Casual counts on pass; review waits for the organiser every time. */
       checks: z.enum(['CASUAL', 'REVIEW']).default('CASUAL'),
+      /*
+       * Teams. The names are the sides, in order; when there are none but
+       * teams are on, the service names them Team 1, Team 2 and so on from
+       * teamCount.
+       */
+      teamsEnabled: z.boolean().default(false),
+      teamCount: z.coerce
+         .number()
+         .int()
+         .min(
+            MIN_TEAMS,
+            `A competition with teams needs at least ${MIN_TEAMS} of them.`
+         )
+         .max(MAX_TEAMS, `A competition can have ${MAX_TEAMS} teams at most.`)
+         .optional()
+         .nullable(),
+      /* In order, one per side. A blank one is named for its place. */
+      teamNames: z
+         .array(
+            z
+               .string()
+               .trim()
+               .max(40, 'A team name is forty letters at most.')
+               .transform(cleanTransform)
+         )
+         .max(MAX_TEAMS)
+         .optional()
+         .default([]),
+      maxPerTeam: z.coerce
+         .number()
+         .int()
+         .min(1, 'A team needs room for at least one angler.')
+         .max(500)
+         .optional()
+         .nullable(),
    })
    .refine(
       (value) => value.areaType === 'ANYWHERE' || Boolean(value.areaName),
@@ -90,7 +146,39 @@ export const createCompetitionSchema = z
    .refine((value) => value.scope !== 'GROUP' || Boolean(value.groupId), {
       message: 'A group competition needs a group.',
       path: ['groupId'],
-   });
+   })
+   .refine(
+      (value) =>
+         !value.teamsEnabled ||
+         Math.max(value.teamNames.length, value.teamCount ?? 0) >= MIN_TEAMS,
+      {
+         message: `A competition with teams needs at least ${MIN_TEAMS} of them.`,
+         path: ['teamCount'],
+      }
+   )
+   .refine(
+      (value) =>
+         new Set(
+            value.teamNames.filter(Boolean).map((name) => name.toLowerCase())
+         ).size === value.teamNames.filter(Boolean).length,
+      {
+         message: 'Two teams cannot have the same name.',
+         path: ['teamNames'],
+      }
+   );
+
+/* Joining, or choosing a side, in a competition with teams. */
+export const joinCompetitionSchema = z.object({
+   teamId: z.string().trim().min(1).max(64).optional().nullable(),
+});
+
+/* The organiser's hand on the teams, before the start. */
+export const addTeamSchema = z.object({ name: teamName });
+export const renameTeamSchema = z.object({ name: teamName });
+export const assignTeamSchema = z.object({
+   userId: z.string().trim().min(1).max(64),
+   teamId: z.string().trim().min(1).max(64),
+});
 
 export const inviteSchema = z.object({
    userIds: z.array(z.string().trim().min(1)).min(1).max(100),
@@ -129,12 +217,26 @@ export const submitEntrySchema = z.object({
    photoTakenAt: z.coerce.date().optional().nullable(),
    /* What the camera wrote in the measure photograph. */
    measureTakenAt: z.coerce.date().optional().nullable(),
-   note: z.string().trim().min(1).max(280).optional().nullable(),
+   note: z
+      .string()
+      .trim()
+      .min(1)
+      .max(280)
+      .optional()
+      .nullable()
+      .transform(cleanOptional),
 });
 
 export const reviewEntrySchema = z.object({
    action: z.enum(['accept', 'exclude']),
-   note: z.string().trim().min(1).max(280).optional().nullable(),
+   note: z
+      .string()
+      .trim()
+      .min(1)
+      .max(280)
+      .optional()
+      .nullable()
+      .transform(cleanOptional),
 });
 
 export const flagEntrySchema = z.object({

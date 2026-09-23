@@ -6,6 +6,7 @@ import { auth } from './lib/auth';
 import { requestScope } from './lib/auth-context';
 import { prisma } from './lib/prisma';
 import { startNightlyBackups } from './services/backup.service';
+import { moderationWords } from './lib/moderation';
 
 //reads variables from .env file and adds them to process.env
 dotenv.config();
@@ -100,6 +101,9 @@ const server = app.listen(port, () => {
 
 /* A copy of the log every night, kept in the same bucket as the photographs. */
 startNightlyBackups();
+
+/* The team's word lists, if it has saved any. Until then the built-in lists. */
+void moderationWords.load();
 
 const shutdown = async () => {
    await prisma.$disconnect();

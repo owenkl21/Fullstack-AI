@@ -30,6 +30,7 @@ export const savedService = {
                   type: true,
                   visibility: true,
                   deletedAt: true,
+                  hiddenAt: true,
                   content: true,
                   createdAt: true,
                   author: {
@@ -71,6 +72,8 @@ export const savedService = {
             (row) =>
                row.post &&
                !row.post.deletedAt &&
+               /* Out of sight while the team looks at a report. */
+               !row.post.hiddenAt &&
                row.post.visibility !== 'PRIVATE'
          )
          .map((row) => ({
@@ -92,7 +95,12 @@ export const savedService = {
 
    async savePost(userId: string, postId: string) {
       const post = await prisma.feedPost.findFirst({
-         where: { id: postId, deletedAt: null, visibility: { not: 'PRIVATE' } },
+         where: {
+            id: postId,
+            deletedAt: null,
+            hiddenAt: null,
+            visibility: { not: 'PRIVATE' },
+         },
          select: { id: true },
       });
       if (!post) return null;

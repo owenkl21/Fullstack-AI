@@ -9,6 +9,11 @@ import {
    type EntryRow,
 } from './competition-entries.service';
 import { notificationsService } from './notifications.service';
+import {
+   TeamError,
+   teamsService,
+   type TeamStanding,
+} from './competition-teams.service';
 
 /*
  * Competitions anglers run themselves.
@@ -56,6 +61,10 @@ export type CreateCompetitionInput = {
    areaLongitude?: number | null;
    areaRadiusKm?: number | null;
    checks?: 'CASUAL' | 'REVIEW';
+   teamsEnabled?: boolean;
+   teamCount?: number | null;
+   teamNames?: string[];
+   maxPerTeam?: number | null;
 };
 
 /* A week to answer an invitation. */
@@ -91,6 +100,8 @@ const COMPETITION_SELECT = {
    areaLongitude: true,
    areaRadiusKm: true,
    checks: true,
+   teamsEnabled: true,
+   maxPerTeam: true,
    _count: { select: { entrants: { where: { leftAt: null } } } },
 } as const;
 
@@ -126,6 +137,34 @@ export type DecoratedCompetition = Omit<
    } | null;
    invite: { id: string; expiresAt: Date } | null;
    status: 'upcoming' | 'running' | 'finished';
+   /* The side this angler is on, in a competition with teams. */
+   yourTeamId: string | null;
+};
+
+/*
+ * The sides a new competition starts with, in order. A side left without a
+ * name is named for where it stands, so Sharks and two blanks are Sharks,
+ * Team 2 and Team 3, and a blank between two names is the team in that place.
+ * A generated name never takes one the organiser gave another side.
+ */
+const teamNamesFor = (input: CreateCompetitionInput) => {
+   const given = input.teamNames ?? [];
+   const count = Math.min(Math.max(given.length, input.teamCount ?? 0, 2), 8);
+   const own = given.slice(0, count).filter(Boolean);
+   const names: string[] = [];
+   const taken = (name: string) =>
+      [...own, ...names].some((n) => n.toLowerCase() === name.toLowerCase());
+   for (let i = 0; i < count; i += 1) {
+      const name = given[i];
+      if (name) {
+         names.push(name);
+         continue;
+      }
+      let n = i + 1;
+      while (taken(`Team ${n}`)) n += 1;
+      names.push(`Team ${n}`);
+   }
+   return names;
 };
 
 export const competitionsService = {
@@ -184,7 +223,24 @@ export const competitionsService = {
                   ? (input.areaRadiusKm ?? 25)
                   : null,
             checks: input.checks ?? 'CASUAL',
-            /* Whoever starts it is in it. */
+            teamsEnabled: Boolean(input.teamsEnabled),
+            maxPerTeam: input.teamsEnabled ? (input.maxPerTeam ?? null) : null,
+            /*
+             * The sides, in the order given. Names the organiser typed come
+             * first; any more from teamCount are Team 3, Team 4 and on.
+             */
+            ...(input.teamsEnabled
+               ? {
+                    teams: {
+                       create: teamNamesFor(input).map((name, position) => ({
+                          name,
+                          position,
+                       })),
+                    },
+                 }
+               : {}),
+            /* Whoever starts it is in it. With teams, they pick a side like
+               everybody else, so the organiser is in it without one. */
             entrants: { create: { userId } },
          },
          select: COMPETITION_SELECT,
@@ -351,7 +407,7 @@ export const competitionsService = {
       const [mine, invites, entries] = await Promise.all([
          prisma.competitionEntrant.findMany({
             where: { userId, leftAt: null, competitionId: { in: ids } },
-            select: { competitionId: true },
+            select: { competitionId: true, teamId: true },
          }),
          prisma.competitionInvite.findMany({
             where: {
@@ -368,6 +424,7 @@ export const competitionsService = {
          }),
       ]);
       const entered = new Set(mine.map((m) => m.competitionId));
+      const sides = new Map(mine.map((m) => [m.competitionId, m.teamId]));
       const invited = new Map(invites.map((i) => [i.competitionId, i]));
       const byCompetition = new Map<string, EntryRow[]>();
       for (const e of entries) {
@@ -384,6 +441,7 @@ export const competitionsService = {
             entrantCount: _count.entrants,
             entryCount: own.filter((e) => e.state === 'COUNTED').length,
             youEntered: entered.has(row.id),
+            yourTeamId: sides.get(row.id) ?? null,
             youOrganise: row.createdById === userId,
             leading: entriesService.leading(row, own),
             invite: invite
@@ -481,6 +539,26 @@ export const competitionsService = {
       }
       const entries = await entriesService.listFor(competitionId);
       const standings = entriesService.standings(row, entries);
+
+      /* With teams: who is on which side, and the board for the sides. */
+      let teams: Awaited<ReturnType<typeof teamsService.roster>> | null = null;
+      let teamStandings: TeamStanding[] | null = null;
+      if (row.teamsEnabled) {
+         teams = await teamsService.roster(competitionId);
+         const entrants = teams.teams.flatMap((team) =>
+            team.members.map((member) => ({
+               userId: member.id,
+               teamId: team.id,
+            }))
+         );
+         teamStandings = teamsService.standings(
+            row.rule as CompetitionRule,
+            teams.teams,
+            entrants,
+            standings,
+            entries.filter((e) => e.state === 'COUNTED')
+         );
+      }
       const shaped = await Promise.all(
          entries.map((e) =>
             entriesService.shape(e, {
@@ -493,6 +571,8 @@ export const competitionsService = {
       return {
          competition,
          standings,
+         teams,
+         teamStandings,
          entries: shaped,
          you: {
             entered: competition.youEntered,
@@ -502,10 +582,10 @@ export const competitionsService = {
       };
    },
 
-   async join(userId: string, competitionId: string) {
+   async join(userId: string, competitionId: string, teamId?: string | null) {
       const competition = await prisma.competition.findFirst({
          where: { id: competitionId, deletedAt: null },
-         select: { id: true, scope: true, groupId: true },
+         select: { id: true, scope: true, groupId: true, teamsEnabled: true },
       });
 
       if (!competition) {
@@ -538,6 +618,18 @@ export const competitionsService = {
          if (!member) {
             return null;
          }
+      }
+
+      /*
+       * With teams, joining is joining a side, and the same call changes
+       * side before the start. The checks (which side, room on it, not after
+       * the start) are the teams service's, so they are the same for an
+       * angler choosing and an organiser moving somebody.
+       */
+      if (competition.teamsEnabled) {
+         if (!teamId) throw new TeamError('pick_team', 'Pick a team to join.');
+         await teamsService.place(competitionId, userId, teamId);
+         return { joined: true, teamId };
       }
 
       await prisma.competitionEntrant.upsert({

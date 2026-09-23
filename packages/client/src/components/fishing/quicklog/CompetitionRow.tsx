@@ -37,7 +37,11 @@ export function CompetitionRow({
          .then((result) =>
             setRunning(
                result.items.filter(
-                  (c) => c.youEntered && c.status === 'running'
+                  (c) =>
+                     c.youEntered &&
+                     c.status === 'running' &&
+                     /* With teams, only once they are on a side. */
+                     !(c.teamsEnabled && !c.yourTeamId)
                )
             )
          )

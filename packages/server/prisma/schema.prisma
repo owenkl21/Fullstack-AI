@@ -217,6 +217,8 @@ model User {
   feedLikes                  FeedLike[]
   feedComments               FeedComment[]
   feedCommentLikes           FeedCommentLike[]
+  reportsMade                ContentReport[]      @relation("ReportsMade")
+  reportsResolved            ContentReport[]      @relation("ReportsResolved")
   sessions                   Session[]
   accounts                   Account[]
   groupsCreated              Group[]              @relation("GroupsCreated")
@@ -578,9 +580,16 @@ model FeedPost {
   likes        FeedLike[]
   comments     FeedComment[]
   saves        SavedPost[]
+  reports      ContentReport[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
+  /**
+   * Taken out of sight while the team looks at it: set when enough different
+   * people report it, cleared if the team keeps it. Unlike deletedAt it is not
+   * the author's doing and not final, so the author still sees their own post.
+   */
+  hiddenAt     DateTime?
 
   @@index([createdAt(sort: Desc)])
   @@index([scope, createdAt(sort: Desc)])
@@ -628,6 +637,9 @@ model FeedComment {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   deletedAt DateTime?
+  /* Out of sight while reported. See FeedPost.hiddenAt. */
+  hiddenAt  DateTime?
+  reports   ContentReport[]
 
   @@index([postId, createdAt(sort: Desc)])
   @@index([parentId])
@@ -790,6 +802,15 @@ model Competition {
    * waits for the organiser.
    */
   checks              CompetitionChecks    @default(CASUAL)
+  /**
+   * Teams: anglers join a side as well as the competition, and the board adds
+   * a table for the sides. Off by default, so every competition made before
+   * teams existed reads exactly as it did.
+   */
+  teamsEnabled        Boolean              @default(false)
+  /* How many one side may hold. Null is no limit. */
+  maxPerTeam          Int?
+  teams               CompetitionTeam[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   deletedAt           DateTime?
@@ -941,6 +962,9 @@ model CompetitionEntrant {
   competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
   userId        String
   user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /* The side they fish for, in a competition with teams. Null otherwise. */
+  teamId        String?
+  team          CompetitionTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
   joinedAt      DateTime    @default(now())
   leftAt        DateTime?
 
@@ -1173,4 +1197,70 @@ model CatchBadge {
   @@index([catchId])
   @@index([awardedById])
   @@map("catch_badges")
+}
+
+/**
+ * One side in a competition with teams. Named by the organiser, joined by the
+ * anglers, and added up on the board by the competition's own rule.
+ */
+model CompetitionTeam {
+  id            String               @id @default(cuid())
+  competitionId String
+  competition   Competition          @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  name          String               @db.VarChar(40)
+  /* The order the organiser put them in, so Team 1 stays first. */
+  position      Int                  @default(0)
+  members       CompetitionEntrant[]
+  createdAt     DateTime             @default(now())
+
+  @@index([competitionId, position])
+  @@map("competition_teams")
+}
+
+enum ReportReason {
+  SPAM
+  ABUSE
+  LANGUAGE
+  IMAGE
+  OTHER
+}
+
+enum ReportOutcome {
+  REMOVED
+  KEPT
+}
+
+/**
+ * Somebody telling the team a post or a comment is not right. One per person
+ * per thing, so pressing it twice is not two voices. Enough different people
+ * and the thing is taken out of sight until the team has looked.
+ */
+model ContentReport {
+  id           String         @id @default(cuid())
+  postId       String?
+  post         FeedPost?      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId    String?
+  comment      FeedComment?   @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  /*
+   * "post:<id>" or "comment:<id>". The one-per-person rule is kept on this
+   * rather than on the two ids, because MySQL lets any number of rows share a
+   * unique key that has a NULL in it, and one of the two ids is always NULL.
+   */
+  targetKey    String         @db.VarChar(80)
+  reporterId   String
+  reporter     User           @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reason       ReportReason
+  note         String?        @db.VarChar(280)
+  createdAt    DateTime       @default(now())
+  resolvedAt   DateTime?
+  resolvedById String?
+  resolvedBy   User?          @relation("ReportsResolved", fields: [resolvedById], references: [id], onDelete: SetNull)
+  outcome      ReportOutcome?
+
+  @@unique([reporterId, targetKey])
+  @@index([targetKey, resolvedAt])
+  @@index([resolvedAt, createdAt(sort: Desc)])
+  @@index([postId])
+  @@index([commentId])
+  @@map("content_reports")
 }

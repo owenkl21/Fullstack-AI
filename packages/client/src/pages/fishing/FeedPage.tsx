@@ -718,6 +718,15 @@ export function FeedPage() {
                         }
                         viewer={viewer}
                         onPatch={(update) => patchPost(post.id, update)}
+                        onRemoved={() => {
+                           setPosts((previous) =>
+                              previous.filter((entry) => entry.id !== post.id)
+                           );
+                           /* A post opened from a link is held on its own. */
+                           setLinked((current) =>
+                              current?.id === post.id ? null : current
+                           );
+                        }}
                         focusCommentId={
                            linked && post.id === linked.id
                               ? linkedCommentId

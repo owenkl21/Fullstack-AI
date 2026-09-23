@@ -160,6 +160,8 @@ type CompetitionForEntries = {
    areaLatitude: number | null;
    areaLongitude: number | null;
    areaRadiusKm: number | null;
+   /* With teams, an entry needs the angler to be on a side. */
+   teamsEnabled?: boolean;
 };
 
 const COMPETITION_FOR_ENTRIES = {
@@ -180,6 +182,7 @@ const COMPETITION_FOR_ENTRIES = {
    areaLatitude: true,
    areaLongitude: true,
    areaRadiusKm: true,
+   teamsEnabled: true,
 } as const;
 
 export type SubmitEntryInput = {
@@ -209,7 +212,8 @@ export type SubmitFailure =
    | 'already_entered'
    | 'measure_photo_required'
    | 'fish_photo_not_on_catch'
-   | 'same_photo_twice';
+   | 'same_photo_twice'
+   | 'pick_team';
 
 const norm = (text: string) =>
    text
@@ -472,6 +476,15 @@ export const entriesService = {
          competition.createdById === userId ||
          (await this.isIn(competitionId, userId));
       if (!inIt) return { error: 'not_entered' };
+      /* With teams a fish counts for a side, so an angler on none (the
+         organiser, or an invitation accepted) picks one before entering. */
+      if (competition.teamsEnabled) {
+         const side = await prisma.competitionEntrant.findFirst({
+            where: { competitionId, userId, leftAt: null },
+            select: { teamId: true },
+         });
+         if (!side?.teamId) return { error: 'pick_team' };
+      }
       const now = Date.now();
       if (now < competition.startsAt.getTime()) return { error: 'not_open' };
       if (now > competition.endsAt.getTime() + LATE_MS) {

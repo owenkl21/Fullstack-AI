@@ -201,6 +201,16 @@ export function ProfileSettingsPanel({
             return;
          }
 
+         /* A new name with bad language in it is said under the name. */
+         if (
+            axios.isAxiosError(error) &&
+            error.response?.data?.code === 'display_name_language'
+         ) {
+            setNameError('Pick a name without bad language in it.');
+            nameRef.current?.focus();
+            return;
+         }
+
          if (axios.isAxiosError(error) && error.response?.status === 400) {
             setSaveError(
                'Not saved. Check the three fields above and try again.'

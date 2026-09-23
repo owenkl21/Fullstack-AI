@@ -1,4 +1,21 @@
 import z from 'zod';
+import { cleanOptional, moderate } from '../lib/moderation';
+
+/*
+ * No swearing and no slurs in a name, a handle or anything else that stands
+ * for a person. Checked word by word, so a handle split by underscores is
+ * read as the words it is made of.
+ *
+ * Checked by the service and the sign-up hook, not in this schema: the
+ * profile form sends the name and the handle with every save, and a name
+ * that was fine when it was chosen (a surname, a word added to the list
+ * later) must not stop somebody changing their bio. Only a new name or a new
+ * handle is held to it.
+ */
+export const nameHasBadLanguage = (value: string) => {
+   const result = moderate(value);
+   return result.blocked || result.masked > 0;
+};
 
 /*
  * What a handle is allowed to be.
@@ -53,7 +70,7 @@ const RESERVED_WITHIN = ['fisherfeed', 'fishlogger'];
 export const normaliseHandle = (raw: string) =>
    raw.trim().replace(/^@/, '').trim().toLowerCase();
 
-export type HandleProblem = 'invalid' | 'reserved';
+export type HandleProblem = 'invalid' | 'reserved' | 'language';
 
 /**
  * Why a normalised handle cannot be had, before anyone else is asked.
@@ -81,10 +98,14 @@ export const handleProblemOf = (
       return null;
    }
 
-   return RESERVED_HANDLES.has(handle) ||
+   if (
+      RESERVED_HANDLES.has(handle) ||
       RESERVED_WITHIN.some((word) => handle.replaceAll('_', '').includes(word))
-      ? 'reserved'
-      : null;
+   ) {
+      return 'reserved';
+   }
+
+   return nameHasBadLanguage(handle.replace(/_/g, ' ')) ? 'language' : null;
 };
 
 /*
@@ -181,7 +202,8 @@ export const updateProfileSchema = z
          .trim()
          .max(280, 'Bio must be 280 characters or less.')
          .nullable()
-         .optional(),
+         .optional()
+         .transform(cleanOptional),
       avatarUrl: z
          .string()
          .trim()

@@ -123,6 +123,20 @@ export const userController = {
 
             /* The app's own name, in the line people read. Said plainly, so
              * the field can repeat it rather than shrug. */
+            if (result.code === 'display_name_language') {
+               return res.status(400).json({
+                  code: 'display_name_language',
+                  message: 'Pick a name without bad language in it.',
+               });
+            }
+
+            if (result.code === 'username_language') {
+               return res.status(400).json({
+                  code: 'username_language',
+                  message: 'Pick a handle without bad language in it.',
+               });
+            }
+
             if (result.code === 'display_name_reserved') {
                return res.status(400).json({
                   code: 'display_name_reserved',
