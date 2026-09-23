@@ -394,11 +394,11 @@ export const statsService = {
    /**
     * One live board per species: who has the heaviest.
     *
-    * Every public catch of the species counts, however it was logged. A
-    * weight typed in is taken as it is, whether it came off a scale, by eye
-    * or from the length, and a fish logged with only a length is given the
-    * weight its length means where the species has published figures, marked
-    * as estimated. A species nobody has weighed is still ranked, by length.
+    * The weight order ranks only weights that were checked: off a scale, with
+    * the photo of the scale read and matched (lib/scale-proof.ts), or entered
+    * in a competition, where the judge reads the scale. Every other weight
+    * still shows, under the ranked ones and not ranked: typed by eye, or
+    * worked out from a length where the species has published figures.
     * None of the competition rules (a minimum weight, a legal size, a closed
     * season) keeps a fish off: this is the record of what was caught, and the
     * points are still worked out for the Points order.
@@ -414,8 +414,15 @@ export const statsService = {
             visibility: 'PUBLIC',
             ...(anglerIds ? { createdById: { in: anglerIds } } : {}),
          },
-         select: CATCH_FOR_SCORING,
-      })) as RawCatch[];
+         select: {
+            ...CATCH_FOR_SCORING,
+            readMeasure: true,
+            competitionId: true,
+         },
+      })) as (RawCatch & {
+         readMeasure: number | null;
+         competitionId: string | null;
+      })[];
 
       const positive = (n: number | null | undefined): n is number =>
          typeof n === 'number' && Number.isFinite(n) && n > 0;
@@ -427,11 +434,13 @@ export const statsService = {
          totalMassKg: number;
          distinctSpecies: number;
          longestCm: number;
-         /* The heaviest fish, and whether its weight was estimated. */
+         /* The heaviest checked fish: the one the weight order ranks. */
          bestMassKg: number | null;
          bestEstimated: boolean;
          bestCatchId: string | null;
          bestAt: number;
+         /* The heaviest of the rest, shown under the ranked, not ranked. */
+         unverifiedKg: number | null;
       };
 
       type Board = {
@@ -459,7 +468,13 @@ export const statsService = {
          let estimated = false;
          if (positive(row.weight)) {
             massKg = row.weight;
-            estimated = row.weightSource !== 'SCALE';
+            /* Checked: off a scale with its photo read, or judged in a
+               competition. A scale weight from before the photo was asked
+               for is not checked. */
+            estimated = !(
+               row.weightSource === 'SCALE' &&
+               (row.readMeasure != null || row.competitionId != null)
+            );
          } else if (
             positive(row.length) &&
             row.species.lwA != null &&
@@ -486,6 +501,7 @@ export const statsService = {
                bestEstimated: false,
                bestCatchId: null,
                bestAt: Number.POSITIVE_INFINITY,
+               unverifiedKg: null,
             } as Row);
          board.rows.set(row.createdById, entry);
 
@@ -501,18 +517,26 @@ export const statsService = {
          if (scored.qualifies) {
             entry.points = Math.round((entry.points + scored.points) * 10) / 10;
          }
-         /* Heaviest wins; a tie goes to the earlier fish. */
+         /* Heaviest checked fish wins; a tie goes to the earlier one. */
          const at = row.caughtAt.getTime();
          if (
             massKg != null &&
+            !estimated &&
             (entry.bestMassKg == null ||
                massKg > entry.bestMassKg ||
                (massKg === entry.bestMassKg && at < entry.bestAt))
          ) {
             entry.bestMassKg = Math.round(massKg * 1000) / 1000;
-            entry.bestEstimated = estimated;
+            entry.bestEstimated = false;
             entry.bestCatchId = row.id;
             entry.bestAt = at;
+         }
+         if (
+            massKg != null &&
+            estimated &&
+            (entry.unverifiedKg == null || massKg > entry.unverifiedKg)
+         ) {
+            entry.unverifiedKg = Math.round(massKg * 1000) / 1000;
          }
       }
 
@@ -532,7 +556,9 @@ export const statsService = {
          const standings = [...board.rows.values()]
             .sort(
                (a, b) =>
+                  /* Checked weights first, then the rest by their weight. */
                   (b.bestMassKg ?? -1) - (a.bestMassKg ?? -1) ||
+                  (b.unverifiedKg ?? -1) - (a.unverifiedKg ?? -1) ||
                   b.longestCm - a.longestCm ||
                   a.bestAt - b.bestAt
             )

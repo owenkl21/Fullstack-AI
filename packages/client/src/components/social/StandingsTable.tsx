@@ -62,11 +62,24 @@ export function StandingsTable({
       return <p className="text-[15px] text-ink-2">{emptyLine}</p>;
    }
 
+   /*
+    * On a species board the weight order ranks only weights checked by a
+    * photo of the scale. The rest sit under them, heaviest first, between
+    * -1 and 0 so they keep their own order, and a fish never weighed last.
+    */
+   const species = standings.some(
+      (s) => 'bestMassKg' in s && s.bestMassKg !== undefined
+   );
+   const ranked = (s: (typeof standings)[number]) =>
+      rankBy !== 'weight' || !species || s.bestMassKg != null;
    const valueOf = (s: (typeof standings)[number]) =>
       rankBy === 'weight'
-         ? 'bestMassKg' in s && s.bestMassKg !== undefined
-            ? /* A species board ranks the heaviest fish; nobody weighed goes last. */
-              (s.bestMassKg ?? -1)
+         ? species
+            ? s.bestMassKg != null
+               ? s.bestMassKg
+               : s.unverifiedKg != null
+                 ? -1 / (1 + s.unverifiedKg)
+                 : -2
             : s.totalMassKg
          : rankBy === 'length'
            ? s.longestCm
@@ -77,12 +90,14 @@ export function StandingsTable({
    /* Written the way the figure is actually measured. */
    const written = (s: (typeof standings)[number]) => {
       if (rankBy === 'weight') {
-         if ('bestMassKg' in s && s.bestMassKg !== undefined) {
-            if (s.bestMassKg == null) return 'Not weighed';
-            const figure = formatMeasure(s.bestMassKg, 'WEIGHT', units);
-            return s.bestEstimated
-               ? `${figure} est.`
-               : (figure ?? 'Not weighed');
+         if (species) {
+            if (s.bestMassKg != null) {
+               return formatMeasure(s.bestMassKg, 'WEIGHT', units) ?? '';
+            }
+            if (s.unverifiedKg != null) {
+               return `${formatMeasure(s.unverifiedKg, 'WEIGHT', units)}, not verified`;
+            }
+            return 'Not weighed';
          }
          return formatMeasure(s.totalMassKg, 'WEIGHT', units) ?? 'Nothing yet';
       }
@@ -106,7 +121,7 @@ export function StandingsTable({
 
    const jointWith = (index: number) => {
       const row = ordered[index];
-      if (!row) return null;
+      if (!row || !ranked(row)) return null;
       const same = tiedWith(row);
       return same.length > 1 ? same.filter((s) => s !== row) : null;
    };
@@ -195,7 +210,8 @@ export function StandingsTable({
                            )}
                         >
                            <td className="num py-3 pr-3 text-[15px] text-ink-2">
-                              {positionOf(i)}
+                              {/* Not ranked: a weight no scale photo checked. */}
+                              {ranked(s) ? positionOf(i) : ''}
                            </td>
                            <td className="py-3 pr-3 text-[17px]">
                               {s.displayName}
@@ -211,7 +227,12 @@ export function StandingsTable({
                                  </span>
                               ) : null}
                            </td>
-                           <td className="num py-3 text-right text-[17px]">
+                           <td
+                              className={cn(
+                                 'num py-3 text-right text-[17px]',
+                                 !ranked(s) && 'text-[15px] text-ink-3'
+                              )}
+                           >
                               {written(s)}
                            </td>
                         </tr>

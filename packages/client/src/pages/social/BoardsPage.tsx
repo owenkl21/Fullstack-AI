@@ -102,7 +102,7 @@ export function BoardsPage() {
             column="w-[min(1320px,100%-32px)]"
             kicker="Boards"
             title="Who is catching what"
-            lede="Every species, heaviest fish first. A weight you log counts as it is, and a fish you only measured is weighed from its length where the species has published figures."
+            lede="Every species, heaviest fish first. Only weights checked by a photo of the scale are ranked; the rest show under them, not verified."
          />
 
          {/*

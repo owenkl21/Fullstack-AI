@@ -15,6 +15,9 @@ export type Standing = {
       weighed nor measured against figures, and whether it was estimated. */
    bestMassKg?: number | null;
    bestEstimated?: boolean;
+   /* The heaviest weight that was not checked by a scale photo: shown under
+      the ranked ones, not ranked. */
+   unverifiedKg?: number | null;
 };
 
 export type SpeciesBoard = {
