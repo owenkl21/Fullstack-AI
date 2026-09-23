@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { isVerifiedEmail } from '../lib/admin';
 import { recentMail } from '../lib/mailer';
 import { mailStatus } from '../lib/mailer';
 
@@ -898,6 +899,34 @@ const READERS: Record<AdminSection, () => Promise<unknown>> = {
 };
 
 export const adminService = {
+   /*
+    * The tick, given or taken by hand from the panel.
+    *
+    * The three addresses in VERIFIED_EMAILS are settled from their address on
+    * every request, so taking the tick off one of those would last until they
+    * next opened the app. Said plainly here rather than silently undone: the
+    * answer says whether it will hold.
+    */
+   async setVerified(userId: string, verified: boolean) {
+      const user = await prisma.user.findUnique({
+         where: { id: userId },
+         select: { id: true, email: true, displayName: true },
+      });
+      if (!user) return null;
+      const settled = isVerifiedEmail(user.email);
+      const updated = await prisma.user.update({
+         where: { id: user.id },
+         data: { verified },
+         select: { id: true, verified: true, displayName: true },
+      });
+      return {
+         ...updated,
+         /* True when the address itself carries the tick, so a removal will
+            come back the next time that account is used. */
+         fromAddress: settled,
+      };
+   },
+
    /*
     * One section, and how long it took. The timing rides along so the panel
     * can show what the page cost to draw: an admin page that quietly becomes

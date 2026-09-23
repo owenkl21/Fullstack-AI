@@ -566,6 +566,12 @@ router.delete(
  */
 router.get('/api/admin/reset', requireAdminRole, resetController.preview);
 router.post('/api/admin/reset', requireAdminRole, resetController.startFresh);
+/* The tick, given or taken from the people section. */
+router.post(
+   '/api/admin/users/:userId/verified',
+   requireAdminRole,
+   adminController.setVerified
+);
 router.get('/api/admin/:section', requireAdminRole, adminController.section);
 
 export default router;

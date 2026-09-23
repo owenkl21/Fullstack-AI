@@ -178,3 +178,15 @@ export async function fetchSection<T>(
       throw error;
    }
 }
+
+/* The tick, given or taken by hand. Answers whether it will hold: an address
+   on the team's own list settles itself again the next time it is used. */
+export async function setVerified(userId: string, verified: boolean) {
+   const { data } = await axios.post<{
+      id: string;
+      verified: boolean;
+      displayName: string;
+      fromAddress: boolean;
+   }>(`/api/admin/users/${userId}/verified`, { verified });
+   return data;
+}

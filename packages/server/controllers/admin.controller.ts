@@ -20,6 +20,25 @@ import {
  */
 
 export const adminController = {
+   /* The tick, from the people section of the panel. */
+   async setVerified(req: Request, res: Response) {
+      const userId = String(req.params.userId ?? '').trim();
+      const body = req.body as { verified?: unknown } | undefined;
+      if (!userId || typeof body?.verified !== 'boolean') {
+         return res.status(400).json({
+            code: 'bad_request',
+            message: 'Say which angler, and whether the tick goes on or off.',
+         });
+      }
+      const answer = await adminService.setVerified(userId, body.verified);
+      if (!answer) {
+         return res
+            .status(404)
+            .json({ code: 'not_found', message: 'No such angler.' });
+      }
+      return res.json(answer);
+   },
+
    async section(req: Request, res: Response) {
       const section = String(req.params.section ?? '');
 

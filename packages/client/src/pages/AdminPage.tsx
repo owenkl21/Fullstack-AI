@@ -9,6 +9,7 @@ import { AdminTable, type Column } from '@/components/admin/AdminTable';
 import { Area, Bars, HeatGrid, Spread } from '@/components/insights/Charts';
 import {
    fetchSection,
+   setVerified,
    NotForYou,
    type Fish,
    type Growth,
@@ -23,6 +24,7 @@ import {
    type JoinedAngler,
    type Water,
 } from '@/components/admin/api';
+import { VerifiedMark } from '@/components/profile/VerifiedMark';
 import { useDocumentTitle } from '@/lib/title';
 import { formatLength, formatMass, readUnitSystem } from '@/lib/units';
 import { cn } from '@/lib/utils';
@@ -710,6 +712,55 @@ function PeoplePanel() {
          <span className="text-ink-3">None yet</span>
       );
 
+   /*
+    * The tick, from here. Optimistic, because the answer is one boolean and
+    * the row is in front of the reader: a refusal puts it straight back.
+    */
+   const [ticks, setTicks] = useState<Record<string, boolean>>({});
+   const [ticking, setTicking] = useState<string | null>(null);
+   const tickOf = (row: { id: string; verified: boolean }) =>
+      ticks[row.id] ?? row.verified;
+   const toggleTick = async (row: { id: string; verified: boolean }) => {
+      const next = !tickOf(row);
+      setTicks((was) => ({ ...was, [row.id]: next }));
+      setTicking(row.id);
+      try {
+         const answer = await setVerified(row.id, next);
+         setTicks((was) => ({ ...was, [row.id]: answer.verified }));
+      } catch {
+         setTicks((was) => ({ ...was, [row.id]: !next }));
+      } finally {
+         setTicking(null);
+      }
+   };
+   const verifiedColumn: Column<ActiveAngler> = {
+      key: 'verified',
+      head: 'Verified',
+      value: (row) => (tickOf(row) ? 1 : 0),
+      cell: (row) => (
+         <button
+            type="button"
+            onClick={() => void toggleTick(row)}
+            disabled={ticking === row.id}
+            aria-pressed={tickOf(row)}
+            className={cn(
+               'g-tracked inline-flex min-h-11 items-center gap-2 text-[15px] transition-colors disabled:opacity-50',
+               tickOf(row) ? 'text-teal-text' : 'text-ink-3 hover:text-ink'
+            )}
+         >
+            {tickOf(row) ? (
+               <VerifiedMark label="Verified" />
+            ) : (
+               <span
+                  aria-hidden="true"
+                  className="size-4 rounded-full border border-current"
+               />
+            )}
+            {tickOf(row) ? 'Verified' : 'Verify'}
+         </button>
+      ),
+   };
+
    const activeColumns: Column<ActiveAngler>[] = [
       {
          key: 'name',
@@ -759,6 +810,7 @@ function PeoplePanel() {
          align: 'right',
          small: true,
       },
+      verifiedColumn,
    ];
 
    const joinedColumns: Column<JoinedAngler>[] = [
