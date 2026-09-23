@@ -25,7 +25,11 @@ import { badgesController } from './controllers/badges.controller';
  * anybody else out of the router, so the answer is the 404 a path that was
  * never registered gives.
  */
-import { requireAdmin as requireAdminRole } from './lib/admin';
+import {
+   isAdminEmail,
+   requireAdmin as requireAdminRole,
+   settleAdminRole,
+} from './lib/admin';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from './lib/auth';
 import { setAuthContext } from './lib/auth-context';
@@ -56,8 +60,26 @@ async function requireApiAuth(
    }
 
    setAuthContext(req, session.user);
+   await settleIfTheTeam(session.user);
 
    return next();
+}
+
+/*
+ * The role is granted when a session is made, which leaves out the one case
+ * that matters most: an account signed in already when its address was
+ * confirmed, or when the address was first named as the team's. That reader
+ * would have to sign out and in again to be let in, with nothing saying so.
+ * Cheap on every other request: an address that is not the team's costs a
+ * string compare and no query.
+ */
+async function settleIfTheTeam(user: {
+   id: string;
+   email?: string | null;
+   role?: unknown;
+}) {
+   if (!isAdminEmail(user.email) || user.role === 'ADMIN') return;
+   await settleAdminRole(user.id).catch(() => undefined);
 }
 
 /*
@@ -77,6 +99,7 @@ async function attachApiAuth(
 
    if (session?.user) {
       setAuthContext(req, session.user);
+      await settleIfTheTeam(session.user);
    }
 
    return next();
