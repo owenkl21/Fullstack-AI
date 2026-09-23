@@ -19,6 +19,7 @@ import { gearController } from './controllers/gear.controller';
 import { feedController } from './controllers/feed.controller';
 import { reviewsController } from './controllers/reviews.controller';
 import { adminController } from './controllers/admin.controller';
+import { resetController } from './controllers/reset.controller';
 import { badgesController } from './controllers/badges.controller';
 /*
  * The role guard: it reads the role off the row behind the session and drops
@@ -27,6 +28,7 @@ import { badgesController } from './controllers/badges.controller';
  */
 import {
    isAdminEmail,
+   isVerifiedEmail,
    requireAdmin as requireAdminRole,
    settleAdminRole,
 } from './lib/admin';
@@ -77,8 +79,11 @@ async function settleIfTheTeam(user: {
    id: string;
    email?: string | null;
    role?: unknown;
+   verified?: unknown;
 }) {
-   if (!isAdminEmail(user.email) || user.role === 'ADMIN') return;
+   const owesRole = isAdminEmail(user.email) && user.role !== 'ADMIN';
+   const owesTick = isVerifiedEmail(user.email) && user.verified !== true;
+   if (!owesRole && !owesTick) return;
    await settleAdminRole(user.id).catch(() => undefined);
 }
 
@@ -553,6 +558,14 @@ router.delete(
  * It is the one route in the product that returns another person's email
  * address, which is why there is a single door rather than six.
  */
+/*
+ * Emptying the log, behind the same guard as the panel: anybody else gets the
+ * 404 a path that is not there gives, and the phrase is checked in the
+ * controller. Declared before the section route so that "reset" is never read
+ * as the name of a panel section.
+ */
+router.get('/api/admin/reset', requireAdminRole, resetController.preview);
+router.post('/api/admin/reset', requireAdminRole, resetController.startFresh);
 router.get('/api/admin/:section', requireAdminRole, adminController.section);
 
 export default router;

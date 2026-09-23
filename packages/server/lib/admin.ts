@@ -34,6 +34,38 @@ export const ADMIN_EMAILS: readonly string[] = (
    .map((address) => address.trim().toLowerCase())
    .filter(Boolean);
 
+/*
+ * The addresses that wear the tick. Wider than the list above on purpose: the
+ * tick says "this is really them", which is true of the people who run
+ * Fisherfeed as well as the account it is run from, while the role says "this
+ * one may empty the database". They were one list and are now two, so that
+ * giving somebody a tick can never hand them the panel by accident.
+ */
+const DEFAULT_VERIFIED_EMAILS = [
+   DEFAULT_ADMIN_EMAIL,
+   'owenkl16@gmail.com',
+   'brandondarker@gmail.com',
+];
+
+export const VERIFIED_EMAILS: readonly string[] = (
+   process.env.VERIFIED_EMAILS?.trim() || DEFAULT_VERIFIED_EMAILS.join(',')
+)
+   .split(',')
+   .map((address) => address.trim().toLowerCase())
+   .filter(Boolean);
+
+/** Whether an address is one of the people behind the app. */
+export const isVerifiedEmail = (email: string | null | undefined): boolean =>
+   Boolean(email) && VERIFIED_EMAILS.includes(email!.trim().toLowerCase());
+
+/*
+ * The accounts a reset keeps. The same three that wear the tick: the people
+ * behind the app. Everything else about a reset is decided in
+ * services/reset.service.ts; this is only the list, kept here so that who the
+ * app belongs to is written in one place.
+ */
+export const KEEP_EMAILS: readonly string[] = VERIFIED_EMAILS;
+
 /* The team's handle, normalised the way every stored handle is. */
 export const TEAM_HANDLE = 'fisherfeedteam';
 
@@ -100,7 +132,10 @@ export async function settleAdminRole(
       });
       if (!user) return;
 
-      const owed = isAdminEmail(user.email) && user.emailVerified;
+      /* Two claims, settled apart: the role, and the tick. */
+      const owedRole = isAdminEmail(user.email) && user.emailVerified;
+      const owedTick = isVerifiedEmail(user.email) && user.emailVerified;
+      const owed = owedRole || owedTick;
 
       if (!owed) {
          if (!options?.withdraw) return;
@@ -120,33 +155,39 @@ export async function settleAdminRole(
        * is still asked to choose their own: this is the one row that is given
        * one, because the name is the app's own and no angler may have it.
        */
-      const handleHolder = user.username
-         ? null
-         : await prisma.user.findFirst({
-              where: { username: TEAM_HANDLE, id: { not: user.id } },
-              select: { id: true },
-           });
+      const handleHolder =
+         !isAdminEmail(user.email) || user.username
+            ? null
+            : await prisma.user.findFirst({
+                 where: { username: TEAM_HANDLE, id: { not: user.id } },
+                 select: { id: true },
+              });
       const takeHandle = !user.username && !handleHolder;
 
-      if (user.role === 'ADMIN' && user.verified && !takeHandle) return;
+      const role = owedRole ? 'ADMIN' : user.role;
+      const verified = owedTick ? true : user.verified;
+      /* The handle is the admin account's alone, whoever else wears a tick. */
+      const claimHandle = owedRole && takeHandle;
+      if (role === user.role && verified === user.verified && !claimHandle)
+         return;
 
       try {
          await prisma.user.update({
             where: { id: user.id },
             data: {
-               role: 'ADMIN',
-               verified: true,
-               ...(takeHandle ? { username: TEAM_HANDLE } : {}),
+               role,
+               verified,
+               ...(claimHandle ? { username: TEAM_HANDLE } : {}),
             },
          });
       } catch (error) {
          /* Two sign-ins at once both found the handle free, and the unique
             index stopped the second. The role is what matters, so write that
             on its own rather than lose it to a name. */
-         if (!takeHandle) throw error;
+         if (!claimHandle) throw error;
          await prisma.user.update({
             where: { id: user.id },
-            data: { role: 'ADMIN', verified: true },
+            data: { role, verified },
          });
       }
    } catch (error) {

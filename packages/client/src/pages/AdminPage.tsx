@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { PageHead } from '@/components/brand/PageHead';
+import { StartFresh } from '@/components/admin/StartFresh';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { CountIn } from '@/components/fishing/record/CountIn';
 import { AdminTable, type Column } from '@/components/admin/AdminTable';
@@ -68,6 +69,8 @@ function Panels({ onRefused }: { onRefused: () => void }) {
          <WaterPanel />
          <PeoplePanel />
          <HealthPanel />
+         {/* Last on the page on purpose: the one thing here that destroys. */}
+         <StartFresh />
       </>
    );
 }
