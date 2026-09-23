@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import express from 'express';
 import type { Request, Response } from 'express';
 import { chatController } from './controllers/chat.controller';
@@ -38,6 +39,26 @@ import { auth } from './lib/auth';
 import { setAuthContext } from './lib/auth-context';
 import { mailStatus } from './lib/mailer';
 import { userService } from './services/user.service';
+
+/*
+ * Which commit is serving. The deploy writes build-id.txt beside the server,
+ * because railway up sends a folder rather than a repository and nothing on
+ * the far side would otherwise know. Read once at boot: a file that is not
+ * there is a local run, which says so with null.
+ */
+const BUILD_ID = (() => {
+   const fromEnv = process.env.RAILWAY_GIT_COMMIT_SHA?.trim();
+   if (fromEnv) return fromEnv.slice(0, 7);
+   try {
+      return (
+         readFileSync(new URL('./build-id.txt', import.meta.url), 'utf8')
+            .trim()
+            .slice(0, 7) || null
+      );
+   } catch {
+      return null;
+   }
+})();
 
 const router = express.Router();
 
@@ -132,7 +153,7 @@ router.get('/api/health', (_req: Request, res: Response) => {
        * without it the only way to tell a deploy landed was to guess from a
        * changed id, which says a build happened and not which one.
        */
-      commit: (process.env.RAILWAY_GIT_COMMIT_SHA ?? '').slice(0, 7) || null,
+      commit: BUILD_ID,
       mail: mailStatus,
       /*
        * Whether Claude can be reached at all, so a competition organiser

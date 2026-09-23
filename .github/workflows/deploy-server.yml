@@ -43,6 +43,12 @@ jobs:
          - name: Install the Railway CLI
            run: npm install -g @railway/cli
 
+         - name: Write the commit beside the server
+           # railway up uploads a folder, not a repository, so nothing on the
+           # other side knows which commit it is running. This file is how
+           # /api/health can say.
+           run: echo "${{ github.sha }}" > packages/server/build-id.txt
+
          - name: Deploy
            env:
               RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
